@@ -4,21 +4,31 @@
 
 ## 1. Statut
 
-**STATUT : voir la section 1 bis ci-dessous (mise à jour au déploiement).**
+**STATUT : NOT READY — non déployé.** Le produit fonctionne et est testé en local ; il n’est pas encore accessible en ligne.
 
 | Critère d’acceptation | État |
 |---|---|
-| Aucun défaut critique connu de sécurité ou de perte de données | Aucun connu à ce jour (27 tests SQL, 35 tests E2E × 2 moteurs) |
-| Tous les parcours obligatoires passent dans l’environnement **déployé** | Dépend du déploiement de la base, voir 1 bis |
+| Aucun défaut critique connu de sécurité ou de perte de données | Aucun connu (29 tests SQL, 35 + 23 tests E2E, parcours de production répété en local 12/12) |
+| Tous les parcours obligatoires passent dans l’environnement **déployé** | **Non vérifié** : la base de données en ligne n’existe pas |
 | Limites des intégrations externes explicites | Oui, section 6 |
 
-## 1 bis. Déploiement
+## 1 bis. Déploiement : état réel et blocage
 
-| Élément | Valeur |
+| Élément | État vérifié |
 |---|---|
-| URL de l’application | https://aramislab0.github.io/fii-la/ |
-| Code source | https://github.com/aramislab0/fii-la (public), branche `main` |
-| Base de données | Supabase, région Paris (`eu-west-3`) |
+| Code | https://github.com/aramislab0/fii-la, branche `main` |
+| Hébergement (GitHub Pages, gratuit) | Activé. Les déploiements échouent uniquement à l’étape « Écrire la configuration publique » : `SUPABASE_URL` et `SUPABASE_PUBLISHABLE_KEY` n’existent pas, faute de base. **L’hébergement n’est pas le blocage et ne demande aucun paiement.** |
+| Base de données (Supabase) | **Bloquée.** Création refusée par Supabase : « There are overdue invoices in the organization(s) AramisLab ». Le refus s’applique aussi à une organisation neuve (essai du 15/10, 01:35) |
+| Migrations | Prêtes : `20261015000000_fiila_init.sql`, `20261015100000_fiila_metrics.sql`. Appliquées sur aucune base en ligne |
+
+**Actions nécessaires (côté compte, non faisables par Claude)**
+1. **Régler la facture en retard** de l’organisation Supabase AramisLab : tableau de bord → Organization → Billing → Invoices. Montant visible seulement dans ce tableau de bord. Fii La lui-même ne coûte rien en plan gratuit.
+2. **Possible ensuite** : Supabase limite le plan gratuit à 2 projets actifs (les projets en pause ne comptent pas). Si la création échoue pour cette raison : mettre en pause un projet inutilisé (gratuit) ou passer l’organisation en Pro (25 $/mois, 1 projet inclus, projets supplémentaires à partir de 10 $/mois). Rien ne sera activé sans accord.
+3. **Lancer le déploiement** depuis le Mac (Supabase CLI et GitHub CLI y sont connectés) : `cd ~/Projects/fii-la && git pull && ./scripts/deploy.sh`, ou rouvrir l’application Claude sur le Mac pour que Claude le lance.
+
+**Ce que fait `scripts/deploy.sh`** : crée (ou réutilise) le projet `fii-la` à Paris, applique les migrations dans l’ordre, vérifie les droits d’accès (`scripts/verify-db.mjs` : schéma privé fermé, aucune table exposée, exactement 14 fonctions publiques), publie seulement l’URL et la clé publique dans les variables GitHub, déploie Pages, attend que le site serve le bon commit, puis lance en production le parcours complet (`tests/deployed.test.mjs`) en Chromium et WebKit et la suite complète en Chromium, avec lecture des compteurs agrégés. Le mot de passe de la base reste dans `~/Projects/fii-la-ops/.env.ops` (droits 600) : jamais affiché, jamais envoyé à GitHub, jamais dans le dépôt. Aucune clé privilégiée n’est utilisée.
+
+**Alternative sans paiement, non retenue par défaut** : installer Fii La dans un schéma séparé d’un projet Supabase existant. Elle demande un accord explicite et un projet encore actif ; or Supabase met en pause les projets d’une organisation qui a une facture en retard.
 
 ## 2. Périmètre livré
 

@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-15T10:19:05.889Z",
+  "ok": true,
+  "migrations": [
+    "20261015000000",
+    "20261015100000"
+  ],
+  "checks": [
+    {
+      "name": "migrations appliquées dans l’ordre",
+      "ok": true,
+      "detail": [
+        "20261015000000",
+        "20261015100000"
+      ]
+    },
+    {
+      "name": "tables présentes",
+      "ok": true,
+      "detail": [
+        "metrics",
+        "places",
+        "rate_events",
+        "requests",
+        "retired_tokens",
+        "settings"
+      ]
+    },
+    {
+      "name": "schéma fiila fermé à anon et authenticated",
+      "ok": true,
+      "detail": {
+        "anon": false,
+        "auth": false
+      }
+    },
+    {
+      "name": "aucun droit sur les tables fiila pour anon / authenticated / PUBLIC",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "fonctions exécutables par anon = exactement les 14 fonctions prévues",
+      "ok": true,
+      "detail": [
+        "fiila_create_place",
+        "fiila_create_request",
+        "fiila_delete_place",
+        "fiila_delete_request",
+        "fiila_fulfill_request",
+        "fiila_get_owned",
+        "fiila_get_public",
+        "fiila_get_request_owner",
+        "fiila_get_request_public",
+        "fiila_new_link",
+        "fiila_owned_summaries",
+        "fiila_revoke_place",
+        "fiila_track",
+        "fiila_update_place"
+      ]
+    },
+    {
+      "name": "fonctions publiques en security definer avec search_path vide",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "aucune table dans le schéma public exposé",
+      "ok": true,
+      "detail": []
+    }
+  ]
+}
