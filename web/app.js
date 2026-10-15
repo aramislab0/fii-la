@@ -137,15 +137,18 @@
   ApiError.prototype = Object.create(Error.prototype);
   function errText(e) { return (e && e.message) || ERRORS.server; }
 
+  function apiHeaders() {
+    var headers = { 'Content-Type': 'application/json', apikey: API_KEY, Accept: 'application/json' };
+    if (/^eyJ/.test(API_KEY)) headers.Authorization = 'Bearer ' + API_KEY;
+    return headers;
+  }
   function api(fn, args) {
     if (!API_URL) return Promise.reject(new ApiError('not_configured'));
     if (navigator.onLine === false) return Promise.reject(new ApiError('network'));
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 25000);
-    var headers = { 'Content-Type': 'application/json', apikey: API_KEY, Accept: 'application/json' };
-    if (/^eyJ/.test(API_KEY)) headers.Authorization = 'Bearer ' + API_KEY;
     return fetch(API_URL + '/rest/v1/rpc/' + fn, {
-      method: 'POST', headers: headers, body: JSON.stringify(args || {}),
+      method: 'POST', headers: apiHeaders(), body: JSON.stringify(args || {}),
       signal: ctrl ? ctrl.signal : undefined, cache: 'no-store', credentials: 'omit'
     }).then(function (res) {
       clearTimeout(timer);
@@ -177,13 +180,107 @@
     setKids(t, box); t.hidden = false;
     toastTimer = setTimeout(function () { t.hidden = true; }, 3200);
   }
-  function copy(text, label) {
-    var done = function () { toast((label || 'Texte') + ' copié.'); };
+  function copy(text, label, onDone) {
+    var done = function () { toast((label || 'Texte') + ' copié.'); if (onDone) onDone(); };
     var fail = function () { toast('Copie automatique impossible. Sélectionnez et copiez :', text); };
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fail);
       else fail();
     } catch (e) { fail(); }
+  }
+
+  /* ================================================================ mesure agrégée (sans identifiant)
+     Compteurs journaliers anonymes côté serveur : nom d'événement + variante, rien d'autre.
+     Jamais d'adresse, de coordonnées, de photo, de clé ni de jeton de lien.
+     Envoi silencieux : un échec n'a aucun effet sur l'affichage ou la création. */
+  var TRACKABLE = {
+    discovery_shown: ['address', 'meeting'],
+    discovery_cta: ['address', 'meeting'],
+    fiche_created: ['address_direct', 'address_discovery', 'address_request', 'meeting_direct', 'meeting_discovery'],
+    share_initiated: ['native', 'whatsapp'],
+    link_copied: ['address', 'meeting']
+  };
+  function privacyOptOut() {
+    try { return navigator.globalPrivacyControl === true || navigator.doNotTrack === '1' || window.doNotTrack === '1'; }
+    catch (e) { return false; }
+  }
+  function track(event, variant) {
+    try {
+      if (!API_URL || CFG.analytics === false || privacyOptOut()) return;
+      if (!TRACKABLE[event] || TRACKABLE[event].indexOf(variant) < 0) return;
+      fetch(API_URL + '/rest/v1/rpc/fiila_track', {
+        method: 'POST', headers: apiHeaders(), body: JSON.stringify({ p_event: event, p_variant: variant }),
+        keepalive: true, credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer'
+      }).catch(function () { /* ignoré */ });
+    } catch (e) { /* ignoré */ }
+  }
+  // Compte un affichage seulement quand le bloc est réellement visible à l'écran, une fois par page.
+  function trackWhenVisible(el, event, variant) {
+    var sent = false;
+    function send() { if (!sent) { sent = true; track(event, variant); } }
+    try {
+      if (!('IntersectionObserver' in window)) { setTimeout(send, 0); return; }
+      var io = new IntersectionObserver(function (entries) {
+        if (entries.some(function (en) { return en.isIntersecting; })) { send(); io.disconnect(); }
+      }, { threshold: 0.5 });
+      io.observe(el);
+    } catch (e) { /* ignoré */ }
+  }
+
+  /* ================================================================ installation (facultative) */
+  var deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredInstall = e;
+    window.dispatchEvent(new Event('fiila:installable'));
+  });
+  window.addEventListener('appinstalled', function () {
+    deferredInstall = null;
+    LS.set('fiila.install.done', true);
+    window.dispatchEvent(new Event('fiila:installable'));
+  });
+  function isStandalone() {
+    try { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+    catch (e) { return false; }
+  }
+  // iOS : aucune API d'installation ; seul Safari (et les navigateurs iOS récents) proposent « Sur l'écran d'accueil ».
+  function iosManualInstall() {
+    return /iPhone|iPad|iPod/.test(navigator.userAgent || '') && 'standalone' in navigator && navigator.standalone === false;
+  }
+  function installSlot() {
+    var slot = h('div', { id: 'install-slot' });
+    function draw() {
+      if (!slot.isConnected && slot.__drawn) { window.removeEventListener('fiila:installable', draw); return; }
+      slot.__drawn = true;
+      setKids(slot);
+      if (!LS.get('fiila.saved', false) || LS.get('fiila.install.dismissed', false) || LS.get('fiila.install.done', false) || isStandalone()) return;
+      var later = h('button', { class: 'btn link', type: 'button', id: 'install-later', onclick: function () { LS.set('fiila.install.dismissed', true); draw(); } }, 'Plus tard');
+      if (deferredInstall) {
+        add(slot, h('section', { class: 'install', 'aria-labelledby': 'install-title' },
+          h('p', null, h('strong', { id: 'install-title' }, 'Installer Fii La'), ' (facultatif) : retrouvez vos fiches depuis l’écran d’accueil. C’est le même site, rien à télécharger depuis un store.'),
+          h('div', { class: 'install-actions' },
+            h('button', { class: 'btn ghost small', type: 'button', id: 'install-btn', onclick: function () {
+              var ev = deferredInstall; deferredInstall = null;
+              if (!ev) { draw(); return; }
+              Promise.resolve().then(function () { return ev.prompt(); }).then(function () { return ev.userChoice; })
+                .then(function (c) { if (c && c.outcome === 'accepted') LS.set('fiila.install.done', true); draw(); }, function () { draw(); });
+            } }, 'Installer Fii La'),
+            later)));
+      } else if (iosManualInstall()) {
+        add(slot, h('section', { class: 'install', 'aria-labelledby': 'install-title' },
+          h('p', null, h('strong', { id: 'install-title' }, 'Ajouter Fii La à l’écran d’accueil'), ' (facultatif) : touchez le bouton Partager du navigateur, puis « Sur l’écran d’accueil ».'),
+          h('div', { class: 'install-actions' }, later)));
+      }
+    }
+    window.addEventListener('fiila:installable', draw);
+    draw();
+    return slot;
+  }
+  function tokenParam(v) { return v && /^[A-Za-z0-9_-]{16,64}$/.test(v) ? v : null; }
+  function qs(params) {
+    var parts = [];
+    for (var k in params) if (params[k]) parts.push(k + '=' + encodeURIComponent(params[k]));
+    return parts.length ? '?' + parts.join('&') : '';
   }
 
   /* ================================================================ chargement à la demande */
@@ -519,7 +616,7 @@
       else if (p[0] === 'demande' && p[1] === 'nouvelle') view = viewRequestNew();
       else if (p[0] === 'demande' && p[1]) view = viewRequestOwner(p[1]);
       else if (p[0] === 'd' && p[1]) view = viewRequestPublic(p[1], r.q);
-      else if (p[0] === 'rdv' && p[1] === 'nouveau') view = viewMeetingForm(null);
+      else if (p[0] === 'rdv' && p[1] === 'nouveau') view = viewMeetingForm(null, r.q);
       else if (p[0] === 'rdv' && p[1] === 'modifier' && p[2]) view = viewMeetingForm(p[2]);
       else if (p[0] === 'k' && p[1]) view = viewRestore(p[1]);
       else if (p[0] === 'cle') view = viewRestore(null);
@@ -615,7 +712,7 @@
       }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger la fiche', errText(e), retryBtn())); });
     }
     var draft = LS.get(DRAFT_KEY, null) || blankAddress();
-    return addressWizard(draft, { reqToken: reqToken });
+    return addressWizard(draft, { reqToken: reqToken, retour: tokenParam(q && q.retour) });
   }
   function retryBtn() { return h('button', { class: 'btn', type: 'button', onclick: render }, 'Réessayer'); }
 
@@ -691,12 +788,14 @@
       refresh();
       setKids(root, 
         step > 1 ? h('button', { class: 'back', type: 'button', onclick: function () { step--; draw(); } }, '← Étape précédente')
+          : ctx.retour ? backBtn('Revenir à la fiche reçue', '#/a/' + ctx.retour)
           : backBtn(ctx.reqToken ? 'Retour à la demande' : ctx.editId ? 'Retour à la fiche' : 'Accueil', ctx.reqToken ? '#/d/' + ctx.reqToken : ctx.editId ? '#/m/' + ctx.editId : '#/'),
         h('div', { class: 'stack tight' },
           h('p', { class: 'eyebrow' }, (ctx.editId ? 'Modifier · ' : '') + 'Étape ' + step + ' sur 4'),
           h('div', { class: 'steps', 'aria-hidden': 'true' }, [1, 2, 3, 4].map(function (i) { return h('i', { class: i <= step ? 'on' : '' }); }))),
         h('div', { class: 'stack' }, body), err, h('div', { class: 'stack' }, next, why),
-        !ctx.editId ? h('p', { class: 'hint' }, 'Votre brouillon reste sur ce téléphone jusqu’à l’enregistrement.') : null);
+        !ctx.editId ? h('p', { class: 'hint' }, 'Votre brouillon reste sur ce téléphone jusqu’à l’enregistrement.') : null,
+        ctx.retour && step > 1 ? h('a', { class: 'btn link', href: '#/a/' + ctx.retour, style: 'align-self:flex-start' }, 'Revenir à la fiche reçue (le brouillon est gardé)') : null);
     }
     function payload() {
       var p = {
@@ -720,10 +819,12 @@
       return api('fiila_create_place', { p: payload() }).then(function (r) {
         var stored = owned.put({ type: 'place', kind: 'address', id: r.id, owner: r.owner_token, label: d.label.trim(), created: Date.now() });
         LS.del(DRAFT_KEY);
+        LS.set('fiila.saved', true);
+        track('fiche_created', ctx.reqToken ? 'address_request' : ctx.retour ? 'address_discovery' : 'address_direct');
         if (!stored) toast('Fiche enregistrée, mais ce téléphone n’a pas pu garder la clé de gestion. Copiez-la sur la page suivante.');
         else toast('Adresse enregistrée.');
         if (ctx.reqToken) go('#/d/' + ctx.reqToken + '?sel=' + r.id);
-        else go('#/m/' + r.id + (stored ? '' : '?k=' + encodeURIComponent(r.owner_token)));
+        else go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour }));
       });
     }
     draw();
@@ -737,7 +838,7 @@
     var owner = rec ? rec.owner : q.k;
     if (!owner) return page(backBtn(), stateCard('?', 'Cette fiche n’est pas gérée sur ce téléphone', 'Ouvrez sa clé de gestion sur ce téléphone pour la gérer ici.', h('a', { class: 'btn', href: '#/cle' }, 'Restaurer une clé')));
     return api('fiila_get_owned', { p_id: id, p_owner: owner }).then(function (pl) {
-      return manageView(pl, owner);
+      return manageView(pl, owner, tokenParam(q.retour));
     }, function (e) {
       if (e.code === 'not_found') {
         return page(backBtn(), stateCard('?', 'Fiche introuvable', 'Elle a peut-être été supprimée.',
@@ -747,7 +848,7 @@
     });
   }
 
-  function manageView(pl, owner) {
+  function manageView(pl, owner, retour) {
     var isMeeting = pl.kind === 'meeting';
     var expired = isMeeting && new Date(pl.expires_at) <= new Date();
     var active = pl.status === 'active' && !expired;
@@ -783,8 +884,9 @@
     }
     var key = keyUrl('place', pl.id, owner);
 
+    var variant = isMeeting ? 'meeting' : 'address';
     return page(
-      backBtn(),
+      retour ? backBtn('Revenir à la fiche reçue', '#/a/' + retour) : backBtn(),
       h('div', { class: 'stack tight' },
         h('p', { class: 'eyebrow' }, isMeeting ? 'Mon rendez-vous' : 'Mon adresse'),
         h('h1', { class: 'wrapword' }, pl.label),
@@ -797,16 +899,18 @@
         h('h2', { id: 'h-share' }, 'Partager'),
         h('p', { class: 'sharelink', id: 'share-url' }, url),
         navigator.share ? h('button', { class: 'btn', type: 'button', onclick: function () {
+          track('share_initiated', 'native');
           navigator.share({ title: pl.label, text: msg.replace(url, '').trim(), url: url }).catch(function (e) {
             if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier le lien ».');
           });
         } }, 'Partager…') : null,
-        h('a', { class: 'btn lime', href: waLink(msg), target: '_blank', rel: 'noopener noreferrer' }, 'Préparer un message WhatsApp'),
-        h('button', { class: 'btn ghost', type: 'button', id: 'copy-link', onclick: function () { copy(url, 'Lien'); } }, 'Copier le lien'),
+        h('a', { class: 'btn lime', href: waLink(msg), target: '_blank', rel: 'noopener noreferrer', onclick: function () { track('share_initiated', 'whatsapp'); } }, 'Préparer un message WhatsApp'),
+        h('button', { class: 'btn ghost', type: 'button', id: 'copy-link', onclick: function () { copy(url, 'Lien', function () { track('link_copied', variant); }); } }, 'Copier le lien'),
         h('p', { class: 'hint' }, 'WhatsApp s’ouvre avec le message prêt : c’est vous qui l’envoyez. Toute personne qui reçoit le lien peut le transférer.'),
         h('div', { class: 'sep' }),
         h('p', { class: 'small' }, h('strong', null, 'QR code'), ' : à afficher ou imprimer près de l’entrée ou sur une commande.'),
         qrBox) : null,
+      installSlot(),
       expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
       h('div', { class: 'row' },
         active ? h('a', { class: 'btn ghost', href: url, target: '_blank', rel: 'noopener' }, 'Voir la fiche publique') : null,
@@ -835,7 +939,8 @@
       var cta = h('div', { class: 'row', style: 'justify-content:center' }, h('div', { style: 'flex:0 1 auto' }, create));
       if (r.state === 'ok') {
         document.title = 'Fii La';
-        return page(fiche(r.place), cta, h('p', { class: 'hint', style: 'text-align:center' }, 'Fiche partagée avec Fii La. Fii La ne demande pas votre position pour l’afficher.'));
+        return page(fiche(r.place), discoveryBlock(r.place.kind, token),
+          h('p', { class: 'hint', style: 'text-align:center' }, 'Fiche partagée avec Fii La. Fii La ne demande pas votre position pour l’afficher.'));
       }
       var map = {
         revoked: ['⦸', 'Ce lien a été désactivé', 'La personne qui l’a partagé l’a désactivé. Aucune information n’est affichée.'],
@@ -848,6 +953,23 @@
     }, function (e) {
       return page(stateCard('!', 'Impossible d’afficher la fiche', errText(e), retryBtn()), create);
     });
+  }
+
+  // Bloc de découverte, placé après les informations d'arrivée. Il ouvre le parcours de création
+  // existant, vierge : rien de la fiche reçue n'est transmis, sauf le lien de retour (qui reste sur l'appareil).
+  function discoveryBlock(kind, token) {
+    var isMeeting = kind === 'meeting';
+    var variant = isMeeting ? 'meeting' : 'address';
+    var block = h('section', { class: 'discover', id: 'discover', 'aria-labelledby': 'discover-title' },
+      h('h2', { id: 'discover-title' }, isMeeting ? 'Tu organises aussi un rassemblement ?' : 'Et si on te trouvait aussi facilement ?'),
+      h('p', null, isMeeting
+        ? 'Partage le lieu, l’heure et les indications dans une seule fiche.'
+        : 'Crée ton adresse avec ta photo d’entrée et tes repères. Partage-la à tes visiteurs et livreurs.'),
+      h('a', { class: 'btn ghost discover-cta', id: 'discover-cta', href: (isMeeting ? '#/rdv/nouveau' : '#/new') + qs({ retour: token }),
+        onclick: function () { track('discovery_cta', variant); } }, isMeeting ? 'Créer mon rendez-vous' : 'Créer mon Fii La'),
+      h('p', { class: 'hint' }, 'Gratuit, sans compte et sans application à installer. Ta fiche se gère depuis ce téléphone.'));
+    trackWhenVisible(block, 'discovery_shown', variant);
+    return block;
   }
 
   /* ================================================================ DEMANDE D'ADRESSE */
@@ -999,7 +1121,7 @@
     var d = new Date(iso);
     return { date: d.toISOString().slice(0, 10), time: d.toISOString().slice(11, 16) }; // Dakar = UTC+0 toute l'année
   }
-  function viewMeetingForm(editId) {
+  function viewMeetingForm(editId, q) {
     if (editId) {
       var rec = owned.find('place', editId);
       if (!rec) return page(backBtn(), stateCard('?', 'Rendez-vous introuvable sur ce téléphone', ''));
@@ -1015,7 +1137,7 @@
       }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger le rendez-vous', errText(e), retryBtn())); });
     }
     var today = new Date(Date.now() + 3600e3).toISOString();
-    return meetingForm({ label: '', date: today.slice(0, 10), time: '19:00', entry: null, hasStop: false, stop: null, walk: '', instruction: '', photo: null, exp: '24' }, {});
+    return meetingForm({ label: '', date: today.slice(0, 10), time: '19:00', entry: null, hasStop: false, stop: null, walk: '', instruction: '', photo: null, exp: '24' }, { retour: tokenParam(q && q.retour) });
   }
   function meetingForm(f, ctx) {
     var err = h('div', { role: 'alert' });
@@ -1053,8 +1175,10 @@
       call.then(function (r) {
         if (ctx.editId) { owned.patch('place', ctx.editId, { label: p.label }); toast('Rendez-vous mis à jour. Le lien reste le même.'); go('#/m/' + ctx.editId); return; }
         var stored = owned.put({ type: 'place', kind: 'meeting', id: r.id, owner: r.owner_token, label: p.label, created: Date.now() });
+        LS.set('fiila.saved', true);
+        track('fiche_created', ctx.retour ? 'meeting_discovery' : 'meeting_direct');
         toast('Rendez-vous enregistré.');
-        go('#/m/' + r.id + (stored ? '' : '?k=' + encodeURIComponent(r.owner_token)));
+        go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour }));
       }, function (e) {
         btn.textContent = 'Réessayer'; chk();
         setKids(err, h('p', { class: 'alert' }, errText(e)));
@@ -1068,7 +1192,8 @@
         textField({ id: 'm-walk', label: 'Du point d’arrêt jusqu’au lieu', multiline: true, max: 200, value: f.walk, onInput: function (v) { f.walk = v; } })]);
     }
     drawStop(); chk();
-    return page(backBtn(ctx.editId ? 'Retour au rendez-vous' : 'Accueil', ctx.editId ? '#/m/' + ctx.editId : '#/'),
+    return page(ctx.retour ? backBtn('Revenir à la fiche reçue', '#/a/' + ctx.retour)
+      : backBtn(ctx.editId ? 'Retour au rendez-vous' : 'Accueil', ctx.editId ? '#/m/' + ctx.editId : '#/'),
       h('h1', null, ctx.editId ? 'Modifier le rendez-vous' : 'Créer un rendez-vous'),
       h('p', { class: 'muted' }, 'Une fiche de lieu temporaire pour un rendez-vous ou un événement. Elle cesse d’afficher le lieu à la date choisie.'),
       textField({ id: 'm-label', label: 'Nom du rendez-vous', max: 60, value: f.label, placeholder: 'Ex. : Baptême chez Awa', onInput: function (v) { f.label = v; chk(); } }),
@@ -1145,7 +1270,7 @@
           h('li', null, 'Pas de compte, pas de numéro de téléphone, pas de contacts, pas de pièce d’identité.'),
           h('li', null, 'Pas de suivi de position : votre position n’est lue qu’au moment où vous appuyez sur « Utiliser ma position ».'),
           h('li', null, 'Les données de localisation contenues dans les photos sont retirées avant l’envoi, et le serveur refuse les photos qui en contiennent encore.'),
-          h('li', null, 'Pas d’outil de statistiques ni de publicité.')),
+          h('li', null, 'Pas de publicité ni d’outil de suivi. Fii La compte seulement, par jour et sans aucun identifiant, quelques actions (par exemple « une fiche a été créée » ou « un lien a été copié »), pour savoir si le service est utile. Si votre navigateur envoie le signal « ne pas suivre », rien n’est compté.')),
         h('h2', null, 'Qui peut voir une fiche'),
         h('p', null, 'Toute personne qui a le lien peut voir la fiche et le transférer. Les fiches ne sont jamais listées publiquement. Une réponse à une demande n’est visible que par le demandeur.'),
         h('h2', null, 'Désactiver et supprimer'),
@@ -1162,6 +1287,15 @@
   window.addEventListener('online', netState);
   window.addEventListener('offline', netState);
   netState();
+
+  // Service worker : coquille de l'application disponible hors ligne, condition d'installation.
+  // Il ne met jamais en cache les appels à l'API ni le contenu des fiches.
+  try {
+    if ('serviceWorker' in navigator && CFG.serviceWorker !== false &&
+        (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
+      window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { /* facultatif */ }); });
+    }
+  } catch (e) { /* facultatif */ }
 
   render();
 })();

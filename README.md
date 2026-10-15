@@ -12,6 +12,7 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 - **Fiche destinataire** : photo, repère, « Arrêt voiture » puis « Entrée », itinéraire Google Maps, coordonnées copiables.
 - **Demander une adresse** : un commerçant ou un livreur envoie une demande, le client répond avec sa fiche, seul le demandeur voit la réponse.
 - **Rendez-vous** : fiche de lieu temporaire qui cesse d’afficher le lieu à la date choisie.
+- **Découverte** : après la fiche reçue, un bloc discret propose de créer sa propre adresse ou son rendez-vous, avec retour vers la fiche.
 - **Gestion** : modifier (même lien), désactiver, nouveau lien, supprimer, clé de gestion pour un autre téléphone.
 
 ## Architecture
@@ -28,13 +29,14 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 - Deux jetons par fiche : un **jeton de partage** (128 bits, dans le lien) et un **jeton propriétaire** (256 bits, gardé sur le téléphone, stocké haché côté serveur). Le lien de partage ne donne jamais de droit de gestion.
 - Les réponses aux demandes d’adresse ne sont lisibles qu’avec le jeton du demandeur.
 - Photos réduites et réencodées dans le navigateur (métadonnées GPS retirées) ; le serveur refuse tout fichier qui n’est pas une image ou qui contient encore un bloc EXIF.
-- Limite de créations par adresse IP (empreinte salée, effacée après 24 h). Pas d’outil de statistiques.
+- Limite de créations par adresse IP (empreinte salée, effacée après 24 h). Mesure agrégée anonyme (compteurs journaliers sans identifiant, signal « ne pas suivre » respecté), voir `docs/LIVRAISON.md` section 11.
 
 ## Développer et tester en local
 ```bash
 npm install
-npm run test:sql      # 27 tests de l'API SQL sur un vrai Postgres (PGlite)
+npm run test:sql      # 29 tests de l'API SQL sur un vrai Postgres (PGlite)
 npm run test:e2e      # parcours complets dans Chromium, format iPhone 13
+npm run test:discovery # découverte destinataire → créateur, installation, mesure
 npm run dev           # http://127.0.0.1:8787
 ```
 Les tests E2E utilisent uniquement des données synthétiques et suppriment ce qu’ils créent.

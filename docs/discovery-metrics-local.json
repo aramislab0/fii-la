@@ -1,0 +1,27 @@
+[
+  {
+    "event": "discovery_cta",
+    "variant": "address",
+    "n": 2
+  },
+  {
+    "event": "discovery_shown",
+    "variant": "address",
+    "n": 2
+  },
+  {
+    "event": "fiche_created",
+    "variant": "address_discovery",
+    "n": 1
+  },
+  {
+    "event": "link_copied",
+    "variant": "address",
+    "n": 1
+  },
+  {
+    "event": "share_initiated",
+    "variant": "whatsapp",
+    "n": 1
+  }
+]

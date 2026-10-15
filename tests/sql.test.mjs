@@ -252,6 +252,25 @@ await t('fonctions internes et inconnues inaccessibles', async () => {
   assert.equal(r.status, 400);
 });
 
+// ----- mesure agrégée
+await t('mesure : liste blanche d’événements, compteur agrégé sans identifiant', async () => {
+  await ok('fiila_track', { p_event: 'discovery_shown', p_variant: 'address' });
+  await ok('fiila_track', { p_event: 'discovery_shown', p_variant: 'address' });
+  await ok('fiila_track', { p_event: 'fiche_created', p_variant: 'meeting_discovery' });
+  await ko('fiila_track', { p_event: 'discovery_shown', p_variant: A.share_token }, 'invalid_event');
+  await ko('fiila_track', { p_event: 'page_view', p_variant: 'address' }, 'invalid_event');
+  await ko('fiila_track', { p_event: 'link_copied', p_variant: '14.75,-17.47' }, 'invalid_event');
+  const r = await db.query(`select event, variant, n::int from fiila.metrics order by event, variant`);
+  const shown = r.rows.find((x) => x.event === 'discovery_shown' && x.variant === 'address');
+  assert.equal(shown.n, 2);
+  const cols = await db.query(`select column_name from information_schema.columns where table_schema='fiila' and table_name='metrics' order by ordinal_position`);
+  assert.deepEqual(cols.rows.map((c) => c.column_name), ['day', 'event', 'variant', 'n']);
+});
+
+await t('mesure : le rôle anon ne peut pas lire les compteurs', async () => {
+  await assert.rejects(db.transaction(async (tx) => { await tx.exec('set local role anon'); await tx.query('select * from fiila.metrics'); }));
+});
+
 for (const r of results) console.log(r.join(' | '));
 console.log(`\n${passed}/${results.length} tests SQL réussis`);
 process.exit(passed === results.length ? 0 : 1);

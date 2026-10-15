@@ -150,3 +150,16 @@ footer.foot a,footer.foot button{color:var(--muted);font-size:13px}
   button,.btn,.item{transition:background-color .15s ease,border-color .15s ease,transform .08s ease}
   button:active,.btn:active,.item:active{transform:scale(.985)}
 }
+
+/* Découverte : bloc secondaire, après les informations d'arrivée. Fond doux, aucun relief,
+   bouton contour : il ne concurrence jamais les boutons d'itinéraire (pleins). */
+.discover{background:var(--soft);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.discover h2{font-size:18px;font-weight:800;letter-spacing:-.01em;overflow-wrap:anywhere}
+.discover p{overflow-wrap:anywhere}
+.discover .discover-cta{background:var(--surface);align-self:stretch}
+.discover .hint{font-size:12.5px}
+
+/* Installation facultative : une ligne discrète, jamais bloquante. */
+.install{border:1px dashed var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.install-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.install-actions .btn.small{flex:0 0 auto}

@@ -1,0 +1,119 @@
+{
+  "moteur": "chromium",
+  "version": "141.0.7390.37",
+  "date": "2026-10-15T10:11:21.366Z",
+  "reussis": 23,
+  "total": 23,
+  "contrastes_bloc_decouverte": {
+    "light": {
+      "title": 14.22,
+      "body": 14.22,
+      "hint": 5.58,
+      "cta": 16.68
+    },
+    "dark": {
+      "title": 13.02,
+      "body": 13.02,
+      "hint": 6.41,
+      "cta": 14.38
+    }
+  },
+  "installabilite": {
+    "manifestErrors": [],
+    "installabilityErrors": []
+  },
+  "results": [
+    {
+      "ok": true,
+      "name": "destinataire anonyme : fiche, photo et itinéraire visibles sans compte ni invite"
+    },
+    {
+      "ok": true,
+      "name": "bloc découverte : après les informations d’arrivée, secondaire, sans recouvrement"
+    },
+    {
+      "ok": true,
+      "name": "mesure : affichage compté quand le bloc est visible, sans aucune donnée de fiche"
+    },
+    {
+      "ok": true,
+      "name": "clavier : le bouton de découverte est atteignable et le focus est visible"
+    },
+    {
+      "ok": true,
+      "name": "CTA adresse : ouvre la création existante, vierge (aucune donnée de l’expéditeur)"
+    },
+    {
+      "ok": true,
+      "name": "retour à la fiche reçue depuis la création"
+    },
+    {
+      "ok": true,
+      "name": "création complète : aucune donnée de l’expéditeur dans la nouvelle fiche"
+    },
+    {
+      "ok": true,
+      "name": "après création : retour à la fiche reçue toujours possible"
+    },
+    {
+      "ok": true,
+      "name": "environnement sans installation possible : aucune proposition, rien de bloqué"
+    },
+    {
+      "ok": true,
+      "name": "mesure : partage WhatsApp ouvert et lien copié, distingués, sans contenu"
+    },
+    {
+      "ok": true,
+      "name": "CTA rendez-vous : texte adapté, ouvre la création de rendez-vous, vierge"
+    },
+    {
+      "ok": true,
+      "name": "rendez-vous créé depuis la découverte : mesuré, sans donnée de l’expéditeur, retour possible"
+    },
+    {
+      "ok": true,
+      "name": "thème sombre : bloc lisible (contrastes AA) et vrai fond sombre"
+    },
+    {
+      "ok": true,
+      "name": "texte long et petit écran (320 px) : aucun débordement horizontal"
+    },
+    {
+      "ok": true,
+      "name": "ordinateur (1 280 px), Light et Dark : bloc sous la fiche"
+    },
+    {
+      "ok": true,
+      "name": "mesure en panne (requêtes rejetées ou sans réponse) : affichage et création intacts"
+    },
+    {
+      "ok": true,
+      "name": "signal « ne pas suivre » (GPC) : aucune mesure envoyée"
+    },
+    {
+      "ok": true,
+      "name": "installation : jamais avant une première fiche enregistrée, même si le navigateur la permet"
+    },
+    {
+      "ok": true,
+      "name": "installation (navigateur compatible) : proposée après la 1re fiche, lance l’invite native puis disparaît"
+    },
+    {
+      "ok": true,
+      "name": "installation refusée (« Plus tard ») : masquée durablement, l’application reste utilisable"
+    },
+    {
+      "ok": true,
+      "name": "iPhone (Safari) : consigne « Sur l’écran d’accueil », sans faux lien de store"
+    },
+    {
+      "ok": true,
+      "name": "déjà installée (mode application) : aucune proposition"
+    },
+    {
+      "ok": true,
+      "name": "installabilité réelle (Chromium, service worker actif) : manifeste valide, aucune erreur"
+    }
+  ]
+}

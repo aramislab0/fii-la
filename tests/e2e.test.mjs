@@ -38,7 +38,7 @@ const phone = devices['iPhone 13'];
 async function newPhone(opts = {}) {
   const ctx = await browser.newContext({
     viewport: phone.viewport, deviceScaleFactor: 2, isMobile: ENGINE !== 'webkit' ? true : phone.isMobile, hasTouch: true,
-    userAgent: phone.userAgent, locale: 'fr-FR', timezoneId: 'Africa/Dakar',
+    userAgent: phone.userAgent, locale: 'fr-FR', timezoneId: 'Africa/Dakar', serviceWorkers: 'block',
     geolocation: opts.geo === false ? undefined : { ...ENTRY, accuracy: opts.accuracy ?? 9 },
     permissions: opts.geo === false ? [] : ['geolocation'],
     ...(opts.ctx || {}),

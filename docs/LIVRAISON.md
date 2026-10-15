@@ -61,10 +61,11 @@
 
 | Suite | Commande | Résultat | Conditions |
 |---|---|---|---|
-| API SQL | `npm run test:sql` | **27/27** | Postgres 17 via PGlite 0.3.16, migration réelle, rôle `anon` |
+| API SQL | `npm run test:sql` | **29/29** | Postgres 17 via PGlite 0.3.16, migration réelle, rôle `anon` |
 | E2E local | `npm run test:e2e` | **35/35** | Chromium 141.0.7390.37 (Playwright 1.56), émulation iPhone 13, 390 px, deux contextes isolés |
 | E2E local | `ENGINE=webkit npm run test:e2e` | **35/35** | WebKit 26.0 (Playwright 1.56) sur le Mac du fondateur, émulation iPhone 13 |
 | E2E déployé | `npm run test:e2e:deploye` | voir 1 bis | même suite, contre l’URL publique |
+| Découverte | `npm run test:discovery` | **23/23** | Chromium 141.0.7390.37, iPhone 13 émulé, Light et Dark, 320 / 390 / 1 280 px ; voir section 11 |
 
 Ce que couvrent les 35 parcours : création complète, géolocalisation réussie / refusée / trop lente / imprécise, correction manuelle sur la carte, arrêt voiture distinct, photo (refus d’un fichier non image, retrait des métadonnées vérifié octet par octet), échec réseau à l’enregistrement avec reprise, absence de clé dans le lien, QR décodé égal au lien, copie et repli quand le presse-papiers est refusé, ouverture sur un second téléphone isolé, aucune demande de position côté destinataire, script injecté non exécuté, texte long sans débordement, itinéraires et coordonnées égaux aux points enregistrés, tentative de modification sans clé refusée, modification sur le même lien, restauration de la clé, demande (création, réponse, invisibilité pour un tiers, récupération privée), rendez-vous (création, mise à jour, expiration côté serveur), désactivation, nouveau lien, suppression, liens invalides, hors connexion, absence d’erreur JavaScript, poids de la page sur réseau lent.
 
@@ -97,7 +98,7 @@ Ce que couvrent les 35 parcours : création complète, géolocalisation réussie
 - La base est hébergée à Paris : **une demande d’autorisation à la CDP est à prévoir avant d’ouvrir le service à de vrais utilisateurs**. Le responsable de traitement (Aramis Lab ou la structure de l’ami) doit être désigné.
 - **Tant que cette formalité n’est pas faite, le pilote doit rester restreint** : données synthétiques, ou test terrain encadré avec le consentement écrit des participants (voir `FICHE-TEST-TERRAIN.md`). Ce point est à faire valider par un juriste ; ce dossier n’est pas un avis juridique.
 
-**Mesures déjà en place** : minimisation (pas de compte, pas de téléphone, pas de contacts, pas de pièce d’identité), position lue seulement sur action, métadonnées des photos retirées, aucun outil de statistiques, suppression réelle, page « Données et confidentialité » dans l’application.
+**Mesures déjà en place** : minimisation (pas de compte, pas de téléphone, pas de contacts, pas de pièce d’identité), position lue seulement sur action, métadonnées des photos retirées, aucun outil de suivi (seulement des compteurs journaliers anonymes, section 11), suppression réelle, page « Données et confidentialité » dans l’application.
 
 **Sauvegardes** : sur le plan gratuit Supabase, aucune sauvegarde automatique n’est incluse ; une suppression est donc définitive. Sur un plan payant, les sauvegardes quotidiennes conservent une copie quelques jours.
 
@@ -136,3 +137,63 @@ Ordre de grandeur : une fiche avec photo pèse environ 150 à 300 Ko, soit envir
 - **Clé perdue et téléphone perdu** : la fiche ne peut plus être modifiée par son propriétaire. Elle peut être supprimée par l’administrateur de la base sur demande, après vérification hors application.
 - **Désactiver** : la fiche n’affiche plus rien ; **Créer un nouveau lien** la remet en ligne avec un lien différent.
 - **Supprimer** : la fiche et sa photo sont effacées. Les captures d’écran ou messages déjà envoyés ne peuvent pas être rappelés.
+
+## 11. Découverte : du destinataire au créateur (ajout du 15/10/2026)
+
+**Ce qui change pour le destinataire.** Rien avant l’essentiel : la fiche (photo, repère, arrêt voiture, entrée, itinéraire) s’affiche comme avant, sans compte, sans invite d’installation, sans fenêtre surgissante ni demande de notification. Juste après les informations d’arrivée vient un bloc discret (fond doux, bouton contour, jamais flottant) :
+
+| Fiche reçue | Titre | Texte | Bouton → parcours ouvert |
+|---|---|---|---|
+| Adresse | Et si on te trouvait aussi facilement ? | Crée ton adresse avec ta photo d’entrée et tes repères. Partage-la à tes visiteurs et livreurs. | « Créer mon Fii La » → création d’adresse existante |
+| Rendez-vous | Tu organises aussi un rassemblement ? | Partage le lieu, l’heure et les indications dans une seule fiche. | « Créer mon rendez-vous » → création de rendez-vous existante |
+
+Sous le bouton, une ligne factuelle : « Gratuit, sans compte et sans application à installer. Ta fiche se gère depuis ce téléphone. » C’est exact aujourd’hui : aucune étape payante ni compte n’existe dans le produit.
+
+**Création.** Le formulaire s’ouvre vierge : aucune donnée de la fiche reçue (nom, repère, quartier, coordonnées, photo, lien) n’est copiée ; la carte part de la vue par défaut de Dakar. Le seul lien conservé est le chemin de retour, dans l’adresse de la page sur le téléphone (`?retour=…`), jamais envoyé au serveur. « ← Revenir à la fiche reçue » est présent pendant la création (le brouillon d’adresse est gardé) et sur la page de gestion après l’enregistrement. Aucun écran supplémentaire.
+
+**Installation.** Proposée seulement après la première fiche enregistrée, sur la page de gestion, en une ligne facultative :
+- Chrome, Edge, Samsung Internet (Android, ordinateur) : bouton « Installer Fii La » qui ouvre l’invite native du navigateur, seulement si le navigateur a signalé que l’installation est possible ;
+- iPhone/iPad : consigne « bouton Partager, puis Sur l’écran d’accueil » (iOS n’a pas d’invite automatique) ;
+- ailleurs (Firefox, navigateur intégré de WhatsApp, appli déjà installée) : rien n’est affiché.
+« Plus tard » la masque durablement sur ce téléphone, sans rien bloquer. Aucun lien de store, aucune mention d’application native. Ajouts techniques : `manifest.webmanifest`, icônes, et un service worker qui garde seulement la coquille de l’application (HTML, CSS, JS, polices) ; il ne met jamais en cache les appels à l’API ni le contenu des fiches.
+
+**Mesure.** Compteurs agrégés par jour, sans aucun identifiant :
+
+| Événement | Variantes | Ce que cela signifie exactement |
+|---|---|---|
+| `discovery_shown` | address, meeting | Le bloc a été visible à au moins 50 % à l’écran, une fois par affichage de page |
+| `discovery_cta` | address, meeting | Le bouton du bloc a été touché |
+| `fiche_created` | address_direct, address_discovery, address_request, meeting_direct, meeting_discovery | Une fiche a été enregistrée par le serveur (succès confirmé) ; *_discovery quand la création part du bloc |
+| `share_initiated` | native, whatsapp | Le partage natif ou WhatsApp a été ouvert. **Ce n’est pas un message envoyé** : Fii La ne peut pas le savoir |
+| `link_copied` | address, meeting | La copie du lien dans le presse-papiers a réussi |
+
+- Stocké : `jour, événement, variante, nombre`. Rien d’autre : ni jeton, ni clé, ni identifiant de fiche, ni adresse, ni coordonnées, ni photo, ni cookie, ni stockage sur le téléphone. Le serveur refuse toute valeur hors de la liste blanche.
+- Anti-abus : 300 envois par heure et par connexion, avec la même empreinte salée de l’IP que les créations, effacée après 24 h.
+- Les signaux « Global Privacy Control » et « Do Not Track » du navigateur sont respectés : aucun envoi.
+- L’envoi est silencieux et n’est jamais attendu : une panne ou un blocage n’affecte ni l’affichage ni la création (testé : requêtes rejetées et requêtes sans réponse).
+- Lecture : uniquement dans l’éditeur SQL Supabase, `select day, event, variant, n from fiila.metrics order by day desc;`. Pas d’accès par l’API publique.
+- Consentement : ces compteurs ne contiennent aucune donnée personnelle et ne déposent rien sur le téléphone ; aucune bannière n’est donc ajoutée. L’empreinte d’IP temporaire relève du traitement déjà décrit en section 7 et doit figurer dans la demande à la CDP. À confirmer par un juriste.
+- Déploiement : appliquer la migration `supabase/migrations/20261015100000_fiila_metrics.sql` (`supabase db push`). Sans elle, la mesure échoue sans bruit et le reste fonctionne.
+
+**Lecture du tunnel.** Taux de clic = `discovery_cta / discovery_shown` ; conversion = `fiche_created (*_discovery) / discovery_cta` ; partage = `share_initiated + link_copied`. Ce sont des ordres de grandeur : sans identifiant, une même personne qui revient sur une fiche est recomptée, et un parcours ne peut pas être suivi d’un bout à l’autre.
+
+**Vérifications (23 tests, `tests/discovery.test.mjs`)**
+- Destinataire anonyme : fiche, photo et itinéraire visibles ; aucun stockage local, aucune demande de position, aucune boîte de dialogue, aucune invite de compte, de store ou d’installation.
+- Bloc placé après la fiche, sans recouvrement ni position flottante ; bouton moins appuyé que l’itinéraire.
+- Contrastes mesurés du bloc (AA exigé, 4,5:1) : Light titre 14,2, texte 14,2, mention 5,6, bouton 16,7 ; Dark titre 13,0, texte 13,0, mention 6,4, bouton 14,4.
+- Clavier : bouton atteignable à la tabulation, focus visible.
+- Les deux boutons ouvrent le bon parcours ; formulaires vierges ; données envoyées à la création vérifiées octet par octet sans aucune donnée de l’expéditeur ; fiche créée relue côté serveur.
+- Retour vers la fiche reçue : depuis la création (étape 1 et suivantes) et après l’enregistrement.
+- Texte long à 320 et 390 px : aucun débordement. Ordinateur 1 280 px en Light et Dark.
+- Mesure : bons événements, uniquement `p_event` et `p_variant`, aucune donnée sensible ; compteurs vérifiés en base ; GPC respecté ; panne de la mesure sans effet.
+- Installation : absente avant la 1re fiche ; bouton puis invite native (simulée) ; « Plus tard » persistant ; consigne iPhone ; rien en mode application ; rien quand le navigateur ne la permet pas. Installabilité réelle vérifiée par Chromium lui-même (manifeste sans erreur, aucune erreur d’installabilité) ; le cache du service worker ne contient aucun appel à l’API.
+- Non-régression : les 35 parcours existants passent toujours.
+
+Captures : `docs/screenshots/discovery-*.png` (fiche adresse et rendez-vous en Light et Dark, focus clavier, création ouverte depuis le bloc, gestion après création, texte long à 320 px, ordinateur Light/Dark, installation Chromium et iPhone).
+
+**Limites restantes**
+- Rien de tout cela n’est encore en ligne : la base Supabase n’est pas créée (facture en attente). Tests faits en local uniquement.
+- WebKit (Safari) n’a pas été relancé pour ce changement : le Mac n’était pas joignable. La passe WebKit précédente (35/35) ne couvre pas ce code.
+- L’invite d’installation Chromium est simulée dans les tests (un navigateur sans interface ne la déclenche pas) ; l’installabilité, elle, est vérifiée réellement. La consigne iPhone est vérifiée en émulation, pas sur un iPhone.
+- Si le destinataire avait lui-même un brouillon d’adresse non terminé sur ce téléphone, la création le reprend : ce sont ses propres données, jamais celles de l’expéditeur.
+- Les compteurs peuvent être gonflés volontairement dans la limite anti-abus ; ils servent à décider, pas à facturer.
