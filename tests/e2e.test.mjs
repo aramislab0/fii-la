@@ -6,7 +6,9 @@ import assert from 'node:assert/strict';
 import { startServer } from './dev-server.mjs';
 
 const require = createRequire(import.meta.url);
-const { chromium, webkit, devices } = require('/opt/npm-tools/node_modules/playwright');
+let pw;
+try { pw = require('playwright'); } catch { pw = require('/opt/npm-tools/node_modules/playwright'); }
+const { chromium, webkit, devices } = pw;
 const jsQR = require('jsqr');
 const { PNG } = require('pngjs');
 
@@ -22,6 +24,7 @@ const browser = await engine.launch();
 const version = browser.version();
 
 const results = [];
+const CREATED = []; // tout ce que les tests créent, supprimé à la fin
 let failed = 0;
 async function t(name, fn) {
   const t0 = Date.now();
@@ -56,7 +59,12 @@ async function newPhone(opts = {}) {
   });
   if (!BASE) await ctx.route('https://tile.openstreetmap.org/**', (r) => r.abort());
   const page = await ctx.newPage();
-  page.setDefaultTimeout(12000);
+  page.setDefaultTimeout(BASE ? 20000 : 12000);
+  page.on('response', async (res) => {
+    const m = res.url().match(/rpc\/(fiila_create_place|fiila_create_request)$/);
+    if (!m || res.status() !== 200) return;
+    try { const b = await res.json(); CREATED.push({ fn: m[1], id: b.id, owner: b.owner_token }); } catch {}
+  });
   page.on('pageerror', (e) => { page.__errors = (page.__errors || []).concat(String(e)); });
   page.on('dialog', (d) => { page.__dialogs = (page.__dialogs || 0) + 1; d.dismiss(); });
   return { ctx, page };
@@ -507,6 +515,19 @@ await t('page destinataire sur réseau lent (3G simulée) : poids et temps mesur
   assert.ok(perf.total_ko < 400, 'page trop lourde');
   await p.ctx.close();
 });
+
+// --------------------------------------------------------------------------- nettoyage
+{
+  const { page } = await newPhone({ geo: false });
+  await page.goto(URL0);
+  let removed = 0;
+  for (const c of CREATED) {
+    const fn = c.fn === 'fiila_create_request' ? 'fiila_delete_request' : 'fiila_delete_place';
+    const r = await rpcFromPage(page, fn, { p_id: c.id, p_owner: c.owner });
+    if (r.status === 200) removed++;
+  }
+  console.log(`nettoyage : ${removed} élément(s) de test supprimé(s) sur ${CREATED.length} créés (les autres l’avaient déjà été par les tests)`);
+}
 
 // --------------------------------------------------------------------------- rapport
 await browser.close();
