@@ -371,7 +371,31 @@
       img.src = url;
     });
   }
-  // Réduit, recompresse en JPEG (ce qui retire toutes les métadonnées, dont la position GPS).
+  // Retire d'un JPEG tous les segments de métadonnées (APP1 à APP15 : EXIF, XMP, IPTC… et commentaires).
+  // Nécessaire car certains navigateurs (Safari/WebKit) écrivent un bloc EXIF même dans un JPEG issu d'un canvas.
+  function stripJpegMetadata(dataUrl) {
+    var b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+    var bin = atob(b64), n = bin.length, src = new Uint8Array(n);
+    for (var i = 0; i < n; i++) src[i] = bin.charCodeAt(i);
+    if (src[0] !== 0xFF || src[1] !== 0xD8) return dataUrl;
+    var out = [src.subarray(0, 2)], pos = 2;
+    while (pos + 4 <= n) {
+      if (src[pos] !== 0xFF) return dataUrl; // structure inattendue : on laisse le serveur décider
+      var marker = src[pos + 1];
+      if (marker === 0xDA) { out.push(src.subarray(pos)); break; } // début des données image
+      var len = (src[pos + 2] << 8) | src[pos + 3];
+      var drop = (marker >= 0xE1 && marker <= 0xEF) || marker === 0xFE;
+      if (!drop) out.push(src.subarray(pos, pos + 2 + len));
+      pos += 2 + len;
+    }
+    var total = 0; out.forEach(function (p) { total += p.length; });
+    var res = new Uint8Array(total), off = 0;
+    out.forEach(function (p) { res.set(p, off); off += p.length; });
+    var s = '', CH = 0x8000;
+    for (var j = 0; j < res.length; j += CH) s += String.fromCharCode.apply(null, res.subarray(j, j + CH));
+    return 'data:image/jpeg;base64,' + btoa(s);
+  }
+  // Réduit, recompresse en JPEG puis retire les métadonnées (dont la position GPS).
   function compressPhoto(file) {
     if (!file || !/^image\//.test(file.type || '')) return Promise.reject(new Error('Ce fichier n’est pas une image.'));
     if (file.size > 25 * 1024 * 1024) return Promise.reject(new Error('Image trop lourde (25 Mo maximum).'));
@@ -391,7 +415,7 @@
         c2.getContext('2d').drawImage(c, 0, 0, c2.width, c2.height);
         url = c2.toDataURL('image/jpeg', 0.7);
       }
-      return url;
+      return stripJpegMetadata(url);
     });
   }
   // opts: get(), set(dataUrl|null), id, optional
