@@ -218,9 +218,20 @@ await t('copie du lien (presse-papiers) et lien WhatsApp avec la vraie URL', asy
 
 // ----- deuxième téléphone (destinataire)
 const other = await newPhone({ geo: false });
-const B = other.page;
+let B = other.page;
+// Ouvre un lien comme le ferait le destinataire : dans un nouvel onglet du même téléphone.
+async function openB(url) {
+  const old = B;
+  B = await other.ctx.newPage();
+  B.setDefaultTimeout(BASE ? 20000 : 12000);
+  B.on('pageerror', (e) => { B.__errors = (B.__errors || []).concat(String(e)); });
+  B.on('dialog', (d) => { B.__dialogs = (B.__dialogs || 0) + 1; d.dismiss(); });
+  if (old) { errorsSeen.push(...(old.__errors || [])); await old.close().catch(() => {}); }
+  await B.goto(url);
+}
+const errorsSeen = [];
 await t('2e téléphone : la fiche s’ouvre sans compte, photo et instructions visibles', async () => {
-  await B.goto(shareUrl);
+  await openB(shareUrl);
   await B.getByRole('heading', { name: /Atelier/ }).waitFor();
   const ok = await B.locator('img.door').evaluate((i) => i.complete && i.naturalWidth > 100);
   assert.ok(ok, 'photo non chargée');
@@ -254,7 +265,7 @@ await t('itinéraires et coordonnées copiées = points enregistrés', async () 
 });
 
 await t('le destinataire ne peut ni gérer ni modifier la fiche', async () => {
-  await B.goto(URL0 + '#/m/' + placeId);
+  await openB(URL0 + '#/m/' + placeId);
   await B.getByText('Cette fiche n’est pas gérée sur ce téléphone').waitFor();
   const token = shareUrl.split('#/a/')[1];
   const r1 = await rpcFromPage(B, 'fiila_update_place', { p_id: placeId, p_owner: token, p: { label: 'piraté', entry: { lat: 1, lng: 1 }, instruction: 'x' } });
@@ -276,7 +287,7 @@ await t('modification : même lien, contenu mis à jour chez le destinataire', a
   await byText(A, 'Enregistrer les modifications').click();
   await A.getByText('Modifications enregistrées. Le lien reste le même.').waitFor();
   assert.equal(await A.locator('#share-url').textContent(), shareUrl);
-  await B.goto(shareUrl); await B.reload();
+  await openB(shareUrl);
   await B.getByText('Porte verte, sonner deux fois.').waitFor();
   assert.ok(await B.locator('img.door').count() === 1, 'photo perdue après modification');
 });
@@ -393,14 +404,14 @@ await t('rendez-vous : création avec date, lieu et expiration', async () => {
 });
 
 await t('rendez-vous : mise à jour visible sur le même lien', async () => {
-  await B.goto(meetingUrl);
+  await openB(meetingUrl);
   await B.getByText('Tente blanche derrière la mosquée').waitFor();
   await byText(A, 'Modifier').click();
   await A.getByLabel(/Indications sur place/).fill('Tente BLEUE, entrée côté plage');
   await byText(A, 'Enregistrer les modifications').click();
   await A.getByText(/Rendez-vous mis à jour/).waitFor();
   assert.equal(await A.locator('#share-url').textContent(), meetingUrl);
-  await B.reload();
+  await openB(meetingUrl);
   await B.getByText('Tente BLEUE, entrée côté plage').waitFor();
   await shot(B, '13-rendez-vous-invite');
 });
@@ -412,7 +423,7 @@ await t('rendez-vous expiré : le serveur ne renvoie plus le lieu', async () => 
     console.log('   (déployé : expiration testée côté SQL uniquement)');
     return;
   }
-  await B.reload();
+  await openB(meetingUrl);
   await B.getByText('Ce rendez-vous est terminé').waitFor();
   const r = await rpcFromPage(B, 'fiila_get_public', { p_token: meetingUrl.split('#/a/')[1] });
   assert.deepEqual(r.body, { state: 'expired' });
@@ -424,7 +435,7 @@ await t('désactivation : la fiche et sa photo ne sont plus servies', async () =
   await A.goto(URL0 + '#/m/' + placeId);
   await A.locator('#revoke').click();
   await A.getByText('Lien désactivé', { exact: true }).waitFor();
-  await B.goto(shareUrl); await B.reload();
+  await openB(shareUrl);
   await B.getByText('Ce lien a été désactivé').waitFor();
   assert.equal(await B.locator('img.door').count(), 0);
   const r = await rpcFromPage(B, 'fiila_get_public', { p_token: shareUrl.split('#/a/')[1] });
@@ -437,9 +448,9 @@ await t('nouveau lien : l’ancien affiche « remplacé »', async () => {
   await A.getByRole('heading', { name: 'Partager' }).waitFor();
   newUrl = await A.locator('#share-url').textContent();
   assert.notEqual(newUrl, shareUrl);
-  await B.goto(shareUrl); await B.reload();
+  await openB(shareUrl);
   await B.getByText('Ce lien a été remplacé').waitFor();
-  await B.goto(newUrl); await B.reload();
+  await openB(newUrl);
   await B.getByText('Porte verte, sonner deux fois.').waitFor();
 });
 
@@ -447,7 +458,7 @@ await t('suppression : confirmation, puis fiche et photo inaccessibles', async (
   await A.locator('#delete').click();
   await A.locator('#confirm-delete').click();
   await A.getByText('Fiche supprimée.').waitFor();
-  await B.goto(newUrl); await B.reload();
+  await openB(newUrl);
   await B.getByText('Lien introuvable').waitFor();
   if (local) {
     const n = await local.db.query('select count(*)::int n from fiila.places where id = $1', [placeId]);
@@ -457,7 +468,7 @@ await t('suppression : confirmation, puis fiche et photo inaccessibles', async (
 
 await t('liens invalides : réponse sûre', async () => {
   for (const [h, txt] of [['#/a/abc', 'Lien non valide'], ['#/a/AAAAAAAAAAAAAAAAAAAAAA', 'Lien introuvable'], ['#/zzz', 'Page introuvable'], ['#/d/%3Cscript%3E', 'Demande introuvable'], ['#/k/p.x.y', 'Clé non valide']]) {
-    await B.goto(URL0 + h);
+    await openB(URL0 + h);
     await B.getByText(txt).first().waitFor();
   }
 });
@@ -485,7 +496,7 @@ await t('presse-papiers refusé : texte à copier affiché', async () => {
 });
 
 await t('aucune erreur JavaScript pendant les parcours', async () => {
-  const errs = [...(A.__errors || []), ...(B.__errors || []), ...(C.__errors || [])];
+  const errs = [...(A.__errors || []), ...errorsSeen, ...(B.__errors || []), ...(C.__errors || [])];
   assert.deepEqual(errs, []);
 });
 
