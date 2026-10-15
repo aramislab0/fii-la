@@ -13,6 +13,7 @@
 | Lieux | Choisir 15 lieux difficiles à trouver (ruelle, entrée arrière, immeuble sans numéro, entrée différente de l’arrêt voiture). |
 | Fiches | Pour chaque lieu, la personne qui y habite ou y travaille crée sa fiche Fii La elle-même, avec son accord. |
 | Consentement | Chaque participant (chauffeur et personne qui reçoit) accepte oralement et par écrit l’usage de ses réponses pour ce test. |
+| Formalité | Un test avec de vraies adresses est un traitement de données personnelles. Avant de le lancer, le responsable du traitement confirme la formalité CDP applicable (lecture prudente de l’art. 18 : récépissé avant mise en œuvre). Voir `CONFORMITE-CDP.md`. |
 | Données | Pas de nom complet ni de numéro de téléphone dans la fiche de test. Utiliser un code (C1 à C5 pour les chauffeurs, L01 à L15 pour les lieux). |
 | Répartition | 15 arrivées avec Fii La, 15 arrivées avec la méthode habituelle. Chaque chauffeur fait les deux méthodes (3 + 3). Un même lieu n’est pas visité deux fois par le même chauffeur. |
 | Chronomètre | L’observateur (ou le chauffeur) utilise le chronomètre du téléphone. |

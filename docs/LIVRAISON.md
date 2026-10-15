@@ -99,20 +99,22 @@ Ce que couvrent les 35 parcours : création complète, géolocalisation réussie
 
 ## 7. Données et conformité (Sénégal)
 
-**Faits vérifiés**
-- La loi n° 2008-12 du 25 janvier 2008 sur la protection des données à caractère personnel reste le cadre applicable ; une réforme est annoncée depuis 2019 mais n’était pas adoptée selon un article de mars 2026.
-- La CDP (Commission de protection des données personnelles) traite les formalités préalables : déclarations et demandes d’autorisation. Son avis trimestriel n° 03-2025 précise qu’une base de données hébergée au Sénégal relève d’une **déclaration normale**, et qu’un hébergement **à l’étranger** relève d’une **demande d’autorisation**.
+**Analyse détaillée : `docs/CONFORMITE-CDP.md`** (textes, inventaire réel des données, questions ouvertes).
 
-**Conséquence pour Fii La**
-- Le pilote stocke des points d’entrée et des photos de portes, rattachables à des personnes : ce sont des données personnelles, même sans compte.
-- La base est hébergée à Paris : **une demande d’autorisation à la CDP est à prévoir avant d’ouvrir le service à de vrais utilisateurs**. Le responsable de traitement (Aramis Lab ou la structure de l’ami) doit être désigné.
-- **Tant que cette formalité n’est pas faite, le pilote doit rester restreint** : données synthétiques, ou test terrain encadré avec le consentement écrit des participants (voir `FICHE-TEST-TERRAIN.md`). Ce point est à faire valider par un juriste ; ce dossier n’est pas un avis juridique.
+**Correction (15/10/2026)** : les versions précédentes affirmaient qu’une demande d’autorisation à la CDP était requise avant tout utilisateur réel. Ce n’est pas établi. En résumé, selon la lecture des textes, qui n’est pas un avis juridique :
+- La loi n° 2008-12 s’applique très probablement aux fiches d’adresse (point d’entrée et photo de porte rattachables à une personne, art. 4.6).
+- Aucune exemption ne paraît applicable (art. 3 et 17) ; l’existence d’une norme simplifiée (art. 19) n’a pas été trouvée.
+- **Formalité de droit commun : déclaration** (art. 18). Seule la réception du récépissé autorise la mise en œuvre.
+- **Autorisation (art. 20)** : la liste est fermée et aucune catégorie ne correspond à Fii La.
+- **Hébergement à Paris = transfert vers un pays tiers** (art. 4.12 et 49) : information préalable de la CDP et niveau de protection suffisant ; à défaut, autorisation sur demande motivée (art. 51). Dans sa pratique publiée (avis trimestriel 03-2025), la CDP oriente l’hébergement hors du Sénégal vers son formulaire de demande d’autorisation : c’est à confirmer pour Fii La.
+- Écarts à traiter : responsable du traitement non désigné, absence de durée maximale pour les fiches d’adresse (art. 35), identité du responsable absente de la page de confidentialité (art. 58), conditions de sous-traitance Supabase à vérifier (art. 39).
+- **Prochaine étape** : désigner le responsable, faire relire la note par un juriste, puis le responsable interroge la CDP sur la formalité applicable. D’ici là, données synthétiques uniquement. Aucune démarche n’a été faite auprès de la CDP.
 
 **Mesures déjà en place** : minimisation (pas de compte, pas de téléphone, pas de contacts, pas de pièce d’identité), position lue seulement sur action, métadonnées des photos retirées, aucun outil de suivi (seulement des compteurs journaliers anonymes, section 11), suppression réelle, page « Données et confidentialité » dans l’application.
 
 **Sauvegardes** : sur le plan gratuit Supabase, aucune sauvegarde automatique n’est incluse ; une suppression est donc définitive. Sur un plan payant, les sauvegardes quotidiennes conservent une copie quelques jours.
 
-**Sources** : [CDP, avis trimestriel n° 03-2025](https://sppsyrftszniuaicadvk.supabase.co/storage/v1/object/public/public_docs/avis-trimestriels/avis-trimestriel-1763029761225.pdf) · [Osiris, révision de la loi (2020)](https://osiris.sn/le-senegal-va-reviser-la-loi-sur-la-protection-des-donnees-personnelles.html) · [AllAfrica, mars 2026](https://fr.allafrica.com/stories/202603280054.html)
+**Sources** : [Loi n° 2008-12](https://www.afapdp.org/wp-content/uploads/2018/05/Senegal-texte-de-loi-2008.pdf) · [CDP, avis trimestriel n° 03-2025](https://sppsyrftszniuaicadvk.supabase.co/storage/v1/object/public/public_docs/avis-trimestriels/avis-trimestriel-1763029761225.pdf) · [Osiris, révision de la loi (2020)](https://osiris.sn/le-senegal-va-reviser-la-loi-sur-la-protection-des-donnees-personnelles.html) · [AllAfrica, mars 2026](https://fr.allafrica.com/stories/202603280054.html)
 
 ## 8. Coûts d’infrastructure (vérifiés sur les sites des fournisseurs le 15/10/2026)
 
@@ -182,7 +184,7 @@ Sous le bouton, une ligne factuelle : « Gratuit, sans compte et sans applicatio
 - Les signaux « Global Privacy Control » et « Do Not Track » du navigateur sont respectés : aucun envoi.
 - L’envoi est silencieux et n’est jamais attendu : une panne ou un blocage n’affecte ni l’affichage ni la création (testé : requêtes rejetées et requêtes sans réponse).
 - Lecture : uniquement dans l’éditeur SQL Supabase, `select day, event, variant, n from fiila.metrics order by day desc;`. Pas d’accès par l’API publique.
-- Consentement : ces compteurs ne contiennent aucune donnée personnelle et ne déposent rien sur le téléphone ; aucune bannière n’est donc ajoutée. L’empreinte d’IP temporaire relève du traitement déjà décrit en section 7 et doit figurer dans la demande à la CDP. À confirmer par un juriste.
+- Consentement : ces compteurs ne contiennent aucune donnée personnelle et ne déposent rien sur le téléphone ; aucune bannière n’est donc ajoutée. L’empreinte d’IP temporaire est vraisemblablement une donnée personnelle : elle fait partie du traitement décrit en section 7 et dans `CONFORMITE-CDP.md`. À confirmer par un juriste.
 - Déploiement : appliquer la migration `supabase/migrations/20261015100000_fiila_metrics.sql` (`supabase db push`). Sans elle, la mesure échoue sans bruit et le reste fonctionne.
 
 **Lecture du tunnel.** Taux de clic = `discovery_cta / discovery_shown` ; conversion = `fiche_created (*_discovery) / discovery_cta` ; partage = `share_initiated + link_copied`. Ce sont des ordres de grandeur : sans identifiant, une même personne qui revient sur une fiche est recomptée, et un parcours ne peut pas être suivi d’un bout à l’autre.
@@ -306,4 +308,4 @@ Le périmètre fonctionnel est **gelé** : adresse, demande d’adresse, rendez-
 | Vraies applications sociales (WhatsApp, Telegram, Facebook, Instagram, TikTok) | **Non vérifié** | Aucune publication ni envoi réel ; liens et images contrôlés par automatisation uniquement |
 | Téléphones physiques | **Non vérifié** | `docs/RECETTE-TELEPHONES.md`, toutes les cases vides |
 
-**Ordre de mise en production** : 1) régler la facture Supabase ; 2) `./scripts/deploy.sh` (migrations, droits, Pages, parcours de production Chromium + WebKit) ; 3) remplir `docs/RECETTE-TELEPHONES.md` ; 4) corriger seulement les défauts trouvés ; 5) demande d’autorisation CDP avant tout utilisateur réel (section 7).
+**Ordre de mise en production** : 1) régler la facture Supabase ; 2) `./scripts/deploy.sh` (migrations, droits, Pages, parcours de production Chromium + WebKit) ; 3) remplir `docs/RECETTE-TELEPHONES.md` ; 4) corriger seulement les défauts trouvés ; 5) avant tout utilisateur réel ou test avec de vraies adresses : désigner le responsable du traitement et confirmer avec la CDP la formalité applicable (déclaration, art. 18, et transfert vers un pays tiers, art. 49 à 51 ; voir `CONFORMITE-CDP.md`).
