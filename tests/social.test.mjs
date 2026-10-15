@@ -79,7 +79,7 @@ for (const kind of ['address', 'meeting', 'request']) {
   await t(`panneau ${kind} : actions présentes, avertissement de confidentialité, lien destinataire seul`, async () => {
     await O.goto(URL0 + views[kind]);
     await O.locator('.share-panel').waitFor();
-    for (const n of ['Préparer un message WhatsApp', 'Copier le lien', 'Telegram', 'Facebook', 'Instagram / Story', 'TikTok'])
+    for (const n of ['Préparer un message WhatsApp', 'Copier le lien', 'Telegram', 'Facebook : copier le lien', 'Instagram / Story', 'TikTok'])
       await O.locator('.share-panel').getByText(n, { exact: true }).first().waitFor();
     assert.equal(await O.locator('#privacy-note').textContent(), 'Toute personne ayant ce lien peut consulter la fiche et le retransmettre.');
     const url = await O.locator('.share-panel .sharelink').textContent();
@@ -90,10 +90,9 @@ for (const kind of ['address', 'meeting', 'request']) {
     assert.equal(tg.origin + tg.pathname, 'https://t.me/share/url');
     assert.equal(tg.searchParams.get('url'), recipientUrl[kind]);
     assert.ok(!tg.searchParams.get('text').includes(recipientUrl[kind]), 'URL répétée dans le texte Telegram');
-    const fb = new URL(hrefs.find((x) => x.startsWith('https://www.facebook.com/')));
-    assert.equal(fb.origin + fb.pathname, 'https://www.facebook.com/sharer/sharer.php');
-    assert.equal(fb.searchParams.get('u'), recipientUrl[kind]);
-    assert.equal(fb.searchParams.get('quote'), null, 'message prérempli');
+    assert.ok(!hrefs.some((x) => x.includes('facebook.com')), 'lien Facebook sans configuration');
+    assert.ok(!hrefs.some((x) => /#\/(m|demande|k|edit)\//.test(decodeURIComponent(x))), 'URL de gestion ou privée dans un lien');
+    assert.equal(await O.locator('#share-facebook').count(), 0);
     const wa = decodeURIComponent(hrefs.find((x) => x.startsWith('https://wa.me/')));
     assert.ok(wa.includes(recipientUrl[kind]));
   });
@@ -117,7 +116,22 @@ await t('Facebook avec identifiant d’application configuré : Share Dialog off
   assert.equal(fb.searchParams.get('app_id'), '1234567890');
   assert.equal(fb.searchParams.get('href'), recipientUrl.address);
   assert.equal(fb.searchParams.get('quote'), null);
+  assert.equal(await p.page.locator('#share-facebook-copy').count(), 0, 'copie affichée alors que le Share Dialog est configuré');
   await p.ctx.close();
+});
+
+await t('Facebook sans configuration : action de copie honnête, consigne affichée, aucune ouverture de Facebook', async () => {
+  await O.goto(URL0 + views.request);
+  await O.locator('#share-facebook-copy').waitFor();
+  assert.equal(await O.locator('#fb-help').isVisible(), false, 'consigne affichée avant le clic');
+  const popups = [];
+  O.on('popup', (pp) => popups.push(pp));
+  const copied = waitTrack(O, 'link_copied', 'request');
+  await O.locator('#share-facebook-copy').click();
+  await O.locator('#fb-help').getByText('Fii La n’est pas relié à Facebook : le lien est seulement copié.', { exact: false }).waitFor();
+  if (ENGINE === 'chromium') { await copied; assert.equal(await O.evaluate(() => navigator.clipboard.readText()), recipientUrl.request); }
+  await O.waitForTimeout(400);
+  assert.equal(popups.length, 0, 'une fenêtre s’est ouverte');
 });
 
 await t('vue destinataire : aucun bouton de réseau social, l’itinéraire reste l’action principale', async () => {
@@ -240,6 +254,29 @@ await t('TikTok : consigne du champ « Site web » (non garanti), formule neutre
   assert.ok(!meta.texts.some((x) => /heure de Dakar/.test(x)), 'date affichée malgré le choix');
 });
 
+await t('adresse et demande : titre neutre réellement appliqué, photo non incluse par défaut, nom du demandeur jamais exporté', async () => {
+  const cases = { address: { name: 'Atelier Ndèye', neutral: 'Une adresse partagée avec Fii La' },
+    request: { name: 'Livraison de votre commande', neutral: 'Une demande d’adresse Fii La' } };
+  for (const kind of ['address', 'request']) {
+    let meta = await openVisual(O, views[kind], 'instagram');
+    assert.equal(meta.includesPhoto, false, 'photo incluse par défaut');
+    if (kind === 'address') assert.equal(await O.locator('#v-photo').isChecked(), false);
+    assert.ok(meta.texts.some((x) => x.includes(cases[kind].name.split(' ')[0])), 'nom absent alors qu’il est demandé');
+    assert.ok(!meta.texts.join(' ').includes('Boutique Ndèye') && !meta.texts.join(' ').includes('CMD-9'), 'nom du demandeur ou référence exportés');
+    await O.locator('#v-title').uncheck();
+    await O.waitForFunction((n) => JSON.parse(document.getElementById('visual-preview').dataset.meta).titleLines.join(' ') === n, cases[kind].neutral);
+    meta = JSON.parse(await O.locator('#visual-preview').getAttribute('data-meta'));
+    const all = meta.texts.join(' | ');
+    for (const word of [cases[kind].name, 'Ndèye', 'Boutique', 'CMD-9', 'Porte verte', 'Livraison']) assert.ok(!all.includes(word), 'donnée personnelle exportée : ' + word);
+    assert.ok(!/#\/(m|demande|k|edit)\//.test(all + meta.qrText), 'URL de gestion ou privée dans l’image');
+    const dl = O.waitForEvent('download');
+    await O.locator('#visual-download').click();
+    const path = `${SHOTS}/social-${ENGINE}-export-${kind}-neutre.png`;
+    await (await dl).saveAs(path);
+    assert.equal(decodePng(readFileSync(path)), recipientUrl[kind]);
+  }
+});
+
 await t('adresse et demande : image avec le bon lien, sans réponse privée', async () => {
   for (const kind of ['address', 'request']) {
     const meta = await openVisual(O, views[kind], 'instagram');
@@ -317,7 +354,7 @@ await t('lien désactivé ou rendez-vous expiré [SIMULÉ temps] : plus de panne
 // ================================================================== 6. mesure
 await t('mesure : canal choisi, lien copié et image exportée distingués ; rien de privé', async () => {
   await O.goto(URL0 + views.request);
-  for (const id of ['share-telegram', 'share-facebook']) {
+  for (const id of ['share-telegram', 'share-facebook-copy']) {
     const [popup] = await Promise.all([O.waitForEvent('popup', { timeout: 4000 }).catch(() => null), O.locator('#' + id).click()]);
     if (popup) await popup.close().catch(() => {});
   }

@@ -2,9 +2,9 @@
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "mode": "automatisation Playwright, émulation iPhone 13, base locale ; aucune publication sur un réseau social",
-  "date": "2026-10-15T10:52:40.807Z",
-  "reussis": 21,
-  "total": 21,
+  "date": "2026-10-15T11:09:40.221Z",
+  "reussis": 23,
+  "total": 23,
   "results": [
     {
       "ok": true,
@@ -25,6 +25,10 @@
     {
       "ok": true,
       "name": "Facebook avec identifiant d’application configuré : Share Dialog officiel, sans message prérempli"
+    },
+    {
+      "ok": true,
+      "name": "Facebook sans configuration : action de copie honnête, consigne affichée, aucune ouverture de Facebook"
     },
     {
       "ok": true,
@@ -57,6 +61,10 @@
     {
       "ok": true,
       "name": "TikTok : consigne du champ « Site web » (non garanti), formule neutre si le nom est masqué"
+    },
+    {
+      "ok": true,
+      "name": "adresse et demande : titre neutre réellement appliqué, photo non incluse par défaut, nom du demandeur jamais exporté"
     },
     {
       "ok": true,

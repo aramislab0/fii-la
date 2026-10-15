@@ -2,17 +2,17 @@
   {
     "event": "link_copied",
     "variant": "request",
-    "n": 1
+    "n": 3
   },
   {
     "event": "share_initiated",
     "variant": "facebook_request",
-    "n": 1
+    "n": 2
   },
   {
     "event": "share_initiated",
     "variant": "instagram_address",
-    "n": 3
+    "n": 4
   },
   {
     "event": "share_initiated",
@@ -22,7 +22,7 @@
   {
     "event": "share_initiated",
     "variant": "instagram_request",
-    "n": 1
+    "n": 2
   },
   {
     "event": "share_initiated",
@@ -42,7 +42,7 @@
   {
     "event": "visual_exported",
     "variant": "download_address",
-    "n": 2
+    "n": 3
   },
   {
     "event": "visual_exported",
@@ -52,6 +52,6 @@
   {
     "event": "visual_exported",
     "variant": "download_request",
-    "n": 1
+    "n": 2
   }
 ]

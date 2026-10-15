@@ -25,7 +25,7 @@ Rien n’a encore été exécuté : toutes les cases de résultat sont vides. Un
 Pour chaque ligne, le téléphone **expéditeur** partage depuis la page de gestion ; le téléphone **destinataire** ouvre ce qu’il reçoit.
 
 Colonnes :
-1. Le partage s’ouvre (l’application cible s’ouvre ou propose l’envoi).
+1. Le partage s’ouvre (l’application cible s’ouvre ou propose l’envoi ; pour une copie, le lien se colle correctement).
 2. Le lien reçu est cliquable et ouvre la fiche.
 3. Photo de l’entrée visible.
 4. « Itinéraire » ouvre Google Maps sur le bon point (arrêt puis entrée).
@@ -38,8 +38,8 @@ Colonnes :
 | WhatsApp | T2 → T1 | | | | | | | |
 | Telegram | T1 → T2 | | | | | | | |
 | Telegram | T2 → T1 | | | | | | | |
-| Facebook (publication, visibilité « Moi uniquement ») | T1 → T2 | | | | | | | |
-| Facebook | T2 → T1 | | | | | | | |
+| Facebook — « Facebook : copier le lien » puis collage dans une publication « Moi uniquement » (sans identifiant Meta) | T1 → T2 | | | | | | | |
+| Facebook — idem, ou bouton « Facebook » (Share Dialog) si `FACEBOOK_APP_ID` est configuré | T2 → T1 | | | | | | | Préciser le mode |
 | Instagram Story (sticker Lien, « Amis proches ») | T1 → T2 | | | | | | | |
 | Instagram Story (QR code scanné) | T1 → T3 | | | | | | | |
 | TikTok (champ « Site web » du profil, si disponible) | T2 → T1 | | | | | | | |

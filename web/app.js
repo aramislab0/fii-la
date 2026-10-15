@@ -943,7 +943,7 @@
      Un seul panneau pour adresse, rendez-vous et demande. Seule l'URL destinataire est partagée.
      Telegram : https://core.telegram.org/widgets/share (url + text encodés).
      Facebook : Share Dialog officiel si un identifiant d'application est configuré (CFG.facebookAppId),
-     sinon l'adresse de partage historique sharer.php (non documentée aujourd'hui) ; aucun message prérempli, aucun SDK.
+     sinon une simple copie du lien, nommée comme telle ; aucun message prérempli, aucun SDK.
      Instagram / TikTok : pas de partage de lien par URL ; image verticale + lien à copier + consigne honnête. */
   var ICONS = {
     telegram: 'M21 4 3 11l6 2 2 6 3-4 5 4 2-15ZM9 13l9-6-7 8',
@@ -965,12 +965,12 @@
   function telegramLink(url, text) {
     return 'https://t.me/share/url?url=' + encodeURIComponent(url) + (text ? '&text=' + encodeURIComponent(text) : '');
   }
+  // Facebook : uniquement le Share Dialog documenté, et seulement si son identifiant d'application est configuré.
+  // Sans configuration, aucun lien vers Facebook : une action de copie, nommée comme telle.
+  function facebookAppId() { return CFG.facebookAppId && /^\d{5,20}$/.test(String(CFG.facebookAppId)) ? String(CFG.facebookAppId) : null; }
   function facebookLink(url) {
-    if (CFG.facebookAppId && /^\d{5,20}$/.test(String(CFG.facebookAppId))) {
-      return 'https://www.facebook.com/dialog/share?app_id=' + encodeURIComponent(CFG.facebookAppId) + '&display=page&href=' +
-        encodeURIComponent(url) + '&redirect_uri=' + encodeURIComponent(baseUrl());
-    }
-    return 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url);
+    return 'https://www.facebook.com/dialog/share?app_id=' + encodeURIComponent(facebookAppId()) + '&display=page&href=' +
+      encodeURIComponent(url) + '&redirect_uri=' + encodeURIComponent(baseUrl());
   }
   var PRIVACY_NOTICE = 'Toute personne ayant ce lien peut consulter la fiche et le retransmettre.';
 
@@ -978,6 +978,8 @@
   function sharePanel(o) {
     var text = o.msg.replace(o.url, '').trim().replace(/\s*:$/, '');
     var visualBox = h('div', { class: 'visual-box', id: 'visual-box', hidden: true });
+    var fbHelp = h('p', { class: 'hint', id: 'fb-help', hidden: true },
+      'Fii La n’est pas relié à Facebook : le lien est seulement copié. Ouvrez Facebook, créez une publication ou un message, puis collez le lien. Facebook affichera un aperçu générique de Fii La.');
     var openChannel = null;
     function channelBtn(ch, label) {
       return h('button', { class: 'btn ghost small chan', type: 'button', id: 'share-' + ch, 'aria-expanded': 'false', 'aria-controls': 'visual-box',
@@ -1011,10 +1013,18 @@
       h('div', { class: 'chan-grid' },
         h('a', { class: 'btn ghost small chan', id: 'share-telegram', href: telegramLink(o.url, text), target: '_blank', rel: 'noopener noreferrer',
           onclick: function () { track('share_initiated', 'telegram_' + o.kind); } }, icon('telegram'), 'Telegram'),
-        h('a', { class: 'btn ghost small chan', id: 'share-facebook', href: facebookLink(o.url), target: '_blank', rel: 'noopener noreferrer',
-          onclick: function () { track('share_initiated', 'facebook_' + o.kind); } }, icon('facebook'), 'Facebook'),
+        facebookAppId()
+          ? h('a', { class: 'btn ghost small chan', id: 'share-facebook', href: facebookLink(o.url), target: '_blank', rel: 'noopener noreferrer',
+              onclick: function () { track('share_initiated', 'facebook_' + o.kind); } }, icon('facebook'), 'Facebook')
+          : h('button', { class: 'btn ghost small chan', type: 'button', id: 'share-facebook-copy', 'aria-describedby': 'fb-help',
+              onclick: function () {
+                track('share_initiated', 'facebook_' + o.kind);
+                copy(o.url, 'Lien', function () { track('link_copied', o.kind); });
+                fbHelp.hidden = false;
+              } }, 'Facebook : copier le lien'),
         channelBtn('instagram', 'Instagram / Story'),
         channelBtn('tiktok', 'TikTok')),
+      fbHelp,
       visualBox,
       h('p', { class: 'hint' }, 'Les applications s’ouvrent avec le lien prêt : c’est vous qui publiez ou envoyez. Si une application ne s’ouvre pas, utilisez « Copier le lien ».'));
     return panel;
