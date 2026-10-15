@@ -172,3 +172,13 @@ footer.foot a,footer.foot button{color:var(--muted);font-size:13px}
 .coords-more .coordline{padding-top:4px}
 
 .notice{overflow-wrap:anywhere}
+
+/* Panneau de partage : WhatsApp et copie d'abord, autres applications en grille discrète. */
+.privacy-note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:10px}
+.chan-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chan{justify-content:flex-start;gap:10px;font-size:14px;min-height:48px}
+.chan[aria-expanded="true"]{border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
+.ico{flex:none}
+.visual-box{border-top:1px solid var(--line);padding-top:14px}
+.visual-preview{display:block;width:min(100%,240px);aspect-ratio:9/16;height:auto;border-radius:14px;border:1px solid var(--line);background:var(--soft);align-self:center}
+@media (max-width:340px){.chan-grid{grid-template-columns:1fr}}

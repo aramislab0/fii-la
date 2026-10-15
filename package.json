@@ -8,7 +8,8 @@
     "test:e2e": "node tests/e2e.test.mjs",
     "test:e2e:deploye": "FIILA_URL=https://aramislab0.github.io/fii-la/ node tests/e2e.test.mjs",
     "test:discovery": "node tests/discovery.test.mjs",
-    "test:circuit": "node tests/circuit.test.mjs"
+    "test:circuit": "node tests/circuit.test.mjs",
+    "test:social": "node tests/social.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",

@@ -1,0 +1,57 @@
+[
+  {
+    "event": "link_copied",
+    "variant": "request",
+    "n": 1
+  },
+  {
+    "event": "share_initiated",
+    "variant": "facebook_request",
+    "n": 1
+  },
+  {
+    "event": "share_initiated",
+    "variant": "instagram_address",
+    "n": 3
+  },
+  {
+    "event": "share_initiated",
+    "variant": "instagram_meeting",
+    "n": 3
+  },
+  {
+    "event": "share_initiated",
+    "variant": "instagram_request",
+    "n": 1
+  },
+  {
+    "event": "share_initiated",
+    "variant": "native_meeting",
+    "n": 3
+  },
+  {
+    "event": "share_initiated",
+    "variant": "telegram_request",
+    "n": 1
+  },
+  {
+    "event": "share_initiated",
+    "variant": "tiktok_meeting",
+    "n": 1
+  },
+  {
+    "event": "visual_exported",
+    "variant": "download_address",
+    "n": 2
+  },
+  {
+    "event": "visual_exported",
+    "variant": "download_meeting",
+    "n": 2
+  },
+  {
+    "event": "visual_exported",
+    "variant": "download_request",
+    "n": 1
+  }
+]

@@ -28,10 +28,11 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          FACEBOOK_APP_ID: ${{ vars.FACEBOOK_APP_ID }}
         run: |
           test -n "$SUPABASE_URL" || { echo "Variable SUPABASE_URL manquante"; exit 1; }
           test -n "$SUPABASE_KEY" || { echo "Variable SUPABASE_PUBLISHABLE_KEY manquante"; exit 1; }
-          node -e 'const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:process.env.PUBLIC_URL||""};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
+          node -e 'const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:process.env.PUBLIC_URL||"",facebookAppId:process.env.FACEBOOK_APP_ID||""};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
           echo "<!-- build ${GITHUB_SHA} -->" >> web/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

@@ -198,8 +198,11 @@
     discovery_cta: ['address', 'meeting'],
     fiche_created: ['address_direct', 'address_discovery', 'address_request', 'meeting_direct', 'meeting_discovery', 'meeting_similar'],
     request_created: ['request'],
-    share_initiated: ['native_address', 'native_meeting', 'native_request', 'whatsapp_address', 'whatsapp_meeting', 'whatsapp_request'],
+    share_initiated: ['native', 'whatsapp', 'telegram', 'facebook', 'instagram', 'tiktok'].reduce(function (a, c) {
+      return a.concat([c + '_address', c + '_meeting', c + '_request']);
+    }, []),
     link_copied: ['address', 'meeting', 'request'],
+    visual_exported: ['download_address', 'download_meeting', 'download_request', 'share_address', 'share_meeting', 'share_request'],
     owned_reopened: ['address', 'meeting', 'request']
   };
   function privacyOptOut() {
@@ -908,20 +911,10 @@
           h('span', { class: 'chip ' + (active ? 'ok' : 'off'), style: 'flex:0 0 auto' },
             expired ? 'Expiré' : pl.status === 'active' ? 'Lien actif' : 'Lien désactivé'),
           h('span', { class: 'small muted' }, isMeeting && !expired ? 'Visible jusqu’au ' + shortDate(pl.expires_at) : 'Modifiée le ' + shortDate(pl.updated_at)))),
-      active ? h('section', { class: 'card', 'aria-labelledby': 'h-share' },
-        h('h2', { id: 'h-share' }, 'Partager'),
-        h('p', { class: 'sharelink', id: 'share-url' }, url),
-        navigator.share ? h('button', { class: 'btn', type: 'button', onclick: function () {
-          track('share_initiated', 'native_' + variant);
-          navigator.share({ title: pl.label, text: msg.replace(url, '').trim(), url: url }).catch(function (e) {
-            if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier le lien ».');
-          });
-        } }, 'Partager…') : null,
-        h('a', { class: 'btn lime', href: waLink(msg), target: '_blank', rel: 'noopener noreferrer', onclick: function () { track('share_initiated', 'whatsapp_' + variant); } }, 'Préparer un message WhatsApp'),
-        h('button', { class: 'btn ghost', type: 'button', id: 'copy-link', onclick: function () { copy(url, 'Lien', function () { track('link_copied', variant); }); } }, 'Copier le lien'),
-        h('p', { class: 'hint' }, 'WhatsApp s’ouvre avec le message prêt : c’est vous qui l’envoyez. Toute personne qui reçoit le lien peut le transférer.'),
-        h('div', { class: 'sep' }),
-        h('p', { class: 'small' }, h('strong', null, 'QR code'), ' : à afficher ou imprimer près de l’entrée ou sur une commande.'),
+      active ? sharePanel({ kind: variant, url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null,
+        ids: { url: 'share-url', copy: 'copy-link', native: 'share-native' } }) : null,
+      active ? h('section', { class: 'card', 'aria-label': 'QR code' },
+        h('p', { class: 'small' }, h('strong', null, 'QR code'), ' : à afficher ou imprimer près de l’entrée ou sur une commande. Gardez aussi le lien : le QR code est un accès de secours.'),
         qrBox) : null,
       installSlot(),
       expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
@@ -944,6 +937,270 @@
           h('a', { class: 'btn ghost small', href: waLink('Ma clé de gestion Fii La pour « ' + pl.label + ' » (ne pas partager) : ' + key), target: '_blank', rel: 'noopener noreferrer' }, 'M’envoyer la clé sur WhatsApp'),
           h('p', { class: 'hint' }, 'Choisissez votre propre discussion WhatsApp, pas celle d’une autre personne.'))),
       footer());
+  }
+
+  /* ================================================================ PARTAGE SOCIAL
+     Un seul panneau pour adresse, rendez-vous et demande. Seule l'URL destinataire est partagée.
+     Telegram : https://core.telegram.org/widgets/share (url + text encodés).
+     Facebook : Share Dialog officiel si un identifiant d'application est configuré (CFG.facebookAppId),
+     sinon l'adresse de partage historique sharer.php (non documentée aujourd'hui) ; aucun message prérempli, aucun SDK.
+     Instagram / TikTok : pas de partage de lien par URL ; image verticale + lien à copier + consigne honnête. */
+  var ICONS = {
+    telegram: 'M21 4 3 11l6 2 2 6 3-4 5 4 2-15ZM9 13l9-6-7 8',
+    facebook: 'M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8Z',
+    instagram: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm5 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm5.5-1.5h.01',
+    tiktok: 'M14 3v11a3 3 0 1 1-3-3M14 3c0 3 2 5 5 5'
+  };
+  function icon(name) {
+    var ns = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', '20'); svg.setAttribute('height', '20');
+    svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('class', 'ico');
+    var path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', ICONS[name]); path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '1.8'); path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+    return svg;
+  }
+  function telegramLink(url, text) {
+    return 'https://t.me/share/url?url=' + encodeURIComponent(url) + (text ? '&text=' + encodeURIComponent(text) : '');
+  }
+  function facebookLink(url) {
+    if (CFG.facebookAppId && /^\d{5,20}$/.test(String(CFG.facebookAppId))) {
+      return 'https://www.facebook.com/dialog/share?app_id=' + encodeURIComponent(CFG.facebookAppId) + '&display=page&href=' +
+        encodeURIComponent(url) + '&redirect_uri=' + encodeURIComponent(baseUrl());
+    }
+    return 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url);
+  }
+  var PRIVACY_NOTICE = 'Toute personne ayant ce lien peut consulter la fiche et le retransmettre.';
+
+  // o : { kind: 'address'|'meeting'|'request', url, msg, title, when, photo, ids: { url, copy, native } }
+  function sharePanel(o) {
+    var text = o.msg.replace(o.url, '').trim().replace(/\s*:$/, '');
+    var visualBox = h('div', { class: 'visual-box', id: 'visual-box', hidden: true });
+    var openChannel = null;
+    function channelBtn(ch, label) {
+      return h('button', { class: 'btn ghost small chan', type: 'button', id: 'share-' + ch, 'aria-expanded': 'false', 'aria-controls': 'visual-box',
+        onclick: function (e) {
+          var btn = e.currentTarget;
+          if (openChannel === ch) { visualBox.hidden = true; openChannel = null; btn.setAttribute('aria-expanded', 'false'); return; }
+          Array.prototype.forEach.call(panel.querySelectorAll('button.chan'), function (b) { b.setAttribute('aria-expanded', 'false'); });
+          btn.setAttribute('aria-expanded', 'true');
+          openChannel = ch;
+          track('share_initiated', ch + '_' + o.kind);
+          setKids(visualBox, visualPanel(o, ch));
+          visualBox.hidden = false;
+        } }, icon(ch), label);
+    }
+    var panel = h('section', { class: 'card share-panel', 'aria-labelledby': 'h-share' },
+      h('h2', { id: 'h-share' }, o.kind === 'request' ? 'Envoyer la demande au client' : 'Partager'),
+      h('p', { class: 'sharelink', id: o.ids.url }, o.url),
+      h('p', { class: 'privacy-note', id: 'privacy-note' }, PRIVACY_NOTICE),
+      navigator.share ? h('button', { class: 'btn', type: 'button', id: o.ids.native || 'share-native', onclick: function () {
+        track('share_initiated', 'native_' + o.kind);
+        try {
+          navigator.share({ title: o.title || 'Fii La', text: text, url: o.url }).catch(function (e) {
+            if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier le lien ».');
+          });
+        } catch (e) { toast('Partage indisponible ici. Utilisez « Copier le lien ».'); }
+      } }, 'Partager…') : null,
+      h('a', { class: 'btn lime', href: waLink(o.msg), target: '_blank', rel: 'noopener noreferrer', id: 'share-whatsapp',
+        onclick: function () { track('share_initiated', 'whatsapp_' + o.kind); } }, 'Préparer un message WhatsApp'),
+      h('button', { class: 'btn ghost', type: 'button', id: o.ids.copy, onclick: function () { copy(o.url, 'Lien', function () { track('link_copied', o.kind); }); } }, 'Copier le lien'),
+      h('p', { class: 'label', style: 'margin-top:4px' }, 'Autres applications'),
+      h('div', { class: 'chan-grid' },
+        h('a', { class: 'btn ghost small chan', id: 'share-telegram', href: telegramLink(o.url, text), target: '_blank', rel: 'noopener noreferrer',
+          onclick: function () { track('share_initiated', 'telegram_' + o.kind); } }, icon('telegram'), 'Telegram'),
+        h('a', { class: 'btn ghost small chan', id: 'share-facebook', href: facebookLink(o.url), target: '_blank', rel: 'noopener noreferrer',
+          onclick: function () { track('share_initiated', 'facebook_' + o.kind); } }, icon('facebook'), 'Facebook'),
+        channelBtn('instagram', 'Instagram / Story'),
+        channelBtn('tiktok', 'TikTok')),
+      visualBox,
+      h('p', { class: 'hint' }, 'Les applications s’ouvrent avec le lien prêt : c’est vous qui publiez ou envoyez. Si une application ne s’ouvre pas, utilisez « Copier le lien ».'));
+    return panel;
+  }
+
+  // Panneau Instagram / TikTok : image verticale, lien séparé, consigne honnête.
+  function visualPanel(o, ch) {
+    var opts = { showTitle: true, showWhen: o.kind === 'meeting', withPhoto: false };
+    var preview = h('img', { class: 'visual-preview', id: 'visual-preview', alt: 'Aperçu de l’image verticale à partager' });
+    var status = h('p', { class: 'msg', role: 'status' });
+    var fallback = h('div', { class: 'stack', id: 'visual-fallback', hidden: true });
+    var current = null, seq = 0;
+    function redraw() {
+      var mine = ++seq; // seul le dernier rendu demandé est affiché
+      status.textContent = 'Préparation de l’aperçu…'; status.className = 'msg info';
+      buildShareVisual(o, Object.assign({}, opts)).then(function (canvas) {
+        if (mine !== seq) return;
+        current = canvas;
+        preview.src = canvas.toDataURL('image/png');
+        preview.dataset.meta = JSON.stringify(canvas.__meta);
+        status.textContent = '';
+      }, function () { status.textContent = 'Aperçu impossible sur ce téléphone. Utilisez « Copier le lien ».'; status.className = 'msg err'; });
+    }
+    function checkbox(id, label, key) {
+      return h('label', null, h('input', { type: 'checkbox', id: id, checked: opts[key], onchange: function (e) { opts[key] = e.target.checked; redraw(); } }), label);
+    }
+    function fileName() { return 'fii-la-' + (o.kind === 'meeting' ? 'rendez-vous' : o.kind === 'request' ? 'demande' : 'adresse') + '.png'; }
+    function download() {
+      if (!current) return;
+      var supportsDownload = 'download' in HTMLAnchorElement.prototype;
+      current.toBlob(function (blob) {
+        if (!blob) { status.textContent = 'Export impossible sur ce téléphone.'; status.className = 'msg err'; return; }
+        var href = URL.createObjectURL(blob);
+        if (supportsDownload) {
+          var a = h('a', { href: href, download: fileName(), hidden: true });
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(href); }, 30000);
+          track('visual_exported', 'download_' + o.kind);
+          status.textContent = 'Image enregistrée dans vos téléchargements.'; status.className = 'msg ok';
+        } else {
+          setKids(fallback, h('p', { class: 'hint' }, 'Votre navigateur ne télécharge pas directement : appuyez longuement sur l’image ci-dessous, puis « Enregistrer l’image ».'),
+            h('img', { class: 'visual-preview', src: href, alt: 'Image verticale à enregistrer' }));
+          fallback.hidden = false;
+          track('visual_exported', 'download_' + o.kind);
+        }
+      }, 'image/png');
+    }
+    function shareFile() {
+      if (!current) return;
+      current.toBlob(function (blob) {
+        var file = new File([blob], fileName(), { type: 'image/png' });
+        track('visual_exported', 'share_' + o.kind);
+        navigator.share({ files: [file] }).catch(function (e) {
+          if (e && e.name !== 'AbortError') toast('Partage de l’image indisponible ici. Téléchargez-la plutôt.');
+        });
+      }, 'image/png');
+    }
+    var canShareFiles = false;
+    try { canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] })); } catch (e) { canShareFiles = false; }
+    var guide = ch === 'instagram'
+      ? 'L’image ne contient pas de lien cliquable. Dans votre Story, ajoutez le sticker « Lien » et collez le lien copié. Instagram ne propose pas ce sticker aux comptes très récents ; le QR code reste alors un accès de secours.'
+      : 'Ni l’image ni la légende d’une vidéo TikTok ne rendent le lien cliquable. Le QR code permet d’ouvrir la fiche. Si votre compte propose le champ « Site web » dans « Modifier le profil », vous pouvez y coller le lien : TikTok ne le propose pas à tous les comptes.';
+    redraw();
+    return h('div', { class: 'stack' },
+      h('h3', null, ch === 'instagram' ? 'Instagram / Story' : 'TikTok'),
+      h('div', { class: 'choice one' },
+        checkbox('v-title', o.kind === 'request' ? 'Afficher l’objet de la demande' : 'Afficher le nom de la fiche', 'showTitle'),
+        o.kind === 'meeting' ? checkbox('v-when', 'Afficher la date et l’heure', 'showWhen') : null,
+        o.photo ? checkbox('v-photo', 'Inclure la photo de l’entrée (désactivé par défaut)', 'withPhoto') : null),
+      preview, status,
+      h('div', { class: 'row' },
+        h('button', { class: 'btn', type: 'button', id: 'visual-download', onclick: download }, 'Télécharger l’image'),
+        canShareFiles ? h('button', { class: 'btn ghost', type: 'button', id: 'visual-share', onclick: shareFile }, 'Partager l’image…') : null),
+      h('button', { class: 'btn ghost', type: 'button', id: 'visual-copy', onclick: function () { copy(o.url, 'Lien', function () { track('link_copied', o.kind); }); } }, 'Copier le lien'),
+      fallback,
+      h('p', { class: 'hint' }, guide),
+      h('p', { class: 'hint' }, 'Une image téléchargée ou publiée ne peut pas être rappelée, même si vous désactivez ou supprimez la fiche ensuite.'));
+  }
+
+  // Image verticale 1080 × 1920, déterministe (canvas, polices et couleurs de Fii La).
+  // Jamais : clé de gestion, coordonnées, réponse privée. La photo n'apparaît que si l'utilisateur la coche,
+  // entière (jamais recadrée) et sans texte par-dessus.
+  function buildShareVisual(o, opts) {
+    var W = 1080, H = 1920, M = 96, CW = W - 2 * M;
+    var C = { bg: '#F5F2EA', ink: '#17201B', muted: '#55605A', green: '#1E4A34', lime: '#C9E265', soft: '#E9EFE1', white: '#FFFFFF' };
+    var fontsReady = document.fonts && document.fonts.load
+      ? Promise.all(['800 84px Montserrat', '600 40px Montserrat', '400 30px Montserrat'].map(function (f) { return document.fonts.load(f); })).catch(function () {})
+      : Promise.resolve();
+    var photoReady = opts.withPhoto && o.photo ? new Promise(function (res) {
+      var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = o.photo;
+    }) : Promise.resolve(null);
+    return Promise.all([fontsReady, photoReady, loadQr()]).then(function (r) {
+      var photo = r[1], qrcode = r[2];
+      var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      var g = cv.getContext('2d');
+      var meta = { width: W, height: H, texts: [], includesPhoto: false, qrText: o.url };
+      function font(w, size, fam) { g.font = w + ' ' + size + 'px ' + (fam || 'Montserrat, system-ui, sans-serif'); }
+      function wrap(text, maxW, maxLines) {
+        var words = String(text).split(/\s+/), lines = [], line = '';
+        function pushLong(word) { // mots plus larges que la ligne : coupe par caractères
+          var part = '';
+          for (var i = 0; i < word.length; i++) {
+            if (g.measureText(part + word[i]).width > maxW && part) { lines.push(part); part = ''; }
+            part += word[i];
+          }
+          return part;
+        }
+        words.forEach(function (w) {
+          var test = line ? line + ' ' + w : w;
+          if (g.measureText(test).width <= maxW) { line = test; return; }
+          if (line) lines.push(line);
+          line = g.measureText(w).width > maxW ? pushLong(w) : w;
+        });
+        if (line) lines.push(line);
+        if (lines.length > maxLines) {
+          lines = lines.slice(0, maxLines);
+          var last = lines[maxLines - 1];
+          while (g.measureText(last + '…').width > maxW && last.length) last = last.slice(0, -1);
+          lines[maxLines - 1] = last.replace(/\s+$/, '') + '…';
+        }
+        return lines;
+      }
+      function rr(x, y, w, hh, rad, fill) { g.beginPath(); g.moveTo(x + rad, y); g.arcTo(x + w, y, x + w, y + hh, rad); g.arcTo(x + w, y + hh, x, y + hh, rad); g.arcTo(x, y + hh, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath(); if (fill) { g.fillStyle = fill; g.fill(); } }
+      function text(t, x, y, color) { g.fillStyle = color; g.fillText(t, x, y); meta.texts.push(t); }
+
+      g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+      g.textBaseline = 'alphabetic';
+      // Marque
+      font(800, 72);
+      var fiiW = g.measureText('Fii').width;
+      text('Fii', M, 170, C.ink);
+      rr(M + fiiW + 12, 104, g.measureText('La').width + 28, 86, 18, C.lime);
+      text('La', M + fiiW + 26, 170, C.ink);
+      var y = 250;
+      if (photo) {
+        var boxH = 520;
+        g.save(); rr(M, y, CW, boxH, 28); g.clip(); g.fillStyle = C.soft; g.fillRect(M, y, CW, boxH);
+        var s = Math.min(CW / photo.naturalWidth, boxH / photo.naturalHeight);
+        var pw = photo.naturalWidth * s, ph = photo.naturalHeight * s;
+        var px = M + (CW - pw) / 2, py = y + (boxH - ph) / 2;
+        g.drawImage(photo, px, py, pw, ph); g.restore();
+        meta.includesPhoto = true; meta.photoRect = { x: px, y: py, w: pw, h: ph }; meta.photoAspect = photo.naturalWidth / photo.naturalHeight;
+        y += boxH + 70;
+      } else { y += 60; }
+      // Type de fiche
+      font(600, 34); g.letterSpacing = '3px';
+      text(o.kind === 'meeting' ? 'RENDEZ-VOUS' : o.kind === 'request' ? 'DEMANDE D’ADRESSE' : 'ADRESSE', M, y, C.muted);
+      g.letterSpacing = '0px';
+      y += 30;
+      // Titre (ou formule neutre)
+      var title = opts.showTitle && o.title ? o.title : (o.kind === 'meeting' ? 'Un rendez-vous partagé avec Fii La' : o.kind === 'request' ? 'Une demande d’adresse Fii La' : 'Une adresse partagée avec Fii La');
+      font(800, 84);
+      var tl = wrap(title, CW, photo ? 2 : 3);
+      tl.forEach(function (l) { y += 96; text(l, M, y, C.ink); });
+      meta.titleLines = tl;
+      if (o.kind === 'meeting' && opts.showWhen && o.when) { y += 18; font(600, 40); wrap(o.when, CW, 2).forEach(function (l) { y += 56; text(l, M, y, C.muted); }); }
+      // Invitation
+      y += 40; font(600, 44);
+      var inv = o.kind === 'meeting' ? 'Ouvre la fiche : le lieu exact, l’heure et comment arriver.'
+        : o.kind === 'request' ? 'Ouvre le lien pour m’envoyer ton adresse avec ta photo d’entrée.'
+        : 'Ouvre la fiche pour trouver l’entrée exacte, avec photo et repères.';
+      wrap(inv, CW, 3).forEach(function (l) { y += 58; text(l, M, y, C.green); });
+      meta.contentBottom = y;
+      // Bloc QR + lien, ancré en bas
+      var qr = qrcode(0, 'M'); qr.addData(o.url); qr.make();
+      var n = qr.getModuleCount();
+      font(400, 30, 'ui-monospace, Menlo, Consolas, monospace');
+      var urlLines = wrap(o.url, CW - 40, 3);
+      var below = 64 + urlLines.length * 40;
+      var room = H - 70 - below - (y + 60);
+      var cell = Math.max(5, Math.min(12, Math.floor((Math.min(room, 560) - 2 * 4) / (n + 8))));
+      var qs2 = cell * (n + 8); // zone de silence de 4 modules de chaque côté
+      var qy = H - 70 - below - qs2;
+      var qx = (W - qs2) / 2;
+      rr(qx - 16, qy - 16, qs2 + 32, qs2 + 32, 28, C.white);
+      g.fillStyle = '#000000';
+      for (var rI = 0; rI < n; rI++) for (var cI = 0; cI < n; cI++) if (qr.isDark(rI, cI)) g.fillRect(qx + (cI + 4) * cell, qy + (rI + 4) * cell, cell, cell);
+      meta.qr = { x: qx, y: qy, size: qs2, cell: cell, modules: n, overlapsContent: qy - 16 < y + 20 };
+      font(600, 32); g.textAlign = 'center';
+      text('Scanne le QR code ou ouvre le lien', W / 2, qy + qs2 + 56, C.ink);
+      font(400, 30, 'ui-monospace, Menlo, Consolas, monospace');
+      urlLines.forEach(function (l, i) { text(l, W / 2, qy + qs2 + 56 + 44 * (i + 1), C.muted); });
+      g.textAlign = 'left';
+      cv.__meta = meta;
+      return cv;
+    });
   }
 
   /* ================================================================ VUE DESTINATAIRE */
@@ -1068,18 +1325,8 @@
           fiche(q.place)];
       } else if (q.state === 'pending') {
         stateBlock = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, 'En attente de réponse'),
-          h('section', { class: 'card' },
-            h('h2', null, 'Envoyer la demande au client'),
-            h('p', { class: 'sharelink', id: 'request-url' }, url),
-            navigator.share ? h('button', { class: 'btn', type: 'button', id: 'share-request', onclick: function () {
-              track('share_initiated', 'native_request');
-              navigator.share({ title: 'Demande d’adresse', text: msg.replace(url, '').trim(), url: url }).catch(function (e) {
-                if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier le lien ».');
-              });
-            } }, 'Partager…') : null,
-            h('a', { class: 'btn lime', href: waLink(msg), target: '_blank', rel: 'noopener noreferrer', onclick: function () { track('share_initiated', 'whatsapp_request'); } }, 'Préparer un message WhatsApp'),
-            h('button', { class: 'btn ghost', type: 'button', id: 'copy-request', onclick: function () { copy(url, 'Lien', function () { track('link_copied', 'request'); }); } }, 'Copier le lien'),
-            h('p', { class: 'hint' }, 'Le client voit votre nom et la raison de la demande, jamais d’autres réponses.')),
+          sharePanel({ kind: 'request', url: url, msg: msg, title: q.purpose, ids: { url: 'request-url', copy: 'copy-request', native: 'share-request' } }),
+          h('p', { class: 'hint' }, 'Le client voit votre nom et la raison de la demande, jamais d’autres réponses.'),
           h('button', { class: 'btn', type: 'button', id: 'refresh', onclick: render }, 'Vérifier si le client a répondu')];
       } else if (q.state === 'expired') {
         stateBlock = [h('div', { class: 'notice' }, 'Cette demande a expiré sans réponse.'),

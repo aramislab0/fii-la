@@ -275,6 +275,14 @@ await t('mesure : événements de réutilisation et de partage typés acceptés'
   await ko('fiila_track', { p_event: 'share_sent', p_variant: 'whatsapp' }, 'invalid_event');
 });
 
+await t('mesure : canaux sociaux et image exportée acceptés, variantes inventées refusées', async () => {
+  for (const [e, v] of [['share_initiated', 'telegram_address'], ['share_initiated', 'facebook_meeting'], ['share_initiated', 'instagram_request'],
+    ['share_initiated', 'tiktok_address'], ['visual_exported', 'download_meeting'], ['visual_exported', 'share_address']])
+    await ok('fiila_track', { p_event: e, p_variant: v });
+  for (const [e, v] of [['share_initiated', 'telegram_address_x'], ['share_initiated', 'snapchat_address'], ['visual_exported', 'download_14.75'], ['story_published', 'instagram']])
+    await ko('fiila_track', { p_event: e, p_variant: v }, 'invalid_event');
+});
+
 await t('mesure : le rôle anon ne peut pas lire les compteurs', async () => {
   await assert.rejects(db.transaction(async (tx) => { await tx.exec('set local role anon'); await tx.query('select * from fiila.metrics'); }));
 });

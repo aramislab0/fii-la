@@ -8,7 +8,7 @@
 
 | Critère d’acceptation | État |
 |---|---|
-| Aucun défaut critique connu de sécurité ou de perte de données | Aucun connu (30 tests SQL ; 35 + 23 + 20 tests E2E ; parcours de production répété en local 12/12) |
+| Aucun défaut critique connu de sécurité ou de perte de données | Aucun connu (31 tests SQL ; 35 + 23 + 20 + 21 tests E2E ; parcours de production répété en local 12/12) |
 | Tous les parcours obligatoires passent dans l’environnement **déployé** | **Non vérifié** : la base de données en ligne n’existe pas |
 | Limites des intégrations externes explicites | Oui, section 6 |
 
@@ -19,7 +19,7 @@
 | Code | https://github.com/aramislab0/fii-la, branche `main` |
 | Hébergement (GitHub Pages, gratuit) | Activé. Les déploiements échouent uniquement à l’étape « Écrire la configuration publique » : `SUPABASE_URL` et `SUPABASE_PUBLISHABLE_KEY` n’existent pas, faute de base. **L’hébergement n’est pas le blocage et ne demande aucun paiement.** |
 | Base de données (Supabase) | **Bloquée.** Création refusée par Supabase : « There are overdue invoices in the organization(s) AramisLab ». Le refus s’applique aussi à une organisation neuve (essai du 15/10, 01:35) |
-| Migrations | Prêtes, à appliquer dans l’ordre : `20261015000000_fiila_init.sql`, `20261015100000_fiila_metrics.sql`, `20261015120000_fiila_metrics_reuse.sql`. Appliquées sur aucune base en ligne (`scripts/deploy.sh` les applique et `scripts/verify-db.mjs` vérifie les trois) |
+| Migrations | Prêtes, à appliquer dans l’ordre : `20261015000000_fiila_init.sql`, `20261015100000_fiila_metrics.sql`, `20261015120000_fiila_metrics_reuse.sql`, `20261015140000_fiila_metrics_social.sql`. Appliquées sur aucune base en ligne (`scripts/deploy.sh` les applique ; `scripts/verify-db.mjs` vérifie qu’elles correspondent toutes aux fichiers du dépôt) |
 
 **Actions nécessaires (côté compte, non faisables par Claude)**
 1. **Régler la facture en retard** de l’organisation Supabase AramisLab : tableau de bord → Organization → Billing → Invoices. Montant visible seulement dans ce tableau de bord. Fii La lui-même ne coûte rien en plan gratuit.
@@ -266,3 +266,28 @@ Ce sont des comptes d’événements par jour : ni des personnes uniques, ni un 
 4. « Créer un rendez-vous similaire » sur un vrai téléphone : saisie de la date avec le sélecteur natif.
 5. Installation : invite sur Android, consigne « Sur l’écran d’accueil » sur iPhone.
 6. Lire `fiila.metrics` après quelques jours de pilote : des comptes, pas des personnes.
+
+## 13. Partage social (ajout du 15/10/2026)
+
+**Panneau unique** sur les pages de gestion d’une adresse, d’un rendez-vous et d’une demande : lien destinataire, avertissement « Toute personne ayant ce lien peut consulter la fiche et le retransmettre. », puis « Partager… » (si le téléphone le permet), WhatsApp, « Copier le lien », et une grille discrète Telegram, Facebook, Instagram / Story, TikTok, avec des icônes monochromes simples (pas les logos officiels). La fiche destinataire ne reçoit aucun bouton de réseau social : l’itinéraire y reste l’action principale.
+
+| Canal | Mise en œuvre | Ce que Fii La ne fait pas |
+|---|---|---|
+| Partage natif | `navigator.share` avec le titre, un court texte et l’URL destinataire. Annulation silencieuse ; refus → « Utilisez Copier le lien ». Bouton absent si le navigateur ne le permet pas | Le système choisit les applications proposées : aucune n’est garantie |
+| WhatsApp | Lien `wa.me` avec message prêt (inchangé) | N’envoie rien tout seul |
+| Telegram | `https://t.me/share/url?url=…&text=…`, les deux encodés, conforme à la documentation Telegram | — |
+| Facebook | Si un identifiant d’application Meta est configuré (`facebookAppId` dans `config.js`) : Share Dialog officiel `facebook.com/dialog/share?app_id=…&href=…`. Sinon : `facebook.com/sharer/sharer.php?u=…`, adresse historique que la documentation actuelle ne décrit plus et qui peut changer ; « Copier le lien » reste à côté | Aucun SDK Facebook, aucun message prérempli, aucune publication forcée |
+| Instagram / Story | Image verticale + « Copier le lien » + consigne : ajouter le sticker « Lien » et y coller le lien | Pas de lien cliquable dans l’image, pas de publication automatique, pas d’ajout automatique du sticker. Instagram ne propose pas ce sticker aux comptes très récents |
+| TikTok | Image verticale + « Copier le lien » + consigne prudente sur le champ « Site web » du profil | Pas de lien cliquable dans la légende ni dans l’image, pas de publication automatique |
+
+**Image verticale** : 1080 × 1920 PNG, dessinée dans le navigateur avec la police et les couleurs de Fii La (aucune image générée par IA). Contenu : marque, type de fiche, nom (ou formule neutre si le propriétaire le masque), date et heure pour un rendez-vous (masquables), invitation à ouvrir la fiche, QR code de l’URL destinataire avec une marge blanche de 4 modules, et l’URL en clair. Jamais de clé de gestion, de coordonnées, de quartier ni de réponse privée. La photo de l’entrée n’apparaît que si le propriétaire coche « Inclure la photo » : elle est alors entière, non recadrée, sans texte par-dessus. Aperçu avant export ; si le navigateur ne sait pas télécharger, l’image s’affiche avec la consigne « appui long ». « Partager l’image… » n’apparaît que si le téléphone sait partager un fichier.
+
+**Aperçus des réseaux sociaux** : les liens de fiche utilisent un fragment (`#/a/…`) que les robots des réseaux ne transmettent pas au serveur. L’aperçu ne montre donc que le titre et la description génériques de Fii La, jamais le contenu d’une fiche. Rien n’a été ouvert aux robots pour enrichir l’aperçu.
+
+**Mesure** (migration `20261015140000_fiila_metrics_social.sql`) : `share_initiated` avec `telegram_*`, `facebook_*`, `instagram_*`, `tiktok_*` (canal choisi dans Fii La) ; `link_copied` (copie réussie) ; `visual_exported` avec `download_*` / `share_*` (image enregistrée ou feuille de partage ouverte). Aucun de ces compteurs ne signifie qu’un contenu a été publié, livré, vu, ni qu’une personne est arrivée. Aucun identifiant ajouté.
+
+**Tests (`tests/social.test.mjs`, 21/21, Chromium 141, iPhone 13 émulé, base locale)** : liens destinataires exacts pour chaque action et chaque type de fiche ; aucune clé ni identifiant interne dans les liens, le partage natif, l’image ou son QR code ; encodage (accents, guillemets français, « & », « # », titre long) ; Share Dialog officiel quand un identifiant est configuré ; vue destinataire sans boutons sociaux ; partage natif absent, réussi, annulé, refusé (simulé) ; presse-papiers refusé ; export PNG réellement téléchargé, 1080 × 1920, QR décodé égal au lien (avec et sans photo, pour les trois types) ; photo non recadrée ; titres longs coupés sans dépasser ; formule neutre ; repli « appui long » ; thème sombre (contraste ≥ 4,5:1) ; clavier ; 320 px ; plus de panneau ni d’image pour un lien désactivé ou un rendez-vous expiré ; compteurs distincts sans donnée privée. Les adresses wa.me, t.me et facebook.com sont interceptées : **aucune publication réelle**. Non-régression : 35/35, 23/23, 20/20, 12/12, SQL 31/31.
+
+**Ce qui n’est pas vérifié** : aucun test dans les vraies applications (WhatsApp, Telegram, Facebook, Instagram, TikTok), aucun téléphone physique, WebKit non exécuté pour ce lot. La page d’aide officielle TikTok sur le lien du profil n’a pas pu être lue : la consigne reste volontairement générale. Fiche de recette à remplir : `docs/RECETTE-TELEPHONES.md`.
+
+**Pour le déploiement** : appliquer les 4 migrations (`./scripts/deploy.sh`). Facultatif : créer une application Meta gratuite et renseigner son identifiant (variable de dépôt GitHub facultative `FACEBOOK_APP_ID`, déjà lue par le workflow) pour utiliser le Share Dialog officiel plutôt que `sharer.php`.

@@ -1,0 +1,94 @@
+{
+  "moteur": "chromium",
+  "version": "141.0.7390.37",
+  "mode": "automatisation Playwright, émulation iPhone 13, base locale ; aucune publication sur un réseau social",
+  "date": "2026-10-15T10:52:40.807Z",
+  "reussis": 21,
+  "total": 21,
+  "results": [
+    {
+      "ok": true,
+      "name": "panneau address : actions présentes, avertissement de confidentialité, lien destinataire seul"
+    },
+    {
+      "ok": true,
+      "name": "panneau meeting : actions présentes, avertissement de confidentialité, lien destinataire seul"
+    },
+    {
+      "ok": true,
+      "name": "panneau request : actions présentes, avertissement de confidentialité, lien destinataire seul"
+    },
+    {
+      "ok": true,
+      "name": "encodage : accents, guillemets, « & », « # » et titre long conservés dans le texte Telegram"
+    },
+    {
+      "ok": true,
+      "name": "Facebook avec identifiant d’application configuré : Share Dialog officiel, sans message prérempli"
+    },
+    {
+      "ok": true,
+      "name": "vue destinataire : aucun bouton de réseau social, l’itinéraire reste l’action principale"
+    },
+    {
+      "ok": true,
+      "name": "partage natif absent (navigateur sans Web Share) : bouton masqué, autres actions disponibles"
+    },
+    {
+      "ok": true,
+      "name": "partage natif [SIMULÉ partage natif] : réussi, annulé, refusé"
+    },
+    {
+      "ok": true,
+      "name": "presse-papiers refusé : le lien destinataire est proposé à copier à la main"
+    },
+    {
+      "ok": true,
+      "name": "Instagram / Story : aperçu 1080 × 1920, consigne du sticker Lien, sans photo par défaut"
+    },
+    {
+      "ok": true,
+      "name": "export : fichier PNG 1080 × 1920 téléchargé, QR décodé = lien destinataire"
+    },
+    {
+      "ok": true,
+      "name": "photo cochée par le propriétaire : entière (non recadrée), sans texte par-dessus ; QR toujours lisible"
+    },
+    {
+      "ok": true,
+      "name": "TikTok : consigne du champ « Site web » (non garanti), formule neutre si le nom est masqué"
+    },
+    {
+      "ok": true,
+      "name": "adresse et demande : image avec le bon lien, sans réponse privée"
+    },
+    {
+      "ok": true,
+      "name": "téléchargement direct impossible : image affichée avec la consigne « appui long »"
+    },
+    {
+      "ok": true,
+      "name": "thème sombre : panneau et aperçu lisibles"
+    },
+    {
+      "ok": true,
+      "name": "clavier : Instagram / Story s’ouvre avec Entrée, focus visible"
+    },
+    {
+      "ok": true,
+      "name": "320 px : panneau sans débordement horizontal"
+    },
+    {
+      "ok": true,
+      "name": "lien désactivé ou rendez-vous expiré [SIMULÉ temps] : plus de panneau de partage ni d’image"
+    },
+    {
+      "ok": true,
+      "name": "mesure : canal choisi, lien copié et image exportée distingués ; rien de privé"
+    },
+    {
+      "ok": true,
+      "name": "aucune erreur JavaScript"
+    }
+  ]
+}

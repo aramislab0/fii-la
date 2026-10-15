@@ -8,7 +8,7 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 
 ## Parcours
 - **Créer mon adresse** : point d’entrée (position GPS ou carte), arrêt voiture distinct, photo, repère, aperçu, lien de partage.
-- **Partager** : lien, message WhatsApp préparé, QR code, partage natif quand le téléphone le permet.
+- **Partager** : un seul panneau (partage natif, WhatsApp, copie du lien, Telegram, Facebook, Instagram / Story, TikTok), QR code, image verticale 1080 × 1920 à télécharger.
 - **Fiche destinataire** : photo, repère, « Arrêt voiture » puis « Entrée », itinéraire Google Maps, coordonnées copiables.
 - **Demander une adresse** : un commerçant ou un livreur envoie une demande, le client répond avec sa fiche, seul le demandeur voit la réponse.
 - **Rendez-vous** : fiche de lieu temporaire qui cesse d’afficher le lieu à la date choisie.
@@ -35,10 +35,11 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 ## Développer et tester en local
 ```bash
 npm install
-npm run test:sql      # 30 tests de l'API SQL sur un vrai Postgres (PGlite)
+npm run test:sql      # 31 tests de l'API SQL sur un vrai Postgres (PGlite)
 npm run test:e2e      # parcours complets dans Chromium, format iPhone 13
 npm run test:discovery # découverte destinataire → créateur, installation, mesure
 npm run test:circuit  # circuit complet : partage, réouverture, rendez-vous similaire, brouillons
+npm run test:social   # partage social : WhatsApp, Telegram, Facebook, Instagram, TikTok, image verticale
 npm run dev           # http://127.0.0.1:8787
 ```
 Les tests E2E utilisent uniquement des données synthétiques et suppriment ce qu’ils créent.
