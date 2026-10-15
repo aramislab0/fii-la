@@ -1,0 +1,41 @@
+name: Déployer Fii La sur GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Écrire la configuration publique
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: |
+          test -n "$SUPABASE_URL" || { echo "Variable SUPABASE_URL manquante"; exit 1; }
+          test -n "$SUPABASE_KEY" || { echo "Variable SUPABASE_PUBLISHABLE_KEY manquante"; exit 1; }
+          node -e 'const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:process.env.PUBLIC_URL||""};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
+          echo "<!-- build ${GITHUB_SHA} -->" >> web/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

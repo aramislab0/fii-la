@@ -1,0 +1,6 @@
+node_modules/
+.env*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+docs/screenshots/*-qr.png
