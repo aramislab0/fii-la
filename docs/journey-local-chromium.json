@@ -1,10 +1,10 @@
 {
   "cible": "local",
-  "url": "http://127.0.0.1:37217/",
+  "url": "http://127.0.0.1:40449/",
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "mode": "automatisation Playwright, émulation iPhone 13 (pas un téléphone physique)",
-  "date": "2026-10-15T11:10:34.109Z",
+  "date": "2026-10-15T11:20:35.509Z",
   "reussis": 12,
   "total": 12,
   "compteurs": {
@@ -22,52 +22,52 @@
     {
       "ok": true,
       "name": "configuration publique : URL HTTPS de l’API et clé publique seulement",
-      "ms": 136
+      "ms": 115
     },
     {
       "ok": true,
       "name": "1. propriétaire : créer une adresse avec photo",
-      "ms": 872
+      "ms": 920
     },
     {
       "ok": true,
       "name": "persistance : la fiche et sa photo survivent au rechargement (propriétaire)",
-      "ms": 418
+      "ms": 379
     },
     {
       "ok": true,
       "name": "2. destinataire (session isolée) : fiche, photo et repère, sans compte",
-      "ms": 420
+      "ms": 433
     },
     {
       "ok": true,
       "name": "3. bouton découverte : création vierge d’une 2e adresse",
-      "ms": 550
+      "ms": 659
     },
     {
       "ok": true,
       "name": "4. retour à la fiche d’origine",
-      "ms": 104
+      "ms": 73
     },
     {
       "ok": true,
       "name": "5. partage : lien copié et message WhatsApp avec la vraie URL",
-      "ms": 194
+      "ms": 247
     },
     {
       "ok": true,
       "name": "6. désactivation : la fiche et sa photo ne sont plus servies",
-      "ms": 263
+      "ms": 298
     },
     {
       "ok": true,
       "name": "7. suppression : fiche et photo inaccessibles, même par l’API",
-      "ms": 271
+      "ms": 257
     },
     {
       "ok": true,
       "name": "sécurité en production : tables privées inaccessibles par l’API",
-      "ms": 16
+      "ms": 18
     },
     {
       "ok": true,
@@ -77,7 +77,7 @@
     {
       "ok": true,
       "name": "compteurs agrégés : événements du parcours enregistrés (comptes, pas un tunnel individuel)",
-      "ms": 1
+      "ms": 0
     }
   ]
 }
