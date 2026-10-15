@@ -13,6 +13,7 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 - **Demander une adresse** : un commerçant ou un livreur envoie une demande, le client répond avec sa fiche, seul le demandeur voit la réponse.
 - **Rendez-vous** : fiche de lieu temporaire qui cesse d’afficher le lieu à la date choisie.
 - **Découverte** : après la fiche reçue, un bloc discret propose de créer sa propre adresse ou son rendez-vous, avec retour vers la fiche.
+- **Réutilisation** : réouvrir et repartager une fiche, « Créer un rendez-vous similaire », relancer une demande expirée.
 - **Gestion** : modifier (même lien), désactiver, nouveau lien, supprimer, clé de gestion pour un autre téléphone.
 
 ## Architecture
@@ -34,9 +35,10 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 ## Développer et tester en local
 ```bash
 npm install
-npm run test:sql      # 29 tests de l'API SQL sur un vrai Postgres (PGlite)
+npm run test:sql      # 30 tests de l'API SQL sur un vrai Postgres (PGlite)
 npm run test:e2e      # parcours complets dans Chromium, format iPhone 13
 npm run test:discovery # découverte destinataire → créateur, installation, mesure
+npm run test:circuit  # circuit complet : partage, réouverture, rendez-vous similaire, brouillons
 npm run dev           # http://127.0.0.1:8787
 ```
 Les tests E2E utilisent uniquement des données synthétiques et suppriment ce qu’ils créent.

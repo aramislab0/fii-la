@@ -1,0 +1,37 @@
+[
+  {
+    "event": "fiche_created",
+    "variant": "meeting_direct",
+    "n": 2
+  },
+  {
+    "event": "fiche_created",
+    "variant": "meeting_similar",
+    "n": 2
+  },
+  {
+    "event": "link_copied",
+    "variant": "meeting",
+    "n": 1
+  },
+  {
+    "event": "owned_reopened",
+    "variant": "meeting",
+    "n": 1
+  },
+  {
+    "event": "request_created",
+    "variant": "request",
+    "n": 2
+  },
+  {
+    "event": "share_initiated",
+    "variant": "native_meeting",
+    "n": 1
+  },
+  {
+    "event": "share_initiated",
+    "variant": "native_request",
+    "n": 1
+  }
+]

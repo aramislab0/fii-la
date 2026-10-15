@@ -163,3 +163,12 @@ footer.foot a,footer.foot button{color:var(--muted);font-size:13px}
 .install{border:1px dashed var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
 .install-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .install-actions .btn.small{flex:0 0 auto}
+
+/* Confirmation après enregistrement : visible tant que la page est ouverte (le toast disparaît). */
+.saved-ok{color:var(--ok);font-weight:600;font-size:15px}
+/* Coordonnées GPS : repli secondaire sous l'itinéraire. */
+.coords-more{background:transparent;border:none;padding:0;border-radius:0}
+.coords-more summary{font-size:13px;font-weight:600;color:var(--muted);min-height:44px;cursor:pointer}
+.coords-more .coordline{padding-top:4px}
+
+.notice{overflow-wrap:anywhere}

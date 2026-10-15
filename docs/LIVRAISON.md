@@ -4,11 +4,11 @@
 
 ## 1. Statut
 
-**STATUT : NOT READY — non déployé.** Le produit fonctionne et est testé en local ; il n’est pas encore accessible en ligne.
+**STATUT : IMPLEMENTED AND VERIFIED LOCALLY — DEPLOYMENT PENDING.** Tous les parcours passent en local (Chromium, base Postgres réelle). Rien n’est encore accessible en ligne, et WebKit n’a pas été relancé depuis la découverte et la réutilisation (section 12).
 
 | Critère d’acceptation | État |
 |---|---|
-| Aucun défaut critique connu de sécurité ou de perte de données | Aucun connu (29 tests SQL, 35 + 23 tests E2E, parcours de production répété en local 12/12) |
+| Aucun défaut critique connu de sécurité ou de perte de données | Aucun connu (30 tests SQL ; 35 + 23 + 20 tests E2E ; parcours de production répété en local 12/12) |
 | Tous les parcours obligatoires passent dans l’environnement **déployé** | **Non vérifié** : la base de données en ligne n’existe pas |
 | Limites des intégrations externes explicites | Oui, section 6 |
 
@@ -19,7 +19,7 @@
 | Code | https://github.com/aramislab0/fii-la, branche `main` |
 | Hébergement (GitHub Pages, gratuit) | Activé. Les déploiements échouent uniquement à l’étape « Écrire la configuration publique » : `SUPABASE_URL` et `SUPABASE_PUBLISHABLE_KEY` n’existent pas, faute de base. **L’hébergement n’est pas le blocage et ne demande aucun paiement.** |
 | Base de données (Supabase) | **Bloquée.** Création refusée par Supabase : « There are overdue invoices in the organization(s) AramisLab ». Le refus s’applique aussi à une organisation neuve (essai du 15/10, 01:35) |
-| Migrations | Prêtes : `20261015000000_fiila_init.sql`, `20261015100000_fiila_metrics.sql`. Appliquées sur aucune base en ligne |
+| Migrations | Prêtes, à appliquer dans l’ordre : `20261015000000_fiila_init.sql`, `20261015100000_fiila_metrics.sql`, `20261015120000_fiila_metrics_reuse.sql`. Appliquées sur aucune base en ligne (`scripts/deploy.sh` les applique et `scripts/verify-db.mjs` vérifie les trois) |
 
 **Actions nécessaires (côté compte, non faisables par Claude)**
 1. **Régler la facture en retard** de l’organisation Supabase AramisLab : tableau de bord → Organization → Billing → Invoices. Montant visible seulement dans ce tableau de bord. Fii La lui-même ne coûte rien en plan gratuit.
@@ -207,3 +207,62 @@ Captures : `docs/screenshots/discovery-*.png` (fiche adresse et rendez-vous en L
 - L’invite d’installation Chromium est simulée dans les tests (un navigateur sans interface ne la déclenche pas) ; l’installabilité, elle, est vérifiée réellement. La consigne iPhone est vérifiée en émulation, pas sur un iPhone.
 - Si le destinataire avait lui-même un brouillon d’adresse non terminé sur ce téléphone, la création le reprend : ce sont ses propres données, jamais celles de l’expéditeur.
 - Les compteurs peuvent être gonflés volontairement dans la limite anti-abus ; ils servent à décider, pas à facturer.
+
+## 12. Circuit complet et réutilisation (ajout du 15/10/2026, après-midi)
+
+Circuit visé : recevoir → trouver l’entrée → comprendre Fii La → créer → enregistrer → partager → revenir → réutiliser. Hors périmètre : offres payantes, paiement, suivi en direct, calcul d’itinéraire interne.
+
+**Audit : écarts trouvés et corrections**
+
+| Étape | Écart constaté dans le code | Correction |
+|---|---|---|
+| Trouver l’entrée | Coordonnées brutes affichées en grand sous chaque itinéraire : on partageait des chiffres plutôt qu’une fiche | Coordonnées repliées sous « Coordonnées GPS (si le lien ne s’ouvre pas) », toujours copiables |
+| Trouver l’entrée | Aucun écart : voiture vers l’arrêt, à pied vers l’entrée, URLs Google Maps officielles | Vérifié par test (`api=1`, `destination=lat,lng` dans cet ordre, virgule encodée `%2C`, `travelmode`) |
+| Comprendre | Le propriétaire qui ouvre son propre lien (depuis WhatsApp) voyait « Créer mon Fii La » | Bloc « Cette fiche est la vôtre » avec « Gérer et partager » |
+| Comprendre | Rendez-vous terminé : le seul bouton menait à la création d’adresse | Le bouton mène à « Créer mon rendez-vous » |
+| Créer | Formulaire de rendez-vous sans brouillon : tout était perdu en quittant la page, en revenant à la fiche reçue ou après un échec suivi d’un rechargement | Brouillon local enregistré à chaque saisie, repris avec « Recommencer » possible, effacé après succès |
+| Enregistrer → partager | Confirmation seulement dans un message éphémère de 3 s | Confirmation persistante « ✓ Enregistré. Envoyez maintenant le lien… » au-dessus du bloc Partager, affichée seulement après la réponse du serveur |
+| Partager | Page d’une demande d’adresse sans partage natif | « Partager… » ajouté quand le téléphone le permet, avant WhatsApp et la copie |
+| Revenir | Aucun écart : retour vers la fiche reçue depuis la création et après l’enregistrement | Revérifié |
+| Réutiliser | Aucun moyen de réutiliser un rendez-vous passé | « Créer un rendez-vous similaire » (détail ci-dessous) |
+| Réutiliser | Demande expirée : « Créez-en une nouvelle » sans bouton (cul-de-sac) | « Refaire la demande », nom et objet repris, référence de commande vide |
+| Carte | Un recalage d’affichage de la carte décalait un point repris d’environ 0,3 m | Le recalage ne modifie plus le point (défaut trouvé par les tests) |
+| Texte long | Le bandeau « À partir de… » débordait à 320 px avec un nom sans espace | Retour à la ligne forcé |
+
+**« Créer un rendez-vous similaire »** (page de gestion d’un rendez-vous ; mis en avant quand il est expiré)
+- Repris : lieu et arrêt voiture (affichés mais à **reconfirmer** avec « Valider ce point »), trajet à pied, indications, photo, durée d’affichage.
+- Jamais repris : nom, date et heure (à saisir), lien de partage, clé de gestion, statut désactivé ou expiré.
+- Enregistré comme une fiche distincte (nouveaux jetons). Le rendez-vous d’origine n’est jamais modifié : vérifié champ par champ en base, y compris quand l’origine est désactivée et expirée.
+- Brouillon propre à chaque rendez-vous d’origine, gardé si l’on quitte la page.
+
+**Carte (rappel)** : Leaflet 1.9.4 + tuiles OpenStreetMap standard, chargées seulement pendant la création, attribution « © OpenStreetMap » visible. Politique d’usage OSMF : pas d’usage intensif ni de téléchargement massif, pas de garantie de service, accès révocable sans préavis. Adapté au pilote ; un fournisseur de tuiles dédié sera nécessaire à plus grande échelle. Aucune API payante. Les itinéraires passent par les URLs Google Maps, qui ne demandent ni clé ni abonnement.
+
+**Mesure : ajouts (migration `20261015120000_fiila_metrics_reuse.sql`)**
+
+| Événement | Variantes | Sens exact |
+|---|---|---|
+| `fiche_created` | + `meeting_similar` | Rendez-vous enregistré à partir d’un autre |
+| `request_created` | `request` | Demande d’adresse enregistrée |
+| `share_initiated` | `native_*`, `whatsapp_*` pour `address`, `meeting`, `request` | Partage natif ou WhatsApp **ouvert** ; jamais « message envoyé » |
+| `link_copied` | + `request` | Copie réussie du lien d’une demande |
+| `owned_reopened` | `address`, `meeting`, `request` | Une fiche possédée rouverte depuis l’accueil |
+
+Ce sont des comptes d’événements par jour : ni des personnes uniques, ni un taux de fidélité, ni des arrivées. Aucun clic sur l’itinéraire n’est compté. Aucune donnée de lieu, aucune clé ni aucun jeton n’est envoyé (vérifié par test).
+
+**Tests de ce lot (`tests/circuit.test.mjs`, 20/20, Chromium 141, iPhone 13 émulé, base Postgres locale réelle)**
+- Simulations, signalées dans le nom des tests : partage natif remplacé par un enregistreur (Chromium Linux n’a pas Web Share), expiration forcée en base, panne ou lenteur réseau par interception.
+- Couvert : état « partager » seulement après la réponse du serveur ; partage natif limité à l’URL destinataire ; ordre partager puis gérer ; destinataire anonyme ; cibles d’itinéraire ; coordonnées repliées ; propriétaire reconnu sur son propre lien ; réouverture depuis l’accueil puis repartage (WhatsApp, copie) ; rendez-vous similaire (vierge sur nom et date, lieu à reconfirmer, brouillon gardé, fiche distincte, origine inchangée, y compris depuis une origine désactivée et expirée) ; liens désactivé et expiré ; brouillon retrouvé après échec puis rechargement ; position refusée ; demande partagée puis relancée après expiration ; thème sombre (contraste de la confirmation au moins 4,5:1) ; clavier ; texte long à 320 px ; contenu de la mesure.
+- Non-régression : SQL 30/30, suite complète 35/35, découverte 23/23, parcours de production rejoué en local 12/12.
+
+**Limites de ce lot**
+- WebKit non exécuté : il ne s’installe pas dans cet environnement (téléchargement bloqué) et le Mac était hors ligne. La dernière exécution WebKit (35/35) date d’avant la découverte et la réutilisation.
+- Aucun test sur téléphone physique ; le partage natif réel n’a pas été ouvert.
+- Rien n’est en ligne : migrations non appliquées, aucune mesure réelle.
+
+**À vérifier après déploiement (URL publique et vrais téléphones)**
+1. `./scripts/deploy.sh` : 3 migrations appliquées, `verify-db` au vert, parcours de production Chromium et WebKit au vert.
+2. iPhone (Safari) et Android (Chrome), en vrai : ouvrir un lien reçu dans WhatsApp, photo, « Itinéraire » qui ouvre bien l’application Google Maps sur l’arrêt puis sur l’entrée.
+3. Partage natif réel depuis la page de gestion et depuis une demande : seul le lien de la fiche part.
+4. « Créer un rendez-vous similaire » sur un vrai téléphone : saisie de la date avec le sélecteur natif.
+5. Installation : invite sur Android, consigne « Sur l’écran d’accueil » sur iPhone.
+6. Lire `fiila.metrics` après quelques jours de pilote : des comptes, pas des personnes.

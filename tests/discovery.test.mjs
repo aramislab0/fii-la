@@ -232,7 +232,7 @@ await t('environnement sans installation possible : aucune proposition, rien de 
 
 await t('mesure : partage WhatsApp ouvert et lien copié, distingués, sans contenu', async () => {
   await anon.ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(URL0).origin });
-  const wa = waitTrack(R, 'share_initiated', 'whatsapp');
+  const wa = waitTrack(R, 'share_initiated', 'whatsapp_address');
   const [popup] = await Promise.all([R.waitForEvent('popup').catch(() => null), R.getByRole('link', { name: 'Préparer un message WhatsApp' }).click()]);
   await wa;
   if (popup) await popup.close().catch(() => {});
@@ -241,7 +241,7 @@ await t('mesure : partage WhatsApp ouvert et lien copié, distingués, sans cont
   await R.getByText('Lien copié.').waitFor();
   await cp;
   const evs = tracks(R).map((x) => x.p_event + ':' + x.p_variant);
-  for (const e of ['discovery_shown:address', 'discovery_cta:address', 'fiche_created:address_discovery', 'share_initiated:whatsapp', 'link_copied:address'])
+  for (const e of ['discovery_shown:address', 'discovery_cta:address', 'fiche_created:address_discovery', 'share_initiated:whatsapp_address', 'link_copied:address'])
     assert.ok(evs.includes(e), 'manque ' + e);
   assert.ok(!evs.some((e) => /sent|envoy/.test(e)), 'événement « envoyé » non vérifiable');
   const own = (await R.evaluate(() => JSON.parse(localStorage.getItem('fiila.owned'))))[0];

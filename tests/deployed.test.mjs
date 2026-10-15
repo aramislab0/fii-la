@@ -261,7 +261,7 @@ await t('compteurs agrégés : événements du parcours enregistrés (comptes, p
     if (d) diff[k] = d;
   }
   metrics = { delta_pendant_le_test: diff, note: 'Écart des compteurs du jour entre le début et la fin du test. D’autres visiteurs réels peuvent s’y ajouter.' };
-  for (const k of ['discovery_shown:address', 'discovery_cta:address', 'fiche_created:address_direct', 'fiche_created:address_discovery', 'share_initiated:whatsapp'])
+  for (const k of ['discovery_shown:address', 'discovery_cta:address', 'fiche_created:address_direct', 'fiche_created:address_discovery', 'share_initiated:whatsapp_address'])
     assert.ok((diff[k] || 0) >= 1, 'compteur non incrémenté : ' + k);
   if (ENGINE === 'chromium') assert.ok((diff['link_copied:address'] || 0) >= 1, 'link_copied non compté');
   for (const b of [...A.__tracks, ...B.__tracks]) assert.deepEqual(Object.keys(JSON.parse(b)).sort(), ['p_event', 'p_variant']);

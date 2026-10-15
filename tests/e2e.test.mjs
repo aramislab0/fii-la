@@ -400,7 +400,7 @@ await t('rendez-vous : création avec date, lieu et expiration', async () => {
   await byText(A, 'Créer le rendez-vous').click();
   await A.getByRole('heading', { name: 'Partager' }).waitFor();
   meetingUrl = await A.locator('#share-url').textContent();
-  meetingId = A.url().split('#/m/')[1];
+  meetingId = A.url().split('#/m/')[1].split('?')[0];
 });
 
 await t('rendez-vous : mise à jour visible sur le même lien', async () => {
@@ -489,6 +489,7 @@ await t('presse-papiers refusé : texte à copier affiché', async () => {
   await p.page.goto(URL0);
   const c = await rpcFromPage(p.page, 'fiila_create_place', { p: { kind: 'address', label: 'Copie', entry: { lat: 14.75, lng: -17.47 }, instruction: 'Test copie' } });
   await p.page.goto(URL0 + '#/a/' + c.body.share_token);
+  await p.page.locator('.coords-more summary').first().click();
   await p.page.getByRole('button', { name: 'Copier' }).first().click();
   await p.page.getByText('Copie automatique impossible. Sélectionnez et copiez :').waitFor();
   assert.equal(await p.page.locator('.toast input').inputValue(), '14.750000, -17.470000');

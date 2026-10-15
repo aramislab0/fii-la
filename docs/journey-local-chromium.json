@@ -1,10 +1,10 @@
 {
   "cible": "local",
-  "url": "http://127.0.0.1:37757/",
+  "url": "http://127.0.0.1:37627/",
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "mode": "automatisation Playwright, émulation iPhone 13 (pas un téléphone physique)",
-  "date": "2026-10-15T10:17:26.576Z",
+  "date": "2026-10-15T10:34:02.742Z",
   "reussis": 12,
   "total": 12,
   "compteurs": {
@@ -13,7 +13,7 @@
       "discovery_shown:address": 1,
       "discovery_cta:address": 1,
       "fiche_created:address_discovery": 1,
-      "share_initiated:whatsapp": 1,
+      "share_initiated:whatsapp_address": 1,
       "link_copied:address": 1
     },
     "note": "Écart des compteurs du jour entre le début et la fin du test. D’autres visiteurs réels peuvent s’y ajouter."
@@ -22,52 +22,52 @@
     {
       "ok": true,
       "name": "configuration publique : URL HTTPS de l’API et clé publique seulement",
-      "ms": 104
+      "ms": 139
     },
     {
       "ok": true,
       "name": "1. propriétaire : créer une adresse avec photo",
-      "ms": 708
+      "ms": 872
     },
     {
       "ok": true,
       "name": "persistance : la fiche et sa photo survivent au rechargement (propriétaire)",
-      "ms": 321
+      "ms": 286
     },
     {
       "ok": true,
       "name": "2. destinataire (session isolée) : fiche, photo et repère, sans compte",
-      "ms": 452
+      "ms": 430
     },
     {
       "ok": true,
       "name": "3. bouton découverte : création vierge d’une 2e adresse",
-      "ms": 683
+      "ms": 694
     },
     {
       "ok": true,
       "name": "4. retour à la fiche d’origine",
-      "ms": 94
+      "ms": 75
     },
     {
       "ok": true,
       "name": "5. partage : lien copié et message WhatsApp avec la vraie URL",
-      "ms": 183
+      "ms": 248
     },
     {
       "ok": true,
       "name": "6. désactivation : la fiche et sa photo ne sont plus servies",
-      "ms": 296
+      "ms": 255
     },
     {
       "ok": true,
       "name": "7. suppression : fiche et photo inaccessibles, même par l’API",
-      "ms": 311
+      "ms": 273
     },
     {
       "ok": true,
       "name": "sécurité en production : tables privées inaccessibles par l’API",
-      "ms": 28
+      "ms": 16
     },
     {
       "ok": true,

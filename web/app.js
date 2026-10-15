@@ -196,9 +196,11 @@
   var TRACKABLE = {
     discovery_shown: ['address', 'meeting'],
     discovery_cta: ['address', 'meeting'],
-    fiche_created: ['address_direct', 'address_discovery', 'address_request', 'meeting_direct', 'meeting_discovery'],
-    share_initiated: ['native', 'whatsapp'],
-    link_copied: ['address', 'meeting']
+    fiche_created: ['address_direct', 'address_discovery', 'address_request', 'meeting_direct', 'meeting_discovery', 'meeting_similar'],
+    request_created: ['request'],
+    share_initiated: ['native_address', 'native_meeting', 'native_request', 'whatsapp_address', 'whatsapp_meeting', 'whatsapp_request'],
+    link_copied: ['address', 'meeting', 'request'],
+    owned_reopened: ['address', 'meeting', 'request']
   };
   function privacyOptOut() {
     try { return navigator.globalPrivacyControl === true || navigator.doNotTrack === '1' || window.doNotTrack === '1'; }
@@ -332,16 +334,19 @@
     }
     if (p.src === 'paste') return ['neutral', 'Coordonnées collées. Vérifiez-les sur la carte.'];
     if (p.src === 'saved') return ['neutral', 'Point déjà enregistré.'];
+    if (p.src === 'reused') return ['mid', 'Point repris du rendez-vous précédent : vérifiez-le, puis validez.'];
     return ['neutral', 'Placé à la main sur la carte.'];
   }
 
   // opts: { get(), set(p|null), what: 'l’entrée', id }
   function mapPicker(opts) {
     var current = opts.get();
-    var center = current ? { lat: current.lat, lng: current.lng } : null;
-    var src = current ? current.src || 'manual' : null;
+    // opts.initial : point repris (rendez-vous similaire) affiché mais NON validé tant que l'utilisateur ne confirme pas.
+    var start = current || opts.initial || null;
+    var center = start ? { lat: start.lat, lng: start.lng } : null;
+    var src = current ? current.src || 'manual' : opts.initial ? 'reused' : null;
     var acc = current ? current.acc : null;
-    var map = null, accCircle = null, zoomOk = !!current, programmatic = false;
+    var map = null, accCircle = null, zoomOk = !!start, programmatic = false;
 
     var msg = h('p', { class: 'msg', role: 'status', 'aria-live': 'polite' });
     var ptBox = h('div', { class: 'pt' });
@@ -435,8 +440,9 @@
         if (!zoomOk && !opts.get()) say('Zoomez davantage pour placer le repère précisément.', 'info');
         draw();
       });
-      setTimeout(function () { map.invalidateSize(); }, 60);
+      setTimeout(function () { programmatic = true; map.invalidateSize(); programmatic = false; }, 60); // recalage d'affichage : ne doit pas déplacer le point
       if (!center) say('Utilisez votre position, ou déplacez et zoomez la carte jusqu’à ' + opts.what + '.', 'info');
+      else if (!opts.get() && opts.initial) say('Point repris du rendez-vous précédent. Vérifiez qu’il est toujours juste, puis validez.', 'info');
       draw();
     }, function () {
       mapBox.replaceWith(h('p', { class: 'alert' }, 'La carte n’a pas pu se charger. Utilisez votre position ou collez des coordonnées.'));
@@ -559,10 +565,14 @@
   }
 
   /* ================================================================ fiche (vue destinataire) */
+  // Repli secondaire : on partage une fiche nommée, pas des chiffres. Les coordonnées restent accessibles
+  // (lien qui ne s'ouvre pas, autre application) mais repliées.
   function coordLine(p) {
-    return h('div', { class: 'coordline' },
-      h('span', { class: 'coords' }, fmt(p)),
-      h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(fmt(p), 'Coordonnées'); } }, 'Copier'));
+    return h('details', { class: 'coords-more' },
+      h('summary', null, 'Coordonnées GPS (si le lien ne s’ouvre pas)'),
+      h('div', { class: 'coordline' },
+        h('span', { class: 'coords' }, fmt(p)),
+        h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(fmt(p), 'Coordonnées'); } }, 'Copier')));
   }
   function leg(n, title, p, mode, note) {
     return h('section', { class: 'leg', 'aria-label': title },
@@ -613,7 +623,7 @@
       else if (p[0] === 'new') view = viewAddressForm(null, r.q);
       else if (p[0] === 'edit' && p[1]) view = viewAddressForm(p[1], r.q);
       else if (p[0] === 'm' && p[1]) view = viewManage(p[1]);
-      else if (p[0] === 'demande' && p[1] === 'nouvelle') view = viewRequestNew();
+      else if (p[0] === 'demande' && p[1] === 'nouvelle') view = viewRequestNew(r.q);
       else if (p[0] === 'demande' && p[1]) view = viewRequestOwner(p[1]);
       else if (p[0] === 'd' && p[1]) view = viewRequestPublic(p[1], r.q);
       else if (p[0] === 'rdv' && p[1] === 'nouveau') view = viewMeetingForm(null, r.q);
@@ -655,7 +665,8 @@
             h('div', null, h('div', { class: 't' }, 'Fiche introuvable'), h('div', { class: 'small muted' }, 'Supprimée, ou clé non valide.')),
             h('button', { class: 'btn ghost small', type: 'button', onclick: function () { owned.remove(x.type, x.id); render(); } }, 'Retirer'));
         }
-        return h('a', { class: 'item', href: href, style: 'text-decoration:none' },
+        var kind = x.type === 'request' ? 'request' : (x.kind || 'address');
+        return h('a', { class: 'item', href: href, style: 'text-decoration:none', onclick: function () { track('owned_reopened', kind); } },
           h('div', null, h('div', { class: 't' }, title), sub ? h('div', { class: 'small muted wrapword' }, sub) : null), chip);
       }
       function chip(cls, text) { return h('span', { class: 'chip ' + cls }, text); }
@@ -817,14 +828,14 @@
         });
       }
       return api('fiila_create_place', { p: payload() }).then(function (r) {
-        var stored = owned.put({ type: 'place', kind: 'address', id: r.id, owner: r.owner_token, label: d.label.trim(), created: Date.now() });
+        var stored = owned.put({ type: 'place', kind: 'address', id: r.id, owner: r.owner_token, share: r.share_token, label: d.label.trim(), created: Date.now() });
         LS.del(DRAFT_KEY);
         LS.set('fiila.saved', true);
         track('fiche_created', ctx.reqToken ? 'address_request' : ctx.retour ? 'address_discovery' : 'address_direct');
         if (!stored) toast('Fiche enregistrée, mais ce téléphone n’a pas pu garder la clé de gestion. Copiez-la sur la page suivante.');
         else toast('Adresse enregistrée.');
         if (ctx.reqToken) go('#/d/' + ctx.reqToken + '?sel=' + r.id);
-        else go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour }));
+        else go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour, nouveau: '1' }));
       });
     }
     draw();
@@ -838,7 +849,8 @@
     var owner = rec ? rec.owner : q.k;
     if (!owner) return page(backBtn(), stateCard('?', 'Cette fiche n’est pas gérée sur ce téléphone', 'Ouvrez sa clé de gestion sur ce téléphone pour la gérer ici.', h('a', { class: 'btn', href: '#/cle' }, 'Restaurer une clé')));
     return api('fiila_get_owned', { p_id: id, p_owner: owner }).then(function (pl) {
-      return manageView(pl, owner, tokenParam(q.retour));
+      if (rec && rec.share !== pl.share_token) owned.patch('place', id, { share: pl.share_token, label: pl.label });
+      return manageView(pl, owner, tokenParam(q.retour), q.nouveau === '1');
     }, function (e) {
       if (e.code === 'not_found') {
         return page(backBtn(), stateCard('?', 'Fiche introuvable', 'Elle a peut-être été supprimée.',
@@ -848,7 +860,7 @@
     });
   }
 
-  function manageView(pl, owner, retour) {
+  function manageView(pl, owner, retour, justSaved) {
     var isMeeting = pl.kind === 'meeting';
     var expired = isMeeting && new Date(pl.expires_at) <= new Date();
     var active = pl.status === 'active' && !expired;
@@ -891,6 +903,7 @@
         h('p', { class: 'eyebrow' }, isMeeting ? 'Mon rendez-vous' : 'Mon adresse'),
         h('h1', { class: 'wrapword' }, pl.label),
         isMeeting ? h('p', { class: 'muted' }, whenText(pl.starts_at)) : null,
+        justSaved && active ? h('p', { class: 'saved-ok', role: 'status', id: 'saved-ok' }, '✓ Enregistré. Envoyez maintenant le lien à vos visiteurs ou livreurs.') : null,
         h('div', { class: 'row', style: 'align-items:center' },
           h('span', { class: 'chip ' + (active ? 'ok' : 'off'), style: 'flex:0 0 auto' },
             expired ? 'Expiré' : pl.status === 'active' ? 'Lien actif' : 'Lien désactivé'),
@@ -899,12 +912,12 @@
         h('h2', { id: 'h-share' }, 'Partager'),
         h('p', { class: 'sharelink', id: 'share-url' }, url),
         navigator.share ? h('button', { class: 'btn', type: 'button', onclick: function () {
-          track('share_initiated', 'native');
+          track('share_initiated', 'native_' + variant);
           navigator.share({ title: pl.label, text: msg.replace(url, '').trim(), url: url }).catch(function (e) {
             if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier le lien ».');
           });
         } }, 'Partager…') : null,
-        h('a', { class: 'btn lime', href: waLink(msg), target: '_blank', rel: 'noopener noreferrer', onclick: function () { track('share_initiated', 'whatsapp'); } }, 'Préparer un message WhatsApp'),
+        h('a', { class: 'btn lime', href: waLink(msg), target: '_blank', rel: 'noopener noreferrer', onclick: function () { track('share_initiated', 'whatsapp_' + variant); } }, 'Préparer un message WhatsApp'),
         h('button', { class: 'btn ghost', type: 'button', id: 'copy-link', onclick: function () { copy(url, 'Lien', function () { track('link_copied', variant); }); } }, 'Copier le lien'),
         h('p', { class: 'hint' }, 'WhatsApp s’ouvre avec le message prêt : c’est vous qui l’envoyez. Toute personne qui reçoit le lien peut le transférer.'),
         h('div', { class: 'sep' }),
@@ -912,6 +925,7 @@
         qrBox) : null,
       installSlot(),
       expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
+      isMeeting ? h('a', { class: expired ? 'btn' : 'btn ghost', id: 'similar', href: '#/rdv/nouveau' + qs({ depuis: pl.id }) }, 'Créer un rendez-vous similaire') : null,
       h('div', { class: 'row' },
         active ? h('a', { class: 'btn ghost', href: url, target: '_blank', rel: 'noopener' }, 'Voir la fiche publique') : null,
         h('a', { class: 'btn ghost', href: isMeeting ? '#/rdv/modifier/' + pl.id : '#/edit/' + pl.id }, 'Modifier')),
@@ -939,7 +953,8 @@
       var cta = h('div', { class: 'row', style: 'justify-content:center' }, h('div', { style: 'flex:0 1 auto' }, create));
       if (r.state === 'ok') {
         document.title = 'Fii La';
-        return page(fiche(r.place), discoveryBlock(r.place.kind, token),
+        var mine = owned.all().filter(function (x) { return x.type === 'place' && x.share === token; })[0];
+        return page(fiche(r.place), mine ? ownerBlock(mine) : discoveryBlock(r.place.kind, token),
           h('p', { class: 'hint', style: 'text-align:center' }, 'Fiche partagée avec Fii La. Fii La ne demande pas votre position pour l’afficher.'));
       }
       var map = {
@@ -949,10 +964,20 @@
         not_found: ['?', 'Lien introuvable', 'Cette fiche n’existe pas ou a été supprimée.'],
         invalid: ['?', 'Lien non valide', 'Vérifiez que le lien a été copié en entier.']
       }[r.state] || ['?', 'Lien introuvable', ''];
+      if (r.state === 'expired') cta = h('div', { class: 'row', style: 'justify-content:center' }, h('div', { style: 'flex:0 1 auto' },
+        h('a', { class: 'btn ghost small', href: '#/rdv/nouveau' }, 'Créer mon rendez-vous')));
       return page(stateCard(map[0], map[1], map[2]), cta);
     }, function (e) {
       return page(stateCard('!', 'Impossible d’afficher la fiche', errText(e), retryBtn()), create);
     });
+  }
+
+  // Le propriétaire qui ouvre son propre lien (depuis WhatsApp, par exemple) retrouve sa gestion, pas une invitation à créer.
+  function ownerBlock(rec) {
+    return h('section', { class: 'discover', id: 'owner-block', 'aria-labelledby': 'owner-title' },
+      h('h2', { id: 'owner-title' }, 'Cette fiche est la vôtre'),
+      h('p', null, 'Vous l’avez créée sur ce téléphone. Vous pouvez la partager à nouveau, la modifier ou la désactiver.'),
+      h('a', { class: 'btn ghost discover-cta', id: 'owner-manage', href: '#/m/' + rec.id }, 'Gérer et partager'));
   }
 
   // Bloc de découverte, placé après les informations d'arrivée. Il ouvre le parcours de création
@@ -973,16 +998,25 @@
   }
 
   /* ================================================================ DEMANDE D'ADRESSE */
-  function viewRequestNew() {
-    var f = { requester_name: '', purpose: '', order_ref: '' };
+  function viewRequestNew(q) {
+    var src = q && q.depuis ? owned.find('request', q.depuis) : null;
+    if (src) {
+      return api('fiila_get_request_owner', { p_id: src.id, p_owner: src.owner }).then(function (old) {
+        return requestForm({ requester_name: old.requester_name || '', purpose: old.purpose || '', order_ref: '' });
+      }, function () { return requestForm({ requester_name: '', purpose: '', order_ref: '' }); });
+    }
+    return requestForm({ requester_name: '', purpose: '', order_ref: '' });
+  }
+  function requestForm(f) {
     var err = h('div', { role: 'alert' });
-    var btn = h('button', { class: 'btn', type: 'button', disabled: true, onclick: submit }, 'Créer la demande');
+    var btn = h('button', { class: 'btn', type: 'button', disabled: !(f.requester_name.trim() && f.purpose.trim()), onclick: submit }, 'Créer la demande');
     function chk() { btn.disabled = !(f.requester_name.trim() && f.purpose.trim()); }
     function submit() {
       btn.disabled = true; btn.textContent = 'Création…'; setKids(err);
       api('fiila_create_request', { p: { requester_name: f.requester_name.trim(), purpose: f.purpose.trim(), order_ref: f.order_ref.trim() || null } })
         .then(function (r) {
           owned.put({ type: 'request', id: r.id, owner: r.owner_token, label: f.purpose.trim(), created: Date.now() });
+          track('request_created', 'request');
           go('#/demande/' + r.id);
         }, function (e) {
           btn.textContent = 'Réessayer'; chk();
@@ -992,8 +1026,8 @@
     return page(backBtn(),
       h('h1', null, 'Demander une adresse'),
       h('p', { class: 'muted' }, 'Pour une livraison, un rendez-vous client ou une visite : la personne répond avec sa fiche, et vous seul la voyez.'),
-      textField({ id: 'rq-name', label: 'Votre nom ou celui de votre commerce', max: 60, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.requester_name = v; chk(); } }),
-      textField({ id: 'rq-purpose', label: 'Pourquoi demandez-vous l’adresse ?', max: 80, placeholder: 'Ex. : Livraison de votre commande', onInput: function (v) { f.purpose = v; chk(); } }),
+      textField({ id: 'rq-name', label: 'Votre nom ou celui de votre commerce', max: 60, value: f.requester_name, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.requester_name = v; chk(); } }),
+      textField({ id: 'rq-purpose', label: 'Pourquoi demandez-vous l’adresse ?', max: 80, value: f.purpose, placeholder: 'Ex. : Livraison de votre commande', onInput: function (v) { f.purpose = v; chk(); } }),
       textField({ id: 'rq-ref', label: 'Référence de commande', optional: true, max: 30, placeholder: 'Ex. : CMD-1042', hint: 'N’indiquez jamais de code de paiement ni de mot de passe.', onInput: function (v) { f.order_ref = v; } }),
       err, btn,
       h('p', { class: 'hint' }, 'La demande reste ouverte 7 jours et accepte une seule réponse.'),
@@ -1037,12 +1071,19 @@
           h('section', { class: 'card' },
             h('h2', null, 'Envoyer la demande au client'),
             h('p', { class: 'sharelink', id: 'request-url' }, url),
-            h('a', { class: 'btn lime', href: waLink(msg), target: '_blank', rel: 'noopener noreferrer' }, 'Préparer un message WhatsApp'),
-            h('button', { class: 'btn ghost', type: 'button', id: 'copy-request', onclick: function () { copy(url, 'Lien'); } }, 'Copier le lien'),
+            navigator.share ? h('button', { class: 'btn', type: 'button', id: 'share-request', onclick: function () {
+              track('share_initiated', 'native_request');
+              navigator.share({ title: 'Demande d’adresse', text: msg.replace(url, '').trim(), url: url }).catch(function (e) {
+                if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier le lien ».');
+              });
+            } }, 'Partager…') : null,
+            h('a', { class: 'btn lime', href: waLink(msg), target: '_blank', rel: 'noopener noreferrer', onclick: function () { track('share_initiated', 'whatsapp_request'); } }, 'Préparer un message WhatsApp'),
+            h('button', { class: 'btn ghost', type: 'button', id: 'copy-request', onclick: function () { copy(url, 'Lien', function () { track('link_copied', 'request'); }); } }, 'Copier le lien'),
             h('p', { class: 'hint' }, 'Le client voit votre nom et la raison de la demande, jamais d’autres réponses.')),
           h('button', { class: 'btn', type: 'button', id: 'refresh', onclick: render }, 'Vérifier si le client a répondu')];
       } else if (q.state === 'expired') {
-        stateBlock = [h('div', { class: 'notice' }, 'Cette demande a expiré sans réponse. Créez-en une nouvelle si besoin.')];
+        stateBlock = [h('div', { class: 'notice' }, 'Cette demande a expiré sans réponse.'),
+          h('a', { class: 'btn', id: 'request-again', href: '#/demande/nouvelle' + qs({ depuis: q.id }) }, 'Refaire la demande')];
       } else if (q.state === 'place_revoked') {
         stateBlock = [h('div', { class: 'notice' }, 'Le client a désactivé l’adresse qu’il vous avait envoyée. Elle n’est plus visible.')];
       } else {
@@ -1136,8 +1177,33 @@
         }, { editId: editId, owner: rec.owner, originalPhoto: pl.photo || null });
       }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger le rendez-vous', errText(e), retryBtn())); });
     }
+    if (q && q.depuis) return viewSimilarMeeting(q.depuis);
+    var key = MEETING_DRAFT;
+    var saved = LS.get(key, null);
     var today = new Date(Date.now() + 3600e3).toISOString();
-    return meetingForm({ label: '', date: today.slice(0, 10), time: '19:00', entry: null, hasStop: false, stop: null, walk: '', instruction: '', photo: null, exp: '24' }, { retour: tokenParam(q && q.retour) });
+    return meetingForm(saved || { label: '', date: today.slice(0, 10), time: '19:00', entry: null, hasStop: false, stop: null, walk: '', instruction: '', photo: null, exp: '24' },
+      { retour: tokenParam(q && q.retour), draftKey: key, restored: !!saved });
+  }
+  var MEETING_DRAFT = 'fiila.draft.meeting';
+  // « Créer un rendez-vous similaire » : nouveau brouillon, enregistré comme une fiche distincte.
+  // Repris : lieu (à reconfirmer), arrêt voiture (à reconfirmer), trajet à pied, indications, photo, durée d'affichage.
+  // Jamais repris : nom, date et heure, liens, clé de gestion, statut (désactivé, expiré).
+  function viewSimilarMeeting(sourceId) {
+    var rec = owned.find('place', sourceId);
+    if (!rec) return page(backBtn(), stateCard('?', 'Rendez-vous introuvable sur ce téléphone', 'Ouvrez sa clé de gestion pour le réutiliser ici.'));
+    var key = MEETING_DRAFT + '.similaire.' + sourceId;
+    var saved = LS.get(key, null);
+    return api('fiila_get_owned', { p_id: sourceId, p_owner: rec.owner }).then(function (pl) {
+      if (pl.kind !== 'meeting') return page(backBtn(), stateCard('?', 'Ce n’est pas un rendez-vous', ''));
+      var hours = Math.round((new Date(pl.expires_at) - new Date(pl.starts_at)) / 3600e3);
+      var f = saved || {
+        label: '', date: '', time: '', entry: null, entryInitial: { lat: pl.entry.lat, lng: pl.entry.lng },
+        hasStop: pl.vehicle_ok === false, stop: null, stopInitial: pl.stop ? { lat: pl.stop.lat, lng: pl.stop.lng } : null,
+        walk: pl.walk || '', instruction: pl.instruction || '', photo: pl.photo || null,
+        exp: String([2, 24, 168].indexOf(hours) >= 0 ? hours : 24)
+      };
+      return meetingForm(f, { similarOf: sourceId, sourceLabel: pl.label, draftKey: key, restored: !!saved });
+    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger le rendez-vous', errText(e), retryBtn())); });
   }
   function meetingForm(f, ctx) {
     var err = h('div', { role: 'alert' });
@@ -1154,11 +1220,17 @@
       var t = times();
       if (!t) return 'Indiquez la date et l’heure.';
       if (t.end <= new Date()) return 'Avec cette date, la fiche aurait déjà disparu. Choisissez une date future ou une durée plus longue.';
+      if (!f.entry && f.entryInitial) return 'Confirmez le lieu repris en appuyant sur « Valider ce point ».';
       if (!f.entry) return 'Validez le point de rendez-vous sur la carte.';
       if (f.hasStop && !f.stop) return 'Validez le point d’arrêt voiture, ou décochez l’option.';
       return '';
     }
+    function saveDraft() {
+      if (!ctx.draftKey) return;
+      if (!LS.set(ctx.draftKey, f)) LS.set(ctx.draftKey, Object.assign({}, f, { photo: null }));
+    }
     function chk() { var p = problem(); btn.disabled = !!p; why.textContent = p; }
+    function changed() { saveDraft(); chk(); }
     function submit() {
       if (problem()) return;
       var t = times();
@@ -1174,11 +1246,12 @@
       var call = ctx.editId ? api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner, p: p }) : api('fiila_create_place', { p: p });
       call.then(function (r) {
         if (ctx.editId) { owned.patch('place', ctx.editId, { label: p.label }); toast('Rendez-vous mis à jour. Le lien reste le même.'); go('#/m/' + ctx.editId); return; }
-        var stored = owned.put({ type: 'place', kind: 'meeting', id: r.id, owner: r.owner_token, label: p.label, created: Date.now() });
+        var stored = owned.put({ type: 'place', kind: 'meeting', id: r.id, owner: r.owner_token, share: r.share_token, label: p.label, created: Date.now() });
+        if (ctx.draftKey) LS.del(ctx.draftKey);
         LS.set('fiila.saved', true);
-        track('fiche_created', ctx.retour ? 'meeting_discovery' : 'meeting_direct');
+        track('fiche_created', ctx.similarOf ? 'meeting_similar' : ctx.retour ? 'meeting_discovery' : 'meeting_direct');
         toast('Rendez-vous enregistré.');
-        go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour }));
+        go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour, nouveau: '1' }));
       }, function (e) {
         btn.textContent = 'Réessayer'; chk();
         setKids(err, h('p', { class: 'alert' }, errText(e)));
@@ -1188,28 +1261,34 @@
     function drawStop() {
       setKids(stopBox);
       if (f.hasStop) add(stopBox, [
-        mapPicker({ id: 'm-stop', what: 'l’arrêt voiture', get: function () { return f.stop; }, set: function (p) { f.stop = p; chk(); } }),
-        textField({ id: 'm-walk', label: 'Du point d’arrêt jusqu’au lieu', multiline: true, max: 200, value: f.walk, onInput: function (v) { f.walk = v; } })]);
+        mapPicker({ id: 'm-stop', what: 'l’arrêt voiture', initial: f.stopInitial, get: function () { return f.stop; }, set: function (p) { f.stop = p; changed(); } }),
+        textField({ id: 'm-walk', label: 'Du point d’arrêt jusqu’au lieu', multiline: true, max: 200, value: f.walk, onInput: function (v) { f.walk = v; saveDraft(); } })]);
     }
     drawStop(); chk();
     return page(ctx.retour ? backBtn('Revenir à la fiche reçue', '#/a/' + ctx.retour)
+      : ctx.similarOf ? backBtn('Retour au rendez-vous d’origine', '#/m/' + ctx.similarOf)
       : backBtn(ctx.editId ? 'Retour au rendez-vous' : 'Accueil', ctx.editId ? '#/m/' + ctx.editId : '#/'),
-      h('h1', null, ctx.editId ? 'Modifier le rendez-vous' : 'Créer un rendez-vous'),
-      h('p', { class: 'muted' }, 'Une fiche de lieu temporaire pour un rendez-vous ou un événement. Elle cesse d’afficher le lieu à la date choisie.'),
-      textField({ id: 'm-label', label: 'Nom du rendez-vous', max: 60, value: f.label, placeholder: 'Ex. : Baptême chez Awa', onInput: function (v) { f.label = v; chk(); } }),
+      h('h1', null, ctx.editId ? 'Modifier le rendez-vous' : ctx.similarOf ? 'Rendez-vous similaire' : 'Créer un rendez-vous'),
+      ctx.similarOf
+        ? h('div', { class: 'notice', id: 'similar-notice' }, 'À partir de « ' + ctx.sourceLabel + ' ». Le lieu, l’arrêt voiture, les indications et la photo sont repris. Choisissez un nom, une nouvelle date et confirmez le lieu sur la carte. Le rendez-vous d’origine ne change pas.')
+        : h('p', { class: 'muted' }, 'Une fiche de lieu temporaire pour un rendez-vous ou un événement. Elle cesse d’afficher le lieu à la date choisie.'),
+      ctx.restored ? h('div', { class: 'row', style: 'align-items:center' },
+        h('p', { class: 'hint', style: 'flex:1 1 200px' }, 'Brouillon repris là où vous l’aviez laissé.'),
+        h('button', { class: 'btn link', type: 'button', id: 'clear-draft', style: 'flex:0 0 auto', onclick: function () { LS.del(ctx.draftKey); render(); } }, 'Recommencer')) : null,
+      textField({ id: 'm-label', label: 'Nom du rendez-vous', max: 60, value: f.label, placeholder: 'Ex. : Baptême chez Awa', onInput: function (v) { f.label = v; changed(); } }),
       h('div', { class: 'row' },
-        h('div', { class: 'field' }, h('label', { for: 'm-date' }, 'Date'), h('input', { type: 'date', id: 'm-date', value: f.date, oninput: function (e) { f.date = e.target.value; chk(); } })),
-        h('div', { class: 'field' }, h('label', { for: 'm-time' }, 'Heure'), h('input', { type: 'time', id: 'm-time', value: f.time, oninput: function (e) { f.time = e.target.value; chk(); } }))),
+        h('div', { class: 'field' }, h('label', { for: 'm-date' }, ctx.similarOf ? 'Nouvelle date' : 'Date'), h('input', { type: 'date', id: 'm-date', value: f.date, oninput: function (e) { f.date = e.target.value; changed(); } })),
+        h('div', { class: 'field' }, h('label', { for: 'm-time' }, 'Heure'), h('input', { type: 'time', id: 'm-time', value: f.time, oninput: function (e) { f.time = e.target.value; changed(); } }))),
       h('p', { class: 'hint' }, 'Heure de Dakar (GMT), quel que soit le fuseau de votre téléphone.'),
       h('h2', null, 'Point de rendez-vous'),
-      mapPicker({ id: 'm-entry', what: 'le lieu du rendez-vous', get: function () { return f.entry; }, set: function (p) { f.entry = p; chk(); } }),
-      textField({ id: 'm-instr', label: 'Indications sur place', optional: true, multiline: true, max: 280, value: f.instruction, placeholder: 'Ex. : tente blanche derrière la mosquée', onInput: function (v) { f.instruction = v; } }),
-      photoField({ id: 'm-photo', optional: true, get: function () { return f.photo; }, set: function (p) { f.photo = p; } }),
+      mapPicker({ id: 'm-entry', what: 'le lieu du rendez-vous', initial: f.entryInitial, get: function () { return f.entry; }, set: function (p) { f.entry = p; changed(); } }),
+      textField({ id: 'm-instr', label: 'Indications sur place', optional: true, multiline: true, max: 280, value: f.instruction, placeholder: 'Ex. : tente blanche derrière la mosquée', onInput: function (v) { f.instruction = v; saveDraft(); } }),
+      photoField({ id: 'm-photo', optional: true, get: function () { return f.photo; }, set: function (p) { f.photo = p; saveDraft(); } }),
       h('div', { class: 'choice one' },
-        h('label', null, h('input', { type: 'checkbox', id: 'm-hasstop', checked: f.hasStop, onchange: function (e) { f.hasStop = e.target.checked; if (!f.hasStop) f.stop = null; drawStop(); chk(); } }), 'Ajouter un point d’arrêt voiture distinct')),
+        h('label', null, h('input', { type: 'checkbox', id: 'm-hasstop', checked: f.hasStop, onchange: function (e) { f.hasStop = e.target.checked; if (!f.hasStop) f.stop = null; drawStop(); changed(); } }), 'Ajouter un point d’arrêt voiture distinct')),
       stopBox,
       h('div', { class: 'field' }, h('label', { for: 'm-exp' }, 'Le lieu cesse d’être affiché'),
-        h('select', { id: 'm-exp', onchange: function (e) { f.exp = e.target.value; chk(); } },
+        h('select', { id: 'm-exp', onchange: function (e) { f.exp = e.target.value; changed(); } },
           h('option', { value: '2', selected: f.exp === '2' }, '2 heures après le début'),
           h('option', { value: '24', selected: f.exp === '24' }, '24 heures après le début'),
           h('option', { value: '168', selected: f.exp === '168' }, '7 jours après le début'))),

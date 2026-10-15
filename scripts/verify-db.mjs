@@ -1,7 +1,7 @@
 // Vérifie la base déployée : migrations appliquées et droits d'accès du rôle public (anon).
 // Usage : DATABASE_URL=... node scripts/verify-db.mjs   (l'URL n'est jamais affichée)
 import { createRequire } from 'node:module';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readdirSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 
@@ -17,7 +17,8 @@ const checks = [];
 const check = (name, ok, detail) => { checks.push({ name, ok, detail }); console.log(ok ? 'OK  ' : 'ÉCHEC', name, detail ? '— ' + JSON.stringify(detail) : ''); };
 
 const migrations = await q(`select version from supabase_migrations.schema_migrations order by version`).catch(() => []);
-check('migrations appliquées dans l’ordre', migrations.map((m) => m.version).join(',') === '20261015000000,20261015100000', migrations.map((m) => m.version));
+const expectedMigrations = readdirSync(new URL('../supabase/migrations/', import.meta.url)).filter((f) => f.endsWith('.sql')).sort().map((f) => f.split('_')[0]);
+check('migrations appliquées dans l’ordre (' + expectedMigrations.length + ')', migrations.map((m) => m.version).join(',') === expectedMigrations.join(','), migrations.map((m) => m.version));
 
 const tables = await q(`select table_name from information_schema.tables where table_schema = 'fiila' order by 1`);
 check('tables présentes', ['metrics', 'places', 'rate_events', 'requests', 'retired_tokens', 'settings'].every((t) => tables.some((r) => r.table_name === t)), tables.map((r) => r.table_name));

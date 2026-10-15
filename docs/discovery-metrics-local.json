@@ -21,7 +21,7 @@
   },
   {
     "event": "share_initiated",
-    "variant": "whatsapp",
+    "variant": "whatsapp_address",
     "n": 1
   }
 ]

@@ -267,6 +267,14 @@ await t('mesure : liste blanche d’événements, compteur agrégé sans identif
   assert.deepEqual(cols.rows.map((c) => c.column_name), ['day', 'event', 'variant', 'n']);
 });
 
+await t('mesure : événements de réutilisation et de partage typés acceptés', async () => {
+  for (const [e, v] of [['fiche_created', 'meeting_similar'], ['request_created', 'request'], ['owned_reopened', 'meeting'],
+    ['share_initiated', 'native_request'], ['share_initiated', 'whatsapp_meeting'], ['link_copied', 'request'], ['share_initiated', 'whatsapp']])
+    await ok('fiila_track', { p_event: e, p_variant: v });
+  await ko('fiila_track', { p_event: 'owned_reopened', p_variant: 'place' }, 'invalid_event');
+  await ko('fiila_track', { p_event: 'share_sent', p_variant: 'whatsapp' }, 'invalid_event');
+});
+
 await t('mesure : le rôle anon ne peut pas lire les compteurs', async () => {
   await assert.rejects(db.transaction(async (tx) => { await tx.exec('set local role anon'); await tx.query('select * from fiila.metrics'); }));
 });

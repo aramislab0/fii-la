@@ -1,0 +1,90 @@
+{
+  "moteur": "chromium",
+  "version": "141.0.7390.37",
+  "mode": "automatisation Playwright, émulation iPhone 13, base Postgres locale réelle (PGlite)",
+  "date": "2026-10-15T10:33:11.963Z",
+  "reussis": 20,
+  "total": 20,
+  "results": [
+    {
+      "ok": true,
+      "name": "enregistrement lent [SIMULÉ réseau] : l’état « partager » n’apparaît qu’après la réponse du serveur"
+    },
+    {
+      "ok": true,
+      "name": "après enregistrement : partager est l’action principale, gestion accessible en second"
+    },
+    {
+      "ok": true,
+      "name": "partage natif [SIMULÉ partage natif] : seule l’URL destinataire est transmise"
+    },
+    {
+      "ok": true,
+      "name": "destinataire anonyme : itinéraire voiture vers l’arrêt, à pied vers le lieu (URLs Google Maps officielles)"
+    },
+    {
+      "ok": true,
+      "name": "coordonnées brutes repliées (repli secondaire), lisibles et copiables sur demande"
+    },
+    {
+      "ok": true,
+      "name": "le propriétaire qui ouvre son propre lien retrouve sa gestion, pas l’invitation à créer"
+    },
+    {
+      "ok": true,
+      "name": "réouverture depuis « Mes rendez-vous » après rechargement, puis repartage"
+    },
+    {
+      "ok": true,
+      "name": "« Créer un rendez-vous similaire » : brouillon neuf, lieu à reconfirmer, nom et date vides"
+    },
+    {
+      "ok": true,
+      "name": "brouillon du rendez-vous similaire conservé si on quitte la page"
+    },
+    {
+      "ok": true,
+      "name": "enregistrement : fiche distincte, rendez-vous d’origine inchangé"
+    },
+    {
+      "ok": true,
+      "name": "similaire depuis un rendez-vous désactivé et expiré [SIMULÉ temps] : la copie est active, l’origine reste désactivée"
+    },
+    {
+      "ok": true,
+      "name": "liens terminés : désactivé et expiré, avec la bonne suite"
+    },
+    {
+      "ok": true,
+      "name": "échec d’enregistrement [SIMULÉ réseau] puis rechargement : le brouillon de rendez-vous est retrouvé"
+    },
+    {
+      "ok": true,
+      "name": "position refusée pendant la création d’un rendez-vous : message et alternative manuelle"
+    },
+    {
+      "ok": true,
+      "name": "demande : partage natif [SIMULÉ partage natif] et lien seul ; demande expirée [SIMULÉ temps] relancée sans la référence"
+    },
+    {
+      "ok": true,
+      "name": "thème sombre : écrans modifiés lisibles (gestion, similaire, demande expirée)"
+    },
+    {
+      "ok": true,
+      "name": "clavier : « Créer un rendez-vous similaire » et le repli des coordonnées sont atteignables, focus visible"
+    },
+    {
+      "ok": true,
+      "name": "texte long à 320 px : rendez-vous similaire et fiche sans débordement"
+    },
+    {
+      "ok": true,
+      "name": "mesure : uniquement événement + variante, sans clé, jeton, identifiant ni coordonnées"
+    },
+    {
+      "ok": true,
+      "name": "aucune erreur JavaScript"
+    }
+  ]
+}
