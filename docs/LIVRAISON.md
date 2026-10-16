@@ -127,7 +127,7 @@ Ce que couvrent les 35 parcours : création complète, géolocalisation réussie
 
 Ordre de grandeur : une fiche avec photo pèse environ 150 à 300 Ko, soit environ 2 000 fiches avec photo dans 500 Mo.
 
-**Inconnu** : la facture en retard sur l’organisation Supabase AramisLab, qui bloque la création de projet.
+**Hébergement retenu** : organisation Supabase « aramislab », plan Pro déjà payé, plafond de dépenses activé. Fii La n’ajoute pas de coût tant qu’il reste dans le quota inclus.
 
 ## 9. Déploiement et retour arrière
 
