@@ -1,34 +1,34 @@
 # Fii La — dossier de livraison du pilote
 
-*Mis à jour le 15 octobre 2026. Données de démonstration et de test : uniquement synthétiques.*
+*Mis à jour le 16 octobre 2026. Données de démonstration et de test : uniquement synthétiques.*
 
 ## 1. Statut
 
-**STATUT : IMPLEMENTED AND VERIFIED LOCALLY — DEPLOYMENT PENDING.** Tous les parcours passent en local (Chromium, base Postgres réelle). Rien n’est encore accessible en ligne, et WebKit n’a pas été relancé depuis la découverte et la réutilisation (section 12).
+**STATUT : DEPLOYED AND VERIFIED IN PRODUCTION (synthetic data) — 16/10/2026.** URL : https://aramislab0.github.io/fii-la/. Pas encore ouvert à de vrais utilisateurs : voir `CONFORMITE-CDP.md` (formalité CDP à clarifier par le responsable du traitement) et la recette sur téléphones réels (`RECETTE-TELEPHONES.md`, non exécutée).
 
 | Critère d’acceptation | État |
 |---|---|
-| Aucun défaut critique connu de sécurité ou de perte de données | Aucun connu (31 tests SQL ; 35 + 23 + 20 + 21 tests E2E ; parcours de production répété en local 12/12) |
-| Tous les parcours obligatoires passent dans l’environnement **déployé** | **Non vérifié** : la base de données en ligne n’existe pas |
+| Aucun défaut critique connu de sécurité ou de perte de données | Aucun connu |
+| Tous les parcours obligatoires passent dans l’environnement **déployé** | **Oui** : parcours de production 12/12 en Chromium 141 et WebKit 26 ; suite complète 35/35 en Chromium et en WebKit sur l’URL publique |
+| Droits de la base de production | Vérifiés (`scripts/verify-db.mjs`) : 4 migrations dans l’ordre, schéma `fiila` fermé, aucune table exposée, exactement 14 fonctions publiques en `security definer` avec `search_path` vide |
 | Limites des intégrations externes explicites | Oui, section 6 |
 
-## 1 bis. Déploiement : état réel et blocage
+Non vérifié à ce jour : vrais téléphones, vraies applications sociales (WhatsApp, Telegram, Facebook, Instagram, TikTok), réseau mobile lent réel. Les suites découverte, circuit et partage social tournent en local uniquement.
+
+## 1 bis. Déploiement
 
 | Élément | État vérifié |
 |---|---|
 | Code | https://github.com/aramislab0/fii-la, branche `main` |
-| Hébergement (GitHub Pages, gratuit) | Activé. Les déploiements échouent uniquement à l’étape « Écrire la configuration publique » : `SUPABASE_URL` et `SUPABASE_PUBLISHABLE_KEY` n’existent pas, faute de base. **L’hébergement n’est pas le blocage et ne demande aucun paiement.** |
-| Base de données (Supabase) | **Bloquée.** Création refusée par Supabase : « There are overdue invoices in the organization(s) AramisLab ». Le refus s’applique aussi à une organisation neuve (essai du 15/10, 01:35) |
-| Migrations | Prêtes, à appliquer dans l’ordre : `20261015000000_fiila_init.sql`, `20261015100000_fiila_metrics.sql`, `20261015120000_fiila_metrics_reuse.sql`, `20261015140000_fiila_metrics_social.sql`. Appliquées sur aucune base en ligne (`scripts/deploy.sh` les applique ; `scripts/verify-db.mjs` vérifie qu’elles correspondent toutes aux fichiers du dépôt) |
+| Hébergement | GitHub Pages (gratuit), URL ci-dessus |
+| Base de données | Supabase, projet `fii-la` (`lkvulwocirttozfnyxck`), région Paris (`eu-west-3`), organisation « aramislab » (plan Pro existant, plafond de dépenses activé : aucun coût au-delà de l’abonnement). Créé le 16/10/2026 |
+| Données | Base vide après les tests : toutes les fiches de test synthétiques supprimées |
 
-**Actions nécessaires (côté compte, non faisables par Claude)**
-1. **Régler la facture en retard** de l’organisation Supabase AramisLab : tableau de bord → Organization → Billing → Invoices. Montant visible seulement dans ce tableau de bord. Fii La lui-même ne coûte rien en plan gratuit.
-2. **Possible ensuite** : Supabase limite le plan gratuit à 2 projets actifs (les projets en pause ne comptent pas). Si la création échoue pour cette raison : mettre en pause un projet inutilisé (gratuit) ou passer l’organisation en Pro (25 $/mois, 1 projet inclus, projets supplémentaires à partir de 10 $/mois). Rien ne sera activé sans accord.
-3. **Lancer le déploiement** depuis le Mac (Supabase CLI et GitHub CLI y sont connectés) : `cd ~/Projects/fii-la && git pull && ./scripts/deploy.sh`, ou rouvrir l’application Claude sur le Mac pour que Claude le lance.
+**Incident de recette corrigé (16/10)** : 3 tests de la suite complète échouaient en production (désactivation, nouveau lien, suppression). Le serveur était correct (vérifié par appels directs). Cause : le test cliquait avant que la vue de gestion demandée remplace la précédente, ce que la latence réseau rendait visible. Correction dans le test uniquement (commit `0d09efe`) ; aucun changement du code de l’application.
 
-**Ce que fait `scripts/deploy.sh`** : crée (ou réutilise) le projet `fii-la` à Paris, applique les migrations dans l’ordre, vérifie les droits d’accès (`scripts/verify-db.mjs` : schéma privé fermé, aucune table exposée, exactement 14 fonctions publiques), publie seulement l’URL et la clé publique dans les variables GitHub, déploie Pages, attend que le site serve le bon commit, puis lance en production le parcours complet (`tests/deployed.test.mjs`) en Chromium et WebKit et la suite complète en Chromium, avec lecture des compteurs agrégés. Le mot de passe de la base reste dans `~/Projects/fii-la-ops/.env.ops` (droits 600) : jamais affiché, jamais envoyé à GitHub, jamais dans le dépôt. Aucune clé privilégiée n’est utilisée.
+**Point d’organisation** : l’organisation Supabase « AramisLab » (autre compte, projets Agent X, Solu, WURUS, etc.) a toujours une facture en retard. Elle n’héberge pas Fii La.
 
-**Alternative sans paiement, non retenue par défaut** : installer Fii La dans un schéma séparé d’un projet Supabase existant. Elle demande un accord explicite et un projet encore actif ; or Supabase met en pause les projets d’une organisation qui a une facture en retard.
+**Redéployer** : `cd ~/Projects/fii-la && git pull && FIILA_ORG_ID=tqooydfbuihhmoudtnot ./scripts/deploy.sh` (réutilise le projet existant). Le mot de passe de la base reste dans `~/Projects/fii-la-ops/.env.ops` (droits 600) : jamais affiché, jamais envoyé à GitHub, jamais dans le dépôt. Aucune clé privilégiée n’est utilisée.
 
 ## 2. Périmètre livré
 
