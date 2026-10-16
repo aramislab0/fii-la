@@ -278,6 +278,7 @@ await t('le destinataire ne peut ni gérer ni modifier la fiche', async () => {
 
 await t('modification : même lien, contenu mis à jour chez le destinataire', async () => {
   await A.goto(URL0 + '#/m/' + placeId);
+  await A.getByRole('heading', { level: 1, name: /Atelier/ }).waitFor();
   await byText(A, 'Modifier').click();
   await A.getByText('Étape 1 sur 4').waitFor();
   await byText(A, 'Continuer').click();
@@ -433,6 +434,8 @@ await t('rendez-vous expiré : le serveur ne renvoie plus le lieu', async () => 
 let newUrl;
 await t('désactivation : la fiche et sa photo ne sont plus servies', async () => {
   await A.goto(URL0 + '#/m/' + placeId);
+  // Attendre la fiche demandée : la vue précédente (rendez-vous) reste affichée pendant le chargement réseau.
+  await A.getByRole('heading', { level: 1, name: /Atelier/ }).waitFor();
   await A.locator('#revoke').click();
   await A.getByText('Lien désactivé', { exact: true }).waitFor();
   await openB(shareUrl);
