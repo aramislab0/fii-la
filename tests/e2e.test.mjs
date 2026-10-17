@@ -319,9 +319,17 @@ await t('géolocalisation refusée : marche à suivre iPhone, réessayer, et poi
   assert.ok(open.startsWith('comgooglemaps://'), 'iPhone : ouverture directe de l’application');
   // Lien court copié depuis « Partager » dans Google Maps (lien de test simulé par le serveur local)
   const input = p.page.locator('input[placeholder^="14.758140"]').first();
-  await input.fill('Repère placé https://maps.app.goo.gl/fiilaTestPin');
-  await p.page.getByRole('button', { name: 'Placer ce point' }).first().click();
-  await p.page.getByText(/Point récupéré depuis Google Maps/).waitFor();
+  if (!BASE) {
+    // Local : lien court simulé par le serveur de test. En production, aucun lien court réel n'est inventé :
+    // on colle un lien long Google Maps (la lecture des liens courts réels se vérifie sur téléphone).
+    await input.fill('Repère placé https://maps.app.goo.gl/fiilaTestPin');
+    await p.page.getByRole('button', { name: 'Placer ce point' }).first().click();
+    await p.page.getByText(/Point récupéré depuis Google Maps/).waitFor();
+  } else {
+    await input.fill('https://www.google.com/maps/search/14.758140,+-17.470320?entry=tts');
+    await p.page.getByRole('button', { name: 'Placer ce point' }).first().click();
+    await p.page.getByText(/Vérifiez que le repère est bien sur l’entrée/).waitFor();
+  }
   await p.page.getByRole('button', { name: 'Valider ce point' }).first().click();
   await p.page.getByText('✓ Point validé pour l’entrée').waitFor();
   assert.equal(await p.page.locator('.pt .coords').first().textContent(), '14.758140, -17.470320');
