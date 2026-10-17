@@ -51,6 +51,7 @@
       h('div', { class: 'foot-links' },
         h('a', { href: '#/' }, 'Fii La'),
         h('a', { href: '#/compte', id: 'foot-account' }, authed() ? 'Mon compte' : 'Se connecter'),
+        h('a', { href: '#/livreur', id: 'foot-courier' }, 'Espace livreur'),
         h('a', { href: '#/confidentialite' }, 'Données et confidentialité'),
         h('a', { href: '#/cle' }, 'Restaurer une clé de gestion')));
   }
@@ -236,7 +237,11 @@
     too_many: 'Limite atteinte.',
     product_not_found: 'Article introuvable.',
     not_delivered: 'Vous pourrez noter vos articles une fois la commande livrée.',
-    invalid_rating: 'Note non valide.'
+    invalid_rating: 'Note non valide.',
+    courier_required: 'Espace livreur introuvable sur ce téléphone.',
+    invalid_vehicle: 'Moyen de livraison non valide.',
+    already_used: 'Cette invitation a déjà été acceptée.',
+    no_courier: 'Aucun livreur attitré disponible.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
   ApiError.prototype = Object.create(Error.prototype);
@@ -425,6 +430,12 @@
     shop_created: ['shop', 'no_account', 'account'],
     product_created: ['photo', 'no_photo'],
     review_left: ['1', '2', '3', '4', '5'],
+    courier_review: ['1', '2', '3', '4', '5'],
+    courier_registered: ['direct', 'invite'],
+    courier_invited: ['whatsapp'],
+    courier_linked: ['invite'],
+    courier_done: ['courier'],
+    shop_deleted: ['shop'],
     order_created: ['new_customer', 'known_customer', 'known_address'],
     invoice_opened: ['order'],
     payment_recorded: ['cash', 'wave', 'orange_money', 'card', 'other'],
@@ -436,7 +447,7 @@
       return a.concat([c + '_address', c + '_meeting', c + '_request']);
     }, []),
     link_copied: ['address', 'meeting', 'request'],
-    delivery_started: ['request', 'place'],
+    delivery_started: ['request', 'place', 'order', 'courier'],
     tracking_shared: ['courier', 'guest'],
     meeting_joined: ['guest'],
     visual_exported: ['download_address', 'download_meeting', 'download_request', 'share_address', 'share_meeting', 'share_request'],
@@ -959,6 +970,8 @@
       else if (p[0] === 'boutique' && !p[1]) view = viewShop(r.q);
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
+      else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
+      else if (p[0] === 'livreur' && p[1] === 'invitation' && p[2]) view = viewCourierInvite(p[2]);
       else if (p[0] === 'boutique' && p[1] === 'article' && p[2]) view = viewProductForm(p[2]);
       else if (p[0] === 'clients' && !p[1]) view = viewCustomers(r.q);
       else if (p[0] === 'clients' && p[1]) view = viewCustomer(p[1]);
@@ -1783,7 +1796,7 @@
     return api('fiila_courier_view', { p_token: token }).then(function (r) {
       if (r.state === 'expired') return page(stateCard('⌛', 'Livraison terminée', 'Ce lien n’est plus actif.'), footer());
       if (r.state !== 'ok') return page(stateCard('⦸', 'Lien livreur indisponible', 'L’adresse a été désactivée ou le lien n’est pas valide.'), footer());
-      var pg = page(h('p', { class: 'eyebrow' }, 'Livraison'),
+      var pg = page(courierKey() ? backBtn('Mes courses', '#/livreur') : null, h('p', { class: 'eyebrow' }, 'Livraison'),
         liveShare(token, r.place.entry, { kind: 'courier', title: 'Prêt à partir ?', startLabel: 'Démarrer la livraison', who: 'L’expéditeur et le client', initial: r.status }),
         fiche(r.place, { wide: true }), footer());
       pg.classList.add('wide');
@@ -2472,7 +2485,77 @@
       textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
       textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
       textField({ id: 'shop-ninea', label: 'NINEA', optional: true, max: 30, value: f.ninea, onInput: function (v) { f.ninea = v; } }),
-      err, btn, footer());
+      err, btn,
+      shop ? courierSection(shop) : null,
+      shop ? shopDeleteBox() : null,
+      footer());
+  }
+
+  // Livreur attitré : invitation par WhatsApp, acceptation par le livreur, envoi automatique des courses.
+  var VEHICLES = { moto: 'Moto', voiture: 'Voiture', velo: 'Vélo', pied: 'À pied' };
+  function courierSection(shop) {
+    var box = h('section', { class: 'card', id: 'courier-section' }, h('h2', null, 'Livreur attitré'));
+    var err = h('div', { role: 'alert' });
+    function act(action, okText) {
+      sapi('fiila_shop_courier', { p_action: action }).then(function () { toast(okText); render(); }, function (e) { errBox(err, e); });
+    }
+    var c = shop.courier, inv = shop.courier_invite;
+    if (c) {
+      box.append(
+        h('p', null, h('strong', null, c.name), ' · ', VEHICLES[c.vehicle] || '', c.reviews ? ' · ' + stars(c.rating) + ' (' + c.reviews + ')' : ''),
+        c.active === false ? h('p', { class: 'notice' }, 'Indisponible pour le moment : les courses ne lui sont pas envoyées.') : null,
+        segField({ legend: 'Envoi des courses', name: 'courier-auto', id: 'courier-auto', value: shop.courier_auto ? 'on' : 'off',
+          options: [['on', 'Automatique'], ['off', 'Manuel']],
+          onChange: function (v) { act(v === 'on' ? 'auto_on' : 'auto_off', v === 'on' ? 'Envoi automatique activé.' : 'Envoi manuel.'); } }),
+        h('p', { class: 'hint' }, shop.courier_auto ? 'Dès que le client donne son adresse, la course arrive sur la page de ' + c.name + '.' : 'Vous envoyez chaque course depuis la commande.'),
+        h('button', { class: 'btn ghost small', type: 'button', id: 'courier-remove', style: 'align-self:flex-start', onclick: function () { act('remove', 'Livreur retiré.'); } }, 'Retirer ce livreur'),
+        err);
+      return box;
+    }
+    var f = { name: inv ? inv.name || '' : '', phone: inv ? inv.phone || '' : '' };
+    var sendBox = h('div', { class: 'stack' });
+    function showSend(tok) {
+      var link = baseUrl() + '#/livreur/invitation/' + tok;
+      var text = (shop.name) + ' vous propose d’être son livreur attitré sur Fii La : vous recevrez ses courses directement. Acceptez ici : ' + link;
+      setKids(sendBox, h('a', { class: 'btn lime', id: 'courier-invite-send', href: waTo(f.phone, text), target: '_blank', rel: 'noopener noreferrer',
+        onclick: function () { track('courier_invited', 'whatsapp'); } }, 'Envoyer l’invitation sur WhatsApp'),
+        h('button', { class: 'btn ghost small', type: 'button', style: 'align-self:flex-start', onclick: function () { copy(link, 'Lien d’invitation'); } }, 'Copier le lien'));
+    }
+    box.append(
+      inv ? h('p', { class: 'small muted', id: 'courier-pending' }, 'Invitation en attente' + (inv.name ? ' : ' + inv.name : '') + '. Elle reste valable 7 jours.') :
+        h('p', { class: 'small muted' }, 'Votre livreur reçoit vos courses automatiquement, avec l’adresse exacte et la photo de l’entrée.'),
+      textField({ id: 'courier-name', label: 'Nom du livreur', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
+      textField({ id: 'courier-phone', label: 'Son numéro WhatsApp', type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+      err,
+      h('button', { class: 'btn', type: 'button', id: 'courier-invite', onclick: function (ev) {
+        setKids(err);
+        if (!f.phone.trim()) return errBox(err, new ApiError('phone_invalid'));
+        var b = ev.currentTarget; b.disabled = true;
+        sapi('fiila_courier_invite', { p_name: f.name.trim() || null, p_phone: f.phone.trim() }).then(function (r) { b.disabled = false; showSend(r.token); },
+          function (e) { b.disabled = false; errBox(err, e); });
+      } }, inv ? 'Préparer une nouvelle invitation' : 'Inviter mon livreur'),
+      sendBox,
+      inv ? h('button', { class: 'btn link', type: 'button', style: 'align-self:flex-start', onclick: function () { act('cancel_invite', 'Invitation annulée.'); } }, 'Annuler l’invitation') : null);
+    return box;
+  }
+
+  function shopDeleteBox() {
+    var zone = h('div', { class: 'stack' });
+    return h('details', { id: 'shop-delete-box' }, h('summary', null, 'Supprimer la boutique'),
+      h('div', { class: 'stack', style: 'margin-top:12px' },
+        h('p', { class: 'small' }, 'Les articles, clients, commandes, factures et paiements de la boutique seront effacés. Les liens déjà envoyés ne fonctionneront plus. Les adresses de vos clients leur appartiennent : elles ne sont pas touchées.'),
+        h('button', { class: 'btn danger', type: 'button', id: 'shop-delete', onclick: function () {
+          setKids(zone, h('div', { class: 'confirm', role: 'alertdialog' },
+            h('p', null, h('strong', null, 'Supprimer définitivement la boutique ?')),
+            h('div', { class: 'row' },
+              h('button', { class: 'btn danger-fill', type: 'button', id: 'shop-delete-confirm', onclick: function (ev) {
+                ev.currentTarget.disabled = true;
+                sapi('fiila_shop_delete', {}).then(function () {
+                  LS.del(SHOP_LS); LS.del(ORDER_DRAFT); ME = null; track('shop_deleted', 'shop'); toast('Boutique supprimée.'); go('#/');
+                }, function (e) { errBox(zone, e); });
+              } }, 'Supprimer'),
+              h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(zone); } }, 'Annuler'))));
+        } }, 'Supprimer la boutique'), zone));
   }
 
   // L'étape suivante d'une commande, en un seul repère.
@@ -2726,7 +2809,9 @@
     var shopName = shop.name || 'votre boutique';
     function refresh(next) { if (next) o = next; setKids(app, orderView(o, shop, {})); }
     function call(fn, args, okText) {
-      return sapi(fn, Object.assign({ p_id: o.id }, args || {})).then(function (next) { if (okText) toast(okText); refresh(next); return next; },
+      return sapi(fn, Object.assign({ p_id: o.id }, args || {})).then(function () {
+        return sapi('fiila_order_get', { p_id: o.id });
+      }).then(function (next) { if (okText) toast(okText); refresh(next); return next; },
         function (e) { toast(errText(e)); throw e; });
     }
     var msgClient = 'Bonjour ' + o.customer_name + ', voici votre commande N° ' + o.ref + ' chez ' + shopName + ' : ' + fcfa(o.total) + '.\n' +
@@ -2767,10 +2852,26 @@
         }, function (e) { startBtn.disabled = false; errBox(dErr, e); });
       } }, cour ? 'Autre livreur' : 'Envoyer au livreur');
       var courierUrl = cour ? baseUrl() + '#/l/' + cour : null;
+      var att = shop.courier;
+      var attBlock = null;
+      if (att && o.courier) {
+        var stx = { waiting: 'Course reçue, pas encore partie', live: 'En route', arrived: 'Arrivé chez le client' }[o.courier.status] || 'Course envoyée';
+        attBlock = h('div', { class: 'stack tight', id: 'att-course' },
+          h('p', null, h('strong', null, o.courier.name), ' · ', stx),
+          o.courier.phone ? h('a', { class: 'btn ghost small', href: 'tel:' + o.courier.phone.replace(/\s/g, ''), style: 'align-self:flex-start' }, 'Appeler le livreur') : null);
+        startBtn.textContent = 'Envoyer à un autre livreur (lien)'; startBtn.className = 'btn ghost small';
+      } else if (att) {
+        attBlock = h('button', { class: 'btn big', type: 'button', id: 'dispatch-att', onclick: function (ev) {
+          ev.currentTarget.disabled = true;
+          call('fiila_order_dispatch', null, 'Course envoyée à ' + att.name + '.').catch(function () {});
+        } }, 'Envoyer à ' + att.name);
+        startBtn.textContent = 'Autre livreur (lien)'; startBtn.className = 'btn ghost small';
+      }
       deliv = h('section', { class: 'card', id: 'order-delivery' }, h('h2', null, 'Livraison'),
-        cour ? h('a', { class: 'btn lime', id: 'send-courier', target: '_blank', rel: 'noopener noreferrer',
+        attBlock,
+        cour && !o.courier ? h('a', { class: 'btn lime', id: 'send-courier', target: '_blank', rel: 'noopener noreferrer',
           href: waLink('Livraison N° ' + o.ref + ' pour ' + o.customer_name + ' : adresse exacte et photo de l’entrée. Ouvrez le lien et touchez « Démarrer la livraison » : ' + courierUrl) }, 'Envoyer le lien au livreur (WhatsApp)') : null,
-        cour ? h('button', { class: 'btn ghost small', type: 'button', id: 'copy-courier', onclick: function () { copy(courierUrl, 'Lien livreur'); } }, 'Copier le lien livreur') : null,
+        cour && !o.courier ? h('button', { class: 'btn ghost small', type: 'button', id: 'copy-courier', onclick: function () { copy(courierUrl, 'Lien livreur'); } }, 'Copier le lien livreur') : null,
         startBtn, dErr,
         o.watch_token ? deliveryWatch(o.watch_token) : null,
         h('button', { class: 'btn', type: 'button', id: 'mark-delivered', onclick: function (ev) { ev.currentTarget.disabled = true; LS.del(COURIER_KEY); call('fiila_order_set_status', { p_status: 'delivered' }, 'Commande livrée.').catch(function () {}); } }, 'Marquer comme livrée'),
@@ -2958,6 +3059,133 @@
     return box;
   }
 
+  /* ----- espace livreur (sans compte : clé gardée sur son téléphone) */
+  var COURIER_LS = 'fiila.courier';
+  function courierKey() { var x = LS.get(COURIER_LS, null); return (x && x.key) || null; }
+  function courierForm(pre, onDone) {
+    var f = { name: (pre && pre.name) || '', phone: (pre && pre.phone) || '', vehicle: 'moto', zone: '' };
+    var err = h('div', { role: 'alert' });
+    var btn = h('button', { class: 'btn', type: 'button', id: 'courier-register', onclick: function () {
+      setKids(err);
+      if (!f.name.trim()) return errBox(err, new ApiError('name_required'));
+      btn.disabled = true;
+      api('fiila_courier_register', { p: { name: f.name.trim(), phone: f.phone.trim() || null, vehicle: f.vehicle, zone: f.zone.trim() || null } }).then(function (r) {
+        LS.set(COURIER_LS, { key: r.key });
+        track('courier_registered', pre ? 'invite' : 'direct');
+        onDone(r);
+      }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, 'Créer mon espace livreur');
+    return h('div', { class: 'stack' },
+      textField({ id: 'cr-name', label: 'Votre nom', max: 60, value: f.name, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
+      textField({ id: 'cr-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+      segField({ legend: 'Vous livrez en', name: 'cr-vehicle', id: 'cr-vehicle', value: f.vehicle, options: Object.keys(VEHICLES).map(function (k) { return [k, VEHICLES[k]]; }), onChange: function (v) { f.vehicle = v; } }),
+      textField({ id: 'cr-zone', label: 'Zone', optional: true, max: 60, value: f.zone, placeholder: 'Ex. : Yoff, Ngor, Almadies', onInput: function (v) { f.zone = v; } }),
+      err, btn);
+  }
+  function viewCourierHome() {
+    if (!courierKey()) {
+      var wrap = h('div', { class: 'wrap' });
+      setKids(wrap, backBtn(),
+        h('div', { class: 'stack tight' }, h('h1', null, 'Espace livreur'),
+          h('p', { class: 'muted' }, 'Recevez les courses de vos boutiques, avec l’adresse exacte et la photo de l’entrée. Sans compte.')),
+        courierForm(null, function () { render(); }), footer());
+      return wrap;
+    }
+    return api('fiila_courier_me', { p_key: courierKey() }).then(function (r) { return courierInbox(r); }, function (e) {
+      if (e.code === 'courier_required') { LS.del(COURIER_LS); return viewCourierHome(); }
+      return page(backBtn(), stateCard('!', 'Impossible de charger vos courses', errText(e), retryBtn()), footer());
+    });
+  }
+  function courierInbox(r) {
+    var c = r.courier;
+    var list = h('div', { class: 'list', id: 'courses' });
+    var seen = r.courses.length;
+    function draw(courses) {
+      setKids(list, courses.length ? courses.map(function (k) {
+        var due = Math.max(0, (k.total || 0) - (k.paid || 0));
+        var st = { waiting: ['wait', 'À récupérer'], live: ['wait', 'En route'], arrived: ['ok', 'Arrivé'] }[k.status] || ['wait', 'À récupérer'];
+        return h('section', { class: 'card course' },
+          h('div', { class: 'brand-row' }, h('strong', null, k.shop + ' · N° ' + k.ref), h('span', { class: 'chip ' + st[0] }, st[1])),
+          h('p', { class: 'wrapword' }, k.customer + ' — ' + k.dest + (k.locality ? ' · ' + k.locality : '')),
+          due ? h('p', { class: 'small' }, 'À encaisser : ', h('strong', null, fcfa(due))) : h('p', { class: 'small muted' }, 'Déjà payée'),
+          h('div', { class: 'row' },
+            h('a', { class: 'btn', href: '#/l/' + k.token }, 'Ouvrir la course'),
+            k.customer_phone ? h('a', { class: 'btn ghost', href: 'tel:' + k.customer_phone.replace(/\s/g, '') }, 'Appeler le client') : null),
+          h('button', { class: 'btn ghost small', type: 'button', style: 'align-self:flex-start', onclick: function (ev) {
+            ev.currentTarget.disabled = true;
+            api('fiila_courier_done', { p_key: courierKey(), p_send: k.token }).then(function () { track('courier_done', 'courier'); toast('Livraison confirmée.'); load(); },
+              function (e) { toast(errText(e)); });
+          } }, 'Livrée'));
+      }) : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucune course pour l’instant. Gardez cette page ouverte : les nouvelles courses s’affichent toutes seules.')));
+    }
+    function load() {
+      api('fiila_courier_me', { p_key: courierKey() }).then(function (n) {
+        if (n.courses.length > seen) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) { /* rien */ } toast('Nouvelle course.'); }
+        seen = n.courses.length;
+        document.title = (n.courses.length ? '(' + n.courses.length + ') ' : '') + 'Fii La — livreur';
+        draw(n.courses);
+      }, function () { /* hors ligne : on réessaie au prochain tour */ });
+    }
+    draw(r.courses);
+    var pg = page(backBtn(),
+      h('div', { class: 'stack tight' },
+        h('p', { class: 'eyebrow' }, 'Espace livreur'),
+        h('h1', { class: 'wrapword' }, c.name),
+        h('p', { class: 'small muted' }, [VEHICLES[c.vehicle], c.zone, c.reviews ? stars(c.rating) + ' (' + c.reviews + ')' : null, r.done_today ? r.done_today + ' livrée(s) aujourd’hui' : null].filter(Boolean).join(' · '))),
+      segField({ name: 'cr-active', id: 'cr-active', value: c.active === false ? 'off' : 'on', options: [['on', 'Disponible'], ['off', 'Indisponible']], onChange: function (v) {
+        api('fiila_courier_update', { p_key: courierKey(), p: { active: v === 'on' } }).then(function () { toast(v === 'on' ? 'Vous recevez les courses.' : 'Plus de nouvelles courses pour l’instant.'); }, function (e) { toast(errText(e)); });
+      } }),
+      h('h2', null, 'Mes courses'), list,
+      r.shops.length ? h('p', { class: 'small muted' }, 'Livreur attitré de : ' + r.shops.map(function (s) { return s.name; }).join(', ') + '.')
+        : h('p', { class: 'small muted' }, 'Aucune boutique pour l’instant. Demandez à vos boutiques de vous inviter depuis Fii La (Réglages de la boutique → Livreur attitré).'),
+      h('details', null, h('summary', null, 'Supprimer mon espace livreur'),
+        h('div', { class: 'stack', style: 'margin-top:12px' },
+          h('p', { class: 'small' }, 'Vos boutiques ne pourront plus vous envoyer de courses.'),
+          h('button', { class: 'btn danger', type: 'button', onclick: function () {
+            api('fiila_courier_delete', { p_key: courierKey() }).then(function () { LS.del(COURIER_LS); toast('Espace livreur supprimé.'); go('#/'); }, function (e) { toast(errText(e)); });
+          } }, 'Supprimer'))),
+      footer());
+    poll(pg, load, 20000);
+    return pg;
+  }
+  function viewCourierInvite(token) {
+    return api('fiila_courier_invite_get', { p_token: token }).then(function (r) {
+      if (r.state !== 'ok') return page(stateCard(r.state === 'used' ? '✓' : '⌛', r.state === 'used' ? 'Invitation déjà acceptée' : 'Invitation expirée ou introuvable',
+        r.state === 'used' ? 'Ouvrez votre espace livreur.' : 'Demandez une nouvelle invitation à la boutique.', h('a', { class: 'btn', href: '#/livreur' }, 'Espace livreur')), footer());
+      var err = h('div', { role: 'alert' });
+      function accept() {
+        return api('fiila_courier_accept', { p_token: token, p_courier_key: courierKey() }).then(function () {
+          track('courier_linked', 'invite'); toast('Vous êtes le livreur attitré de ' + r.shop + '.'); go('#/livreur');
+        }, function (e) { errBox(err, e); });
+      }
+      return page(
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Invitation'),
+          h('h1', { class: 'wrapword' }, r.shop + ' vous propose d’être son livreur attitré'),
+          h('p', { class: 'muted' }, 'Vous recevrez ses courses directement sur votre espace livreur, avec l’adresse exacte et la photo de l’entrée.')),
+        courierKey() ? h('button', { class: 'btn big', type: 'button', id: 'courier-accept', onclick: function (ev) { ev.currentTarget.disabled = true; accept(); } }, 'Accepter') :
+          courierForm({ name: r.name, phone: r.phone }, function () { accept(); }),
+        err, footer());
+    }, function (e) { return page(stateCard('!', 'Impossible d’afficher l’invitation', errText(e), retryBtn())); });
+  }
+  // Note de la livraison par le client.
+  function courierRateBox(token, cour) {
+    var cur = cour.my_rating || 0;
+    var box = h('section', { class: 'card no-print', id: 'courier-rate' });
+    function draw() {
+      setKids(box, h('h2', null, 'Notez la livraison'),
+        h('div', { class: 'rate-row' }, h('span', null, cour.name),
+          h('span', { class: 'stars', role: 'radiogroup', 'aria-label': 'Note de la livraison' }, [1, 2, 3, 4, 5].map(function (n) {
+            return h('button', { type: 'button', class: 'star' + (n <= cur ? ' on' : ''), role: 'radio', 'aria-checked': String(n === cur), 'aria-label': 'Livraison ' + n + ' sur 5',
+              onclick: function () {
+                api('fiila_courier_review', { p_token: token, p_rating: n }).then(function () { cur = n; draw(); track('courier_review', String(n)); toast('Merci pour votre note.'); },
+                  function (e) { toast(errText(e)); });
+              } }, n <= cur ? '★' : '☆');
+          }))));
+    }
+    draw();
+    return box;
+  }
+
   /* ----- facture vue par le client (lien partagé) */
   function viewInvoice(token) {
     return api('fiila_order_public', { p_token: token }).then(function (r) {
@@ -2979,6 +3207,8 @@
       if (o.delivery_state === 'delivered') act.push(h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Livrée'));
       var rateable = (o.items || []).filter(function (it) { return it.product_id; });
       if (o.can_review && rateable.length) act.push(reviewBox(token, rateable, s.name));
+      if (o.can_review && o.courier) act.push(courierRateBox(token, o.courier));
+      else if (o.courier && o.watch_token) act.push(h('p', { class: 'small muted no-print' }, 'Livreur : ' + o.courier.name));
       var pg = page(
         act,
         h('article', { class: 'card invoice', id: 'invoice' },
@@ -3012,6 +3242,7 @@
           h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.'),
           h('li', null, 'Si vous créez un compte (facultatif) : votre e-mail, votre mot de passe (géré par Supabase Auth, jamais visible en clair), et si vous les ajoutez votre nom, votre téléphone et votre photo de profil.'),
           h('li', null, 'Si vous ouvrez une boutique : son nom, son téléphone et son NINEA s’ils sont indiqués ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii La les héberge pour lui.'),
+          h('li', null, 'Si vous êtes livreur : votre nom, et si vous les indiquez votre téléphone, votre moyen de livraison et votre zone. Vos boutiques voient votre nom, votre téléphone et votre note ; les clients voient votre prénom.'),
           h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom. Le commerçant voit la moyenne de ses articles.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),

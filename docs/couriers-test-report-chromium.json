@@ -1,0 +1,41 @@
+{
+  "moteur": "chromium",
+  "version": "141.0.7390.37",
+  "date": "2026-10-17T21:30:59.305Z",
+  "reussis": 8,
+  "total": 8,
+  "results": [
+    {
+      "ok": true,
+      "name": "commerçante : boutique sans compte, invitation du livreur sur son WhatsApp"
+    },
+    {
+      "ok": true,
+      "name": "livreur : ouvre l’invitation, crée son espace sans compte, accepte"
+    },
+    {
+      "ok": true,
+      "name": "commande → la cliente donne son adresse → la course arrive seule chez le livreur"
+    },
+    {
+      "ok": true,
+      "name": "livreur : démarre la course ; la cliente le voit en route sur sa facture"
+    },
+    {
+      "ok": true,
+      "name": "livreur : « Livrée » → commande livrée ; la cliente note la livraison"
+    },
+    {
+      "ok": true,
+      "name": "livreur indisponible : la commande suivante ne lui est pas envoyée"
+    },
+    {
+      "ok": true,
+      "name": "suppression de la boutique : tout part, l’adresse de la cliente reste, le livreur n’a plus de course"
+    },
+    {
+      "ok": true,
+      "name": "aucune erreur JavaScript"
+    }
+  ]
+}

@@ -12,7 +12,9 @@
     "test:social": "node tests/social.test.mjs",
     "test:tracking": "node tests/tracking.test.mjs",
     "test:accounts": "node tests/accounts.sql.test.mjs",
-    "test:shop": "node tests/shop.test.mjs"
+    "test:shop": "node tests/shop.test.mjs",
+    "test:couriers-sql": "node tests/couriers.sql.test.mjs",
+    "test:couriers": "node tests/couriers.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",

@@ -22,7 +22,8 @@
 | **V1 — lancement** | Adresse (entrée, photo, repère, arrêt voiture), rendez-vous, demande d'adresse, partage WhatsApp / Facebook / Telegram / Instagram / TikTok, suivi du livreur, invités d'un rendez-vous | ✅ en production |
 | **V1 — lancement (Rali inclus)** | Boutique sans compte, articles avec photo et prix, commande en un geste depuis le catalogue, facture partageable, demande d'adresse liée, livraison suivie depuis la facture, paiements enregistrés à la main, clients, notes des acheteurs | ✅ construit ce soir |
 | V1 — option | Compte : profil, photo, mot de passe, carnet d'adresses étiqueté (maison, bureau, boutique), boutique sur tous ses téléphones | ✅ |
-| **V2 — livreurs** | Inscription livreur, livreur attitré, réception automatique des courses, notes des livreurs | ◻︎ §4 |
+| **V2 — livreurs (livreur attitré)** | Invitation du livreur par WhatsApp, espace livreur sans compte, courses automatiques dès que l'adresse est reçue, « Livrée » par le livreur, notes de la livraison, disponible/indisponible | ✅ construit (17/10, 21:45) |
+| V2 — livreurs (inscription publique) | Annuaire de livreurs, choix par zone, vérification | ◻︎ §4 |
 | **V2 — paiement** | Wave / Orange Money sur la facture | ◻︎ §5 (modèle prêt) |
 | **V3 — vitrine et marketplace** | Vitrine publique de chaque boutique, fil des produits, recherche, marketplace Sénégal | ◻︎ §6 |
 
@@ -50,7 +51,20 @@
 - Tout lien partagé porte un jeton de 128 bits.
 - La facture publique n'expose ni le téléphone du client ni d'identifiant interne.
 
-## 4. V2 — livreurs (prévu, non construit)
+## 4. V2 — livreurs
+
+**Construit (décision du fondateur, 17/10 21:25) : livreur attitré d'abord.**
+- `couriers` (clé du téléphone, nom, téléphone, moyen, zone, disponible), `courier_invites` (lien à usage unique, 7 jours, envoyé sur le WhatsApp du livreur), `courier_reviews` (note de la livraison par le client), `shops.courier_id` et `courier_auto`, `trackers.courier_id / order_id / courier_send`.
+- Sécurité : un numéro saisi seul ne donne rien. Seul celui qui ouvre l'invitation et l'accepte reçoit les courses, donc les adresses des clients. Le lien de course est effacé à la fin de la livraison.
+- Course automatique : à la réponse du client (`fiila_fulfill_request` → `order_sync` → `order_dispatch`) ou à la création d'une commande dont l'adresse est déjà connue. Envoi manuel possible (« Envoyer à … »).
+- Page livreur `#/livreur` : courses en cours, montant à encaisser, appel du client, « Livrée ». Rafraîchie toutes les 20 s, vibration à chaque nouvelle course. Pas d'API WhatsApp payante.
+- Suppression de la boutique (`fiila_shop_delete`) : boutique, articles, clients, commandes, paiements, notes, demandes liées. Les adresses des clients restent à eux.
+
+**Suite prévue**
+- Notification web push (gratuite) pour prévenir le livreur page fermée.
+- Inscription publique des livreurs.
+
+### Conception initiale (référence)
 
 **Besoin (fondateur)**
 - Un livreur s'inscrit et reçoit des courses.
