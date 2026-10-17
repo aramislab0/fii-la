@@ -2,7 +2,7 @@
 
 > Fichier de passation entre agents. **Mis à jour à chaque action** (code, déploiement, décision, test, doc).
 > Règle : toute session qui modifie le projet met à jour « État actuel » et ajoute une ligne au « Journal » dans le même commit.
-> Dernière mise à jour : **17/10/2026 21:10 (Dakar)** — commit de référence : voir `git log -1`.
+> Dernière mise à jour : **17/10/2026 21:40 (Dakar)** — commit de référence : voir `git log -1`.
 
 ## 0. Équipe et rôles
 
@@ -36,7 +36,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Données réelles | Aucune ouverture publique. Base : uniquement les fiches de test personnelles du fondateur, aucune donnée de test automatique | — |
 | Test terrain (5 chauffeurs, 30 arrivées) | **Non démarré** — attend le récépissé CDP | `docs/FICHE-TEST-TERRAIN.md` |
 | Suivi en direct | **Livré (17/10)** : lien livreur + lien de suivi client (livraison), « Qui arrive » pour l'organisateur d'un rendez-vous. Heure d'arrivée estimée sur le téléphone, sans service payant. Dernière position seulement, effacée à l'arrivée | `supabase/migrations/20261017100000_fiila_tracking.sql`, `tests/tracking.test.mjs` |
-| Comptes et boutique (Rali) | **Construit et testé en local (17/10), pas encore en production** : migration `20261017220000_fiila_accounts_shops` à appliquer ; réglages Auth du tableau de bord Supabase à faire par le fondateur (§4 #12) | `docs/ARCHITECTURE-RALI.md`, `tests/accounts.sql.test.mjs` (21), `tests/shop.test.mjs` (19) |
+| Comptes et boutique (Rali) | **En production (17/10 21:35)** : migration appliquée, `verify-db` 8/8 (6 migrations, 40 fonctions, schéma fermé). Inscription ouverte mais « Confirm email » actif avec l'envoi d'e-mails intégré de Supabase : seules les adresses de l'équipe reçoivent l'e-mail → réglage fondateur §4 #12 avant tout vrai commerçant | `docs/ARCHITECTURE-RALI.md`, `tests/accounts.sql.test.mjs` (21), `tests/shop.test.mjs` (19) |
 | Interface | **Design system v1.1 appliqué** (Light + Dark, sélecteur de thème, 6 cartes, contrastes AA). Aucune coordonnée affichée. Audit UI/UX fait et corrigé le 17/10 | `docs/design-system/README.md`, `web/styles.css` |
 
 ## 3. Décisions en vigueur
@@ -72,9 +72,10 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 10 | Alléger les textes de l'interface (retour fondateur du 17/10 : trop de petites indications) | Builder | Prochain test |
 | 11 | Application mobile native, après validation de la version web | Builder, VP | — |
 | 12 | Supabase → Authentication : Site URL et Redirect URL = `https://aramislab0.github.io/fii-la/` ; pour le pilote, désactiver « Confirm email » **ou** brancher un SMTP (Resend / Brevo, offre gratuite à confirmer) — sans SMTP, « mot de passe oublié » ne marche pas pour de vrais utilisateurs | Fondateur | Mise en production des comptes |
-| 13 | Appliquer la migration comptes/boutique en production puis `verify-db` | Builder (après #12) | Mise en production |
+| 13 | ~~Appliquer la migration comptes/boutique en production~~ fait 17/10 21:35 | Builder | — |
 | 14 | Ajouter au dossier CDP : comptes (e-mail, profil, photo), données clients des commerçants (nom, téléphone, commandes, paiements). Le commerçant est responsable de ses données clients | Fondateur | Usage réel des comptes |
 | 15 | Paiement en ligne : choisir l'opérateur (Wave Business, Orange Money, agrégateur), coûts et contrat | Fondateur | Bouton « Payer » sur la facture |
+| 17 | Tester sur iPhone : créer son compte (e-mail du fondateur), créer la boutique, une commande, ouvrir la facture sur un 2e téléphone, donner l'adresse, envoyer au livreur | Fondateur | Validation web avant app native |
 | 16 | Revue VP de l'intégration Rali (parcours commerçant et client, `docs/screenshots/boutique/`) | VP | — |
 | 7 | ~~Alignement Fii La ↔ Rali~~ → tranché le 17/10 : intégration (voir décisions) | VP → fondateur | Feuille de route | (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
 | 8 | Régler la facture de l'organisation Supabase « AramisLab » (autres projets) | Fondateur | Hors Fii La |
@@ -115,6 +116,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 17/10 21:35 | Production : migration comptes/boutique appliquée (script `scripts/apply-migration.mjs`, transaction unique) ; `verify-db` 8/8 ; sondes anonymes (`fiila_me` → auth_required, facture inconnue → not_found) ; E2E production 38/38 Chromium et 38/38 WebKit ; parcours boutique 19/19 WebKit (Mac, local). Base de production : 3 fiches (fondateur ×2, Test VP), aucune donnée de test restante. Suite suivi : 1 échec ponctuel sous charge (attente d'arrivée), 12/12 au relancement | `inspect.sh`, journaux Mac |
 | 17/10 21:10 | Rali intégré à Fii La : migration `20261017220000_fiila_accounts_shops` (comptes, profil, carnet étiqueté, boutique, clients, commandes, factures, paiements, livraison par commande), client Auth sans bibliothèque, écrans `#/compte`, `#/boutique`, `#/clients`, `#/commande/…`, facture `#/f/…`. Tests locaux : comptes/boutique SQL 21/21, parcours boutique 19/19 Chromium ; non-régression SQL 37, E2E 38, circuit 20, découverte 23, social 23. Note `docs/ARCHITECTURE-RALI.md`. Production : migration à appliquer | ce commit |
 | 17/10 21:25 | Migration `fiila_tracking` appliquée en production (directement sur la base, le CLI Supabase du Mac restant bloqué) ; `verify-db` : 5 migrations, 20 fonctions, schéma fermé. Sonde de production des 6 fonctions de suivi : OK (données supprimées). E2E en production 38/38 Chromium et WebKit ; suite suivi 12/12 WebKit | journal de session |
 | 17/10 21:10 | ~~En attente~~ (résolu à 21:25) : interface du suivi en ligne (GitHub Pages), mais migration `20261017100000_fiila_tracking` **pas encore appliquée** en production. Le CLI Supabase du Mac reste bloqué (probable fenêtre Trousseau macOS) ; l'application via le connecteur Supabase a été annulée côté fondateur. Les boutons de suivi échouent en production tant que la migration n'est pas appliquée | journal de session |
