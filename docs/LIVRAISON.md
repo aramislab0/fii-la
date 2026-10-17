@@ -127,6 +127,8 @@ Ce que couvrent les 35 parcours : création complète, géolocalisation réussie
 
 Ordre de grandeur : une fiche avec photo pèse environ 150 à 300 Ko, soit environ 2 000 fiches avec photo dans 500 Mo.
 
+**Fonction serveur** : `fiila-resolve-maps` (Supabase Edge Function, publique, sans accès à la base) lit les liens courts Google Maps (`maps.app.goo.gl`) collés par l’utilisateur et renvoie le point. Elle n’accepte que ces liens, ne suit que des redirections vers Google et n’enregistre rien. Déployée par `scripts/deploy.sh`.
+
 **Hébergement retenu** : organisation Supabase « aramislab », plan Pro déjà payé, plafond de dépenses activé. Fii La n’ajoute pas de coût tant qu’il reste dans le quota inclus.
 
 ## 9. Déploiement et retour arrière

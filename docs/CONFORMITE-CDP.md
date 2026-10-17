@@ -32,6 +32,7 @@ Constaté dans le code au commit `9576bc8`.
 | Rendez-vous : lieu, date, indications, photo | Organisateur et invités (indirectement) | Lieu temporaire | Idem | Effacé 30 jours après la fin d’affichage | Toute personne qui a le lien |
 | Demande d’adresse : nom du demandeur, objet, référence | Demandeur (souvent un commerce) | Recevoir l’adresse d’un client | Idem | Effacée 30 jours après expiration (7 jours de validité) | Le client qui a le lien voit le nom et l’objet ; seul le demandeur voit la réponse |
 | Réponse à une demande (lien vers la fiche du client) | Client | Livraison | Idem | Tant que la demande existe ; disparaît si le client supprime ou désactive | Le demandeur seulement |
+| Lien court Google Maps collé par l’utilisateur | Créateur de la fiche | Lire le point désigné (fonction `fiila-resolve-maps`) | Fonction Supabase (Paris) qui interroge Google | Non conservé : traité le temps de la requête | Google (reçoit la requête du serveur, pas l’adresse IP de l’utilisateur) |
 | Empreinte salée de l’adresse IP (limite anti-abus) | Toute personne qui crée une fiche ou déclenche un compteur | Sécurité | Idem | 24 heures | Personne |
 | Jetons (partage, gestion haché, anciens liens) | Créateurs | Contrôle d’accès | Idem | Anciens liens : 180 jours | Personne |
 | Compteurs agrégés (jour, événement, variante, nombre) | Aucune personne identifiable | Mesure d’usage | Idem | Sans limite | Administrateur |
