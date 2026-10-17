@@ -50,6 +50,7 @@
       themeSwitch(),
       h('div', { class: 'foot-links' },
         h('a', { href: '#/' }, 'Fii La'),
+        h('a', { href: '#/compte', id: 'foot-account' }, authed() ? 'Mon compte' : 'Se connecter'),
         h('a', { href: '#/confidentialite' }, 'Données et confidentialité'),
         h('a', { href: '#/cle' }, 'Restaurer une clé de gestion')));
   }
@@ -232,7 +233,10 @@
     order_closed: 'Cette commande est clôturée.',
     address_already: 'L’adresse est déjà reçue ou demandée.',
     payment_not_found: 'Paiement introuvable.',
-    too_many: 'Limite atteinte.'
+    too_many: 'Limite atteinte.',
+    product_not_found: 'Article introuvable.',
+    not_delivered: 'Vous pourrez noter vos articles une fois la commande livrée.',
+    invalid_rating: 'Note non valide.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
   ApiError.prototype = Object.create(Error.prototype);
@@ -301,15 +305,21 @@
   // Après connexion : les fiches de ce téléphone rejoignent le compte (seules celles dont on a la clé).
   function afterLogin(name) {
     var items = owned.all().filter(function (r) { return r.owner; }).map(function (r) { return { type: r.type, id: r.id, owner: r.owner }; });
+    var sk = LS.get('fiila.shop', null);
     return (items.length ? api('fiila_claim', { p_items: items.slice(0, 200) }) : Promise.resolve({ claimed: 0 })).then(function (c) {
+      return sk && sk.key ? api('fiila_shop_claim', { p_key: sk.key }).then(function (r) {
+        if (r && r.claimed) LS.set('fiila.shop', Object.assign({}, sk, { linked: true }));
+        return c;
+      }, function () { return c; }) : c;
+    }).then(function (c) {
       return (name ? api('fiila_profile_save', { p: { display_name: name } }) : api('fiila_me', {})).then(function (me) { ME = me; return c; });
     });
   }
   var account = {
-    signUp: function (email, password, name) {
+    signUp: function (email, password, name, source) {
       return authCall('/signup?redirect_to=' + encodeURIComponent(baseUrl()), 'POST', { email: email, password: password, data: { display_name: name || undefined } })
         .then(function (r) {
-          if (r && r.access_token) { saveSession(r); track('account_created', 'account'); return afterLogin(name).then(function (c) { return { session: true, claimed: c.claimed }; }); }
+          if (r && r.access_token) { saveSession(r); track('account_created', source === 'nudge' || source === 'shop' ? source : 'account'); return afterLogin(name).then(function (c) { return { session: true, claimed: c.claimed }; }); }
           return { confirm: true };
         });
     },
@@ -323,6 +333,9 @@
         saveSession(null);
         // On garde sur ce téléphone les fiches dont il a la clé ; celles du compte seul disparaissent d'ici.
         LS.set('fiila.owned', owned.all().filter(function (r) { return r.owner; }));
+        // Boutique rattachée au compte : elle reste accessible par le compte, plus par ce téléphone.
+        var sk = LS.get('fiila.shop', null);
+        if (sk && sk.linked) LS.del('fiila.shop');
       };
       return authCall('/logout', 'POST', null, true).then(done, done);
     },
@@ -407,8 +420,11 @@
      Jamais d'adresse, de coordonnées, de photo, de clé ni de jeton de lien.
      Envoi silencieux : un échec n'a aucun effet sur l'affichage ou la création. */
   var TRACKABLE = {
-    account_created: ['account'],
-    shop_created: ['shop'],
+    account_created: ['account', 'shop', 'nudge'],
+    account_nudge: ['shown', 'dismissed'],
+    shop_created: ['shop', 'no_account', 'account'],
+    product_created: ['photo', 'no_photo'],
+    review_left: ['1', '2', '3', '4', '5'],
     order_created: ['new_customer', 'known_customer', 'known_address'],
     invoice_opened: ['order'],
     payment_recorded: ['cash', 'wave', 'orange_money', 'card', 'other'],
@@ -431,6 +447,7 @@
     catch (e) { return false; }
   }
   function track(event, variant) {
+    if (event === 'fiche_created' || event === 'request_created' || event === 'order_created') bumpTx();
     try {
       if (!API_URL || CFG.analytics === false || privacyOptOut()) return;
       if (!TRACKABLE[event] || TRACKABLE[event].indexOf(variant) < 0) return;
@@ -826,7 +843,7 @@
         var f = inp.files && inp.files[0];
         if (!f) return;
         msg.textContent = 'Préparation de la photo…'; msg.className = 'msg info';
-        compressPhoto(f).then(function (d) { opts.set(d); msg.textContent = ''; draw(); },
+        compressPhoto(f, opts.maxSide).then(function (d) { opts.set(d); msg.textContent = ''; draw(); },
           function (e) { msg.textContent = e.message; msg.className = 'msg err'; });
         inp.value = '';
       }
@@ -834,12 +851,12 @@
     function draw() {
       var p = opts.get();
       setKids(box, 
-        h('span', { class: 'label' }, 'Photo de l’entrée ', h('span', { class: 'hint' }, opts.optional ? '(facultatif)' : '(conseillé)')),
-        p ? h('img', { class: 'photo-prev', src: p, alt: 'Aperçu de la photo de l’entrée' }) : null,
+        h('span', { class: 'label' }, (opts.label || 'Photo de l’entrée') + ' ', h('span', { class: 'hint' }, opts.optional ? '(facultatif)' : '(conseillé)')),
+        p ? h('img', { class: 'photo-prev', src: p, alt: 'Aperçu : ' + (opts.label || 'photo de l’entrée') }) : null,
         h('div', { class: 'row' },
           h('button', { class: p || opts.optional ? 'btn ghost' : 'btn', type: 'button', onclick: function () { inp.click(); } }, p ? 'Remplacer la photo' : 'Prendre ou choisir une photo'),
           p ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { opts.set(null); draw(); } }, 'Retirer') : null),
-        h('p', { class: 'hint' }, 'Photographiez la porte, pas toute la maison, et évitez les visages et plaques. La photo est réduite et ses données de localisation sont retirées avant l’envoi.'),
+        opts.label ? null : h('p', { class: 'hint' }, 'Photographiez la porte, pas toute la maison, et évitez les visages et plaques. La photo est réduite et ses données de localisation sont retirées avant l’envoi.'),
         inp, msg);
     }
     draw();
@@ -941,6 +958,8 @@
       else if (p[0] === 'compte') view = viewAccount(r.q);
       else if (p[0] === 'boutique' && !p[1]) view = viewShop(r.q);
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
+      else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
+      else if (p[0] === 'boutique' && p[1] === 'article' && p[2]) view = viewProductForm(p[2]);
       else if (p[0] === 'clients' && !p[1]) view = viewCustomers(r.q);
       else if (p[0] === 'clients' && p[1]) view = viewCustomer(p[1]);
       else if (p[0] === 'commande' && p[1] === 'nouvelle') view = viewOrderNew(r.q);
@@ -1009,13 +1028,13 @@
           }))) : null);
     }
 
-    var who = h('a', { class: 'who', id: 'account-link', href: '#/compte' }, authed() ? avatarEl(null, 32) : null, authed() ? 'Mon compte' : 'Se connecter');
+    var who = authed() ? h('a', { class: 'who', id: 'account-link', href: '#/compte' }, avatarEl(null, 32), 'Mon compte') : null;
     if (authed()) account.me().then(function (me) {
       if (!me) { setKids(who, 'Se connecter'); return; }
       setKids(who, avatarEl(me, 32), h('span', { class: 'who-name' }, me.display_name || 'Mon compte'));
-      if (me.shop) shopBtn.textContent = me.shop.name;
+      if (me.shop && shopBtn) shopBtn.textContent = me.shop.name;
     }, function () { /* hors ligne : on garde le lien */ });
-    var shopBtn = h('a', { class: 'btn ghost full', id: 'shop-link', href: '#/boutique' }, 'Ma boutique');
+    var shopBtn = CFG.shop === false ? null : h('a', { class: 'btn ghost full', id: 'shop-link', href: '#/boutique' }, 'Ma boutique');
     return page(
       h('header', { class: 'stack tight' },
         h('div', { class: 'brand-row' },
@@ -1029,6 +1048,7 @@
         h('a', { class: 'btn ghost', href: '#/demande/nouvelle' }, 'Demander une adresse'),
         h('a', { class: 'btn ghost full', href: '#/rdv/nouveau' }, 'Créer un rendez-vous'),
         shopBtn),
+      accountNudge(),
       listBox,
       footer());
   }
@@ -2208,6 +2228,10 @@
      Rali dans Fii La : un compte (facultatif) qui garde les adresses de l'utilisateur sur tous ses
      téléphones, et pour un commerçant une boutique : clients, commandes, facture partageable,
      demande d'adresse liée, livraison suivie, paiements enregistrés. Paiement en ligne : plus tard. */
+  // Boutique sans compte obligatoire : sa clé reste sur ce téléphone (comme la clé d'une fiche).
+  var SHOP_LS = 'fiila.shop';
+  function shopKey() { var x = LS.get(SHOP_LS, null); return (x && x.key) || null; }
+  function sapi(fn, args) { return api(fn, Object.assign({ p_key: shopKey() }, args || {})); }
   var TAGS = { home: 'Maison', work: 'Bureau', shop: 'Boutique', other: 'Autre' };
   var PAY_METHODS = { cash: 'Espèces', wave: 'Wave', orange_money: 'Orange Money', other: 'Autre' };
   function fcfa(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' FCFA'; }
@@ -2253,6 +2277,7 @@
   }
   function failPage(title, retour) {
     return function (e) {
+      if (e.code === 'shop_required') { go('#/boutique'); return loading(); }
       if (e.code === 'session_expired' || e.code === 'auth_required') return needLogin(retour, 'Reconnectez-vous', 'Votre session a expiré.');
       return page(backBtn(), stateCard('!', title, errText(e), retryBtn()), footer());
     };
@@ -2297,7 +2322,7 @@
         if (mode === 'login' && !f.password) return errBox(err, new ApiError('invalid_credentials'));
         btn.disabled = true;
         var label = btn.textContent; btn.textContent = 'Un instant…';
-        var p = mode === 'signup' ? account.signUp(email, f.password, f.name.trim())
+        var p = mode === 'signup' ? account.signUp(email, f.password, f.name.trim(), q.source)
           : mode === 'forgot' ? account.recover(email) : account.signIn(email, f.password);
         p.then(function (r) {
           if (mode === 'forgot') {
@@ -2422,22 +2447,21 @@
 
   /* ----- boutique */
   function viewShop(q) {
-    if (!authed()) return needLogin('boutique', 'Votre boutique sur Fii La', 'Commandes, factures, adresses des clients et livraisons suivies au même endroit.');
-    return api('fiila_shop_get', {}).then(function (r) {
+    return sapi('fiila_shop_get', {}).then(function (r) {
       return r.shop ? shopDashboard(r, q || {}) : shopForm(null);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
   function viewShopSettings() {
-    if (!authed()) return needLogin('boutique/reglages', 'Connectez-vous', '');
-    return api('fiila_shop_get', {}).then(function (r) { return shopForm(r.shop); }, failPage('Impossible de charger la boutique', 'boutique'));
+    return sapi('fiila_shop_get', {}).then(function (r) { return shopForm(r.shop); }, failPage('Impossible de charger la boutique', 'boutique'));
   }
   function shopForm(shop) {
     var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '', ninea: shop ? shop.ninea || '' : '' };
     var err = h('div', { role: 'alert' });
     var btn = h('button', { class: 'btn', type: 'button', id: 'shop-save', onclick: function () {
       btn.disabled = true; setKids(err);
-      api('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: f.ninea.trim() || null } }).then(function () {
-        if (!shop) track('shop_created', 'shop');
+      sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: f.ninea.trim() || null } }).then(function (r) {
+        if (r && r.key) LS.set(SHOP_LS, { id: r.shop.id, key: r.key, linked: authed() || undefined });
+        if (!shop) { track('shop_created', authed() ? 'account' : 'no_account'); bumpTx(); }
         ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, shop ? 'Enregistrer' : 'Créer ma boutique');
@@ -2478,7 +2502,7 @@
     var vue = ['open', 'unpaid', 'done', 'all'].indexOf(q.vue) >= 0 ? q.vue : 'open';
     var listBox = h('div', { class: 'list', id: 'orders' }, loading('Chargement des commandes…'));
     function load() {
-      api('fiila_orders', { p_filter: vue === 'all' ? null : vue }).then(function (rows) {
+      sapi('fiila_orders', { p_filter: vue === 'all' ? null : vue }).then(function (rows) {
         setKids(listBox, rows.length ? rows.map(orderItem) : h('div', { class: 'card' },
           h('p', { class: 'muted' }, vue === 'open' ? 'Aucune commande en cours.' : vue === 'unpaid' ? 'Rien à encaisser.' : 'Aucune commande.')));
       }, function (e) { errBox(listBox, e); });
@@ -2493,9 +2517,11 @@
         h('div', { class: 'brand-row' }, h('h1', { class: 'wrapword', id: 'shop-title' }, shop.name),
           h('a', { class: 'btn ghost small', href: '#/boutique/reglages' }, 'Réglages'))),
       h('a', { class: 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'Nouvelle commande'),
+      shop.account || authed() ? null : shopAccountCard(),
       h('div', { class: 'tiles' },
         tile(st.open, 'en cours', '#/boutique?vue=open'),
         tile(st.unpaid, 'à encaisser', '#/boutique?vue=unpaid'),
+        tile(st.products, st.products === 1 ? 'article' : 'articles', '#/boutique/articles'),
         tile(st.customers, st.customers === 1 ? 'client' : 'clients', '#/clients')),
       segField({ name: 'vue', id: 'orders-filter', value: vue,
         options: [['open', 'En cours'], ['unpaid', 'À encaisser'], ['done', 'Terminées'], ['all', 'Toutes']],
@@ -2505,12 +2531,11 @@
 
   /* ----- clients */
   function viewCustomers(q) {
-    if (!authed()) return needLogin('clients', 'Connectez-vous', 'Vos clients sont rattachés à votre boutique.');
     var term = (q && q.q) || '';
     var listBox = h('div', { class: 'list', id: 'customers' }, loading());
     var timer;
     function load() {
-      api('fiila_customers', { p_query: term.trim() || null }).then(function (rows) {
+      sapi('fiila_customers', { p_query: term.trim() || null }).then(function (rows) {
         setKids(listBox, rows.length ? rows.map(function (c) {
           return h('a', { class: 'item', href: '#/clients/' + c.id },
             h('div', null, h('div', { class: 't' }, c.name), h('div', { class: 'small muted' }, [c.phone, c.orders ? c.orders + ' commande' + (c.orders > 1 ? 's' : '') : null].filter(Boolean).join(' · '))),
@@ -2528,8 +2553,7 @@
   }
 
   function viewCustomer(id) {
-    if (!authed()) return needLogin('clients/' + id, 'Connectez-vous', '');
-    return api('fiila_customer_get', { p_id: id }).then(function (c) {
+    return sapi('fiila_customer_get', { p_id: id }).then(function (c) {
       var f = { name: c.name, phone: c.phone || '' };
       var err = h('div', { role: 'alert' });
       var zone = h('div', { class: 'stack' });
@@ -2546,7 +2570,7 @@
             textField({ id: 'cu-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
             err,
             h('button', { class: 'btn', type: 'button', onclick: function () {
-              api('fiila_customer_save', { p: { id: c.id, name: f.name.trim(), phone: f.phone.trim() || null } }).then(function () { toast('Client mis à jour.'); render(); }, function (e) { errBox(err, e); });
+              sapi('fiila_customer_save', { p: { id: c.id, name: f.name.trim(), phone: f.phone.trim() || null } }).then(function () { toast('Client mis à jour.'); render(); }, function (e) { errBox(err, e); });
             } }, 'Enregistrer'),
             h('button', { class: 'btn danger', type: 'button', id: 'customer-delete', onclick: function () {
               setKids(zone, h('div', { class: 'confirm' },
@@ -2554,7 +2578,7 @@
                 h('p', { class: 'small' }, 'Ses commandes passées restent, avec son nom. Son adresse n’est plus mémorisée par la boutique.'),
                 h('div', { class: 'row' },
                   h('button', { class: 'btn danger-fill', type: 'button', onclick: function () {
-                    api('fiila_customer_delete', { p_id: c.id }).then(function () { toast('Client retiré.'); go('#/clients'); }, function (e) { errBox(zone, e); });
+                    sapi('fiila_customer_delete', { p_id: c.id }).then(function () { toast('Client retiré.'); go('#/clients'); }, function (e) { errBox(zone, e); });
                   } }, 'Retirer'),
                   h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(zone); } }, 'Annuler'))));
             } }, 'Retirer ce client'), zone)),
@@ -2565,16 +2589,17 @@
   /* ----- nouvelle commande */
   var ORDER_DRAFT = 'fiila.draft.order';
   function viewOrderNew(q) {
-    if (!authed()) return needLogin('commande/nouvelle', 'Connectez-vous', 'Les commandes sont rattachées à votre boutique.');
-    return api('fiila_customers', { p_query: null }).then(function (customers) {
+    return Promise.all([sapi('fiila_customers', { p_query: null }), sapi('fiila_products', { p_all: false })]).then(function (res) {
+      var customers = res[0];
       var pre = q && q.client ? customers.filter(function (c) { return c.id === q.client; })[0] : null;
-      return orderForm(customers, pre || null);
+      return orderForm(customers, pre || null, res[1]);
     }, function (e) {
       if (e.code === 'shop_required') { go('#/boutique'); return loading(); }
       return failPage('Impossible de préparer la commande', 'commande/nouvelle')(e);
     });
   }
-  function orderForm(customers, pre) {
+  function orderForm(customers, pre, products) {
+    products = products || [];
     var saved = pre ? null : LS.get(ORDER_DRAFT, null);
     var d = saved || { cust: null, name: '', phone: '', items: [{ label: '', qty: '1', price: '' }], note: '' };
     if (pre) d.cust = { id: pre.id, name: pre.name, phone: pre.phone, has_address: pre.has_address };
@@ -2620,9 +2645,26 @@
       showMatches();
     }
 
+    var byId = {};
+    products.forEach(function (pr) { byId[pr.id] = pr; });
+    function addProduct(pr) {
+      var empty = d.items.length === 1 && !d.items[0].label && !String(d.items[0].price);
+      var line = { product_id: pr.id, label: pr.name, qty: '1', price: String(pr.price) };
+      if (empty) d.items[0] = line; else d.items.push(line);
+      drawItems(); refreshTotal();
+    }
+    var picker = products.length ? h('div', { class: 'stack tight', id: 'product-picker' },
+      h('span', { class: 'label' }, 'Ajouter depuis mes articles'),
+      h('div', { class: 'pick-row' }, products.map(function (pr) {
+        return h('button', { class: 'pick', type: 'button', onclick: function () { addProduct(pr); } },
+          pr.photo ? h('img', { src: pr.photo, alt: '' }) : null,
+          h('span', null, h('strong', null, pr.name), h('span', { class: 'small muted' }, fcfa(pr.price))));
+      }))) : null;
     function drawItems() {
       setKids(itemsBox, d.items.map(function (it, i) {
-        return h('div', { class: 'line-item' },
+        var pr = it.product_id ? byId[it.product_id] : null;
+        return h('div', { class: 'line-item' + (pr && pr.photo ? ' has-photo' : '') },
+          pr && pr.photo ? h('img', { class: 'li-photo', src: pr.photo, alt: '' }) : null,
           h('input', { type: 'text', class: 'li-label', placeholder: 'Article', maxlength: '80', value: it.label, 'aria-label': 'Article ' + (i + 1),
             oninput: function (e) { it.label = e.target.value; keep(); } }),
           h('input', { type: 'text', class: 'li-qty', inputmode: 'numeric', value: it.qty, placeholder: 'Qté', 'aria-label': 'Quantité', oninput: function (e) { it.qty = e.target.value; refreshTotal(); } }),
@@ -2637,7 +2679,7 @@
     function submit() {
       setKids(err);
       var items = d.items.filter(function (it) { return it.label.trim() || String(it.price).trim(); }).map(function (it) {
-        return { label: it.label.trim(), qty: num(it.qty), price: num(it.price) };
+        return { product_id: it.product_id && byId[it.product_id] ? it.product_id : undefined, label: it.label.trim(), qty: num(it.qty), price: num(it.price) };
       });
       if (!d.cust && !d.name.trim()) return errBox(err, new ApiError('customer_name_required'));
       if (!items.length) return errBox(err, new ApiError('items_required'));
@@ -2649,7 +2691,7 @@
       btn.disabled = true; btn.textContent = 'Création…';
       var p = { items: items, note: d.note.trim() || null };
       if (d.cust) p.customer_id = d.cust.id; else p.customer = { name: d.name.trim(), phone: d.phone.trim() || null };
-      api('fiila_order_create', { p: p }).then(function (o) {
+      sapi('fiila_order_create', { p: p }).then(function (o) {
         LS.del(ORDER_DRAFT);
         track('order_created', o.address_state === 'received' ? 'known_address' : d.cust ? 'known_customer' : 'new_customer');
         go('#/commande/' + o.id + '?nouveau=1');
@@ -2660,7 +2702,7 @@
     setKids(root, backBtn('Ma boutique', '#/boutique'),
       h('h1', null, 'Nouvelle commande'),
       h('section', { class: 'card' }, h('h2', null, 'Client'), custBox),
-      h('section', { class: 'card' }, h('h2', null, 'Articles'),
+      h('section', { class: 'card' }, h('h2', null, 'Articles'), picker,
         h('div', { class: 'line-head', 'aria-hidden': 'true' }, h('span', null, 'Article'), h('span', null, 'Qté'), h('span', null, 'Prix (FCFA)'), h('span')),
         itemsBox,
         h('div', { class: 'total-row' }, h('span', null, 'Total'), totalEl)),
@@ -2673,8 +2715,7 @@
 
   /* ----- une commande (commerçant) */
   function viewOrder(id, q) {
-    if (!authed()) return needLogin('commande/' + id, 'Connectez-vous', 'Cette commande est rattachée à votre boutique.');
-    return Promise.all([api('fiila_order_get', { p_id: id }), account.me()]).then(function (res) {
+    return Promise.all([sapi('fiila_order_get', { p_id: id }), sapi('fiila_shop_get', {})]).then(function (res) {
       return orderView(res[0], (res[1] && res[1].shop) || {}, q || {});
     }, failPage('Commande introuvable', 'boutique'));
   }
@@ -2685,7 +2726,7 @@
     var shopName = shop.name || 'votre boutique';
     function refresh(next) { if (next) o = next; setKids(app, orderView(o, shop, {})); }
     function call(fn, args, okText) {
-      return api(fn, Object.assign({ p_id: o.id }, args || {})).then(function (next) { if (okText) toast(okText); refresh(next); return next; },
+      return sapi(fn, Object.assign({ p_id: o.id }, args || {})).then(function (next) { if (okText) toast(okText); refresh(next); return next; },
         function (e) { toast(errText(e)); throw e; });
     }
     var msgClient = 'Bonjour ' + o.customer_name + ', voici votre commande N° ' + o.ref + ' chez ' + shopName + ' : ' + fcfa(o.total) + '.\n' +
@@ -2720,9 +2761,9 @@
       var dErr = h('div', { role: 'alert' });
       var startBtn = h('button', { class: cour ? 'btn ghost small' : 'btn big', type: 'button', id: 'start-delivery', onclick: function () {
         startBtn.disabled = true;
-        api('fiila_order_delivery', { p_id: o.id }).then(function (r) {
+        sapi('fiila_order_delivery', { p_id: o.id }).then(function (r) {
           LS.set(COURIER_KEY, r.courier_token); track('delivery_started', 'order');
-          api('fiila_order_get', { p_id: o.id }).then(function (n) { refresh(n); }, function () { render(); });
+          sapi('fiila_order_get', { p_id: o.id }).then(function (n) { refresh(n); }, function () { render(); });
         }, function (e) { startBtn.disabled = false; errBox(dErr, e); });
       } }, cour ? 'Autre livreur' : 'Envoyer au livreur');
       var courierUrl = cour ? baseUrl() + '#/l/' + cour : null;
@@ -2797,9 +2838,124 @@
     return h('table', { class: 'inv' },
       h('thead', null, h('tr', null, h('th', null, 'Article'), h('th', { class: 'n' }, 'Qté'), h('th', { class: 'n' }, 'Prix'), h('th', { class: 'n' }, 'Montant'))),
       h('tbody', null, (items || []).map(function (it) {
-        return h('tr', null, h('td', { class: 'wrapword' }, it.label), h('td', { class: 'n' }, String(it.qty)), h('td', { class: 'n' }, fcfa(it.price)), h('td', { class: 'n' }, fcfa(it.qty * it.price)));
+        return h('tr', null, h('td', { class: 'wrapword' }, it.photo ? h('span', { class: 'lbl' }, h('img', { class: 'inv-photo', src: it.photo, alt: '' }), h('span', null, it.label)) : it.label), h('td', { class: 'n' }, String(it.qty)), h('td', { class: 'n' }, fcfa(it.price)), h('td', { class: 'n' }, fcfa(it.qty * it.price)));
       })),
       h('tfoot', null, h('tr', null, h('td', { colspan: '3' }, 'Total'), h('td', { class: 'n' }, fcfa(total)))));
+  }
+
+  /* ----- compte proposé, jamais imposé */
+  // Compte des actions utiles sur ce téléphone (fiche, demande, boutique, commande).
+  function bumpTx() { LS.set('fiila.tx', (LS.get('fiila.tx', 0) || 0) + 1); }
+  function nudgeCard(id, title, text, href, onLater) {
+    var card = h('section', { class: 'card nudge', id: id },
+      h('h2', null, title), h('p', { class: 'small muted' }, text),
+      h('div', { class: 'row' },
+        h('a', { class: 'btn small', href: href, id: id + '-yes' }, 'Créer un compte'),
+        h('button', { class: 'btn ghost small', type: 'button', id: id + '-later', onclick: function () { onLater(); card.remove(); } }, 'Plus tard')));
+    return card;
+  }
+  // Après 3 actions, sans compte : une proposition discrète, jamais bloquante.
+  function accountNudge() {
+    if (authed() || (LS.get('fiila.tx', 0) || 0) < 3) return null;
+    var until = LS.get('fiila.nudge.until', 0) || 0;
+    if (Date.now() < until) return null;
+    track('account_nudge', 'shown');
+    return nudgeCard('account-nudge', 'Ne perdez rien', 'Un compte garde vos adresses et votre boutique, même si vous changez de téléphone. Facultatif.',
+      '#/compte' + qs({ mode: 'inscription', source: 'nudge' }), function () {
+        LS.set('fiila.nudge.until', Date.now() + 14 * 864e5); track('account_nudge', 'dismissed');
+      });
+  }
+  function shopAccountCard() {
+    if (Date.now() < (LS.get('fiila.nudge.shop', 0) || 0)) return null;
+    return nudgeCard('shop-nudge', 'Votre boutique est sur ce téléphone', 'Créez un compte pour la retrouver sur tous vos téléphones. Vous pouvez continuer sans.',
+      '#/compte' + qs({ mode: 'inscription', retour: 'boutique', source: 'shop' }), function () { LS.set('fiila.nudge.shop', Date.now() + 7 * 864e5); });
+  }
+
+  /* ----- articles de la boutique (catalogue) */
+  function stars(n) { var r = Math.round(Number(n) || 0); return '★★★★★'.slice(0, r) + '☆☆☆☆☆'.slice(0, 5 - r); }
+  function viewProducts() {
+    return sapi('fiila_products', { p_all: true }).then(function (rows) {
+      return page(backBtn('Ma boutique', '#/boutique'),
+        h('div', { class: 'brand-row' }, h('h1', null, 'Mes articles'), h('a', { class: 'btn small', id: 'product-new', href: '#/boutique/article/nouveau' }, 'Ajouter')),
+        rows.length ? h('div', { class: 'list', id: 'products' }, rows.map(function (pr) {
+          return h('a', { class: 'item product-item', href: '#/boutique/article/' + pr.id },
+            pr.photo ? h('img', { class: 'thumb', src: pr.photo, alt: '' }) : h('span', { class: 'thumb empty', 'aria-hidden': 'true' }),
+            h('div', { style: 'flex:1;min-width:0' }, h('div', { class: 't' }, pr.name),
+              h('div', { class: 'small muted' }, fcfa(pr.price) + (pr.reviews ? ' · ' + stars(pr.rating) + ' (' + pr.reviews + ')' : ''))),
+            h('span', { class: 'item-end' }, pr.active ? null : h('span', { class: 'chip neutral' }, 'Masqué'), h('span', { class: 'chev' }, icon('chev', 18))));
+        })) : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Ajoutez vos articles avec leur photo et leur prix : vous les choisirez en un geste dans vos commandes.')),
+        footer());
+    }, failPage('Impossible de charger les articles', 'boutique/articles'));
+  }
+  function viewProductForm(id) {
+    if (id === 'nouveau') return productForm(null);
+    return sapi('fiila_products', { p_all: true }).then(function (rows) {
+      var pr = rows.filter(function (x) { return x.id === id; })[0];
+      return pr ? productForm(pr) : page(backBtn('Mes articles', '#/boutique/articles'), stateCard('?', 'Article introuvable', ''), footer());
+    }, failPage('Impossible de charger l’article', 'boutique/articles'));
+  }
+  function productForm(pr) {
+    var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
+    var original = f.photo;
+    var err = h('div', { role: 'alert' });
+    var zone = h('div', { class: 'stack' });
+    var photoBox = photoField({ id: 'product-photo', optional: true, label: 'Photo de l’article', get: function () { return f.photo; }, set: function (v) { f.photo = v; }, maxSide: 720 });
+    var btn = h('button', { class: 'btn', type: 'button', id: 'product-save', onclick: function () {
+      setKids(err);
+      var price = parseInt(String(f.price).replace(/\D/g, ''), 10);
+      if (!f.name.trim()) return errBox(err, new ApiError('item_label_required'));
+      if (!(price >= 0)) return errBox(err, new ApiError('invalid_price'));
+      var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active };
+      if (f.photo !== original) p.photo = f.photo ? f.photo.replace(/^data:[^,]+,/, '') : '';
+      btn.disabled = true;
+      sapi('fiila_product_save', { p: p }).then(function () {
+        if (!pr) track('product_created', f.photo ? 'photo' : 'no_photo');
+        toast(pr ? 'Article mis à jour.' : 'Article ajouté.'); go('#/boutique/articles');
+      }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, pr ? 'Enregistrer' : 'Ajouter l’article');
+    return page(backBtn('Mes articles', '#/boutique/articles'),
+      h('h1', null, pr ? 'Modifier l’article' : 'Nouvel article'),
+      photoBox,
+      textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; } }),
+      textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; } }),
+      textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, onInput: function (v) { f.description = v; } }),
+      pr ? segField({ name: 'product-active', id: 'product-active', value: f.active ? 'on' : 'off', options: [['on', 'Visible'], ['off', 'Masqué']], onChange: function (v) { f.active = v === 'on'; } }) : null,
+      err, btn,
+      pr ? h('button', { class: 'btn danger', type: 'button', id: 'product-delete', onclick: function () {
+        setKids(zone, h('div', { class: 'confirm' },
+          h('p', null, h('strong', null, 'Supprimer cet article ?')),
+          h('p', { class: 'small' }, 'Les commandes passées gardent son nom et son prix. Ses notes sont effacées. Pour le retirer sans perdre ses notes, choisissez plutôt « Masqué ».'),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn danger-fill', type: 'button', onclick: function () {
+              sapi('fiila_product_delete', { p_id: pr.id }).then(function () { toast('Article supprimé.'); go('#/boutique/articles'); }, function (e) { errBox(zone, e); });
+            } }, 'Supprimer'),
+            h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(zone); } }, 'Annuler'))));
+      } }, 'Supprimer l’article') : null,
+      zone, footer());
+  }
+
+  // Notes de l'acheteur, sur la facture d'une commande livrée.
+  function reviewBox(token, items, shopName) {
+    var box = h('section', { class: 'card no-print', id: 'reviews' }, h('h2', null, 'Notez vos articles'),
+      h('p', { class: 'small muted' }, 'Votre note aide ' + shopName + ' et les prochains clients.'));
+    items.forEach(function (it) {
+      var cur = it.my_rating || 0;
+      var row = h('div', { class: 'rate-row' });
+      function draw() {
+        setKids(row, h('span', { class: 'wrapword' }, it.label),
+          h('span', { class: 'stars', role: 'radiogroup', 'aria-label': 'Note pour ' + it.label }, [1, 2, 3, 4, 5].map(function (n) {
+            return h('button', { type: 'button', class: 'star' + (n <= cur ? ' on' : ''), role: 'radio', 'aria-checked': String(n === cur), 'aria-label': n + ' sur 5',
+              onclick: function () {
+                api('fiila_review', { p_token: token, p_product_id: it.product_id, p_rating: n, p_comment: null }).then(function () {
+                  cur = n; draw(); track('review_left', String(n)); toast('Merci pour votre note.');
+                }, function (e) { toast(errText(e)); });
+              } }, n <= cur ? '★' : '☆');
+          })));
+      }
+      draw();
+      box.append(row);
+    });
+    return box;
   }
 
   /* ----- facture vue par le client (lien partagé) */
@@ -2811,7 +2967,7 @@
       var o = r.order, s = r.shop;
       var remaining = Math.max(0, o.total - o.paid);
       var act = [];
-      if (o.address_state === 'pending' && o.request_token) {
+      if (o.address_state === 'pending' && o.request_token && o.delivery_state !== 'delivered') {
         act.push(h('section', { class: 'card highlight no-print', id: 'give-address' },
           h('h2', null, 'Où faut-il livrer ?'),
           h('a', { class: 'btn big', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'Donner mon adresse de livraison'),
@@ -2821,6 +2977,8 @@
       }
       if (o.watch_token) act.push(h('div', { class: 'no-print' }, deliveryWatch(o.watch_token)));
       if (o.delivery_state === 'delivered') act.push(h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Livrée'));
+      var rateable = (o.items || []).filter(function (it) { return it.product_id; });
+      if (o.can_review && rateable.length) act.push(reviewBox(token, rateable, s.name));
       var pg = page(
         act,
         h('article', { class: 'card invoice', id: 'invoice' },
@@ -2854,6 +3012,7 @@
           h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.'),
           h('li', null, 'Si vous créez un compte (facultatif) : votre e-mail, votre mot de passe (géré par Supabase Auth, jamais visible en clair), et si vous les ajoutez votre nom, votre téléphone et votre photo de profil.'),
           h('li', null, 'Si vous ouvrez une boutique : son nom, son téléphone et son NINEA s’ils sont indiqués ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii La les héberge pour lui.'),
+          h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom. Le commerçant voit la moyenne de ses articles.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),
         h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un rendez-vous : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),

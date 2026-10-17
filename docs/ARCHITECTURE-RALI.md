@@ -1,81 +1,100 @@
-# Rali dans Fii La : architecture
+# Fii La + Rali : périmètre, architecture et phases
 
-> 17/10/2026. Décision du fondateur : le produit Rali (boutique, commandes, factures, clients, demande d'adresse, livraison, paiement) est intégré à Fii La. Le paiement en ligne (Wave, Orange Money) vient en dernier : le modèle est prêt, l'intégration ne l'est pas.
+> Version du 17/10/2026, 21:15, après la consigne du fondateur. Remplace la version de 21:00.
+> Ce qui est **construit** est marqué ✅. Ce qui est **prévu dans l'architecture, sans code** est marqué ◻︎.
 
-## 1. Principe
+## 1. Règles produit (fondateur, 17/10)
 
-Fii La reste utilisable sans compte. Le compte ajoute une seconde façon de prouver qu'une fiche vous appartient : en plus de la clé de gestion stockée sur le téléphone, le serveur reconnaît `auth.uid()`.
+1. **Personne n'est bloqué par un compte.**
+   - Toute personne qui reçoit un lien l'ouvre et fait sa transaction : voir une adresse, donner la sienne, suivre un livreur, voir sa facture, noter un article.
+   - Tout le monde peut aussi créer une adresse, un rendez-vous, une demande ou **une boutique** sans compte.
+2. **Le compte est proposé, jamais imposé**, à trois moments :
+   - à la création de la boutique : carte « Votre boutique est sur ce téléphone », avec « Plus tard » ;
+   - après 3 actions sur le téléphone : carte « Ne perdez rien », avec « Plus tard » (revient après 14 jours) ;
+   - par un lien discret en bas de page, « Se connecter », pour retrouver ses données sur un autre téléphone.
+3. **Ouverture des fonctions une à une**, avec un interrupteur par fonction (`window.FIILA_CONFIG`).
+   - Exemple : `shop: false` masque la boutique.
 
-Les fonctions existantes n'ont donc pas été dupliquées. Seules `fiila.owned_place` et `fiila.owned_request` ont changé : elles acceptent la clé **ou** le compte. Tout le reste en hérite (modifier, désactiver, supprimer, livraison, invités d'un rendez-vous).
+## 2. Phases
 
-## 2. Briques
-
-| Brique | Ce qui existait | Ce qui a été ajouté |
+| Phase | Contenu | État |
 |---|---|---|
-| Identité | Clé de gestion par fiche | Supabase Auth (e-mail + mot de passe), client REST minimal dans `app.js`, sans bibliothèque. Rafraîchissement automatique du jeton. Retour des liens e-mail (`#access_token=…`). |
-| Profil | — | `fiila.profiles` : nom, téléphone, photo (≤ 150 Ko, métadonnées refusées). |
-| Carnet d'adresses | « Mes adresses » sur le téléphone | `places.user_id` et `places.tag` (maison, bureau, boutique, autre). À la connexion, les fiches du téléphone rejoignent le compte (`fiila_claim`, clé valide obligatoire). Une adresse reste privée tant que son lien n'est pas envoyé. |
-| Boutique | Demande d'adresse anonyme | `fiila.shops` : une boutique par compte (MVP). |
-| Clients | — | `fiila.customers` : nom, téléphone, dernière adresse reçue. Même numéro dans la boutique = même client (+221 normalisé). |
-| Commandes et factures | Référence libre dans une demande | `fiila.orders` : numéro par boutique (0001…), articles, total calculé côté serveur en FCFA, lien de facture (jeton 128 bits). |
-| Adresse de livraison | Demande d'adresse | Chaque commande crée une demande au nom de la boutique, sauf si le client a déjà une adresse active. La réponse remonte sur la commande et sur la fiche client. |
-| Livraison | Liens livreur et suivi | `fiila_order_delivery` : lien livreur. Le client suit directement sur sa facture. Position effacée à la livraison ou à l'annulation. |
-| Paiement | — | `fiila.payments` : saisie manuelle aujourd'hui (espèces, Wave, Orange Money, autre). Colonnes `source` (`manual` / `provider`), `status`, `provider_ref` prêtes pour l'opérateur. |
+| **V1 — lancement** | Adresse (entrée, photo, repère, arrêt voiture), rendez-vous, demande d'adresse, partage WhatsApp / Facebook / Telegram / Instagram / TikTok, suivi du livreur, invités d'un rendez-vous | ✅ en production |
+| **V1 — lancement (Rali inclus)** | Boutique sans compte, articles avec photo et prix, commande en un geste depuis le catalogue, facture partageable, demande d'adresse liée, livraison suivie depuis la facture, paiements enregistrés à la main, clients, notes des acheteurs | ✅ construit ce soir |
+| V1 — option | Compte : profil, photo, mot de passe, carnet d'adresses étiqueté (maison, bureau, boutique), boutique sur tous ses téléphones | ✅ |
+| **V2 — livreurs** | Inscription livreur, livreur attitré, réception automatique des courses, notes des livreurs | ◻︎ §4 |
+| **V2 — paiement** | Wave / Orange Money sur la facture | ◻︎ §5 (modèle prêt) |
+| **V3 — vitrine et marketplace** | Vitrine publique de chaque boutique, fil des produits, recherche, marketplace Sénégal | ◻︎ §6 |
 
-## 3. Parcours
+## 3. Architecture en place
 
-**Commerçant**
+**Propriété.** Chaque objet se gère par **une clé gardée sur le téléphone** (fiche, demande, boutique), **ou** par le compte connecté.
+- Le compte est une couche de récupération, pas une porte d'entrée.
+- Fonctions communes : `fiila.owned_place`, `fiila.owned_request`, `fiila.my_shop(p_key)`.
 
-1. Il crée sa boutique.
-2. Il crée une commande : client et articles.
-3. Il envoie la commande sur WhatsApp, directement au numéro du client.
-4. Le client ouvre la facture, sans compte.
-5. Le client touche « Donner mon adresse de livraison ».
-6. Le commerçant envoie le lien au livreur.
-7. Le client suit le livreur sur sa facture.
-8. Le commerçant enregistre le paiement et marque la commande livrée.
+**Tables (schéma privé `fiila`)**
 
-**Client connu.** Sa commande suivante reprend son adresse, sans la redemander. S'il désactive son adresse, la boutique ne la voit plus et peut la redemander.
+| Table | Rôle |
+|---|---|
+| `places`, `requests`, `trackers` | Adresses et rendez-vous, demandes d'adresse, suivi en direct (existants) |
+| `profiles` | Nom, téléphone, photo du compte |
+| `shops` | Boutique, avec `owner_hash` (clé du téléphone) et/ou `user_id` (compte) |
+| `products` | Articles : nom, prix FCFA, description, photo, visible ou masqué |
+| `customers` | Fichier clients de la boutique. Même numéro = même client. Dernière adresse reçue |
+| `orders` | Commandes numérotées, lignes (avec `product_id` si l'article vient du catalogue), total calculé par le serveur, lien de facture |
+| `payments` | Paiements. Aujourd'hui `source = manual` ; demain `source = provider` |
+| `reviews` | Notes 1 à 5 par article. Seulement l'acheteur, depuis sa facture, une fois la commande livrée. Une par article et par commande |
 
-**État d'une commande.** Il est calculé sur trois axes indépendants : adresse (attendue, reçue, expirée, retirée), livraison (à livrer, en route, arrivé, livrée, annulée) et paiement (impayée, acompte, payée). L'écran n'affiche que l'étape suivante, en un seul repère : « Adresse attendue », « À livrer », « En route », « À encaisser » ou « Terminée ».
+**Sécurité**
+- Aucun accès direct aux tables. Uniquement des fonctions `security definer` avec `search_path` vide.
+- Tout lien partagé porte un jeton de 128 bits.
+- La facture publique n'expose ni le téléphone du client ni d'identifiant interne.
 
-## 4. Sécurité
+## 4. V2 — livreurs (prévu, non construit)
 
-- Toutes les tables restent dans le schéma privé `fiila`. Les rôles `anon` et `authenticated` n'ont aucun droit direct. Tout passe par des fonctions `security definer` avec `search_path` vide.
-- Chaque fonction de boutique vérifie `auth.uid()` puis l'appartenance (`fiila.my_shop`, `fiila.my_order`). Tests d'isolation entre deux comptes.
-- La facture publique ne contient ni le téléphone du client ni aucun identifiant interne.
-- Supprimer le compte efface la boutique, les clients, les commandes, les paiements, les fiches rattachées et le profil. Les fiches restées seulement sur un téléphone ne sont pas touchées.
+**Besoin (fondateur)**
+- Un livreur s'inscrit et reçoit des courses.
+- Un commerçant ou un particulier choisit un « livreur attitré ».
+- Dès que le client a donné son adresse, la course part automatiquement chez ce livreur.
+- Les livreurs sont notés.
 
-## 5. Paiement en ligne : ce qu'il restera à faire
+**Architecture prévue**
+- `couriers` : nom, téléphone, zone, moyen (moto, voiture, vélo), clé du téléphone et/ou compte. Statut disponible / indisponible.
+- `shop_couriers` : livreur(s) attitré(s) d'une boutique. Le livreur accepte le rattachement par un lien.
+- `deliveries` : course. Elle regroupe l'actuel `trackers` (lien livreur, suivi) plus le livreur assigné et son statut (proposée, acceptée, en route, livrée). La table `trackers` existante en devient la partie position, sans réécriture.
+- **Envoi automatique.** À la réponse du client (`order_sync`), si la boutique a un livreur attitré, une course est créée et apparaît dans la page du livreur.
+  - Page livreur `#/livreur` : ses courses du jour, sans compte obligatoire.
+  - Alerte du livreur : notification web push (gratuite) si elle est acceptée sur son téléphone, sinon lien WhatsApp préparé.
+  - L'envoi automatique d'un message WhatsApp passe par l'API WhatsApp Business, **payante** : décision du fondateur.
+- `courier_reviews` : note par l'expéditeur et/ou le client après la livraison, comme `reviews`.
 
-Rien n'est activé et aucun contrat n'est engagé.
+**Point à trancher avant de construire.** La liste publique de livreurs (« inscrits sur la plateforme ») engage Fii La : vérification d'identité, litiges, données à déclarer à la CDP. Je recommande de commencer par le **livreur attitré** (relation déjà existante entre le commerçant et son livreur), puis d'ouvrir l'inscription publique.
 
-1. Accord opérateur. Wave Business API (checkout et webhook) et Orange Money Web Payment ou un agrégateur (PayDunya, CinetPay, etc.).
-   - Frais et conditions à confirmer par le fondateur.
-   - Rien n'est activé sans son accord (CLAUDE.md, règle 6).
-2. Une fonction Edge `fiila-pay`. Elle crée la session de paiement et reçoit le webhook signé.
-   - Elle écrit dans `fiila.payments` avec `source = 'provider'`, `status`, `provider_ref`.
-   - Les secrets restent dans les secrets Supabase, jamais dans le dépôt.
-3. Sur la facture : un bouton « Payer avec Wave / Orange Money » quand la boutique a activé un moyen.
-   - L'état de paiement existe déjà, l'écran s'en sert sans autre changement.
+## 5. V2 — paiement en ligne (prévu)
 
-## 6. Ce qui est volontairement hors MVP
+Le modèle est en place (`payments.source / status / provider_ref`).
 
-- Plusieurs boutiques par compte, ou plusieurs vendeurs par boutique.
-- Catalogue produits et stocks.
-- TVA et mentions légales complètes de facture.
-- Avoirs.
-- Connexion par téléphone et SMS : service payant, à décider.
-- Envoi automatique de messages : WhatsApp Business API, payant.
+Il reste :
+1. l'accord avec l'opérateur : Wave Business, Orange Money ou un agrégateur ;
+2. la fonction serveur `fiila-pay` : session de paiement et webhook signé ;
+3. le bouton « Payer » sur la facture.
 
-## 7. Réglages Supabase à faire par le fondateur (tableau de bord)
+Aucun service payant ni contrat n'est engagé sans accord du fondateur.
 
-**Authentication → URL Configuration**
-- Site URL : `https://aramislab0.github.io/fii-la/`.
-- Redirect URLs : la même adresse.
+## 6. V3 — vitrine et marketplace (prévu)
 
-**Authentication → Providers → Email**, pour le pilote :
-- soit garder « Confirm email » activé, avec un SMTP personnalisé ;
-- soit le désactiver. L'envoi d'e-mails intégré de Supabase est très limité et réservé aux adresses de l'équipe.
+**Base déjà posée :** boutiques, articles avec photo et prix, notes vérifiées par achat.
 
-**Mot de passe oublié.** Il a besoin d'un SMTP qui fonctionne : Resend, Brevo… Les offres gratuites suffisent pour le pilote, à confirmer par le fondateur.
+**À ajouter le moment venu**
+- `shops.public` et `shops.slug` : vitrine `#/b/<slug>` avec les articles visibles et le bouton « Commander », qui crée la commande et la demande d'adresse d'un coup.
+- `products.public` et `category`, un index de recherche : fil des produits et recherche par quartier ou catégorie.
+- Modération (signalement, retrait), règles de mise en avant, frais éventuels.
+
+**Condition proposée pour ouvrir la marketplace :** un nombre minimal de boutiques actives et de commandes livrées en V1. Une vitrine vide décourage. Seuil à fixer par le fondateur.
+
+## 7. Limites connues
+
+- Sans compte, la boutique vit dans le navigateur du téléphone. Effacer ses données fait perdre l'accès. D'où la proposition de compte à la création.
+- « Mot de passe oublié » demande un service d'envoi d'e-mails (Resend ou Brevo, gratuits au départ). La confirmation e-mail est désactivée pour le pilote.
+- Les limites anti-abus sont comptées par adresse IP. Au Sénégal, beaucoup de téléphones mobiles partagent une même adresse IP. Les seuils sont à surveiller au lancement : 60 boutiques par heure, 40 fiches par heure et par adresse IP.
+- Les photos sont stockées dans la base (≤ 300 Ko par article). C'est suffisant pour la V1. Pour la marketplace, il faudra passer au stockage de fichiers avec miniatures.

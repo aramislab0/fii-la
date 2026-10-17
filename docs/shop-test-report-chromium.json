@@ -1,13 +1,13 @@
 {
   "moteur": "chromium",
   "version": "141.0.7390.37",
-  "date": "2026-10-17T20:47:26.514Z",
-  "reussis": 19,
-  "total": 19,
+  "date": "2026-10-17T21:13:00.738Z",
+  "reussis": 24,
+  "total": 24,
   "results": [
     {
       "ok": true,
-      "name": "accueil sans compte : « Se connecter » et « Ma boutique » visibles, rien n’est imposé"
+      "name": "accueil sans compte : aucun appel à se connecter en haut ; « Ma boutique » visible ; connexion discrète en pied de page"
     },
     {
       "ok": true,
@@ -71,7 +71,27 @@
     },
     {
       "ok": true,
-      "name": "déconnexion : les fiches du téléphone restent, la boutique demande une connexion"
+      "name": "boutique sans compte : créée en un geste, le compte est proposé, pas imposé"
+    },
+    {
+      "ok": true,
+      "name": "articles : ajout avec photo et prix"
+    },
+    {
+      "ok": true,
+      "name": "commande depuis le catalogue : un geste ajoute l’article ; la facture montre sa photo"
+    },
+    {
+      "ok": true,
+      "name": "notes : après livraison, la cliente note l’article depuis sa facture"
+    },
+    {
+      "ok": true,
+      "name": "compte proposé dans la boutique : inscription, la boutique rejoint le compte"
+    },
+    {
+      "ok": true,
+      "name": "déconnexion : les fiches du téléphone restent, la boutique n’est plus visible ici"
     },
     {
       "ok": true,

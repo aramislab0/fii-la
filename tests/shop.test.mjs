@@ -71,15 +71,16 @@ const clientPlace = await ok('fiila_create_place', { p: { kind: 'address', label
 const A = await newPhone({ owned: [{ type: 'place', kind: 'address', id: before.id, owner: before.owner_token, share: before.share_token, label: 'Atelier (test)' }] });
 const M = A.page;
 
-await t('accueil sans compte : « Se connecter » et « Ma boutique » visibles, rien n’est imposé', async () => {
+await t('accueil sans compte : aucun appel à se connecter en haut ; « Ma boutique » visible ; connexion discrète en pied de page', async () => {
   await M.goto(URL0);
-  await M.getByRole('link', { name: 'Se connecter' }).waitFor();
+  assert.equal(await M.locator('#account-link').count(), 0);
+  await M.locator('#foot-account').getByText('Se connecter').waitFor();
   await M.getByRole('link', { name: 'Ma boutique' }).waitFor();
   await M.getByRole('link', { name: 'Créer mon adresse' }).waitFor();
 });
 
 await t('inscription : compte créé, fiche du téléphone rattachée, nom affiché sur l’accueil', async () => {
-  await M.getByRole('link', { name: 'Se connecter' }).click();
+  await M.click('#foot-account');
   await M.getByRole('tab', { name: 'Créer un compte' }).click();
   await M.fill('#acc-name', 'Awa Test');
   await M.fill('#acc-email', EMAIL);
@@ -279,14 +280,91 @@ await t('mode sombre : facture lisible', async () => {
   await D.ctx.close();
 });
 
-await t('déconnexion : les fiches du téléphone restent, la boutique demande une connexion', async () => {
+// ------------------------------------------------------------------ boutique sans compte, articles, notes
+let inv2;
+await t('boutique sans compte : créée en un geste, le compte est proposé, pas imposé', async () => {
+  const S = await newPhone();
+  globalThis.SP = S.page;
+  await S.page.goto(URL0);
+  await S.page.click('#shop-link');
+  await S.page.fill('#shop-name', 'Boutique Binta (test)');
+  await S.page.click('#shop-save');
+  await S.page.locator('#shop-title').getByText('Boutique Binta (test)').waitFor();
+  await S.page.locator('#shop-nudge').waitFor();
+  const key = await S.page.evaluate(() => JSON.parse(localStorage.getItem('fiila.shop')).key);
+  assert.ok(key && key.length > 40);
+  await S.page.click('#shop-nudge-later');
+  assert.equal(await S.page.locator('#shop-nudge').count(), 0);
+});
+
+await t('articles : ajout avec photo et prix', async () => {
+  const P = globalThis.SP;
+  await P.goto(URL0 + '#/boutique/articles');
+  await P.click('#product-new');
+  await P.setInputFiles('#product-photo', pngFile());
+  await P.locator('img.photo-prev').waitFor();
+  await P.fill('#product-name', 'Bissap 1 L');
+  await P.fill('#product-price', '1500');
+  await P.click('#product-save');
+  await P.getByText('Article ajouté.').waitFor();
+  await P.locator('#products').getByText('Bissap 1 L').waitFor();
+  await P.locator('#products img.thumb').waitFor();
+  await shot(P, '09-articles');
+});
+
+await t('commande depuis le catalogue : un geste ajoute l’article ; la facture montre sa photo', async () => {
+  const P = globalThis.SP;
+  await P.goto(URL0 + '#/commande/nouvelle');
+  await P.fill('#cust-name', 'Coumba (test)');
+  await P.locator('#product-picker').getByText('Bissap 1 L').click();
+  await P.locator('.li-qty').first().fill('3');
+  await P.locator('#order-total').getByText('4 500 FCFA').waitFor();
+  await shot(P, '10-commande-catalogue');
+  await P.click('#order-create');
+  await P.locator('#order-created').waitFor();
+  inv2 = waText(await waHref(P, '#send-invoice')).match(/https?:\/\/\S+/)[0];
+  await C.page.goto(inv2);
+  await C.page.locator('#invoice img.inv-photo').waitFor();
+  assert.equal(await C.page.locator('#reviews').count(), 0, 'pas de note avant livraison');
+});
+
+await t('notes : après livraison, la cliente note l’article depuis sa facture', async () => {
+  const P = globalThis.SP;
+  // l'adresse n'est pas encore donnée : la boutique marque quand même la commande livrée (remise en main propre)
+  const id = new URL(P.url()).hash.match(/#\/commande\/([0-9a-f-]+)/)[1];
+  await rpc(local.db, 'fiila_order_set_status', { p_key: await P.evaluate(() => JSON.parse(localStorage.getItem('fiila.shop')).key), p_id: id, p_status: 'delivered' });
+  await C.page.reload();
+  await C.page.locator('#reviews').waitFor();
+  await C.page.getByRole('radio', { name: '4 sur 5' }).click();
+  await C.page.getByText('Merci pour votre note.').waitFor();
+  await P.goto(URL0 + '#/boutique/articles');
+  await P.locator('#products').getByText('★★★★☆ (1)').waitFor();
+  await shot(C.page, '11-facture-note');
+});
+
+await t('compte proposé dans la boutique : inscription, la boutique rejoint le compte', async () => {
+  const P = globalThis.SP;
+  await P.evaluate(() => localStorage.removeItem('fiila.nudge.shop'));
+  await P.goto(URL0 + '#/boutique');
+  await P.click('#shop-nudge-yes');
+  await P.fill('#acc-name', 'Binta Test');
+  await P.fill('#acc-email', 'binta.test@example.invalid');
+  await P.fill('#acc-pass', PASS);
+  await P.click('#auth-submit');
+  await P.locator('#shop-title').getByText('Boutique Binta (test)').waitFor();
+  assert.equal(await P.locator('#shop-nudge').count(), 0);
+  const r = (await local.db.query(`select user_id is not null as linked from fiila.shops where name = 'Boutique Binta (test)'`)).rows[0];
+  assert.equal(r.linked, true);
+});
+
+await t('déconnexion : les fiches du téléphone restent, la boutique n’est plus visible ici', async () => {
   await M.goto(URL0 + '#/compte');
   await M.click('#logout');
   await M.getByText('Déconnecté.').waitFor();
-  await M.getByRole('link', { name: 'Se connecter' }).waitFor();
+  await M.locator('#foot-account').getByText('Se connecter').waitFor();
   await M.locator('#mes-adresses').getByText('Atelier (test)').waitFor();
   await M.goto(URL0 + '#/boutique');
-  await M.locator('#login-cta').waitFor();
+  await M.locator('#shop-name').waitFor(); // boutique du compte non visible déconnecté : on propose d'en créer une, sans blocage
 });
 
 await t('suppression du compte : tout ce qui est rattaché est effacé', async () => {
@@ -302,9 +380,9 @@ await t('suppression du compte : tout ce qui est rattaché est effacé', async (
   await M.click('#confirm-delete-account');
   await M.getByText('Compte supprimé.').waitFor();
   const n = async (sql) => (await local.db.query(sql)).rows[0].n;
-  assert.equal(await n(`select count(*)::int n from fiila.shops`), 0);
-  assert.equal(await n(`select count(*)::int n from fiila.orders`), 0);
-  assert.equal(await n(`select count(*)::int n from fiila.customers`), 0);
+  assert.equal(await n(`select count(*)::int n from fiila.shops where name = 'Boutique Awa (test)'`), 0);
+  assert.equal(await n(`select count(*)::int n from fiila.orders o where not exists (select 1 from fiila.shops s where s.id = o.shop_id)`), 0);
+  assert.equal(await n(`select count(*)::int n from fiila.shops where name = 'Boutique Binta (test)'`), 1, 'l’autre boutique reste');
   assert.equal(await n(`select count(*)::int n from fiila.places where id = '${before.id}'`), 0);
   assert.equal(await n(`select count(*)::int n from fiila.places where id = '${clientPlace.id}'`), 1, 'l’adresse de la cliente lui appartient');
 });

@@ -48,7 +48,7 @@ export async function rpc(db, fn, args = {}, { ip = '203.0.113.7', role = 'anon'
   for (const k of keys) if (!/^[a-z_]+$/.test(k)) return { status: 400, body: { message: 'bad arg' } };
   const params = keys.map((k) => {
     const v = args[k];
-    return v !== null && typeof v === 'object' ? JSON.stringify(v) : v == null ? null : String(v);
+    return v !== null && typeof v === 'object' ? JSON.stringify(v) : v == null ? null : typeof v === 'boolean' ? v : String(v);
   });
   const call = `select public.${fn}(${keys.map((k, i) => `${k} => $${i + 1}`).join(', ')}) as r`;
   try {

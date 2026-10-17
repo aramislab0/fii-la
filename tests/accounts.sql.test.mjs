@@ -89,18 +89,18 @@ await t('profil : nom, téléphone, photo ; téléphone invalide refusé ; anony
 
 let SHOP, O1, O2, C1;
 await t('boutique : création, une seule par compte, nom obligatoire', async () => {
-  await ko('fiila_order_create', { p: { customer: { name: 'X' }, items: [{ label: 'a', qty: 1, price: 1 }] } }, 'shop_required', as1);
-  await ko('fiila_shop_save', { p: { name: '' } }, 'shop_name_required', as1);
-  SHOP = (await ok('fiila_shop_save', { p: { name: 'Boutique Test [TEST]', phone: '77 000 00 01' } }, as1)).shop;
-  const again = (await ok('fiila_shop_save', { p: { name: 'Boutique Test 2 [TEST]', ninea: '0000000 2G3' } }, as1)).shop;
+  await ko('fiila_order_create', { p_key: null, p: { customer: { name: 'X' }, items: [{ label: 'a', qty: 1, price: 1 }] } }, 'shop_required', as1);
+  await ko('fiila_shop_save', { p_key: null, p: { name: '' } }, 'shop_name_required', as1);
+  SHOP = (await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique Test [TEST]', phone: '77 000 00 01' } }, as1)).shop;
+  const again = (await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique Test 2 [TEST]', ninea: '0000000 2G3' } }, as1)).shop;
   assert.equal(again.id, SHOP.id);
-  const g = await ok('fiila_shop_get', {}, as1);
+  const g = await ok('fiila_shop_get', { p_key: null,}, as1);
   assert.equal(g.shop.name, 'Boutique Test 2 [TEST]');
-  assert.equal((await ok('fiila_shop_get', {}, as2)).shop, null);
+  assert.equal((await ok('fiila_shop_get', { p_key: null,}, as2)).shop, null);
 });
 
 await t('commande : numéro par boutique, total calculé par le serveur, demande d’adresse créée', async () => {
-  O1 = await ok('fiila_order_create', { p: { customer: { name: 'Fatou [TEST]', phone: '+221 70 111 11 11' },
+  O1 = await ok('fiila_order_create', { p_key: null, p: { customer: { name: 'Fatou [TEST]', phone: '+221 70 111 11 11' },
     items: [{ label: 'Robe wax', qty: 2, price: 12500 }, { label: 'Foulard', qty: 1, price: 3000 }], total: 1 } }, as1);
   assert.equal(O1.number, 1);
   assert.equal(O1.ref, '0001');
@@ -110,28 +110,28 @@ await t('commande : numéro par boutique, total calculé par le serveur, demande
   assert.equal(O1.delivery_state, 'to_ship');
   assert.ok(O1.request_token && O1.share_token);
   C1 = O1.customer_id;
-  O2 = await ok('fiila_order_create', { p: { customer: { name: 'Fatou D. [TEST]', phone: '70 111 11 11' }, items: [{ label: 'Sac', qty: 1, price: 5000 }] } }, as1);
+  O2 = await ok('fiila_order_create', { p_key: null, p: { customer: { name: 'Fatou D. [TEST]', phone: '70 111 11 11' }, items: [{ label: 'Sac', qty: 1, price: 5000 }] } }, as1);
   assert.equal(O2.number, 2);
   assert.equal(O2.customer_id, C1, 'même numéro = même client');
 });
 
 await t('commande : validations (articles, quantités, prix)', async () => {
-  await ko('fiila_order_create', { p: { customer: { name: 'A' }, items: [] } }, 'items_required', as1);
-  await ko('fiila_order_create', { p: { customer: { name: 'A' }, items: [{ label: '', qty: 1, price: 1 }] } }, 'item_label_required', as1);
-  await ko('fiila_order_create', { p: { customer: { name: 'A' }, items: [{ label: 'a', qty: 0, price: 1 }] } }, 'invalid_qty', as1);
-  await ko('fiila_order_create', { p: { customer: { name: 'A' }, items: [{ label: 'a', qty: 1, price: -5 }] } }, 'invalid_price', as1);
-  await ko('fiila_order_create', { p: { customer: { name: 'A' }, items: [{ label: 'a', qty: 'x', price: 1 }] } }, 'invalid_number', as1);
-  await ko('fiila_order_create', { p: { items: [{ label: 'a', qty: 1, price: 1 }] } }, 'customer_name_required', as1);
+  await ko('fiila_order_create', { p_key: null, p: { customer: { name: 'A' }, items: [] } }, 'items_required', as1);
+  await ko('fiila_order_create', { p_key: null, p: { customer: { name: 'A' }, items: [{ label: '', qty: 1, price: 1 }] } }, 'item_label_required', as1);
+  await ko('fiila_order_create', { p_key: null, p: { customer: { name: 'A' }, items: [{ label: 'a', qty: 0, price: 1 }] } }, 'invalid_qty', as1);
+  await ko('fiila_order_create', { p_key: null, p: { customer: { name: 'A' }, items: [{ label: 'a', qty: 1, price: -5 }] } }, 'invalid_price', as1);
+  await ko('fiila_order_create', { p_key: null, p: { customer: { name: 'A' }, items: [{ label: 'a', qty: 'x', price: 1 }] } }, 'invalid_number', as1);
+  await ko('fiila_order_create', { p_key: null, p: { items: [{ label: 'a', qty: 1, price: 1 }] } }, 'customer_name_required', as1);
 });
 
 await t('isolation : un autre compte ne voit ni les commandes ni les clients', async () => {
-  await ok('fiila_shop_save', { p: { name: 'Autre boutique [TEST]' } }, as2);
-  await ko('fiila_order_get', { p_id: O1.id }, 'order_not_found', as2);
-  await ko('fiila_customer_get', { p_id: C1 }, 'customer_not_found', as2);
-  assert.equal((await ok('fiila_orders', { p_filter: null }, as2)).length, 0);
-  assert.equal((await ok('fiila_customers', { p_query: null }, as2)).length, 0);
-  await ko('fiila_order_create', { p: { customer_id: C1, items: [{ label: 'a', qty: 1, price: 1 }] } }, 'customer_not_found', as2);
-  await ko('fiila_order_get', { p_id: O1.id }, 'auth_required');
+  await ok('fiila_shop_save', { p_key: null, p: { name: 'Autre boutique [TEST]' } }, as2);
+  await ko('fiila_order_get', { p_key: null, p_id: O1.id }, 'order_not_found', as2);
+  await ko('fiila_customer_get', { p_key: null, p_id: C1 }, 'customer_not_found', as2);
+  assert.equal((await ok('fiila_orders', { p_key: null, p_filter: null }, as2)).length, 0);
+  assert.equal((await ok('fiila_customers', { p_key: null, p_query: null }, as2)).length, 0);
+  await ko('fiila_order_create', { p_key: null, p: { customer_id: C1, items: [{ label: 'a', qty: 1, price: 1 }] } }, 'customer_not_found', as2);
+  await ko('fiila_order_get', { p_key: null, p_id: O1.id }, 'shop_required');
 });
 
 await t('facture publique : contenu utile, sans téléphone ni identifiant interne', async () => {
@@ -153,11 +153,11 @@ await t('demande d’adresse de la commande : le client répond, l’adresse arr
   assert.match(pub.purpose, /0001/);
   const clientPlace = await ok('fiila_create_place', { p: addr('Chez Fatou [TEST]') });
   await ok('fiila_fulfill_request', { p_token: O1.request_token, p_place_id: clientPlace.id, p_place_owner: clientPlace.owner_token });
-  const o = await ok('fiila_order_get', { p_id: O1.id }, as1);
+  const o = await ok('fiila_order_get', { p_key: null, p_id: O1.id }, as1);
   assert.equal(o.address_state, 'received');
   assert.equal(o.place.label, 'Chez Fatou [TEST]');
   assert.equal(o.request_token, undefined);
-  const c = await ok('fiila_customer_get', { p_id: C1 }, as1);
+  const c = await ok('fiila_customer_get', { p_key: null, p_id: C1 }, as1);
   assert.equal(c.has_address, true);
   // la demande liée à une commande ne pollue pas « Mes demandes »
   const sums = await ok('fiila_owned_summaries', { p_items: [] }, as1);
@@ -165,15 +165,15 @@ await t('demande d’adresse de la commande : le client répond, l’adresse arr
 });
 
 await t('client connu : la commande suivante réutilise son adresse, sans nouvelle demande', async () => {
-  const o3 = await ok('fiila_order_create', { p: { customer_id: C1, items: [{ label: 'Chaussures', qty: 1, price: 15000 }] } }, as1);
+  const o3 = await ok('fiila_order_create', { p_key: null, p: { customer_id: C1, items: [{ label: 'Chaussures', qty: 1, price: 15000 }] } }, as1);
   assert.equal(o3.address_state, 'received');
   assert.equal(o3.request_token, undefined);
   assert.equal(o3.number, 3);
 });
 
 await t('livraison : lien livreur, suivi visible sur la facture, arrêt à la livraison', async () => {
-  await ko('fiila_order_delivery', { p_id: O2.id }, 'not_fulfilled', as1); // O2 : adresse redemandée (O1 répondue)… O2 a sa propre demande
-  const d = await ok('fiila_order_delivery', { p_id: O1.id }, as1);
+  await ko('fiila_order_delivery', { p_key: null, p_id: O2.id }, 'not_fulfilled', as1); // O2 : adresse redemandée (O1 répondue)… O2 a sa propre demande
+  const d = await ok('fiila_order_delivery', { p_key: null, p_id: O1.id }, as1);
   assert.ok(d.courier_token && d.watch_token);
   let pub = await ok('fiila_order_public', { p_token: O1.share_token });
   assert.equal(pub.order.delivery_state, 'courier_ready');
@@ -183,7 +183,7 @@ await t('livraison : lien livreur, suivi visible sur la facture, arrêt à la li
   assert.equal(pub.order.delivery_state, 'on_the_way');
   const w = await ok('fiila_watch', { p_token: d.watch_token });
   assert.ok(w.tracker.pos);
-  const done = await ok('fiila_order_set_status', { p_id: O1.id, p_status: 'delivered' }, as1);
+  const done = await ok('fiila_order_set_status', { p_key: null, p_id: O1.id, p_status: 'delivered' }, as1);
   assert.equal(done.delivery_state, 'delivered');
   const t2 = await db.query('select lat, trail from fiila.trackers where watch_token = $1', [d.watch_token]);
   assert.equal(t2.rows[0].lat, null, 'position effacée à la livraison');
@@ -192,16 +192,16 @@ await t('livraison : lien livreur, suivi visible sur la facture, arrêt à la li
 });
 
 await t('paiements : partiel puis complet, retrait d’un paiement manuel, méthode inventée refusée', async () => {
-  let o = await ok('fiila_order_payment_add', { p_id: O1.id, p_amount: 10000, p_method: 'wave' }, as1);
+  let o = await ok('fiila_order_payment_add', { p_key: null, p_id: O1.id, p_amount: 10000, p_method: 'wave' }, as1);
   assert.equal(o.pay_state, 'partial');
   assert.equal(o.paid, 10000);
-  o = await ok('fiila_order_payment_add', { p_id: O1.id, p_amount: 18000, p_method: 'cash' }, as1);
+  o = await ok('fiila_order_payment_add', { p_key: null, p_id: O1.id, p_amount: 18000, p_method: 'cash' }, as1);
   assert.equal(o.pay_state, 'paid');
-  await ko('fiila_order_payment_add', { p_id: O1.id, p_amount: 1, p_method: 'bitcoin' }, 'invalid_method', as1);
-  await ko('fiila_order_payment_add', { p_id: O1.id, p_amount: 0, p_method: 'cash' }, 'invalid_price', as1);
-  o = await ok('fiila_order_payment_delete', { p_id: O1.id, p_payment_id: o.payments[1].id }, as1);
+  await ko('fiila_order_payment_add', { p_key: null, p_id: O1.id, p_amount: 1, p_method: 'bitcoin' }, 'invalid_method', as1);
+  await ko('fiila_order_payment_add', { p_key: null, p_id: O1.id, p_amount: 0, p_method: 'cash' }, 'invalid_price', as1);
+  o = await ok('fiila_order_payment_delete', { p_key: null, p_id: O1.id, p_payment_id: o.payments[1].id }, as1);
   assert.equal(o.pay_state, 'partial');
-  const unpaid = await ok('fiila_orders', { p_filter: 'unpaid' }, as1);
+  const unpaid = await ok('fiila_orders', { p_key: null, p_filter: 'unpaid' }, as1);
   assert.ok(unpaid.some((x) => x.id === O1.id));
   const pub = await ok('fiila_order_public', { p_token: O1.share_token });
   assert.equal(pub.order.paid, 10000);
@@ -209,31 +209,31 @@ await t('paiements : partiel puis complet, retrait d’un paiement manuel, méth
 
 await t('adresse retirée par le client : la commande le voit et peut redemander', async () => {
   // O2 : sa demande est encore en attente → refus de redemander
-  await ko('fiila_order_request_address', { p_id: O2.id }, 'address_already', as1);
+  await ko('fiila_order_request_address', { p_key: null, p_id: O2.id }, 'address_already', as1);
   await db.query(`update fiila.requests set expires_at = now() - interval '1 minute' where id = (select request_id from fiila.orders where id = $1)`, [O2.id]);
-  let o = await ok('fiila_order_get', { p_id: O2.id }, as1);
+  let o = await ok('fiila_order_get', { p_key: null, p_id: O2.id }, as1);
   assert.equal(o.address_state, 'expired');
-  o = await ok('fiila_order_request_address', { p_id: O2.id }, as1);
+  o = await ok('fiila_order_request_address', { p_key: null, p_id: O2.id }, as1);
   assert.equal(o.address_state, 'pending');
   assert.ok(o.request_token);
 });
 
 await t('annulation : la facture publique n’affiche plus le détail', async () => {
-  await ok('fiila_order_set_status', { p_id: O2.id, p_status: 'cancelled' }, as1);
-  const pub = await ok('fiila_order_public', { p_token: (await ok('fiila_order_get', { p_id: O2.id }, as1)).share_token });
+  await ok('fiila_order_set_status', { p_key: null, p_id: O2.id, p_status: 'cancelled' }, as1);
+  const pub = await ok('fiila_order_public', { p_token: (await ok('fiila_order_get', { p_key: null, p_id: O2.id }, as1)).share_token });
   assert.equal(pub.state, 'cancelled');
   assert.equal(pub.order, undefined);
-  await ko('fiila_order_set_status', { p_id: O2.id, p_status: 'lost' }, 'invalid_status', as1);
+  await ko('fiila_order_set_status', { p_key: null, p_id: O2.id, p_status: 'lost' }, 'invalid_status', as1);
 });
 
 await t('clients : recherche, modification, suppression (les commandes restent)', async () => {
-  const found = await ok('fiila_customers', { p_query: 'fatou' }, as1);
+  const found = await ok('fiila_customers', { p_key: null, p_query: 'fatou' }, as1);
   assert.equal(found.length, 1);
-  assert.equal((await ok('fiila_customers', { p_query: '70 111' }, as1)).length, 1);
-  const c = await ok('fiila_customer_save', { p: { id: C1, name: 'Fatou Diop [TEST]', phone: '+221 70 111 11 11' } }, as1);
+  assert.equal((await ok('fiila_customers', { p_key: null, p_query: '70 111' }, as1)).length, 1);
+  const c = await ok('fiila_customer_save', { p_key: null, p: { id: C1, name: 'Fatou Diop [TEST]', phone: '+221 70 111 11 11' } }, as1);
   assert.equal(c.name, 'Fatou Diop [TEST]');
-  await ok('fiila_customer_delete', { p_id: C1 }, as1);
-  const o = await ok('fiila_order_get', { p_id: O1.id }, as1);
+  await ok('fiila_customer_delete', { p_key: null, p_id: C1 }, as1);
+  const o = await ok('fiila_order_get', { p_key: null, p_id: O1.id }, as1);
   assert.equal(o.customer_name, 'Fatou [TEST]', 'le nom reste recopié sur la commande');
 });
 
@@ -258,6 +258,73 @@ await t('suppression du compte : fiches, boutique, clients, commandes et profil 
   assert.equal((await db.query('select count(*)::int n from fiila.orders o join fiila.shops s on s.id = o.shop_id where s.user_id = $1', [U1])).rows[0].n, 0);
   assert.equal((await db.query('select count(*)::int n from auth.users where id = $1', [U1])).rows[0].n, 0);
   await ok('fiila_get_owned', { p_id: anon.id, p_owner: anon.owner_token });
+});
+
+// ------------------------------------------------------------------ boutique sans compte, articles, notes
+let K, SK, PR1, PR2, OK1;
+await t('boutique sans compte : créée avec une clé, gérée avec la clé seule', async () => {
+  await ko('fiila_order_create', { p_key: null, p: { customer: { name: 'X' }, items: [{ label: 'a', qty: 1, price: 1 }] } }, 'shop_required');
+  const r = await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique sans compte [TEST]' } });
+  K = r.key; SK = r.shop.id;
+  assert.ok(K && K.length >= 40);
+  const g = await ok('fiila_shop_get', { p_key: K });
+  assert.equal(g.shop.name, 'Boutique sans compte [TEST]');
+  assert.equal(g.shop.account, false);
+  assert.equal((await ok('fiila_shop_get', { p_key: 'mauvaise-cle-123' })).shop, null);
+  const again = await ok('fiila_shop_save', { p_key: K, p: { name: 'Boutique sans compte 2 [TEST]' } });
+  assert.equal(again.shop.id, SK); assert.equal(again.key, undefined, 'la clé n’est donnée qu’une fois');
+});
+
+await t('articles : création avec photo, prix, liste ; mauvaise clé refusée', async () => {
+  PR1 = await ok('fiila_product_save', { p_key: K, p: { name: 'Robe wax [TEST]', price: 12500, photo: jpeg.toString('base64') } });
+  assert.match(PR1.photo, /^data:image\/jpeg;base64,/);
+  PR2 = await ok('fiila_product_save', { p_key: K, p: { name: 'Foulard [TEST]', price: 3000 } });
+  const list = await ok('fiila_products', { p_key: K, p_all: false });
+  assert.equal(list.length, 2);
+  await ko('fiila_products', { p_key: 'mauvaise-cle-123', p_all: false }, 'shop_required');
+  await ko('fiila_product_save', { p_key: K, p: { name: '', price: 1 } }, 'item_label_required');
+  await ko('fiila_product_save', { p_key: K, p: { name: 'x', price: -1 } }, 'invalid_price');
+  const off = await ok('fiila_product_save', { p_key: K, p: { id: PR2.id, name: 'Foulard [TEST]', price: 3000, active: false } });
+  assert.equal(off.active, false);
+  assert.equal((await ok('fiila_products', { p_key: K, p_all: false })).length, 1);
+  assert.equal((await ok('fiila_products', { p_key: K, p_all: true })).length, 2);
+});
+
+await t('commande depuis le catalogue : la facture montre la photo de l’article', async () => {
+  OK1 = await ok('fiila_order_create', { p_key: K, p: { customer: { name: 'Awa [TEST]' }, items: [{ product_id: PR1.id, label: 'Robe wax [TEST]', qty: 1, price: 12500 }, { label: 'Retouche', qty: 1, price: 1000 }] } });
+  assert.equal(OK1.total, 13500);
+  const pub = await ok('fiila_order_public', { p_token: OK1.share_token });
+  assert.match(pub.order.items[0].photo, /^data:image\/jpeg/);
+  assert.equal(pub.order.items[1].photo, undefined);
+  assert.equal(pub.order.can_review, false);
+  await ko('fiila_order_create', { p_key: K, p: { customer: { name: 'A' }, items: [{ product_id: O1.id, label: 'x', qty: 1, price: 1 }] } }, 'product_not_found');
+});
+
+await t('notes : seulement après livraison, seulement les articles achetés, modifiables', async () => {
+  await ko('fiila_review', { p_token: OK1.share_token, p_product_id: PR1.id, p_rating: 5, p_comment: null }, 'not_delivered');
+  await ok('fiila_order_set_status', { p_key: K, p_id: OK1.id, p_status: 'delivered' });
+  await ko('fiila_review', { p_token: OK1.share_token, p_product_id: PR2.id, p_rating: 5, p_comment: null }, 'product_not_found');
+  await ko('fiila_review', { p_token: OK1.share_token, p_product_id: PR1.id, p_rating: 9, p_comment: null }, 'invalid_rating');
+  await ok('fiila_review', { p_token: OK1.share_token, p_product_id: PR1.id, p_rating: 3, p_comment: 'Bien [TEST]' });
+  await ok('fiila_review', { p_token: OK1.share_token, p_product_id: PR1.id, p_rating: 5, p_comment: null });
+  const pub = await ok('fiila_order_public', { p_token: OK1.share_token });
+  assert.equal(pub.order.items[0].my_rating, 5);
+  assert.equal(pub.order.can_review, true);
+  const list = await ok('fiila_products', { p_key: K, p_all: true });
+  const p1 = list.find((x) => x.id === PR1.id);
+  assert.equal(Number(p1.rating), 5); assert.equal(p1.reviews, 1);
+});
+
+await t('compte proposé après coup : la boutique du téléphone rejoint le compte', async () => {
+  const U3 = await createUser(db, 'u3@test.invalid');
+  await ko('fiila_shop_claim', { p_key: K }, 'auth_required');
+  const c = await ok('fiila_shop_claim', { p_key: K }, { uid: U3 });
+  assert.equal(c.claimed, true);
+  const g = await ok('fiila_shop_get', { p_key: null }, { uid: U3 });
+  assert.equal(g.shop.id, SK); assert.equal(g.shop.account, true);
+  await ok('fiila_shop_get', { p_key: K }); // la clé du téléphone marche toujours
+  const other = await ok('fiila_shop_claim', { p_key: K }, as2);
+  assert.equal(other.claimed, false);
 });
 
 for (const r of results) console.log(r.join(' | '));

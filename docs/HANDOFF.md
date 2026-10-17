@@ -2,7 +2,7 @@
 
 > Fichier de passation entre agents. **Mis à jour à chaque action** (code, déploiement, décision, test, doc).
 > Règle : toute session qui modifie le projet met à jour « État actuel » et ajoute une ligne au « Journal » dans le même commit.
-> Dernière mise à jour : **17/10/2026 21:40 (Dakar)** — commit de référence : voir `git log -1`.
+> Dernière mise à jour : **17/10/2026 21:20 (Dakar)** — commit de référence : voir `git log -1`.
 
 ## 0. Équipe et rôles
 
@@ -36,6 +36,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Données réelles | Aucune ouverture publique. Base : uniquement les fiches de test personnelles du fondateur, aucune donnée de test automatique | — |
 | Test terrain (5 chauffeurs, 30 arrivées) | **Non démarré** — attend le récépissé CDP | `docs/FICHE-TEST-TERRAIN.md` |
 | Suivi en direct | **Livré (17/10)** : lien livreur + lien de suivi client (livraison), « Qui arrive » pour l'organisateur d'un rendez-vous. Heure d'arrivée estimée sur le téléphone, sans service payant. Dernière position seulement, effacée à l'arrivée | `supabase/migrations/20261017100000_fiila_tracking.sql`, `tests/tracking.test.mjs` |
+| Boutique ouverte, articles, notes | **Construit et testé en local (17/10 21:20)** : boutique sans compte (clé du téléphone), compte proposé à la création et après 3 actions, articles avec photo, commande depuis le catalogue, notes des acheteurs après livraison. Migration `20261017230000_fiila_shop_open_products` | `tests/accounts.sql.test.mjs` (26), `tests/shop.test.mjs` (24) |
 | Comptes et boutique (Rali) | **En production (17/10 21:35)** : migration appliquée, `verify-db` 8/8 (6 migrations, 40 fonctions, schéma fermé). Inscription ouverte mais « Confirm email » actif avec l'envoi d'e-mails intégré de Supabase : seules les adresses de l'équipe reçoivent l'e-mail → réglage fondateur §4 #12 avant tout vrai commerçant | `docs/ARCHITECTURE-RALI.md`, `tests/accounts.sql.test.mjs` (21), `tests/shop.test.mjs` (19) |
 | Interface | **Design system v1.1 appliqué** (Light + Dark, sélecteur de thème, 6 cartes, contrastes AA). Aucune coordonnée affichée. Audit UI/UX fait et corrigé le 17/10 | `docs/design-system/README.md`, `web/styles.css` |
 
@@ -55,7 +56,9 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 17/10 | Ne plus afficher de coordonnées GPS à l'utilisateur (destinataire et création) : la complexité reste en arrière-plan | Fondateur |
 | 17/10 | Tenir ce fichier HANDOFF à jour à chaque action ; un agent VP valide l'alignement produit | Fondateur |
 | 17/10 | Intégrer tout le produit Rali dans Fii La : comptes (profil, photo, mot de passe), carnet d'adresses secret (maison, bureau, boutique), boutique (clients, commandes numérotées, factures, demande d'adresse, livraisons, paiements). Paiement Wave / Orange Money en dernier : prévu dans le modèle, non intégré | Fondateur |
-| 17/10 | Compte facultatif : tout reste utilisable sans compte (clé de gestion). Connexion par e-mail + mot de passe (gratuit) ; pas de SMS (payant) | Builder, à confirmer fondateur |
+| 17/10 | Aucun blocage par le compte : toute personne qui reçoit un lien fait sa transaction ; la boutique se crée sans compte ; le compte est proposé à la création de la boutique et après quelques transactions. E-mail + mot de passe ; pas de SMS (payant) | Fondateur |
+| 17/10 | Lancement V1 = Fii La (adresses, rendez-vous, demande, partage, suivi) **+ Rali** (boutique, articles avec photo, factures, livraisons). V2 : livreurs (inscription, livreur attitré, courses automatiques, notes) et paiement en ligne. V3 : vitrine et marketplace Sénégal. Les fonctions s'ouvrent une à une | Fondateur |
+| 17/10 | Chaque article est noté par l'acheteur (achat vérifié, après livraison) | Fondateur |
 | 17/10 | Design system v1 (Light + Dark) = référence de la refonte d'interface ; application par le Builder sans toucher aux parcours ni aux textes ; ajout d'un sélecteur de thème Clair / Sombre / Automatique (seule addition au périmètre) | Fondateur |
 
 ## 4. En attente / prochaines actions
@@ -76,6 +79,8 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 14 | Ajouter au dossier CDP : comptes (e-mail, profil, photo), données clients des commerçants (nom, téléphone, commandes, paiements). Le commerçant est responsable de ses données clients | Fondateur | Usage réel des comptes |
 | 15 | Paiement en ligne : choisir l'opérateur (Wave Business, Orange Money, agrégateur), coûts et contrat | Fondateur | Bouton « Payer » sur la facture |
 | 17 | Tester sur iPhone : créer son compte (e-mail du fondateur), créer la boutique, une commande, ouvrir la facture sur un 2e téléphone, donner l'adresse, envoyer au livreur | Fondateur | Validation web avant app native |
+| 18 | Trancher pour la V2 livreurs : commencer par le « livreur attitré » (recommandé) avant l'inscription publique des livreurs ; envoi WhatsApp automatique = API payante | Fondateur, avis VP | V2 livreurs |
+| 19 | Fixer le seuil d'ouverture de la marketplace (boutiques actives, commandes livrées) | Fondateur | V3 |
 | 16 | Revue VP de l'intégration Rali (parcours commerçant et client, `docs/screenshots/boutique/`) | VP | — |
 | 7 | ~~Alignement Fii La ↔ Rali~~ → tranché le 17/10 : intégration (voir décisions) | VP → fondateur | Feuille de route | (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
 | 8 | Régler la facture de l'organisation Supabase « AramisLab » (autres projets) | Fondateur | Hors Fii La |
@@ -116,6 +121,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 17/10 21:20 | Consigne fondateur appliquée : aucun blocage par le compte (boutique sans compte, clé du téléphone ; compte proposé à la création et après 3 actions ; « Se connecter » retiré de l'en-tête, gardé en pied de page). Articles avec photo et prix, commande en un geste depuis le catalogue, photos sur la facture, notes des acheteurs après livraison. Périmètre V1/V2/V3 (livreurs, paiement, marketplace) dans `docs/ARCHITECTURE-RALI.md`. Tests locaux : SQL 37, comptes/boutique 26, E2E 38, circuit 20, boutique 24 | ce commit |
 | 17/10 21:02 | Réglages Auth Supabase faits par le fondateur ; vérification publique `/auth/v1/settings` : inscription ouverte, confirmation e-mail désactivée. Site URL non lisible publiquement (déclaré fait) | `/auth/v1/settings` |
 | 17/10 21:35 | Production : migration comptes/boutique appliquée (script `scripts/apply-migration.mjs`, transaction unique) ; `verify-db` 8/8 ; sondes anonymes (`fiila_me` → auth_required, facture inconnue → not_found) ; E2E production 38/38 Chromium et 38/38 WebKit ; parcours boutique 19/19 WebKit (Mac, local). Base de production : 3 fiches (fondateur ×2, Test VP), aucune donnée de test restante. Suite suivi : 1 échec ponctuel sous charge (attente d'arrivée), 12/12 au relancement | `inspect.sh`, journaux Mac |
 | 17/10 21:10 | Rali intégré à Fii La : migration `20261017220000_fiila_accounts_shops` (comptes, profil, carnet étiqueté, boutique, clients, commandes, factures, paiements, livraison par commande), client Auth sans bibliothèque, écrans `#/compte`, `#/boutique`, `#/clients`, `#/commande/…`, facture `#/f/…`. Tests locaux : comptes/boutique SQL 21/21, parcours boutique 19/19 Chromium ; non-régression SQL 37, E2E 38, circuit 20, découverte 23, social 23. Note `docs/ARCHITECTURE-RALI.md`. Production : migration à appliquer | ce commit |
