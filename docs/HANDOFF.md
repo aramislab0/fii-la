@@ -63,6 +63,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 17/10 | Plan d'audit validé dans l'ordre recommandé ; conservation des commandes et clients : 24 mois (standard, avant les abonnements) ; domaine dédié à la fin | Fondateur (22:10) |
 | 17/10 | Chaque article est noté par l'acheteur (achat vérifié, après livraison) | Fondateur |
 | 17/10 | Design system v1 (Light + Dark) = référence de la refonte d'interface ; application par le Builder sans toucher aux parcours ni aux textes ; ajout d'un sélecteur de thème Clair / Sombre / Automatique (seule addition au périmètre) | Fondateur |
+| 17/10 23:01 | Suivi 3D mis en attente ; publication réseaux sociaux à prévoir dans le périmètre sans tout développer ; parrainage par numéro voulu, croissance organique d'abord, publicité plus tard ; stratégie à proposer avant exécution | Fondateur |
 
 ## 4. En attente / prochaines actions
 
@@ -87,7 +88,10 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 19 | Fixer le seuil d'ouverture de la marketplace (boutiques actives, commandes livrées) | Fondateur | V3 |
 | 21 | ~~Valider le plan d'audit~~ validé 22:10 et exécuté (lots 0 à 3) ; domaine dédié reporté à la fin (S2) | Fondateur | — |
 | 22 | Domaine dédié pour Fii La (audit S2), avant l'ouverture publique | Fondateur | Ouverture publique |
-| 23 | Design du suivi en direct « 3D, moderne » : à discuter avec le fondateur | Fondateur + Builder | — |
+| 23 | Suivi en direct 3D : proposition faite et **mise en attente** par le fondateur (17/10 23:01, « on validera plus tard »). Proposition conservée dans `ARCHITECTURE-RALI.md` §9 | Fondateur | — |
+| 24 | Publication des articles sur les réseaux de la boutique : périmètre posé (`ARCHITECTURE-RALI.md` §8), partage natif d'abord, API Meta/TikTok plus tard. Non construit | Fondateur → Builder | Validation de la stratégie de croissance |
+| 25 | Valider la stratégie de croissance et le parrainage par numéro (`docs/CROISSANCE.md` §8 : cible, récompenses, pilote, phase 0) | Fondateur | Construction de la phase 0 |
+| 26 | Ajouter au dossier CDP le traitement « parrainage » (lien parrain–filleul) si la phase 0 est validée | Fondateur | Usage réel du parrainage |
 | 16 | Revue VP de l'intégration Rali (parcours commerçant et client, `docs/screenshots/boutique/`) | VP | — |
 | 7 | ~~Alignement Fii La ↔ Rali~~ → tranché le 17/10 : intégration (voir décisions) | VP → fondateur | Feuille de route | (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
 | 8 | Régler la facture de l'organisation Supabase « AramisLab » (autres projets) | Fondateur | Hors Fii La |
@@ -128,6 +132,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 17/10 23:15 | Proposition de stratégie de croissance et de parrainage rédigée ; périmètre publication réseaux sociaux et suivi 3D en attente consignés | `docs/CROISSANCE.md`, `ARCHITECTURE-RALI.md` §8-9 |
 | 17/10 23:05 | Vérification production après l'audit : E2E déployé 38/38 Chromium et 38/38 WebKit ; base de production : 3 fiches réelles/VP, aucune demande, boutique, commande, livreur ni compte de test ; S3 (IP usurpée) confirmé ; fonction Maps v2 refuse les origines inconnues (403) | `852fde0`, journaux Mac `e2e-c.log`, `e2e-w.log` |
 | 17/10 23:00 | Audit exécuté (lots 0 à 3) : PKCE et rattachement confirmé (S1), livreur confirmé et coupé au retrait (S4, S5), notes vérifiées (S6), index, ménage espacé, limites de lecture, IP de confiance, facture en lecture seule, suivi arrondi, retrait d'invité, suppression de compte complète avec mot de passe, XMP, caractères invisibles, conservation 24 mois ; UX : réponse en un geste, « C'est l'entrée », pages reçues épurées, « Plus », signes IA retirés, rétention. Migration `20261017250000_fiila_security_hardening`, fonction Maps restreinte | `docs/AUDIT-2026-10-17.md` §4 |
 | 17/10 22:00 | Audit sécurité + UX/UI avant le test terrain (lecture seule, rien modifié) : 1 faille critique prouvée (S1, session piégée par lien `#access_token` + rattachement automatique), 2 élevées (origine partagée github.io, limites IP), 3 défauts visibles (« null », message contradictoire, faute). Plan en 4 lots proposé au fondateur, en attente de validation | `docs/AUDIT-2026-10-17.md` |

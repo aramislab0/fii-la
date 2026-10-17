@@ -112,3 +112,28 @@ Aucun service payant ni contrat n'est engagé sans accord du fondateur.
 - « Mot de passe oublié » demande un service d'envoi d'e-mails (Resend ou Brevo, gratuits au départ). La confirmation e-mail est désactivée pour le pilote.
 - Les limites anti-abus sont comptées par adresse IP. Au Sénégal, beaucoup de téléphones mobiles partagent une même adresse IP. Les seuils sont à surveiller au lancement : 60 boutiques par heure, 40 fiches par heure et par adresse IP.
 - Les photos sont stockées dans la base (≤ 300 Ko par article). C'est suffisant pour la V1. Pour la marketplace, il faudra passer au stockage de fichiers avec miniatures.
+
+## 8. Publication sur les réseaux sociaux de la boutique (prévu, fondateur 17/10 23:01)
+
+**Besoin :** quand une boutique ajoute un article (ou en livre un), elle publie la photo et le texte sur ses propres comptes (Instagram, Facebook, TikTok, statut WhatsApp) depuis Fii La, puis gère ses publications depuis Fii La.
+
+**Briques, dans l'ordre**
+1. **Partage natif (gratuit, sans compte relié).** Bouton « Publier » sur un article : le téléphone ouvre sa feuille de partage avec la photo, la légende et le lien de commande (`navigator.share` avec fichier). La commerçante choisit Instagram, Facebook, TikTok ou son statut WhatsApp. Repli ordinateur : télécharger la photo et copier la légende. Aucune autorisation, aucune API, aucun coût.
+2. **Vitrine publique** (§6, `#/b/<slug>`) : chaque publication renvoie vers l'article et le bouton « Commander ». Sans elle, le lien d'une publication ne peut qu'ouvrir WhatsApp.
+3. **Historique local** : table `posts` (shop_id, product_id, canal choisi, date, lien suivi `?src=post`) pour savoir quelles publications ramènent des commandes.
+4. **Comptes reliés (plus tard).** Publication directe et programmée par API : Meta Graph API (Instagram professionnel et page Facebook, examen de l'application par Meta obligatoire), TikTok Content Posting API (audit TikTok). Jetons des réseaux chiffrés côté serveur, jamais dans le navigateur. Le statut WhatsApp n'a pas d'API : il restera en partage natif.
+
+**Données prévues :** `posts`, `social_accounts` (shop_id, réseau, identifiant du compte, jeton chiffré, expiration). Rien n'est créé tant que la brique 4 n'est pas lancée.
+
+**Points à trancher plus tard :** examen Meta (délai, politique de confidentialité sur le domaine dédié), traitement de données supplémentaire à signaler à la CDP.
+
+## 9. Suivi en direct en 3D (en attente, fondateur 17/10 23:01 : « on validera plus tard »)
+
+Proposition faite le 17/10, non validée. Rien n'est construit.
+
+- **Rendu :** carte inclinée de Dakar, bâtiments en relief stylisés (hauteurs OpenStreetMap souvent absentes), style propre à Fii La : sol sable, océan profond, peu de libellés, version nuit pour le thème sombre. Livreur représenté par un personnage sur son véhicule (moto Jakarta, voiture, à pied) avec ombre, mouvement fluide entre deux positions, orientation dans le sens de la marche, trajet en ligne lumineuse, caméra qui suit, petite animation à l'arrivée avec la photo de l'entrée.
+- **Technique, coût 0 :** MapLibre GL (libre) avec fonds vectoriels OpenStreetMap gratuits (OpenFreeMap), ou un fichier PMTiles du Sénégal hébergé par nous (hébergement et coût à vérifier) ; modèles 3D légers (glTF) affichés avec three.js, libres de droits ou dessinés pour Fii La ; interpolation des positions reçues, pas de service payant.
+- **Garde-fous :** +400 Ko environ, alors que la page reçue pèse 118 Ko. Le statut, l'heure d'arrivée et l'appel s'affichent d'abord ; la 3D se charge ensuite seulement si le téléphone tient, sinon la carte 2D actuelle. Rien ne change dans les données de position (toujours effacées à l'arrivée).
+- **Non retenu :** 3D photoréaliste (Google, Mapbox) : payante et trop lourde pour la 3G.
+- **Étapes proposées :** prototype seul avec un faux trajet → test iPhone du fondateur → branchement livraison puis rendez-vous → plus tard trajet calé sur les rues (service d'itinéraire, choix de coût).
+- **Questions ouvertes pour le fondateur :** ambiance (« Dakar au crépuscule » ou graphique façon jeu), véhicules du départ, périmètre (livraison seule ou aussi rendez-vous), feu vert du prototype.
