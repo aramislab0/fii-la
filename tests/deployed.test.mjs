@@ -75,7 +75,7 @@ async function session(label) {
 const shot = (page, name) => page.screenshot({ path: `${SHOTS}/${TARGET}-${ENGINE}-${name}.png`, fullPage: true });
 async function pastePoint(page, coords) {
   await page.getByRole('button', { name: 'Depuis Google Maps' }).first().click();
-  await page.locator('input[placeholder^="14.758140"]').first().fill(`${coords.lat}, ${coords.lng}`);
+  await page.locator('input[placeholder^="Collez"]').first().fill(`${coords.lat}, ${coords.lng}`);
   await page.getByRole('button', { name: 'Placer ce point' }).first().click();
   await page.getByRole('button', { name: 'Valider ce point' }).first().click();
 }

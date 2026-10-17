@@ -47,13 +47,41 @@
   }
   function footer() {
     return h('footer', { class: 'foot' },
-      h('a', { href: '#/' }, 'Fii La'),
-      h('a', { href: '#/confidentialite' }, 'Données et confidentialité'),
-      h('a', { href: '#/cle' }, 'Restaurer une clé de gestion'));
+      themeSwitch(),
+      h('div', { class: 'foot-links' },
+        h('a', { href: '#/' }, 'Fii La'),
+        h('a', { href: '#/confidentialite' }, 'Données et confidentialité'),
+        h('a', { href: '#/cle' }, 'Restaurer une clé de gestion')));
   }
-  function stateCard(icon, title, text, extra) {
-    return h('div', { class: 'card state' },
-      h('div', { class: 'big', 'aria-hidden': 'true' }, icon),
+  // Thème : Automatique (réglage du téléphone, par défaut), Clair ou Sombre. Choix gardé sur ce téléphone.
+  function currentTheme() { var t = document.documentElement.getAttribute('data-theme'); return t === 'light' || t === 'dark' ? t : 'auto'; }
+  function setTheme(t) {
+    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+    else document.documentElement.removeAttribute('data-theme');
+    try { if (t === 'light' || t === 'dark') localStorage.setItem('fiila-theme', t); else localStorage.removeItem('fiila-theme'); } catch (e) { /* navigation privée */ }
+    syncThemeColor();
+  }
+  function syncThemeColor() {
+    var bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+    var metas = document.querySelectorAll('meta[name="theme-color"]');
+    for (var i = 0; i < metas.length; i++) {
+      if (currentTheme() === 'auto') metas[i].setAttribute('content', /dark/.test(metas[i].media) ? '#0D1310' : '#F5F2EA');
+      else if (bg) metas[i].setAttribute('content', bg);
+    }
+  }
+  function themeSwitch() {
+    var cur = currentTheme();
+    function opt(val, text) {
+      return h('label', null, h('input', { type: 'radio', name: 'theme', value: val, checked: cur === val ? 'checked' : null,
+        onchange: function () { setTheme(val); } }), text);
+    }
+    return h('fieldset', { class: 'theme-switch' }, h('legend', null, 'Thème'),
+      h('div', { class: 'segs' }, opt('light', 'Clair'), opt('dark', 'Sombre'), opt('auto', 'Automatique')));
+  }
+  var STATE_ICONS = { '?': 'help', '!': 'alert', '⦸': 'ban', '⌛': 'hourglass', '✓': 'check' };
+  function stateCard(glyph, title, text, extra) {
+    return h('div', { class: 'card state' + (glyph === '!' ? ' error' : '') },
+      h('div', { class: 'big', 'aria-hidden': 'true' }, icon(STATE_ICONS[glyph] || 'help', 26)),
       h('h2', null, title), text ? h('p', { class: 'muted' }, text) : null, extra || null);
   }
   function loading(text) { return h('p', { class: 'loading', role: 'status' }, text || 'Chargement…'); }
@@ -359,11 +387,11 @@
     if (!p) return null;
     if (p.src === 'gps' && p.acc != null) {
       var a = Math.round(p.acc);
-      if (a <= 15) return ['good', 'Position précise : à environ ' + a + ' m près.'];
-      if (a <= 50) return ['mid', 'Position approximative : à environ ' + a + ' m près. Vérifiez le repère sur la carte.'];
-      return ['bad', 'Position peu précise : à environ ' + a + ' m près. Déplacez la carte pour corriger.'];
+      if (a <= 15) return ['good', 'Position précise.'];
+      if (a <= 50) return ['mid', 'Position approximative : vérifiez le repère sur la carte.'];
+      return ['bad', 'Position peu précise : déplacez la carte pour mettre le repère sur l’entrée.'];
     }
-    if (p.src === 'paste') return ['neutral', 'Coordonnées collées. Vérifiez-les sur la carte.'];
+    if (p.src === 'paste') return ['neutral', 'Point récupéré. Vérifiez-le sur la carte.'];
     if (p.src === 'saved') return ['neutral', 'Point déjà enregistré.'];
     if (p.src === 'reused') return ['mid', 'Point repris du rendez-vous précédent : vérifiez-le, puis validez.'];
     return ['neutral', 'Placé à la main sur la carte.'];
@@ -386,10 +414,10 @@
     var mapBox = h('div', { class: 'map-box', 'aria-label': 'Carte : déplacez-la pour placer le repère au centre sur ' + opts.what },
       mapEl, h('div', { class: 'map-pin' }), h('div', { class: 'map-dot' }));
     var pid = (opts.id || 'map') + '-paste';
-    var pasteIn = h('input', { type: 'text', id: pid, placeholder: '14.758140, -17.470320 ou lien Google Maps', autocomplete: 'off', inputmode: 'url' });
+    var pasteIn = h('input', { type: 'text', id: pid, placeholder: 'Collez ici le lien Google Maps', autocomplete: 'off', inputmode: 'url' });
     pasteIn.addEventListener('paste', function () { setTimeout(usePaste, 0); });
     var clipBtn = h('button', { class: 'btn', type: 'button', onclick: fromClipboard }, 'Coller le lien');
-    var paste = h('div', { class: 'stack gm-panel', hidden: true },
+    var paste = h('div', { class: 'stack gm-panel', id: pid + '-panel', hidden: true },
       h('ol', { class: 'howto' },
         h('li', null, 'Ouvrez Google Maps.'),
         h('li', null, 'Faites un appui long exactement sur ' + opts.what + ' : un repère rouge apparaît.'),
@@ -398,21 +426,26 @@
       h('div', { class: 'row' },
         h('a', { class: 'btn ghost', href: gmOpenApp(), target: IS_IOS ? null : '_blank', rel: 'noopener noreferrer' }, 'Ouvrir Google Maps'),
         clipBtn),
-      h('label', { for: pid }, 'Ou collez ici le lien ou les coordonnées'),
+      h('label', { for: pid }, 'Ou collez le lien vous-même'),
       pasteIn,
       h('button', { class: 'btn small ghost', type: 'button', onclick: usePaste }, 'Placer ce point'));
     var help = h('div', { class: 'stack', hidden: true });
+    var gmBtn = h('button', { class: 'btn ghost', type: 'button', 'aria-expanded': 'false', 'aria-controls': pid + '-panel', onclick: function () {
+      paste.hidden = !paste.hidden; if (!paste.hidden) help.hidden = true;
+      gmBtn.setAttribute('aria-expanded', paste.hidden ? 'false' : 'true');
+    } }, 'Depuis Google Maps');
 
     function say(t, cls) { msg.textContent = t || ''; msg.className = 'msg ' + (cls || 'info'); }
     function draw() {
       var c = opts.get();
       ptBox.className = 'pt' + (c ? ' set' : '');
+      ptBox.setAttribute('data-point', center ? fmt(center) : ''); // pour les tests ; jamais affiché
       var ai = accInfo(c || (center ? { src: src, acc: acc } : null));
       setKids(ptBox, 
-        c ? h('p', { class: 'acc good' }, '✓ Point validé pour ' + opts.what) : h('p', { class: 'acc neutral' }, center ? 'Point pas encore validé' : 'Aucun point choisi'),
-        center ? h('p', { class: 'coords' }, fmt(center)) : null,
+        c ? h('p', { class: 'acc good' }, icon('check', 18), 'Point validé pour ' + opts.what) : h('p', { class: 'acc neutral' }, center ? 'Point pas encore validé' : 'Aucun point choisi'),
         ai && center ? h('p', { class: 'acc ' + ai[0] }, ai[1]) : null);
       confirmBtn.disabled = !center || !zoomOk || !!c;
+      if (typeof locBtn !== 'undefined' && locBtn) locBtn.className = center ? 'btn ghost' : 'btn'; // une seule action principale à la fois
       confirmBtn.textContent = c ? 'Point validé' : 'Valider ce point';
     }
     function moved(newSrc) {
@@ -434,7 +467,7 @@
     }
     function placeFrom(c, how) {
       goTo(c.lat, c.lng, 18, 'paste');
-      paste.hidden = true; help.hidden = true;
+      paste.hidden = true; help.hidden = true; gmBtn.setAttribute('aria-expanded', 'false');
       say((how || 'Point récupéré.') + ' Vérifiez que le repère est bien sur ' + opts.what + ', puis validez.', 'info');
     }
     function usePaste() {
@@ -453,7 +486,7 @@
         });
         return;
       }
-      say('Lien ou coordonnées non reconnus. Copiez le lien depuis « Partager » dans Google Maps, ou des chiffres comme 14.758140, -17.470320.', 'err');
+      say('Ce lien n’est pas reconnu. Dans Google Maps, touchez « Partager », puis « Copier », et collez ici.', 'err');
     }
     function fromClipboard() {
       if (navigator.clipboard && navigator.clipboard.readText) {
@@ -463,7 +496,7 @@
         }, function () { pasteIn.focus(); say('Appuyez longuement dans le champ ci-dessous, puis « Coller ».', 'info'); });
       } else { pasteIn.focus(); say('Appuyez longuement dans le champ ci-dessous, puis « Coller ».', 'info'); }
     }
-    function showGm() { paste.hidden = false; help.hidden = true; }
+    function showGm() { paste.hidden = false; help.hidden = true; gmBtn.setAttribute('aria-expanded', 'true'); }
     function deniedHelp() {
       var steps;
       if (IN_APP) {
@@ -515,7 +548,7 @@
         else say('Position indisponible pour le moment. Placez le repère à la main sur la carte.', 'err');
       }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     }
-    var locBtn = h('button', { class: 'btn ghost', type: 'button', onclick: locate }, 'Utiliser ma position');
+    var locBtn = h('button', { class: 'btn', type: 'button', onclick: locate }, 'Utiliser ma position');
 
     loadLeaflet().then(function (L) {
       var start = center ? [center.lat, center.lng] : DAKAR_VIEW;
@@ -552,7 +585,7 @@
     return h('div', { class: 'stack' },
       mapBox,
       h('div', { class: 'row' }, locBtn,
-        h('button', { class: 'btn ghost', type: 'button', onclick: function () { paste.hidden = !paste.hidden; if (!paste.hidden) help.hidden = true; } }, 'Depuis Google Maps')),
+        gmBtn),
       help, paste, ptBox, confirmBtn, msg);
   }
 
@@ -638,7 +671,7 @@
         h('span', { class: 'label' }, 'Photo de l’entrée ', h('span', { class: 'hint' }, opts.optional ? '(facultatif)' : '(conseillé)')),
         p ? h('img', { class: 'photo-prev', src: p, alt: 'Aperçu de la photo de l’entrée' }) : null,
         h('div', { class: 'row' },
-          h('button', { class: p ? 'btn ghost' : 'btn', type: 'button', onclick: function () { inp.click(); } }, p ? 'Remplacer la photo' : 'Prendre ou choisir une photo'),
+          h('button', { class: p || opts.optional ? 'btn ghost' : 'btn', type: 'button', onclick: function () { inp.click(); } }, p ? 'Remplacer la photo' : 'Prendre ou choisir une photo'),
           p ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { opts.set(null); draw(); } }, 'Retirer') : null),
         h('p', { class: 'hint' }, 'Photographiez la porte, pas toute la maison, et évitez les visages et plaques. La photo est réduite et ses données de localisation sont retirées avant l’envoi.'),
         inp, msg);
@@ -662,24 +695,16 @@
   }
 
   /* ================================================================ fiche (vue destinataire) */
-  // Repli secondaire : on partage une fiche nommée, pas des chiffres. Les coordonnées restent accessibles
-  // (lien qui ne s'ouvre pas, autre application) mais repliées.
-  function coordLine(p) {
-    return h('details', { class: 'coords-more' },
-      h('summary', null, 'Coordonnées GPS (si le lien ne s’ouvre pas)'),
-      h('div', { class: 'coordline' },
-        h('span', { class: 'coords' }, fmt(p)),
-        h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(fmt(p), 'Coordonnées'); } }, 'Copier')));
-  }
+  // Aucune coordonnée affichée : l'itinéraire s'ouvre directement dans l'application de navigation.
   function leg(n, title, p, mode, note) {
     return h('section', { class: 'leg', 'aria-label': title },
-      h('div', { class: 'leg-h' }, n ? h('span', { class: 'leg-n', 'aria-hidden': 'true' }, n) : null, h('h3', null, title)),
+      h('div', { class: 'leg-h' }, n ? h('span', { class: 'leg-n', 'aria-hidden': 'true' }, n) : null, h('h3', null, title),
+        h('span', { class: 'leg-ico', 'aria-hidden': 'true' }, icon(mode === 'driving' && n ? 'car' : 'door', 22))),
       note ? h('p', { class: 'note' }, note) : null,
-      dirButtons(p, mode),
-      coordLine(p));
+      dirButtons(p, mode, !!n));
   }
-  function dirButtons(p, mode) {
-    var label = mode === 'walking' ? 'Itinéraire à pied (Google Maps)' : 'Itinéraire (Google Maps)';
+  function dirButtons(p, mode, opts2) {
+    var label = mode === 'walking' ? 'Itinéraire à pied' : opts2 ? 'Itinéraire en voiture' : 'Itinéraire';
     if (!IS_IOS) return h('a', { class: 'btn', href: gmDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, label);
     // iPhone : ouverture directe de l'application Google Maps ; si rien ne s'ouvre, on propose Plans.
     var note = h('p', { class: 'hint', hidden: true, role: 'status' }, 'Google Maps ne s’est pas ouvert ? Il n’est peut-être pas installé : utilisez Plans.');
@@ -697,7 +722,7 @@
     opts = opts || {};
     var hasStop = p.vehicle_ok === false && p.stop;
     var isMeeting = p.kind === 'meeting';
-    return h('article', { class: 'fiche' },
+    return h('article', { class: 'fiche' + (opts.wide && p.photo ? ' wide' : '') },
       p.photo ? h('img', { class: 'door', src: p.photo, alt: 'Photo de l’entrée' + (p.label ? ' : ' + p.label : ''), decoding: 'async' }) : null,
       h('div', { class: 'fiche-body' },
         h('div', { class: 'stack tight' },
@@ -773,15 +798,16 @@
       var reqs = rows.filter(function (x) { return x.type === 'request'; });
       function item(x, href, title, sub, chip) {
         if (x.missing) {
-          return h('div', { class: 'item', style: 'cursor:default' },
+          return h('div', { class: 'item missing' },
             h('div', null, h('div', { class: 't' }, 'Fiche introuvable'), h('div', { class: 'small muted' }, 'Supprimée, ou clé non valide.')),
             h('button', { class: 'btn ghost small', type: 'button', onclick: function () { owned.remove(x.type, x.id); render(); } }, 'Retirer'));
         }
         var kind = x.type === 'request' ? 'request' : (x.kind || 'address');
-        return h('a', { class: 'item', href: href, style: 'text-decoration:none', onclick: function () { track('owned_reopened', kind); } },
-          h('div', null, h('div', { class: 't' }, title), sub ? h('div', { class: 'small muted wrapword' }, sub) : null), chip);
+        return h('a', { class: 'item', href: href, onclick: function () { track('owned_reopened', kind); } },
+          h('div', null, h('div', { class: 't' }, title), sub ? h('div', { class: 'small muted wrapword' }, sub) : null),
+          h('span', { class: 'item-end' }, chip, h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))));
       }
-      function chip(cls, text) { return h('span', { class: 'chip ' + cls }, text); }
+      function chip(cls, text) { return h('span', { class: 'chip ' + cls }, icon(cls === 'ok' ? 'check' : cls === 'wait' ? 'clock' : 'ban', 12), text); }
       setKids(listBox, 
         offlineMsg ? h('p', { class: 'alert' }, offlineMsg) : null,
         h('section', { class: 'stack', id: 'mes-adresses', 'aria-labelledby': 'h-adr' },
@@ -994,7 +1020,7 @@
         h('p', null, h('strong', null, 'Supprimer définitivement cette fiche ?')),
         h('p', { class: 'small' }, 'La fiche et sa photo seront effacées du serveur et le lien ne fonctionnera plus. Les copies déjà téléchargées ou les captures d’écran ne peuvent pas être rappelées.'),
         h('div', { class: 'row' },
-          h('button', { class: 'btn danger', type: 'button', id: 'confirm-delete', onclick: function () {
+          h('button', { class: 'btn danger-fill', type: 'button', id: 'confirm-delete', onclick: function () {
             act('fiila_delete_place', 'Fiche supprimée.', function () { owned.remove('place', pl.id); go('#/'); });
           } }, 'Supprimer définitivement'),
           h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(zone); } }, 'Annuler'))));
@@ -1015,9 +1041,9 @@
         h('p', { class: 'eyebrow' }, isMeeting ? 'Mon rendez-vous' : 'Mon adresse'),
         h('h1', { class: 'wrapword' }, pl.label),
         isMeeting ? h('p', { class: 'muted' }, whenText(pl.starts_at)) : null,
-        justSaved && active ? h('p', { class: 'saved-ok', role: 'status', id: 'saved-ok' }, '✓ Enregistré. Envoyez maintenant le lien à vos visiteurs ou livreurs.') : null,
+        justSaved && active ? h('p', { class: 'saved-ok', role: 'status', id: 'saved-ok' }, icon('check', 18), 'Enregistré. Envoyez maintenant le lien à vos visiteurs ou livreurs.') : null,
         h('div', { class: 'row', style: 'align-items:center' },
-          h('span', { class: 'chip ' + (active ? 'ok' : 'off'), style: 'flex:0 0 auto' },
+          h('span', { class: 'chip ' + (active ? 'ok' : 'off'), style: 'flex:0 0 auto' }, icon(active ? 'check' : expired ? 'hourglass' : 'ban', 12),
             expired ? 'Expiré' : pl.status === 'active' ? 'Lien actif' : 'Lien désactivé'),
           h('span', { class: 'small muted' }, isMeeting && !expired ? 'Visible jusqu’au ' + shortDate(pl.expires_at) : 'Modifiée le ' + shortDate(pl.updated_at)))),
       active ? sharePanel({ kind: variant, url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null,
@@ -1058,12 +1084,22 @@
     telegram: 'M21 4 3 11l6 2 2 6 3-4 5 4 2-15ZM9 13l9-6-7 8',
     facebook: 'M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8Z',
     instagram: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm5 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm5.5-1.5h.01',
-    tiktok: 'M14 3v11a3 3 0 1 1-3-3M14 3c0 3 2 5 5 5'
+    tiktok: 'M14 3v11a3 3 0 1 1-3-3M14 3c0 3 2 5 5 5',
+    check: 'M5 12.5l4.5 4.5L19 7.5',
+    ban: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM5.6 5.6l12.8 12.8',
+    clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7v5l3 2',
+    hourglass: 'M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9',
+    help: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01',
+    alert: 'M12 3 2 20h20L12 3ZM12 10v4M12 17h.01',
+    link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+    car: 'M5 16h14M6 16l1.5-5h9L18 16M5 16v3h2v-2M19 16v3h-2v-2M8 13.5h.01M16 13.5h.01',
+    door: 'M6 21V4h12v17M3 21h18M14.5 12.5h.01',
+    chev: 'M9 6l6 6-6 6'
   };
-  function icon(name) {
+  function icon(name, size) {
     var ns = 'http://www.w3.org/2000/svg';
     var svg = document.createElementNS(ns, 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', '20'); svg.setAttribute('height', '20');
+    svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('width', String(size || 20)); svg.setAttribute('height', String(size || 20));
     svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('class', 'ico');
     var path = document.createElementNS(ns, 'path');
     path.setAttribute('d', ICONS[name]); path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'currentColor');
@@ -1330,8 +1366,10 @@
       if (r.state === 'ok') {
         document.title = 'Fii La';
         var mine = owned.all().filter(function (x) { return x.type === 'place' && x.share === token; })[0];
-        return page(fiche(r.place), mine ? ownerBlock(mine) : discoveryBlock(r.place.kind, token),
+        var pg = page(fiche(r.place, { wide: true }), mine ? ownerBlock(mine) : discoveryBlock(r.place.kind, token),
           h('p', { class: 'hint', style: 'text-align:center' }, 'Fiche partagée avec Fii La. Fii La ne demande pas votre position pour l’afficher.'));
+        pg.classList.add('wide');
+        return pg;
       }
       var map = {
         revoked: ['⦸', 'Ce lien a été désactivé', 'La personne qui l’a partagé l’a désactivé. Aucune information n’est affichée.'],
@@ -1427,7 +1465,7 @@
           h('p', null, h('strong', null, 'Supprimer cette demande ?')),
           h('p', { class: 'small' }, 'Vous ne verrez plus la réponse. L’adresse du client n’est pas supprimée : elle lui appartient.'),
           h('div', { class: 'row' },
-            h('button', { class: 'btn danger', type: 'button', onclick: function () {
+            h('button', { class: 'btn danger-fill', type: 'button', onclick: function () {
               api('fiila_delete_request', { p_id: q.id, p_owner: rec.owner }).then(function () { owned.remove('request', q.id); toast('Demande supprimée.'); go('#/'); },
                 function (e) { setKids(zone, h('p', { class: 'alert' }, errText(e))); });
             } }, 'Supprimer'),
@@ -1439,11 +1477,11 @@
           h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(key, 'Clé de gestion'); } }, 'Copier la clé de gestion')));
       var stateBlock;
       if (q.state === 'fulfilled') {
-        stateBlock = [h('span', { class: 'chip ok', style: 'align-self:flex-start' }, 'Adresse reçue le ' + shortDate(q.fulfilled_at)),
+        stateBlock = [h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Adresse reçue le ' + shortDate(q.fulfilled_at)),
           h('p', { class: 'small muted' }, 'Visible uniquement par vous, avec ce téléphone ou la clé de gestion. Le client peut la désactiver à tout moment.'),
           fiche(q.place)];
       } else if (q.state === 'pending') {
-        stateBlock = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, 'En attente de réponse'),
+        stateBlock = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de réponse'),
           sharePanel({ kind: 'request', url: url, msg: msg, title: q.purpose, ids: { url: 'request-url', copy: 'copy-request', native: 'share-request' } }),
           h('p', { class: 'hint' }, 'Le client voit votre nom et la raison de la demande, jamais d’autres réponses.'),
           h('button', { class: 'btn', type: 'button', id: 'refresh', onclick: render }, 'Vérifier si le client a répondu')];

@@ -62,7 +62,7 @@ const waitTrack = (page, ev, v) => {
 };
 async function pastePoint(page, coords, idx = 0) {
   await page.getByRole('button', { name: 'Depuis Google Maps' }).nth(idx).click();
-  await page.locator('input[placeholder^="14.758140"]').nth(idx).fill(`${coords.lat}, ${coords.lng}`);
+  await page.locator('input[placeholder^="Collez"]').nth(idx).fill(`${coords.lat}, ${coords.lng}`);
   await page.getByRole('button', { name: 'Placer ce point' }).first().click(); // seul le panneau ouvert est visible
   await page.locator('button:not([disabled])', { hasText: /^Valider ce point$/ }).first().click(); // le seul sélecteur actif est celui qu'on vient de placer
 }
@@ -146,13 +146,10 @@ await t('destinataire anonyme : itinéraire voiture vers l’arrêt, à pied ver
   assert.equal(await V.evaluate(() => localStorage.length), 0);
 });
 
-await t('coordonnées brutes repliées (repli secondaire), lisibles et copiables sur demande', async () => {
-  const coords = V.locator('.coords').first();
-  assert.equal(await coords.isVisible(), false, 'coordonnées visibles par défaut');
-  await V.locator('.coords-more summary').first().click();
-  assert.equal(await coords.isVisible(), true);
-  assert.equal(await coords.textContent(), '14.746500, -17.493000');
-  await shot(V, '02-destinataire-coordonnees-repliees');
+await t('destinataire : aucune coordonnée affichée, tout passe par l’itinéraire', async () => {
+  assert.equal(await V.locator('.coords, .coords-more').count(), 0);
+  assert.equal(await V.getByText(/14\.74/).count(), 0);
+  await shot(V, '02-destinataire-sans-coordonnees');
 });
 
 await t('le propriétaire qui ouvre son propre lien retrouve sa gestion, pas l’invitation à créer', async () => {
@@ -198,7 +195,7 @@ await t('« Créer un rendez-vous similaire » : brouillon neuf, lieu à reconfi
   assert.equal(await O.locator('#m-walk').inputValue(), 'Traverser la place, 60 m');
   assert.ok(await O.locator('#m-hasstop').isChecked());
   assert.equal(await O.locator('img.photo-prev').count(), 1, 'photo non reprise');
-  assert.equal(await O.getByText('✓ Point validé pour le lieu du rendez-vous').count(), 0, 'lieu validé sans confirmation');
+  assert.equal(await O.getByText('Point validé pour le lieu du rendez-vous').count(), 0, 'lieu validé sans confirmation');
   await O.getByText('Point repris du rendez-vous précédent : vérifiez-le, puis validez.').first().waitFor();
   assert.ok(await O.getByRole('button', { name: 'Créer le rendez-vous' }).isDisabled(), 'création possible sans nouvelle date');
   await shot(O, '03-rendez-vous-similaire');
@@ -288,7 +285,7 @@ await t('échec d’enregistrement [SIMULÉ réseau] puis rechargement : le brou
   await p.page.getByText('Brouillon repris là où vous l’aviez laissé.').waitFor();
   assert.equal(await p.page.locator('#m-label').inputValue(), 'Mariage (test brouillon)');
   assert.equal(await p.page.locator('#m-instr').inputValue(), 'Entrée par le portail blanc');
-  await p.page.getByText('✓ Point validé pour le lieu du rendez-vous').waitFor();
+  await p.page.getByText('Point validé pour le lieu du rendez-vous').waitFor();
   await p.ctx.unroute('**/rpc/fiila_create_place');
   await p.page.getByRole('button', { name: 'Créer le rendez-vous' }).click();
   await p.page.locator('#saved-ok').waitFor();
@@ -303,7 +300,7 @@ await t('position refusée pendant la création d’un rendez-vous : message et 
   await p.page.getByRole('button', { name: 'Utiliser ma position' }).first().click();
   await p.page.getByText(/Accès à la position refusé|Position indisponible/).waitFor();
   await pastePoint(p.page, { lat: 14.71, lng: -17.46 });
-  await p.page.getByText('✓ Point validé pour le lieu du rendez-vous').waitFor();
+  await p.page.getByText('Point validé pour le lieu du rendez-vous').waitFor();
   await p.ctx.close();
 });
 
@@ -366,9 +363,9 @@ await t('clavier : « Créer un rendez-vous similaire » et le repli des coordon
   assert.notEqual(o, 'none');
   await V.goto(URL0 + '#/a/' + (await row(simId)).share_token);
   await V.getByRole('heading', { name: /novembre/ }).waitFor();
-  assert.ok(await reach(V, () => document.activeElement && document.activeElement.tagName === 'SUMMARY'), 'repli des coordonnées non atteint');
-  await V.keyboard.press('Enter');
-  assert.equal(await V.locator('.coords').first().isVisible(), true, 'Entrée n’ouvre pas le repli');
+  assert.ok(await reach(V, () => document.activeElement && /Itinéraire/.test(document.activeElement.textContent || '')), 'bouton Itinéraire non atteint au clavier');
+  const o2 = await V.evaluate(() => getComputedStyle(document.activeElement).outlineStyle);
+  assert.notEqual(o2, 'none');
 });
 
 await t('texte long à 320 px : rendez-vous similaire et fiche sans débordement', async () => {

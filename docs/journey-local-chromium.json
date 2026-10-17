@@ -1,10 +1,10 @@
 {
   "cible": "local",
-  "url": "http://127.0.0.1:40449/",
+  "url": "http://127.0.0.1:39191/",
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "mode": "automatisation Playwright, émulation iPhone 13 (pas un téléphone physique)",
-  "date": "2026-10-15T11:20:35.509Z",
+  "date": "2026-10-17T19:27:52.985Z",
   "reussis": 12,
   "total": 12,
   "compteurs": {
@@ -22,52 +22,52 @@
     {
       "ok": true,
       "name": "configuration publique : URL HTTPS de l’API et clé publique seulement",
-      "ms": 115
+      "ms": 93
     },
     {
       "ok": true,
       "name": "1. propriétaire : créer une adresse avec photo",
-      "ms": 920
+      "ms": 722
     },
     {
       "ok": true,
       "name": "persistance : la fiche et sa photo survivent au rechargement (propriétaire)",
-      "ms": 379
+      "ms": 344
     },
     {
       "ok": true,
       "name": "2. destinataire (session isolée) : fiche, photo et repère, sans compte",
-      "ms": 433
+      "ms": 389
     },
     {
       "ok": true,
       "name": "3. bouton découverte : création vierge d’une 2e adresse",
-      "ms": 659
+      "ms": 623
     },
     {
       "ok": true,
       "name": "4. retour à la fiche d’origine",
-      "ms": 73
+      "ms": 86
     },
     {
       "ok": true,
       "name": "5. partage : lien copié et message WhatsApp avec la vraie URL",
-      "ms": 247
+      "ms": 222
     },
     {
       "ok": true,
       "name": "6. désactivation : la fiche et sa photo ne sont plus servies",
-      "ms": 298
+      "ms": 267
     },
     {
       "ok": true,
       "name": "7. suppression : fiche et photo inaccessibles, même par l’API",
-      "ms": 257
+      "ms": 280
     },
     {
       "ok": true,
       "name": "sécurité en production : tables privées inaccessibles par l’API",
-      "ms": 18
+      "ms": 15
     },
     {
       "ok": true,

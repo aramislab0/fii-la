@@ -2,7 +2,7 @@
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "mode": "automatisation Playwright, émulation iPhone 13, base Postgres locale réelle (PGlite)",
-  "date": "2026-10-15T11:20:10.589Z",
+  "date": "2026-10-17T19:27:16.457Z",
   "reussis": 20,
   "total": 20,
   "results": [
@@ -20,11 +20,11 @@
     },
     {
       "ok": true,
-      "name": "destinataire anonyme : itinéraire voiture vers l’arrêt, à pied vers le lieu (URLs Google Maps officielles)"
+      "name": "destinataire anonyme : itinéraire voiture vers l’arrêt, à pied vers le lieu (iPhone : appli Google Maps directe + Plans)"
     },
     {
       "ok": true,
-      "name": "coordonnées brutes repliées (repli secondaire), lisibles et copiables sur demande"
+      "name": "destinataire : aucune coordonnée affichée, tout passe par l’itinéraire"
     },
     {
       "ok": true,

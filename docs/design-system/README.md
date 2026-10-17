@@ -145,7 +145,7 @@ Planches de référence : « 03 · Fiche », « 08 · Gestion », « 12 · Nouve
 
 | Fonction (code) | Spécification |
 |---|---|
-| Coordonnées repliées (`.coords-more`) | Sous chaque itinéraire, dans le bloc étape ; summary 44 px, 13/600 `--muted`, chevron qui pivote à l'ouverture ; replié par défaut |
+| ~~Coordonnées repliées (`.coords-more`)~~ | **Retiré le 17/10 (décision fondateur)** : aucune coordonnée n'est affichée à l'utilisateur, ni au destinataire ni pendant la création. La complexité reste en arrière-plan |
 | « Ouvrir dans Plans » (iPhone) | `.btn.ghost.small` (44 px) sous le bouton Itinéraire, jamais au même niveau |
 | Bloc Découverte (`.discover`) | Après la fiche ; fond `--soft`, rayon 16, aucune ombre ni bordure ; titre 18/800 ; bouton secondaire sur `--surface` ; aide 13 px (au lieu de 12,5) |
 | Confirmation après enregistrement (`.saved-ok`) | `--ok`, 14/600, précédée d'une icône coche, sous le titre |

@@ -86,7 +86,7 @@ const tracks = (page) => page.__tracks.map((b) => JSON.parse(b));
 const waitTrack = (page, ev, variant) => page.waitForRequest((r) => r.url().endsWith('/rpc/fiila_track') && r.postData().includes(`"${ev}"`) && r.postData().includes(`"${variant}"`), { timeout: 8000 });
 async function pastePoint(page, coords) {
   await page.getByRole('button', { name: 'Depuis Google Maps' }).first().click();
-  await page.locator('input[placeholder^="14.758140"]').first().fill(`${coords.lat}, ${coords.lng}`);
+  await page.locator('input[placeholder^="Collez"]').first().fill(`${coords.lat}, ${coords.lng}`);
   await page.getByRole('button', { name: 'Placer ce point' }).first().click();
   await page.getByRole('button', { name: 'Valider ce point' }).first().click();
 }
@@ -118,7 +118,7 @@ await t('destinataire anonyme : fiche, photo et itinéraire visibles sans compte
   await R.goto(addrUrl);
   await R.getByRole('heading', { name: SENDER.label }).waitFor();
   assert.ok(await R.locator('img.door').evaluate((i) => i.complete && i.naturalWidth > 100), 'photo absente');
-  await R.getByRole('link', { name: 'Itinéraire (Google Maps)' }).waitFor();
+  await R.getByRole('link', { name: /Itinéraire/ }).first().waitFor();
   assert.equal(await R.evaluate(() => localStorage.length), 0, 'stockage local utilisé sans action');
   assert.equal(await R.evaluate(() => window.__geoCalls), 0, 'position demandée');
   assert.equal(R.__dialogs, 0, 'boîte de dialogue affichée');
@@ -178,7 +178,7 @@ await t('CTA adresse : ouvre la création existante, vierge (aucune donnée de l
   await R.getByRole('heading', { name: 'Où est l’entrée ?' }).waitFor();
   assert.match(R.url(), /#\/new\?retour=/);
   await R.getByText('Aucun point choisi').waitFor();
-  assert.equal(await R.locator('.pt .coords').count(), 0, 'coordonnées pré-remplies');
+  assert.equal(await R.locator('.pt').first().getAttribute('data-point'), '', 'coordonnées pré-remplies');
   assert.equal(await R.evaluate(() => localStorage.getItem('fiila.draft.address')), null, 'brouillon pré-rempli');
   await shot(R, 'creation-depuis-decouverte');
 });
@@ -266,7 +266,7 @@ await t('CTA rendez-vous : texte adapté, ouvre la création de rendez-vous, vie
   assert.match(M.url(), /#\/rdv\/nouveau\?retour=/);
   assert.equal(await M.locator('#m-label').inputValue(), '');
   assert.equal(await M.locator('#m-instr').inputValue(), '');
-  assert.equal(await M.locator('.pt .coords').count(), 0, 'lieu pré-rempli');
+  assert.equal(await M.locator('.pt').first().getAttribute('data-point'), '', 'lieu pré-rempli');
   await M.getByRole('link', { name: '← Revenir à la fiche reçue' }).click();
   await M.getByRole('heading', { name: 'Baptême EXPEDITEUR' }).waitFor();
 });

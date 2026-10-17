@@ -1,21 +1,21 @@
 {
   "moteur": "chromium",
   "version": "141.0.7390.37",
-  "date": "2026-10-15T11:19:57.971Z",
+  "date": "2026-10-17T19:27:29.135Z",
   "reussis": 23,
   "total": 23,
   "contrastes_bloc_decouverte": {
     "light": {
       "title": 14.22,
       "body": 14.22,
-      "hint": 5.58,
+      "hint": 5.74,
       "cta": 16.68
     },
     "dark": {
-      "title": 13.02,
-      "body": 13.02,
-      "hint": 6.41,
-      "cta": 14.38
+      "title": 13.14,
+      "body": 13.14,
+      "hint": 6.68,
+      "cta": 15.07
     }
   },
   "installabilite": {
