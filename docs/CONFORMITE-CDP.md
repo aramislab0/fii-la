@@ -78,7 +78,7 @@ Constaté dans le code au commit `9576bc8`.
 - Art. 33 : licéité, notamment par le consentement de la personne.
 - Art. 35 : conservation limitée à la durée nécessaire. **Écart actuel** : aucune durée maximale pour les fiches d’adresse.
 - Art. 39 : contrat écrit avec le sous-traitant, qui ne doit agir que sur instruction. Il faut vérifier et conserver les conditions de traitement de Supabase.
-- Art. 58 : information des personnes « au plus tard, lors de la collecte », dont « l’identité du responsable du traitement ». **Écart actuel** : la page « Données et confidentialité » ne nomme pas de responsable, puisqu’il n’est pas encore désigné.
+- Art. 58 : information des personnes « au plus tard, lors de la collecte ». Depuis le 17/10/2026 (commit `3419094`), la page « Données et confidentialité » indique les champs obligatoires, l’hébergement en France, les durées de conservation et les droits. **Écart restant** : l’identité et le contact du responsable du traitement, à ajouter dès qu’ils sont communiqués.
 
 ## 4. Questions non résolues
 
@@ -98,7 +98,7 @@ Constaté dans le code au commit `9576bc8`.
 4. **D’ici là** : données synthétiques uniquement, et aucun test terrain avec de vraies adresses avant d’avoir clarifié le point 3 de la section 4.
 5. **Après la formalité** : compléter la page « Données et confidentialité » avec l’identité et le contact du responsable (art. 58). Cette mise à jour de contenu est prévue hors du gel fonctionnel.
 
-Aucune démarche n’a été faite auprès de la CDP, et aucune ne le sera par Claude.
+**Statut au 17/10/2026** : demande CDP en cours, déposée par le fondateur. Une fiche descriptive du traitement, rubrique par rubrique (art. 22), a été préparée dans un document partagé pour l’accompagner. Claude n’a pris aucun contact avec la CDP.
 
 **Sources**
 - [Loi n° 2008-12, texte publié par l’AFAPDP](https://www.afapdp.org/wp-content/uploads/2018/05/Senegal-texte-de-loi-2008.pdf)
