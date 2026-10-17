@@ -2,7 +2,7 @@
 
 > Fichier de passation entre agents. **Mis à jour à chaque action** (code, déploiement, décision, test, doc).
 > Règle : toute session qui modifie le projet met à jour « État actuel » et ajoute une ligne au « Journal » dans le même commit.
-> Dernière mise à jour : **17/10/2026 18:55 (Dakar)** — commit de référence : voir `git log -1`.
+> Dernière mise à jour : **17/10/2026 19:40 (Dakar)** — commit de référence : voir `git log -1`.
 
 ## 0. Équipe et rôles
 
@@ -35,7 +35,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Conformité CDP | **Demande en cours**, déposée par le fondateur (17/10). Fiche descriptive art. 22 préparée | `docs/CONFORMITE-CDP.md` ; doc partagé « Fii La — Fiche descriptive du traitement (dossier CDP) » |
 | Données réelles | Aucune ouverture publique. Base : uniquement les fiches de test personnelles du fondateur, aucune donnée de test automatique | — |
 | Test terrain (5 chauffeurs, 30 arrivées) | **Non démarré** — attend le récépissé CDP | `docs/FICHE-TEST-TERRAIN.md` |
-| Interface | Fonctionnelle ; **refonte prévue** à partir d'une interface existante du fondateur, après validation des parcours | — |
+| Interface | Fonctionnelle. **Design system v1.1 Light + Dark versé au dépôt, à appliquer** (tokens, 6 cartes, sélecteur de thème, corrections d'accessibilité) | `docs/design-system/README.md` |
 
 ## 3. Décisions en vigueur
 
@@ -48,6 +48,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 16/10 | Héberger dans l'organisation Supabase « aramislab » (Pro) ; la facture de l'autre organisation « AramisLab » reste à régler séparément | Fondateur |
 | 17/10 | Corriger la position refusée et l'ouverture de Google Maps sur iPhone ; rendre l'import depuis Google Maps « très simple » (dérogation au gel demandée par le fondateur) | Fondateur |
 | 17/10 | Tenir ce fichier HANDOFF à jour à chaque action ; un agent VP valide l'alignement produit | Fondateur |
+| 17/10 | Design system v1 (Light + Dark) = référence de la refonte d'interface ; application par le Builder sans toucher aux parcours ni aux textes ; ajout d'un sélecteur de thème Clair / Sombre / Automatique (seule addition au périmètre) | Fondateur |
 
 ## 4. En attente / prochaines actions
 
@@ -58,7 +59,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 3 | Décider une durée maximale de conservation des adresses (proposition : 12 mois sans consultation ni modification) | Fondateur, avis VP | Art. 35 ; nécessite une petite évolution du code |
 | 4 | Recette complète sur 3 téléphones (iPhone, Android, Android entrée de gamme) | Fondateur / testeur | Ouverture au test terrain |
 | 5 | Test terrain réel | Après récépissé CDP | Décision de pilote élargi |
-| 6 | Refonte de l'interface à partir de l'interface du fondateur | Builder, validation VP | — |
+| 6 | **Appliquer le design system v1.1** : suivre le brief `docs/design-system/README.md` §1 (lots : tokens → thème → composants → retouches `app.js` → captures Light/Dark) | Builder, contrôle VP | — |
 | 7 | Alignement Fii La ↔ Rali (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
 | 8 | Régler la facture de l'organisation Supabase « AramisLab » (autres projets) | Fondateur | Hors Fii La |
 
@@ -72,6 +73,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 - `docs/CONFORMITE-CDP.md` : données traitées, lecture de la loi 2008-12, questions ouvertes
 - `docs/RECETTE-TELEPHONES.md`, `docs/FICHE-TEST-TERRAIN.md` : grilles de recette et de terrain
 - `docs/screenshots/` : captures des parcours (générées par les tests)
+- `docs/design-system/` : design system v1 Light + Dark (référence de la refonte)
 - `web/app.js` : toute l'application ; `supabase/migrations/` : base et règles d'accès ; `supabase/functions/` : fonction serveur
 
 **Commandes** (Node 20+) :
@@ -97,6 +99,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 17/10 19:40 | Design system v1.1 Light + Dark versé dans `docs/design-system/` (tokens CSS/JSON, composants sur les classes existantes, brief d'exécution, script de contrastes : 31/31 couples AA). v1.1 spécifie les fonctions du 17/10 : coordonnées repliées, Plans iPhone, Découverte, partage multi-canaux et panneau Instagram/TikTok, installation, position refusée, « Depuis Google Maps ». Code applicatif non modifié | ce commit |
 | 17/10 18:55 | Création de ce fichier HANDOFF, règle de mise à jour (`CLAUDE.md`), prompt de l'agent VP (`docs/PROMPT-VP.md`) | `8cad411` |
 | 17/10 18:50 | Nettoyage des données de test laissées par un test interrompu (fiche réelle du fondateur conservée) | base : 1 fiche |
 | 17/10 18:45 | Suite complète en production : 37/37 Chromium et WebKit | journal de test sur le Mac |

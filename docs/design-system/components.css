@@ -1,0 +1,138 @@
+/* Fii La — Design system v1 — règles de composants (référence d'intégration).
+   Écrites sur les classes EXISTANTES de web/styles.css et web/app.js : elles remplacent
+   les règles du même nom. Nouvelles classes signalées « NOUVEAU ».
+   Aucune couleur en dur : uniquement des tokens (tokens.css). */
+
+/* ---------- Typographie ---------- */
+h1{font-size:28px;font-weight:800;line-height:1.15;letter-spacing:-.02em}
+h2{font-size:22px;font-weight:800;line-height:1.2;letter-spacing:-.01em}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.hint{font-size:13px;line-height:1.45;color:var(--muted)}
+.coords{font-family:var(--mono);font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+
+/* ---------- Focus (remplace l'anneau citron, 1,3:1 sur fond clair) ---------- */
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+
+/* ---------- Boutons ---------- */
+button,.btn{min-height:52px;border-radius:14px;font-weight:600}
+.btn:not(.ghost):not(.lime):not(.danger):not(.danger-fill):not(.link):active{background:var(--green-press);border-color:var(--green-press)}
+.btn.big{min-height:64px;font-size:18px;border-radius:16px}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1.5px solid var(--line)}
+.btn.ghost:hover{border-color:var(--green)}
+.btn.ghost:active{background:var(--surface-3)}
+.btn.lime{background:var(--lime);border-color:var(--lime);color:var(--on-lime)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger)}
+.btn.danger-fill{background:var(--danger);border-color:var(--danger);color:var(--on-danger)} /* NOUVEAU : « Supprimer définitivement » */
+.btn.small{min-height:44px;font-size:14px;border-radius:12px}
+button:disabled,.btn[aria-disabled="true"]{opacity:1;background:var(--surface-3);border-color:var(--surface-3);color:var(--muted)}
+.btn svg,.btn .ico{flex:none}
+
+/* ---------- 1. Carte fiche ---------- */
+.card{border-radius:var(--radius-card);box-shadow:var(--shadow-card);padding:20px;gap:14px}
+.fiche{border-radius:var(--radius-card);box-shadow:var(--shadow-card)}
+.fiche .door{aspect-ratio:4/3;object-fit:cover}            /* jamais de texte ni de voile sur la photo */
+.fiche-body{padding:20px;gap:18px}
+.fiche-body h1{font-size:26px}
+.instr{font-size:18px;font-weight:600;line-height:1.45}
+
+/* ---------- 2. Carte étape (bloc dans la fiche, sans bordure) ---------- */
+.leg{background:var(--surface-2);border:0;border-radius:16px;padding:16px;gap:12px}
+.leg-h{gap:12px}
+.leg-h h3{font-size:18px;font-weight:800}
+.leg-n{width:32px;height:32px;font-size:16px}
+.leg-ico{margin-left:auto;color:var(--muted);display:flex}  /* NOUVEAU : pictogramme voiture (1) / porte (2) */
+.leg .btn{min-height:64px;font-size:18px;border-radius:16px}  /* boutons Itinéraire */
+.leg .coordline .btn{min-height:44px;font-size:14px;border-radius:12px}
+.coords-more summary{min-height:44px}
+
+/* ---------- 3. Carte partage ---------- */
+.sharelink{background:var(--surface-2);color:var(--ink);border-radius:12px;padding:12px}
+.qr{background:var(--qr-bg);border:1px solid var(--line);padding:12px;border-radius:12px}
+
+/* ---------- 4. Carte élément de liste ---------- */
+.item{border-radius:16px;min-height:72px;box-shadow:var(--shadow-card);padding:14px 14px 14px 16px}
+.item:active{background:var(--surface-2);border-color:var(--green);box-shadow:none}
+.item.missing{border:1.5px dashed var(--line-strong);box-shadow:none}  /* NOUVEAU : « Fiche introuvable » */
+.chip{padding:6px 10px;display:inline-flex;align-items:center;gap:6px;line-height:1}
+.chip svg{width:12px;height:12px;flex:none}  /* icône obligatoire : coche (ok), interdit (off), horloge (wait) */
+
+/* ---------- 5. Carte état ---------- */
+.state{padding:32px 24px;gap:12px;box-shadow:none}
+.state .big{width:56px;height:56px;border-radius:50%;background:var(--surface-2);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:0}
+.state .big svg{width:26px;height:26px}
+.state.error .big{color:var(--danger)}  /* NOUVEAU : variante erreur */
+
+/* ---------- 6. Carte de confirmation destructive ---------- */
+.confirm{background:var(--surface);border:1.5px solid var(--danger);border-radius:var(--radius-card);padding:20px;gap:12px;box-shadow:none}
+
+/* ---------- Formulaires ---------- */
+input[type=text],input[type=date],input[type=time],textarea,select{border:1.5px solid var(--line-strong);min-height:52px}
+input:focus,textarea:focus,select:focus{border:2px solid var(--focus);outline:none}
+.choice label{border:1.5px solid var(--line-strong)}
+.choice label:has(input:checked){border:2px solid var(--green);background:var(--soft);box-shadow:none}
+.steps i{height:6px}
+.pt{border:1.5px dashed var(--line-strong)}
+.pt.set{border-style:solid;border-color:var(--green)}
+
+/* ---------- Carte OSM : tuiles inchangées, contrôles au thème ---------- */
+.map-box{border-radius:20px;background:var(--map)}
+.leaflet-bar a,.leaflet-bar a:hover{background:var(--surface);color:var(--ink);border-color:var(--line);width:44px;height:44px;line-height:44px}
+.leaflet-control-attribution{background:var(--surface)!important;color:var(--ink)}
+.leaflet-control-attribution a{color:var(--link)}
+
+/* ---------- Messages ---------- */
+.notice{background:var(--soft);border-radius:14px}
+.alert{background:var(--surface);border-radius:14px}
+.net{background:var(--warn);color:var(--on-warn)}  /* corrige #fff sur --warn clair en Dark (échec AA) */
+.toast>div{background:var(--ink);color:var(--bg)}
+.loading-skel{background:var(--surface-3);border-radius:8px;display:block}  /* NOUVEAU : squelette statique, sans animation */
+
+/* ---------- Pied de page : sélecteur de thème (NOUVEAU) ---------- */
+.theme-switch{border:0;margin:0;padding:0;min-width:0}
+.theme-switch legend{font-size:13px;font-weight:600;color:var(--muted);padding:0;margin-bottom:8px}
+.theme-switch .segs{display:flex;gap:3px;padding:3px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px}
+.theme-switch label{flex:1;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;color:var(--muted);border:1px solid transparent;border-radius:9px;cursor:pointer}
+.theme-switch input{position:absolute;opacity:0;width:1px;height:1px}
+.theme-switch label:has(input:checked){background:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:var(--shadow-card)}
+.theme-switch label:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:1px}
+
+/* ---------- Desktop >= 960 px : fiche destinataire en 2 colonnes ---------- */
+@media (min-width:960px){
+  .wrap.wide{max-width:1184px;padding-inline:48px}
+  .fiche.wide{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start}
+  .fiche.wide .fiche-body{padding:32px;gap:20px}
+}
+
+/* ---------- Ajouts du 17/10 (fonctions arrivées après les maquettes du 15/10) ---------- */
+/* Fiche : coordonnées GPS repliées sous chaque itinéraire */
+.coords-more summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:600;color:var(--muted);list-style:none}
+.coords-more summary::-webkit-details-marker{display:none}
+.coords-more[open] summary svg{transform:rotate(180deg)}
+/* Fiche : « Ouvrir dans Plans » (iPhone) = .btn.ghost.small sous l'itinéraire, jamais au même niveau */
+
+/* Bloc Découverte, après la fiche : fond doux, aucun relief, bouton secondaire */
+.discover{background:var(--soft);border:0;border-radius:16px;padding:20px;gap:12px;box-shadow:none}
+.discover h2{font-size:18px;font-weight:800}
+.discover .hint{font-size:13px}  /* 12,5 px → 13 px : minimum d'un texte utile */
+.discover .discover-cta{background:var(--surface);border-color:var(--line)}
+
+/* Après enregistrement : confirmation persistante */
+.saved-ok{color:var(--ok);display:flex;gap:6px;align-items:flex-start}  /* précédée d'une icône coche */
+
+/* Partage : mention de confidentialité en encadré (fin de la bordure gauche) */
+.privacy-note{border-left:0;padding:10px 12px;background:var(--soft);border-radius:12px;color:var(--ink);font-size:13px}
+/* Partage : autres applications */
+.chan{min-height:48px;font-size:14px;border-radius:12px}
+.chan .ico{color:var(--muted)}
+.chan[aria-expanded="true"]{border:2px solid var(--green);background:var(--soft);box-shadow:none}
+.visual-box{border-top:1px solid var(--line)}
+.visual-preview{border:1px solid var(--line);background:var(--surface-2)}  /* l'image elle-même reste en Light */
+.choice.one label:has(input[type=checkbox]:checked){border:2px solid var(--green);background:var(--surface)}
+
+/* Installation facultative */
+.install{border:1.5px dashed var(--line-strong);border-radius:16px;padding:14px 16px}
+
+/* Création : import « Depuis Google Maps » et aide « position refusée » */
+.gm-panel{background:var(--surface-2);border:0;border-radius:16px;padding:16px;gap:12px}
+.howto{font-size:14px;line-height:1.45}
+.btn.ghost[aria-expanded="true"]{border:2px solid var(--green);background:var(--soft)}  /* bouton « Depuis Google Maps » ouvert */

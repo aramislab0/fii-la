@@ -1,0 +1,50 @@
+/* Fii La — Design system v1 (17/10/2026) — tokens Light + Dark.
+   À coller à la place des blocs :root et @media (prefers-color-scheme: dark) de web/styles.css.
+   Règle de priorité : [data-theme] sur <html> > réglage du téléphone.
+   « Automatique » = pas d'attribut data-theme. */
+
+:root{
+  /* Surfaces (3 niveaux) */
+  --bg:#F5F2EA; --surface:#FFFFFF; --surface-2:#F3F0E8; --surface-3:#E8E4D8;
+  /* Texte et lignes */
+  --ink:#17201B; --muted:#545E58; --line:#E2DDD0; --line-strong:#7F857E;
+  /* Actions et accents */
+  --green:#1E4A34; --green-press:#163828; --green-hover:var(--green-press); --on-green:#FFFFFF;
+  --lime:#C9E265; --on-lime:#17201B; --soft:#E9EFE1;
+  /* Statuts */
+  --danger:#A3302A; --on-danger:#FFFFFF; --warn:#7A4F00; --on-warn:#FFFFFF; --ok:#1E6B43;
+  --link:#1E4A34; --focus:#1E4A34;
+  /* Élévation et forme */
+  --shadow-card:0 1px 2px rgba(23,32,27,.06),0 8px 24px -12px rgba(23,32,27,.16);
+  --radius-card:20px;
+  /* Fixes dans les deux thèmes : la carte OSM et le QR restent clairs */
+  --map:#E4E2DC; --pin:#1E4A34; --qr-bg:#FFFFFF; --qr-ink:#17201B;
+  /* Inchangés */
+  --font:"Montserrat",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+
+/* Dark : vrai thème, pas une inversion. Vert-noir, surfaces étagées, aucune ombre. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1310; --surface:#151D18; --surface-2:#1C2620; --surface-3:#25312A;
+    --ink:#EDF1EC; --muted:#A4B0A8; --line:#2A352E; --line-strong:#66756B;
+    --green:#2E7D55; --green-press:#276B48; --on-green:#FFFFFF;
+    --lime:#C9E265; --on-lime:#17201B; --soft:#1B2A21;
+    --danger:#F08A80; --on-danger:#17201B; --warn:#E8B95E; --on-warn:#17201B; --ok:#7FCB9C;
+    --link:#C9E265; --focus:#C9E265;
+    --shadow-card:none;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1310; --surface:#151D18; --surface-2:#1C2620; --surface-3:#25312A;
+  --ink:#EDF1EC; --muted:#A4B0A8; --line:#2A352E; --line-strong:#66756B;
+  --green:#2E7D55; --green-press:#276B48; --on-green:#FFFFFF;
+  --lime:#C9E265; --on-lime:#17201B; --soft:#1B2A21;
+  --danger:#F08A80; --on-danger:#17201B; --warn:#E8B95E; --on-warn:#17201B; --ok:#7FCB9C;
+  --link:#C9E265; --focus:#C9E265;
+  --shadow-card:none;
+  color-scheme:dark;
+}
