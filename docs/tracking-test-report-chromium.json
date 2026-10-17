@@ -1,8 +1,8 @@
 {
   "moteur": "chromium",
   "version": "141.0.7390.37",
-  "date": "2026-10-17T20:49:03.684Z",
-  "reussis": 11,
+  "date": "2026-10-17T21:14:49.235Z",
+  "reussis": 12,
   "total": 12,
   "results": [
     {
@@ -22,9 +22,8 @@
       "name": "demandeur : le suivi intégré se met à jour sans recharger"
     },
     {
-      "ok": false,
-      "name": "livreur près de l’entrée : arrivée détectée, position effacée, suivi « arrivé »",
-      "err": "Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   lat: 14.7167,\n+   n: 1,\n+   status: 'live'\n-   lat: null,\n-   n: 0,\n-   status: 'arrived'\n  }\n"
+      "ok": true,
+      "name": "livreur près de l’entrée : arrivée détectée, position effacée, suivi « arrivé »"
     },
     {
       "ok": true,
