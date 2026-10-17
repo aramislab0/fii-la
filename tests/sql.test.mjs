@@ -252,6 +252,112 @@ await t('fonctions internes et inconnues inaccessibles', async () => {
   assert.equal(r.status, 400);
 });
 
+// ----- suivi en direct : livraison
+await t('livraison : seul le demandeur d’une adresse reçue crée les liens livreur et suivi', async () => {
+  const P = await ok('fiila_create_place', { p: { ...base, label: 'Client livraison' } });
+  const Q = await ok('fiila_create_request', { p: { requester_name: 'Boutique', purpose: 'Commande' } });
+  await ko('fiila_start_delivery', { p_kind: 'request', p_id: Q.id, p_owner: Q.owner_token }, 'not_fulfilled');
+  await ok('fiila_fulfill_request', { p_token: Q.share_token, p_place_id: P.id, p_place_owner: P.owner_token });
+  await ko('fiila_start_delivery', { p_kind: 'request', p_id: Q.id, p_owner: 'mauvais' }, 'not_found');
+  const D = await ok('fiila_start_delivery', { p_kind: 'request', p_id: Q.id, p_owner: Q.owner_token });
+  assert.ok(D.courier_token.length >= 20 && D.watch_token.length >= 20 && D.courier_token !== D.watch_token);
+  const cv = await ok('fiila_courier_view', { p_token: D.courier_token });
+  assert.equal(cv.state, 'ok'); assert.equal(cv.place.label, 'Client livraison'); assert.equal(cv.place.id, undefined);
+  const w0 = await ok('fiila_watch', { p_token: D.watch_token });
+  assert.equal(w0.tracker.status, 'waiting'); assert.equal(w0.tracker.pos, undefined);
+  // le lien de suivi ne permet pas d'envoyer une position, et inversement
+  await ko('fiila_position', { p_token: D.watch_token, p_status: 'live', p_lat: 14.7, p_lng: -17.4, p_acc: 10 }, 'not_found');
+  assert.equal((await ok('fiila_watch', { p_token: D.courier_token })).state, 'not_found');
+  await ok('fiila_position', { p_token: D.courier_token, p_status: 'live', p_lat: 14.70, p_lng: -17.45, p_acc: 12 });
+  const w1 = await ok('fiila_watch', { p_token: D.watch_token });
+  assert.equal(w1.tracker.status, 'live'); assert.equal(w1.tracker.pos.lat, 14.7);
+  assert.deepEqual(w1.dest.entry, { lat: base.entry.lat, lng: base.entry.lng });
+  // propriétaire d'une adresse : il peut aussi faire venir un livreur
+  const D2 = await ok('fiila_start_delivery', { p_kind: 'place', p_id: P.id, p_owner: P.owner_token });
+  assert.equal((await ok('fiila_courier_view', { p_token: D2.courier_token })).state, 'ok');
+  await ko('fiila_start_delivery', { p_kind: 'autre', p_id: P.id, p_owner: P.owner_token }, 'invalid_kind');
+  globalThis.__D = { P, D };
+});
+
+await t('livraison : arrivée = position et trace effacées ; adresse désactivée = suivi fermé', async () => {
+  const { P, D } = globalThis.__D;
+  await db.query(`update fiila.trackers set pos_at = now() - interval '1 minute'`);
+  await ok('fiila_position', { p_token: D.courier_token, p_status: 'live', p_lat: 14.71, p_lng: -17.46, p_acc: 8 });
+  const w = await ok('fiila_watch', { p_token: D.watch_token });
+  assert.equal(w.tracker.trail.length, 2);
+  await ok('fiila_position', { p_token: D.courier_token, p_status: 'arrived', p_lat: null, p_lng: null, p_acc: null });
+  const row = await db.query(`select lat, lng, jsonb_array_length(trail) n, status from fiila.trackers where watch_token = $1`, [D.watch_token]);
+  assert.deepEqual(row.rows[0], { lat: null, lng: null, n: 0, status: 'arrived' });
+  await ko('fiila_position', { p_token: D.courier_token, p_status: 'teleporte', p_lat: 1, p_lng: 1, p_acc: 1 }, 'invalid_status');
+  await ok('fiila_revoke_place', { p_id: P.id, p_owner: P.owner_token });
+  assert.equal((await ok('fiila_watch', { p_token: D.watch_token })).state, 'revoked');
+  assert.equal((await ok('fiila_courier_view', { p_token: D.courier_token })).state, 'revoked');
+  await ok('fiila_delete_place', { p_id: P.id, p_owner: P.owner_token });
+  assert.equal((await ok('fiila_watch', { p_token: D.watch_token })).state, 'not_found');
+});
+
+await t('livraison : la trace garde au plus 30 points', async () => {
+  const P = await ok('fiila_create_place', { p: { ...base, label: 'Trace' } });
+  const D = await ok('fiila_start_delivery', { p_kind: 'place', p_id: P.id, p_owner: P.owner_token });
+  for (let i = 0; i < 35; i++) {
+    await db.query(`update fiila.trackers set pos_at = now() - interval '1 minute' where watch_token = $1`, [D.watch_token]);
+    await ok('fiila_position', { p_token: D.courier_token, p_status: 'live', p_lat: 14.7 + i / 1000, p_lng: -17.45, p_acc: 5 });
+  }
+  const w = await ok('fiila_watch', { p_token: D.watch_token });
+  assert.equal(w.tracker.trail.length, 30);
+  assert.equal(w.tracker.pos.lat, 14.734);
+  await ok('fiila_delete_place', { p_id: P.id, p_owner: P.owner_token });
+});
+
+// ----- suivi en direct : rendez-vous
+await t('rendez-vous : l’invité qui accepte partage son trajet ; seul l’organisateur le voit', async () => {
+  const now = Date.now();
+  const R = await ok('fiila_create_place', { p: { kind: 'meeting', label: 'Réunion', entry: base.entry, instruction: 'Salle 2',
+    starts_at: new Date(now + 3600e3).toISOString(), expires_at: new Date(now + 7200e3).toISOString() } });
+  await ko('fiila_join_meeting', { p_share_token: R.share_token, p_name: '   ' }, 'name_required');
+  await ko('fiila_join_meeting', { p_share_token: A.share_token, p_name: 'Awa' }, 'not_found'); // une adresse n'est pas un rendez-vous
+  const G = await ok('fiila_join_meeting', { p_share_token: R.share_token, p_name: 'Assane Niang' });
+  const G2 = await ok('fiila_join_meeting', { p_share_token: R.share_token, p_name: 'Fatou' });
+  await ok('fiila_position', { p_token: G.guest_token, p_status: 'live', p_lat: 14.72, p_lng: -17.46, p_acc: 15 });
+  const v = await ok('fiila_meeting_guests', { p_id: R.id, p_owner: R.owner_token });
+  assert.equal(v.guests.length, 2);
+  assert.deepEqual(v.guests.map((g) => [g.name, g.status]), [['Assane Niang', 'live'], ['Fatou', 'waiting']]);
+  assert.equal(v.guests[0].pos.lat, 14.72);
+  await ko('fiila_meeting_guests', { p_id: R.id, p_owner: 'pas-le-bon' }, 'not_found');
+  // la fiche publique du rendez-vous ne révèle rien des invités
+  const pub = await ok('fiila_get_public', { p_token: R.share_token });
+  assert.ok(!JSON.stringify(pub).includes('Assane'));
+  // jeton invité haché en base
+  const raw = await db.query(`select count(*)::int n from fiila.trackers where encode(send_hash, 'escape') like '%' || $1 || '%'`, [G.guest_token]);
+  assert.equal(raw.rows[0].n, 0);
+  await ok('fiila_position', { p_token: G2.guest_token, p_status: 'stopped', p_lat: null, p_lng: null, p_acc: null });
+  await ko('fiila_meeting_guests', { p_id: A.id, p_owner: A.owner_token }, 'not_a_meeting');
+  await ok('fiila_delete_place', { p_id: R.id, p_owner: R.owner_token });
+  assert.equal((await db.query(`select count(*)::int n from fiila.trackers where kind = 'guest'`)).rows[0].n, 0);
+});
+
+await t('suivi : expiré = fermé, positions effacées au ménage', async () => {
+  const P = await ok('fiila_create_place', { p: { ...base, label: 'Expire' } });
+  const D = await ok('fiila_start_delivery', { p_kind: 'place', p_id: P.id, p_owner: P.owner_token });
+  await ok('fiila_position', { p_token: D.courier_token, p_status: 'live', p_lat: 14.7, p_lng: -17.45, p_acc: 5 });
+  await db.query(`update fiila.trackers set expires_at = now() - interval '1 hour' where watch_token = $1`, [D.watch_token]);
+  assert.equal((await ok('fiila_watch', { p_token: D.watch_token })).state, 'expired');
+  await ko('fiila_position', { p_token: D.courier_token, p_status: 'live', p_lat: 14.7, p_lng: -17.45, p_acc: 5 }, 'expired');
+  await db.query(`select fiila.housekeeping()`);
+  const r = await db.query(`select lat from fiila.trackers where watch_token = $1`, [D.watch_token]);
+  assert.equal(r.rows[0].lat, null);
+  await db.query(`update fiila.trackers set expires_at = now() - interval '2 days' where watch_token = $1`, [D.watch_token]);
+  await db.query(`select fiila.housekeeping()`);
+  assert.equal((await db.query(`select count(*)::int n from fiila.trackers where watch_token = $1`, [D.watch_token])).rows[0].n, 0);
+  await ok('fiila_delete_place', { p_id: P.id, p_owner: P.owner_token });
+});
+
+await t('mesure : événements de suivi acceptés, sans aucune position', async () => {
+  for (const [e, v] of [['delivery_started', 'request'], ['delivery_started', 'place'], ['tracking_shared', 'courier'], ['tracking_shared', 'guest'], ['meeting_joined', 'guest']])
+    await ok('fiila_track', { p_event: e, p_variant: v });
+  await ko('fiila_track', { p_event: 'tracking_shared', p_variant: '14.7,-17.4' }, 'invalid_event');
+});
+
 // ----- mesure agrégée
 await t('mesure : liste blanche d’événements, compteur agrégé sans identifiant', async () => {
   await ok('fiila_track', { p_event: 'discovery_shown', p_variant: 'address' });

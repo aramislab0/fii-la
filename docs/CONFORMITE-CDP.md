@@ -33,6 +33,7 @@ Constaté dans le code au commit `9576bc8`.
 | Demande d’adresse : nom du demandeur, objet, référence | Demandeur (souvent un commerce) | Recevoir l’adresse d’un client | Idem | Effacée 30 jours après expiration (7 jours de validité) | Le client qui a le lien voit le nom et l’objet ; seul le demandeur voit la réponse |
 | Réponse à une demande (lien vers la fiche du client) | Client | Livraison | Idem | Tant que la demande existe ; disparaît si le client supprime ou désactive | Le demandeur seulement |
 | Lien court Google Maps collé par l’utilisateur | Créateur de la fiche | Lire le point désigné (fonction `fiila-resolve-maps`) | Fonction Supabase (Paris) qui interroge Google | Non conservé : traité le temps de la requête | Google (reçoit la requête du serveur, pas l’adresse IP de l’utilisateur) |
+| **Suivi en direct (ajout du 17/10)** : dernière position GPS et courte trace (30 points max) d’un livreur ou d’un invité de rendez-vous ; prénom de l’invité | Livreurs, invités | Indiquer l’heure d’arrivée à l’expéditeur et au client (livraison) ou au seul organisateur (rendez-vous) | Idem | Position effacée à l’arrivée ou à l’arrêt ; suivi supprimé 1 jour après expiration (livraison : 12 h ; rendez-vous : fin d’affichage) | Détenteurs du lien de suivi (livraison) ; organisateur seul (rendez-vous) |
 | Empreinte salée de l’adresse IP (limite anti-abus) | Toute personne qui crée une fiche ou déclenche un compteur | Sécurité | Idem | 24 heures | Personne |
 | Jetons (partage, gestion haché, anciens liens) | Créateurs | Contrôle d’accès | Idem | Anciens liens : 180 jours | Personne |
 | Compteurs agrégés (jour, événement, variante, nombre) | Aucune personne identifiable | Mesure d’usage | Idem | Sans limite | Administrateur |
@@ -98,6 +99,8 @@ Constaté dans le code au commit `9576bc8`.
 3. **Le responsable lui-même**, et non Claude : interroger la CDP sur la formalité applicable à un service hébergé à Paris. Le dossier se prépare avec les 11 rubriques de l’article 22, que la section 2 de cette note couvre déjà en grande partie.
 4. **D’ici là** : données synthétiques uniquement, et aucun test terrain avec de vraies adresses avant d’avoir clarifié le point 3 de la section 4.
 5. **Après la formalité** : compléter la page « Données et confidentialité » avec l’identité et le contact du responsable (art. 58). Cette mise à jour de contenu est prévue hors du gel fonctionnel.
+
+**Nouveau traitement à signaler à la CDP (17/10/2026)** : le suivi en direct de la position des livreurs et des invités, activé seulement par la personne suivie, avec effacement à l’arrivée. À ajouter au dossier en cours avant toute utilisation avec de vrais livreurs.
 
 **Statut au 17/10/2026** : demande CDP en cours, déposée par le fondateur. Une fiche descriptive du traitement, rubrique par rubrique (art. 22), a été préparée dans un document partagé pour l’accompagner. Claude n’a pris aucun contact avec la CDP.
 

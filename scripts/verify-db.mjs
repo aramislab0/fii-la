@@ -6,9 +6,10 @@ const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 
 const EXPECTED_FUNCTIONS = [
-  'fiila_create_place', 'fiila_create_request', 'fiila_delete_place', 'fiila_delete_request', 'fiila_fulfill_request',
-  'fiila_get_owned', 'fiila_get_public', 'fiila_get_request_owner', 'fiila_get_request_public', 'fiila_new_link',
-  'fiila_owned_summaries', 'fiila_revoke_place', 'fiila_track', 'fiila_update_place',
+  'fiila_courier_view', 'fiila_create_place', 'fiila_create_request', 'fiila_delete_place', 'fiila_delete_request',
+  'fiila_fulfill_request', 'fiila_get_owned', 'fiila_get_public', 'fiila_get_request_owner', 'fiila_get_request_public',
+  'fiila_join_meeting', 'fiila_meeting_guests', 'fiila_new_link', 'fiila_owned_summaries', 'fiila_position',
+  'fiila_revoke_place', 'fiila_start_delivery', 'fiila_track', 'fiila_update_place', 'fiila_watch',
 ];
 const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
@@ -33,7 +34,7 @@ check('aucun droit sur les tables fiila pour anon / authenticated / PUBLIC', tab
 const fns = await q(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname like 'fiila_%' and has_function_privilege('anon', p.oid, 'execute') order by 1`);
 const names = fns.map((f) => f.proname);
-check('fonctions exécutables par anon = exactement les 14 fonctions prévues', JSON.stringify(names) === JSON.stringify(EXPECTED_FUNCTIONS), names);
+check('fonctions exécutables par anon = exactement les ' + EXPECTED_FUNCTIONS.length + ' fonctions prévues', JSON.stringify(names) === JSON.stringify(EXPECTED_FUNCTIONS), names);
 
 const definer = await q(`select p.proname, p.prosecdef, coalesce(array_to_string(p.proconfig, ','), '') as cfg from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'fiila_%'`);

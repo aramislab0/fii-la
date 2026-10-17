@@ -103,6 +103,7 @@
   var IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|musical_ly|TikTok|BytedanceWebview|GSA\/|; wv\)/.test(UA);
   function ll(p) { return Number(p.lat).toFixed(6) + ',' + Number(p.lng).toFixed(6); }
   function iosGmDir(p, mode) { return 'comgooglemaps://?daddr=' + ll(p) + '&directionsmode=' + (mode || 'driving'); }
+  function wazeDir(p) { return 'https://waze.com/ul?ll=' + ll(p) + '&navigate=yes'; }
   function appleDir(p, mode) { return 'https://maps.apple.com/?daddr=' + ll(p) + '&dirflg=' + (mode === 'walking' ? 'w' : 'd'); }
   function gmOpenApp() {
     return IS_IOS ? 'comgooglemaps://?center=14.7167,-17.4677&zoom=14' : 'https://www.google.com/maps/@14.7167,-17.4677,14z';
@@ -257,6 +258,9 @@
       return a.concat([c + '_address', c + '_meeting', c + '_request']);
     }, []),
     link_copied: ['address', 'meeting', 'request'],
+    delivery_started: ['request', 'place'],
+    tracking_shared: ['courier', 'guest'],
+    meeting_joined: ['guest'],
     visual_exported: ['download_address', 'download_meeting', 'download_request', 'share_address', 'share_meeting', 'share_request'],
     owned_reopened: ['address', 'meeting', 'request']
   };
@@ -705,7 +709,8 @@
   }
   function dirButtons(p, mode, opts2) {
     var label = mode === 'walking' ? 'Itinéraire à pied' : opts2 ? 'Itinéraire en voiture' : 'Itinéraire';
-    if (!IS_IOS) return h('a', { class: 'btn', href: gmDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, label);
+    var waze = h('a', { class: 'btn ghost small', href: wazeDir(p), target: '_blank', rel: 'noopener noreferrer' }, 'Ouvrir dans Waze');
+    if (!IS_IOS) return h('div', { class: 'stack tight' }, h('a', { class: 'btn', href: gmDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, label), mode === 'walking' ? null : waze);
     // iPhone : ouverture directe de l'application Google Maps ; si rien ne s'ouvre, on propose Plans.
     var note = h('p', { class: 'hint', hidden: true, role: 'status' }, 'Google Maps ne s’est pas ouvert ? Il n’est peut-être pas installé : utilisez Plans.');
     function tried() {
@@ -715,7 +720,8 @@
     }
     return h('div', { class: 'stack tight' },
       h('a', { class: 'btn', href: iosGmDir(p, mode), onclick: tried }, label),
-      h('a', { class: 'btn ghost small', href: appleDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, 'Ouvrir dans Plans'),
+      h('div', { class: 'row' }, h('a', { class: 'btn ghost small', href: appleDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, 'Ouvrir dans Plans'),
+        mode === 'walking' ? null : waze),
       note);
   }
   function fiche(p, opts) {
@@ -766,6 +772,8 @@
       else if (p[0] === 'rdv' && p[1] === 'nouveau') view = viewMeetingForm(null, r.q);
       else if (p[0] === 'rdv' && p[1] === 'modifier' && p[2]) view = viewMeetingForm(p[2]);
       else if (p[0] === 'k' && p[1]) view = viewRestore(p[1]);
+      else if (p[0] === 'l' && p[1]) view = viewCourier(p[1]);
+      else if (p[0] === 's' && p[1]) view = viewWatch(p[1]);
       else if (p[0] === 'cle') view = viewRestore(null);
       else if (p[0] === 'confidentialite') view = viewPrivacy();
       else view = page(backBtn(), stateCard('?', 'Page introuvable', 'Ce lien n’est pas valide.'));
@@ -1051,6 +1059,8 @@
       active ? h('section', { class: 'card', 'aria-label': 'QR code' },
         h('p', { class: 'small' }, h('strong', null, 'QR code'), ' : à afficher ou imprimer près de l’entrée ou sur une commande. Gardez aussi le lien : le QR code est un accès de secours.'),
         qrBox) : null,
+      isMeeting && active ? guestsPanel(pl, owner) : null,
+      !isMeeting && active ? deliveryPanel({ id: pl.id, owner: owner }, 'place') : null,
       installSlot(),
       expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
       isMeeting ? h('a', { class: expired ? 'btn' : 'btn ghost', id: 'similar', href: '#/rdv/nouveau' + qs({ depuis: pl.id }) }, 'Créer un rendez-vous similaire') : null,
@@ -1358,6 +1368,275 @@
     });
   }
 
+
+  /* ================================================================ SUIVI EN DIRECT
+     Livreur et invités partagent leur position tant que leur page est ouverte (écran gardé allumé si possible).
+     Seule la dernière position et une courte trace sont gardées, effacées à l'arrivée. L'heure d'arrivée est une
+     estimation locale (distance × détour / vitesse moyenne) : aucun service payant. */
+  function distM(a, b) {
+    var R = 6371000, toR = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * toR, dLng = (b.lng - a.lng) * toR;
+    var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * toR) * Math.cos(b.lat * toR) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(x)));
+  }
+  function etaMin(pos, dest) {
+    var d = distM(pos, dest) * 1.35;              // détour moyen des rues
+    var kmh = d < 1200 ? 4.5 : 18;                 // à pied près du lieu, sinon circulation urbaine
+    return Math.max(1, Math.round(d / 1000 / kmh * 60));
+  }
+  function etaText(m) {
+    if (m >= 60) return 'environ ' + Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0');
+    return 'environ ' + (m > 20 ? Math.round(m / 5) * 5 : m) + ' min';
+  }
+  function agoText(iso) {
+    var s = (Date.now() - Date.parse(iso)) / 1000;
+    if (!isFinite(s) || s < 60) return 'à l’instant';
+    if (s < 3600) return 'il y a ' + Math.round(s / 60) + ' min';
+    return 'il y a plus d’une heure';
+  }
+  function poll(el, fn, ms) {
+    function tick() {
+      if (!document.contains(el)) return;
+      if (document.visibilityState === 'visible') fn();
+      setTimeout(tick, ms);
+    }
+    setTimeout(tick, ms);
+  }
+
+  // Un seul partage actif par jeton, conservé si la vue est redessinée.
+  var SHARERS = {};
+  function positionSharer(token, dest) {
+    if (SHARERS[token]) return SHARERS[token];
+    var sh = { state: 'idle', listeners: [] };
+    var watchId = null, last = null, lastSent = 0, wake = null;
+    function emit(st, info) { sh.state = st; sh.info = info; sh.listeners.forEach(function (f) { f(st, info); }); }
+    function send(status, c) {
+      return api('fiila_position', { p_token: token, p_status: status, p_lat: c ? c.latitude : null, p_lng: c ? c.longitude : null, p_acc: c ? c.accuracy : null });
+    }
+    function keepAwake() {
+      try { if (navigator.wakeLock && !wake) navigator.wakeLock.request('screen').then(function (w) { wake = w; w.addEventListener('release', function () { wake = null; }); }, function () {}); } catch (e) { /* facultatif */ }
+    }
+    document.addEventListener('visibilitychange', function () { if (sh.state === 'live' && document.visibilityState === 'visible') keepAwake(); });
+    function halt() {
+      if (watchId != null) navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      if (wake) { try { wake.release(); } catch (e) { /* déjà libéré */ } wake = null; }
+    }
+    sh.start = function () {
+      if (!('geolocation' in navigator)) { emit('error', 'unavailable'); return; }
+      emit('starting'); keepAwake(); lastSent = 0; last = null;
+      watchId = navigator.geolocation.watchPosition(function (p) {
+        var c = p.coords, now = Date.now(), here = { lat: c.latitude, lng: c.longitude };
+        if (dest && distM(here, dest) <= 60) { sh.arrive(); return; }
+        var moved = last ? distM({ lat: last.latitude, lng: last.longitude }, here) : Infinity;
+        if (lastSent && now - lastSent < 20000 && moved < 40) return;
+        last = c; lastSent = now;
+        send('live', c).then(function () { emit('live', { at: new Date().toISOString() }); }, function (e) { emit('error', e.code); });
+      }, function (err) { halt(); emit('error', err.code === 1 ? 'denied' : 'unavailable'); },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
+    };
+    sh.arrive = function () { halt(); emit('arrived'); return send('arrived').catch(function () {}); };
+    sh.stop = function () { halt(); emit('stopped'); return send('stopped').catch(function () {}); };
+    SHARERS[token] = sh;
+    return sh;
+  }
+
+  // Bloc « partager mon trajet » (livreur ou invité).
+  function liveShare(token, dest, o) {
+    var sh = positionSharer(token, dest);
+    var box = h('section', { class: 'card live', 'aria-live': 'polite' });
+    function draw() {
+      var st = sh.state, info = sh.info;
+      if (st === 'idle' && o.initial === 'arrived') st = 'arrived';
+      if (st === 'idle' || st === 'stopped' || st === 'error') {
+        setKids(box, h('h2', null, o.title),
+          st === 'error' ? h('p', { class: 'msg err' }, info === 'denied' ? 'Position refusée. Autorisez-la dans les réglages du téléphone, puis réessayez.' : 'Position indisponible. Réessayez dans un instant.') : null,
+          st === 'stopped' ? h('p', { class: 'muted' }, 'Partage arrêté.') : null,
+          h('button', { class: 'btn big', type: 'button', id: 'live-start', onclick: function () { track('tracking_shared', o.kind); sh.start(); } }, st === 'idle' ? o.startLabel : 'Reprendre le partage'),
+          h('p', { class: 'hint' }, o.who + ' verra votre position jusqu’à votre arrivée. Rien n’est gardé ensuite.'));
+      } else if (st === 'arrived') {
+        setKids(box, h('p', { class: 'live-big' }, icon('check', 22), 'Arrivée confirmée'));
+      } else {
+        setKids(box,
+          h('p', { class: 'live-big' }, h('span', { class: 'live-dot', 'aria-hidden': 'true' }), st === 'starting' ? 'Recherche de votre position…' : 'Position partagée'),
+          h('p', { class: 'hint' }, 'Gardez cette page ouverte pendant le trajet.'),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn', type: 'button', id: 'live-arrived', onclick: function () { sh.arrive(); } }, 'Je suis arrivé'),
+            h('button', { class: 'btn ghost', type: 'button', id: 'live-stop', onclick: function () { sh.stop(); } }, 'Arrêter')));
+      }
+    }
+    sh.listeners.push(function () { if (document.contains(box)) draw(); });
+    draw();
+    return box;
+  }
+
+  // Carte de suivi : destination fixe + personnes en mouvement. La carte reste claire (tuiles OSM).
+  function liveMap(dest) {
+    var el = h('div', { class: 'map live-map' });
+    var box = h('div', { class: 'map-box' }, el);
+    var map = null, L = null, layer = null, pending = null, fitted = false;
+    function whenShown(fn) { // Leaflet a besoin d'un conteneur affiché pour calculer la carte
+      var seen = false;
+      (function wait() { if (el.isConnected) seen = true; if (el.isConnected && el.offsetWidth) fn(); else if (seen && !el.isConnected) return; else setTimeout(wait, 150); })();
+    }
+    loadLeaflet().then(function (LL) { whenShown(function () {
+      L = LL;
+      map = L.map(el, { zoomControl: true, attributionControl: true }).setView([dest.lat, dest.lng], 15);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(map);
+      map.attributionControl.setPrefix(false);
+      L.circleMarker([dest.lat, dest.lng], { radius: 10, color: '#1E4A34', weight: 3, fillColor: '#C9E265', fillOpacity: 1 }).addTo(map);
+      layer = L.layerGroup().addTo(map);
+      if (pending) update(pending);
+    }); }, function () { box.hidden = true; });
+    function update(people) {
+      if (!map) { pending = people; return; }
+      map.invalidateSize();   // la carte a pu être masquée ou insérée après sa création
+      layer.clearLayers();
+      var pts = [[dest.lat, dest.lng]];
+      people.forEach(function (p) {
+        if (!p.pos) return;
+        if (p.trail && p.trail.length > 1) L.polyline(p.trail, { color: '#1E4A34', weight: 4, opacity: 0.55 }).addTo(layer);
+        var m = L.circleMarker([p.pos.lat, p.pos.lng], { radius: 8, color: '#FFFFFF', weight: 3, fillColor: '#1E4A34', fillOpacity: 1 }).addTo(layer);
+        if (p.label) m.bindTooltip(p.label, { permanent: true, direction: 'top', offset: [0, -8] });
+        pts.push([p.pos.lat, p.pos.lng]);
+      });
+      if (!el.offsetWidth) { pending = people; fitted = false; return; }
+      var outside = pts.some(function (pt) { return !map.getBounds().contains(pt); });
+      if (pts.length > 1 && (!fitted || outside)) { map.fitBounds(pts, { padding: [40, 40], maxZoom: 16 }); fitted = true; }
+    }
+    return { el: box, update: update };
+  }
+
+  function statusLine(t, dest, name) {
+    var big, small = null, cls = 'live-big';
+    if (t.status === 'arrived') big = [icon('check', 20), name ? name + ' est arrivé' : 'Livreur arrivé'];
+    else if (t.status === 'stopped') { big = name ? name + ' a arrêté le partage' : 'Partage arrêté'; cls += ' muted'; }
+    else if (!t.pos) { big = name ? name + ' n’est pas encore parti' : 'Pas encore parti'; cls += ' muted'; }
+    else {
+      big = [h('span', { class: 'live-dot', 'aria-hidden': 'true' }), (name ? name + ' · ' : 'En route · ') + etaText(etaMin(t.pos, dest))];
+      small = 'Position ' + agoText(t.pos.at);
+    }
+    return h('div', { class: 'stack tight' }, h('p', { class: cls }, big), small ? h('p', { class: 'hint' }, small) : null);
+  }
+
+  // Suivi d'une livraison (lien de suivi, ou intégré chez le demandeur).
+  function deliveryWatch(watchToken) {
+    var status = h('div', { role: 'status' }, loading('Chargement du suivi…'));
+    var mapW = null;
+    var box = h('section', { class: 'card live', id: 'delivery-watch' }, h('h2', null, 'Suivi du livreur'), status);
+    function load() {
+      api('fiila_watch', { p_token: watchToken }).then(function (r) {
+        if (r.state !== 'ok') { setKids(status, h('p', { class: 'muted' }, r.state === 'expired' ? 'Cette livraison est terminée.' : 'Suivi indisponible.')); if (mapW) mapW.el.hidden = true; return; }
+        var t = r.tracker;
+        if (!mapW) { mapW = liveMap(r.dest.entry); box.append(mapW.el); }
+        mapW.update(t.pos ? [{ id: t.id, pos: t.pos, trail: t.trail }] : []);
+        setKids(status, statusLine(t, r.dest.stop || r.dest.entry, null));
+      }, function (e) { setKids(status, h('p', { class: 'alert' }, errText(e))); });
+    }
+    load(); poll(box, load, 15000);
+    return box;
+  }
+
+  // Création des liens livreur et suivi (demandeur d'une adresse reçue, ou propriétaire d'une adresse).
+  function deliveryPanel(rec, type) {
+    var kindParam = type === 'request' ? 'request' : 'place';
+    var box = h('div', { class: 'stack', id: 'delivery' });
+    var err = h('div', { role: 'alert' });
+    function create(ev) {
+      var b = ev && ev.currentTarget; if (b) b.disabled = true; setKids(err);
+      api('fiila_start_delivery', { p_kind: kindParam, p_id: rec.id, p_owner: rec.owner }).then(function (r) {
+        owned.patch(type, rec.id, { delivery: { courier: r.courier_token, watch: r.watch_token } });
+        track('delivery_started', kindParam);
+        draw();
+      }, function (e) { if (b) b.disabled = false; setKids(err, h('p', { class: 'alert' }, errText(e))); });
+    }
+    function draw() {
+      var cur = owned.find(type, rec.id) || {};
+      var d = cur.delivery;
+      if (!d) {
+        setKids(box, h('button', { class: 'btn big', type: 'button', id: 'start-delivery', onclick: create }, type === 'request' ? 'Envoyer au livreur' : 'Faire venir un livreur'), err);
+        return;
+      }
+      var courierUrl = baseUrl() + '#/l/' + d.courier, watchUrl = baseUrl() + '#/s/' + d.watch;
+      setKids(box,
+        h('section', { class: 'card' }, h('h2', null, 'Livraison'),
+          h('a', { class: 'btn lime', id: 'send-courier', target: '_blank', rel: 'noopener noreferrer',
+            href: waLink('Livraison : l’adresse exacte avec la photo de l’entrée. Ouvrez le lien et touchez « Démarrer la livraison » : ' + courierUrl) }, 'Envoyer au livreur (WhatsApp)'),
+          type === 'request' ? h('a', { class: 'btn ghost', id: 'send-watch', target: '_blank', rel: 'noopener noreferrer',
+            href: waLink('Suivez votre livraison en direct : ' + watchUrl) }, 'Envoyer le suivi au client (WhatsApp)') : null,
+          h('div', { class: 'row' },
+            h('button', { class: 'btn ghost small', type: 'button', id: 'copy-courier', onclick: function () { copy(courierUrl, 'Lien livreur'); } }, 'Copier le lien livreur'),
+            h('button', { class: 'btn ghost small', type: 'button', id: 'new-courier', onclick: create }, 'Autre livreur'))),
+        err, deliveryWatch(d.watch));
+    }
+    draw();
+    return box;
+  }
+
+  // Page du livreur : démarrer la livraison, puis la fiche d'arrivée.
+  function viewCourier(token) {
+    return api('fiila_courier_view', { p_token: token }).then(function (r) {
+      if (r.state === 'expired') return page(stateCard('⌛', 'Livraison terminée', 'Ce lien n’est plus actif.'), footer());
+      if (r.state !== 'ok') return page(stateCard('⦸', 'Lien livreur indisponible', 'L’adresse a été désactivée ou le lien n’est pas valide.'), footer());
+      var pg = page(h('p', { class: 'eyebrow' }, 'Livraison'),
+        liveShare(token, r.place.entry, { kind: 'courier', title: 'Prêt à partir ?', startLabel: 'Démarrer la livraison', who: 'L’expéditeur et le client', initial: r.status }),
+        fiche(r.place, { wide: true }), footer());
+      pg.classList.add('wide');
+      return pg;
+    }, function (e) { return page(stateCard('!', 'Impossible d’afficher la livraison', errText(e), retryBtn())); });
+  }
+
+  // Lien de suivi envoyé au client.
+  function viewWatch(token) {
+    return Promise.resolve(page(h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fii La'), h('h1', null, 'Votre livraison')), deliveryWatch(token), footer()));
+  }
+
+  // Invité d'un rendez-vous : accepte de partager son trajet avec l'organisateur.
+  function guestBlock(shareToken, place) {
+    var KEY = 'fiila.guest.' + shareToken;
+    var box = h('div', { class: 'stack', id: 'guest' });
+    function draw() {
+      var g = LS.get(KEY, null);
+      if (g && g.token) { setKids(box, liveShare(g.token, place.entry, { kind: 'guest', title: 'Prévenir l’organisateur', startLabel: 'Je pars maintenant', who: 'Seul l’organisateur' })); return; }
+      var nameIn = h('input', { type: 'text', id: 'guest-name', maxlength: '40', autocomplete: 'given-name', placeholder: 'Votre prénom' });
+      var err = h('div', { role: 'alert' });
+      setKids(box, h('section', { class: 'card' },
+        h('h2', null, 'Prévenir l’organisateur'),
+        h('label', { for: 'guest-name' }, 'Votre prénom'), nameIn,
+        h('button', { class: 'btn', type: 'button', id: 'guest-join', onclick: function (ev) {
+          var b = ev.currentTarget; b.disabled = true; setKids(err);
+          api('fiila_join_meeting', { p_share_token: shareToken, p_name: nameIn.value }).then(function (r) {
+            LS.set(KEY, { token: r.guest_token, name: nameIn.value.trim() }); track('meeting_joined', 'guest'); draw();
+          }, function (e) { b.disabled = false; setKids(err, h('p', { class: 'alert' }, errText(e))); });
+        } }, 'Je viens'),
+        err,
+        h('p', { class: 'hint' }, 'Seul l’organisateur voit votre trajet, et seulement quand vous le démarrez.')));
+    }
+    draw();
+    return box;
+  }
+
+  // Organisateur : qui arrive, et quand.
+  function guestsPanel(pl, owner) {
+    var list = h('div', { class: 'stack', role: 'status' }, loading('Chargement…'));
+    var mapW = liveMap(pl.entry);
+    mapW.el.hidden = true;
+    var box = h('section', { class: 'card live', id: 'guests' }, h('h2', null, 'Qui arrive'), list, mapW.el);
+    function load() {
+      api('fiila_meeting_guests', { p_id: pl.id, p_owner: owner }).then(function (r) {
+        var gs = r.guests || [];
+        if (!gs.length) { setKids(list, h('p', { class: 'muted' }, 'Personne pour l’instant. Les invités qui acceptent de partager leur trajet apparaîtront ici.')); mapW.el.hidden = true; return; }
+        setKids(list, gs.map(function (g) { return h('div', { class: 'guest' }, statusLine(g, pl.entry, g.name)); }));
+        var moving = gs.filter(function (g) { return g.pos; });
+        mapW.el.hidden = !moving.length;
+        mapW.update(moving.map(function (g) { return { id: g.id, pos: g.pos, trail: g.trail, label: g.name }; }));
+      }, function (e) { setKids(list, h('p', { class: 'alert' }, errText(e))); });
+    }
+    load(); poll(box, load, 15000);
+    return box;
+  }
+
   /* ================================================================ VUE DESTINATAIRE */
   function viewRecipient(token) {
     var create = h('a', { class: 'btn ghost small', href: '#/new' }, 'Créer mon Fii La');
@@ -1366,7 +1645,8 @@
       if (r.state === 'ok') {
         document.title = 'Fii La';
         var mine = owned.all().filter(function (x) { return x.type === 'place' && x.share === token; })[0];
-        var pg = page(fiche(r.place, { wide: true }), mine ? ownerBlock(mine) : discoveryBlock(r.place.kind, token),
+        var pg = page(fiche(r.place, { wide: true }), !mine && r.place.kind === 'meeting' ? guestBlock(token, r.place) : null,
+          mine ? ownerBlock(mine) : discoveryBlock(r.place.kind, token),
           h('p', { class: 'hint', style: 'text-align:center' }, 'Fiche partagée avec Fii La. Fii La ne demande pas votre position pour l’afficher.'));
         pg.classList.add('wide');
         return pg;
@@ -1479,6 +1759,7 @@
       if (q.state === 'fulfilled') {
         stateBlock = [h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Adresse reçue le ' + shortDate(q.fulfilled_at)),
           h('p', { class: 'small muted' }, 'Visible uniquement par vous, avec ce téléphone ou la clé de gestion. Le client peut la désactiver à tout moment.'),
+          deliveryPanel(rec, 'request'),
           fiche(q.place)];
       } else if (q.state === 'pending') {
         stateBlock = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de réponse'),
@@ -1748,7 +2029,8 @@
           h('li', null, 'Ce que vous saisissez : nom du lieu, quartier, repère, point d’entrée, point d’arrêt voiture, photo, et pour un rendez-vous sa date.'),
           h('li', null, 'Pour une demande d’adresse : le nom du demandeur, la raison et la référence éventuelle.'),
           h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.'),
-          h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.')),
+          h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.'),
+          h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),
         h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un rendez-vous : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),
         h('h2', null, 'Où sont stockées les données'),

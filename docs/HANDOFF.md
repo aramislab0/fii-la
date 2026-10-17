@@ -2,7 +2,7 @@
 
 > Fichier de passation entre agents. **Mis à jour à chaque action** (code, déploiement, décision, test, doc).
 > Règle : toute session qui modifie le projet met à jour « État actuel » et ajoute une ligne au « Journal » dans le même commit.
-> Dernière mise à jour : **17/10/2026 19:55 (Dakar)** — commit de référence : voir `git log -1`.
+> Dernière mise à jour : **17/10/2026 21:00 (Dakar)** — commit de référence : voir `git log -1`.
 
 ## 0. Équipe et rôles
 
@@ -35,6 +35,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Conformité CDP | **Demande en cours**, déposée par le fondateur (17/10). Fiche descriptive art. 22 préparée | `docs/CONFORMITE-CDP.md` ; doc partagé « Fii La — Fiche descriptive du traitement (dossier CDP) » |
 | Données réelles | Aucune ouverture publique. Base : uniquement les fiches de test personnelles du fondateur, aucune donnée de test automatique | — |
 | Test terrain (5 chauffeurs, 30 arrivées) | **Non démarré** — attend le récépissé CDP | `docs/FICHE-TEST-TERRAIN.md` |
+| Suivi en direct | **Livré (17/10)** : lien livreur + lien de suivi client (livraison), « Qui arrive » pour l'organisateur d'un rendez-vous. Heure d'arrivée estimée sur le téléphone, sans service payant. Dernière position seulement, effacée à l'arrivée | `supabase/migrations/20261017100000_fiila_tracking.sql`, `tests/tracking.test.mjs` |
 | Interface | **Design system v1.1 appliqué** (Light + Dark, sélecteur de thème, 6 cartes, contrastes AA). Aucune coordonnée affichée. Audit UI/UX fait et corrigé le 17/10 | `docs/design-system/README.md`, `web/styles.css` |
 
 ## 3. Décisions en vigueur
@@ -47,6 +48,9 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 15/10 | Ne pas affirmer qu'une autorisation CDP est requise ; formalité = déclaration (art. 18) + transfert (art. 49) à confirmer par la CDP ; Claude ne contacte pas la CDP | Mandat fondateur |
 | 16/10 | Héberger dans l'organisation Supabase « aramislab » (Pro) ; la facture de l'autre organisation « AramisLab » reste à régler séparément | Fondateur |
 | 17/10 | Corriger la position refusée et l'ouverture de Google Maps sur iPhone ; rendre l'import depuis Google Maps « très simple » (dérogation au gel demandée par le fondateur) | Fondateur |
+| 17/10 | Abandon du comparateur Google Maps / Waze : la navigation reste dans Google Maps ou Waze (lien direct, gratuit) | Fondateur |
+| 17/10 | Suivi en direct à coût zéro : livreur suivi par l'expéditeur et le client ; invités d'un rendez-vous suivis par l'organisateur seul, avec leur accord | Fondateur |
+| 17/10 | Après validation de la version web, construction d'une application mobile native (suivi en arrière-plan fiable) | Fondateur |
 | 17/10 | Ne plus afficher de coordonnées GPS à l'utilisateur (destinataire et création) : la complexité reste en arrière-plan | Fondateur |
 | 17/10 | Tenir ce fichier HANDOFF à jour à chaque action ; un agent VP valide l'alignement produit | Fondateur |
 | 17/10 | Design system v1 (Light + Dark) = référence de la refonte d'interface ; application par le Builder sans toucher aux parcours ni aux textes ; ajout d'un sélecteur de thème Clair / Sombre / Automatique (seule addition au périmètre) | Fondateur |
@@ -61,6 +65,9 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 4 | Recette complète sur 3 téléphones (iPhone, Android, Android entrée de gamme) | Fondateur / testeur | Ouverture au test terrain |
 | 5 | Test terrain réel | Après récépissé CDP | Décision de pilote élargi |
 | 6 | Contrôle VP du design appliqué (captures Light/Dark dans `docs/screenshots/`) | VP | — |
+| 9 | Signaler à la CDP le nouveau traitement « suivi en direct » (dossier en cours) avant usage avec de vrais livreurs | Fondateur | Usage réel du suivi |
+| 10 | Alléger les textes de l'interface (retour fondateur du 17/10 : trop de petites indications) | Builder | Prochain test |
+| 11 | Application mobile native, après validation de la version web | Builder, VP | — |
 | 7 | Alignement Fii La ↔ Rali (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
 | 8 | Régler la facture de l'organisation Supabase « AramisLab » (autres projets) | Fondateur | Hors Fii La |
 
@@ -100,6 +107,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 17/10 21:00 | Suivi en direct : migration `fiila_tracking` (table `trackers`, 6 fonctions), pages livreur `#/l/…` et suivi `#/s/…`, « Envoyer au livreur » (demande reçue) et « Faire venir un livreur » (adresse), « Prévenir l'organisateur » et « Qui arrive » (rendez-vous), bouton Waze. Tests locaux : SQL 37, E2E 38, circuit 20, découverte 23, social 23, suivi 12, parcours 12 | ce commit |
 | 17/10 20:05 | Production après refonte : E2E 38/38 Chromium et 38/38 WebKit sur l'URL publique. Base : fiche du fondateur + une fiche « Test VP » créée par l'agent VP (à supprimer par lui) | journal de test sur le Mac |
 | 17/10 19:55 | Design system v1.1 appliqué (tokens Light/Dark, `theme.js`, sélecteur Clair/Sombre/Automatique, icônes de puces et d'états, étapes avec pictogrammes, confirmation destructive pleine, fiche en 2 colonnes sur ordinateur). Coordonnées retirées de l'interface. Audit UI/UX : libellés d'itinéraire raccourcis (« Itinéraire en voiture / à pied »), une seule action principale à l'étape carte, photo de rendez-vous en bouton secondaire, lien de partage sur une ligne. Tests locaux : SQL 31, E2E 38, découverte 23, circuit 20, social 23, parcours 12 | `e3628db` |
 | 17/10 19:40 | Design system v1.1 Light + Dark versé dans `docs/design-system/` (tokens CSS/JSON, composants sur les classes existantes, brief d'exécution, script de contrastes : 31/31 couples AA). v1.1 spécifie les fonctions du 17/10 : coordonnées repliées, Plans iPhone, Découverte, partage multi-canaux et panneau Instagram/TikTok, installation, position refusée, « Depuis Google Maps ». Code applicatif non modifié | `e3628db` |

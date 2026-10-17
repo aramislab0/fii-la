@@ -1,0 +1,57 @@
+{
+  "moteur": "chromium",
+  "version": "141.0.7390.37",
+  "date": "2026-10-17T20:06:59.662Z",
+  "reussis": 12,
+  "total": 12,
+  "results": [
+    {
+      "ok": true,
+      "name": "demandeur : « Envoyer au livreur » crée un lien livreur et un lien de suivi pour le client"
+    },
+    {
+      "ok": true,
+      "name": "livreur : voit la fiche (photo, repère, Google Maps, Waze) et démarre la livraison"
+    },
+    {
+      "ok": true,
+      "name": "client : le lien de suivi montre le livreur en route et une heure d’arrivée estimée"
+    },
+    {
+      "ok": true,
+      "name": "demandeur : le suivi intégré se met à jour sans recharger"
+    },
+    {
+      "ok": true,
+      "name": "livreur près de l’entrée : arrivée détectée, position effacée, suivi « arrivé »"
+    },
+    {
+      "ok": true,
+      "name": "propriétaire d’une adresse : « Faire venir un livreur » sur sa propre fiche"
+    },
+    {
+      "ok": true,
+      "name": "livreur : position refusée → message clair, rien n’est envoyé"
+    },
+    {
+      "ok": true,
+      "name": "invité : « Je viens » puis « Je pars maintenant » ; l’organisateur seul le voit"
+    },
+    {
+      "ok": true,
+      "name": "organisateur : « Qui arrive » avec heure d’arrivée et invités pas encore partis"
+    },
+    {
+      "ok": true,
+      "name": "fiche publique du rendez-vous : aucun nom d’invité, aucune position"
+    },
+    {
+      "ok": true,
+      "name": "mode sombre : pages de suivi lisibles"
+    },
+    {
+      "ok": true,
+      "name": "aucune erreur JavaScript"
+    }
+  ]
+}
