@@ -69,6 +69,10 @@ supabase link --project-ref "$REF" -p "$SUPABASE_DB_PASSWORD" >/dev/null
 printf 'y\n' | supabase db push -p "$SUPABASE_DB_PASSWORD"
 supabase migration list -p "$SUPABASE_DB_PASSWORD" 2>&1 | grep -vi password | tee "$ROOT/docs/deploy-migrations.txt" || true
 
+log "Fonction de lecture des liens Google Maps"
+# Publique (aucune donnée lue ni écrite en base) : pas de vérification de jeton, la clé publique n'étant pas un JWT.
+supabase functions deploy fiila-resolve-maps --project-ref "$REF" --no-verify-jwt >/dev/null
+
 POOLER=$(cat supabase/.temp/pooler-url 2>/dev/null || true)
 [ -n "$POOLER" ] || die "URL de connexion introuvable (supabase/.temp/pooler-url)."
 export DATABASE_URL=$(POOLER="$POOLER" node -e 'const u=new URL(process.env.POOLER);u.password=encodeURIComponent(process.env.SUPABASE_DB_PASSWORD);process.stdout.write(u.toString())')

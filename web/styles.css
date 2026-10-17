@@ -182,3 +182,6 @@ footer.foot a,footer.foot button{color:var(--muted);font-size:13px}
 .visual-box{border-top:1px solid var(--line);padding-top:14px}
 .visual-preview{display:block;width:min(100%,240px);aspect-ratio:9/16;height:auto;border-radius:14px;border:1px solid var(--line);background:var(--soft);align-self:center}
 @media (max-width:340px){.chan-grid{grid-template-columns:1fr}}
+.howto{margin:0;padding-left:20px;display:grid;gap:6px;font-size:14px;line-height:1.45}
+.notice .howto{margin-top:6px}
+.gm-panel{border:1px solid var(--line);border-radius:12px;padding:12px 14px}

@@ -85,9 +85,9 @@ const shot = (page, name, full = true) => page.screenshot({ path: `${SHOTS}/disc
 const tracks = (page) => page.__tracks.map((b) => JSON.parse(b));
 const waitTrack = (page, ev, variant) => page.waitForRequest((r) => r.url().endsWith('/rpc/fiila_track') && r.postData().includes(`"${ev}"`) && r.postData().includes(`"${variant}"`), { timeout: 8000 });
 async function pastePoint(page, coords) {
-  await page.getByRole('button', { name: 'Coller des coordonnées' }).first().click();
+  await page.getByRole('button', { name: 'Depuis Google Maps' }).first().click();
   await page.locator('input[placeholder^="14.758140"]').first().fill(`${coords.lat}, ${coords.lng}`);
-  await page.getByRole('button', { name: 'Aller à ces coordonnées' }).first().click();
+  await page.getByRole('button', { name: 'Placer ce point' }).first().click();
   await page.getByRole('button', { name: 'Valider ce point' }).first().click();
 }
 function lum([r, g, b]) {

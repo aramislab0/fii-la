@@ -74,9 +74,9 @@ async function session(label) {
 }
 const shot = (page, name) => page.screenshot({ path: `${SHOTS}/${TARGET}-${ENGINE}-${name}.png`, fullPage: true });
 async function pastePoint(page, coords) {
-  await page.getByRole('button', { name: 'Coller des coordonnées' }).first().click();
+  await page.getByRole('button', { name: 'Depuis Google Maps' }).first().click();
   await page.locator('input[placeholder^="14.758140"]').first().fill(`${coords.lat}, ${coords.lng}`);
-  await page.getByRole('button', { name: 'Aller à ces coordonnées' }).first().click();
+  await page.getByRole('button', { name: 'Placer ce point' }).first().click();
   await page.getByRole('button', { name: 'Valider ce point' }).first().click();
 }
 async function rpcFrom(page, fn, args) {
@@ -153,7 +153,7 @@ await t('2. destinataire (session isolée) : fiche, photo et repère, sans compt
   await B.getByText(A_INSTR).waitFor();
   assert.ok(await B.locator('img.door').evaluate((i) => i.complete && i.naturalWidth > 100), 'photo non chargée');
   const dir = await B.getByRole('link', { name: /Itinéraire/ }).first().getAttribute('href');
-  assert.match(dir, /destination=14\.758140%2C-17\.470320/);
+  assert.match(dir, /^comgooglemaps:\/\/\?daddr=14\.758140,-17\.470320&directionsmode=/); // iPhone : application Google Maps directe
   await B.reload();
   await B.getByText(A_INSTR).waitFor();
   assert.ok(await B.locator('img.door').evaluate((i) => i.complete && i.naturalWidth > 100), 'photo non chargée après rechargement');

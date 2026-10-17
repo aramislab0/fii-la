@@ -72,11 +72,11 @@ async function newPhone(opts = {}) {
 const shot = (page, name) => page.screenshot({ path: `${SHOTS}/${ENGINE}-${name}.png`, fullPage: true });
 const byText = (page, text) => page.getByRole('button', { name: text }).or(page.getByRole('link', { name: text })).first();
 async function confirmPointByPaste(page, scopeIdx, coords) {
-  const pasteBtns = page.getByRole('button', { name: 'Coller des coordonnées' });
+  const pasteBtns = page.getByRole('button', { name: 'Depuis Google Maps' });
   await pasteBtns.nth(scopeIdx).click();
   const inputs = page.locator('input[placeholder^="14.758140"]');
   await inputs.nth(scopeIdx).fill(`${coords.lat}, ${coords.lng}`);
-  await page.getByRole('button', { name: 'Aller à ces coordonnées' }).nth(scopeIdx).click();
+  await page.getByRole('button', { name: 'Placer ce point' }).nth(scopeIdx).click();
   await page.getByRole('button', { name: 'Valider ce point' }).nth(scopeIdx).click();
 }
 async function rpcFromPage(page, fn, args) {
@@ -255,11 +255,11 @@ await t('texte long : aucune largeur de page débordante (390 px)', async () => 
 });
 
 await t('itinéraires et coordonnées copiées = points enregistrés', async () => {
-  const links = await B.getByRole('link', { name: /Itinéraire/ }).evaluateAll((as) => as.map((a) => a.href));
+  const links = await B.getByRole('link', { name: /Itinéraire/ }).evaluateAll((as) => as.map((a) => a.getAttribute('href')));
   assert.equal(links.length, 2);
-  assert.match(links[0], /destination=14\.757905%2C-17\.469880&travelmode=driving/);
-  assert.match(links[1], /destination=14\.758140%2C-17\.470320&travelmode=walking/);
-  assert.ok(links.every((l) => l.startsWith('https://www.google.com/maps/dir/?api=1&')));
+  // iPhone : application Google Maps ouverte directement (schéma officiel), Plans en repli
+  assert.deepEqual(links, ['comgooglemaps://?daddr=14.757905,-17.469880&directionsmode=driving', 'comgooglemaps://?daddr=14.758140,-17.470320&directionsmode=walking']);
+  assert.equal(await B.getByRole('link', { name: 'Ouvrir dans Plans' }).count(), 2);
   const coords = await B.locator('.coords').allTextContents();
   assert.deepEqual(coords, ['14.757905, -17.469880', '14.758140, -17.470320']);
 });
@@ -304,14 +304,50 @@ await t('clé de gestion : restaurée sur un autre téléphone, elle donne la ge
 });
 
 // ----- géolocalisation : refus, délai dépassé, faible précision
-await t('géolocalisation refusée : message et alternative manuelle', async () => {
+await t('géolocalisation refusée : marche à suivre iPhone, réessayer, et point pris dans Google Maps', async () => {
   const p = await newPhone({ geo: false });
   await p.page.goto(URL0 + '#/new');
   await p.page.getByRole('button', { name: 'Utiliser ma position' }).click();
   await p.page.getByText(/Accès à la position refusé/).waitFor();
-  await confirmPointByPaste(p.page, 0, { lat: 14.7, lng: -17.45 });
-  await p.page.getByText('✓ Point validé pour l’entrée').waitFor();
+  await p.page.getByText('Autoriser la position sur iPhone').waitFor();
+  await p.page.getByText(/Sites web Safari/).waitFor();
+  await p.page.getByRole('button', { name: 'Réessayer' }).waitFor();
   await shot(p.page, '08-position-refusee');
+  await p.page.getByRole('button', { name: 'Prendre le point dans Google Maps' }).click();
+  await p.page.getByText('Faites un appui long exactement sur l’entrée : un repère rouge apparaît.').waitFor();
+  const open = await p.page.getByRole('link', { name: 'Ouvrir Google Maps' }).getAttribute('href');
+  assert.ok(open.startsWith('comgooglemaps://'), 'iPhone : ouverture directe de l’application');
+  // Lien court copié depuis « Partager » dans Google Maps (lien de test simulé par le serveur local)
+  const input = p.page.locator('input[placeholder^="14.758140"]').first();
+  await input.fill('Repère placé https://maps.app.goo.gl/fiilaTestPin');
+  await p.page.getByRole('button', { name: 'Placer ce point' }).first().click();
+  await p.page.getByText(/Point récupéré depuis Google Maps/).waitFor();
+  await p.page.getByRole('button', { name: 'Valider ce point' }).first().click();
+  await p.page.getByText('✓ Point validé pour l’entrée').waitFor();
+  assert.equal(await p.page.locator('.pt .coords').first().textContent(), '14.758140, -17.470320');
+  await p.ctx.close();
+});
+await t('Google Maps : lien sans point précis → consigne claire ; coordonnées et lien long acceptés', async () => {
+  const p = await newPhone();
+  await p.page.goto(URL0 + '#/new');
+  await p.page.getByRole('button', { name: 'Depuis Google Maps' }).first().click();
+  const input = p.page.locator('input[placeholder^="14.758140"]').first();
+  await input.fill('https://maps.app.goo.gl/inconnu123');
+  await p.page.getByRole('button', { name: 'Placer ce point' }).first().click();
+  await p.page.getByText(/ne contient pas de point précis/).waitFor();
+  await input.fill('https://www.google.com/maps/search/14.746500,+-17.493000?entry=tts');
+  await p.page.getByRole('button', { name: 'Placer ce point' }).first().click();
+  await p.page.getByText(/Vérifiez que le repère est bien sur l’entrée/).waitFor();
+  assert.equal(await p.page.locator('.pt .coords').first().textContent(), '14.746500, -17.493000');
+  await p.ctx.close();
+});
+await t('Android : itinéraire par lien Google Maps https (ouvre l’application), sans Plans', async () => {
+  const p = await newPhone({ ctx: { userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-A155F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36' } });
+  await p.page.goto(shareUrl);
+  await p.page.getByRole('link', { name: /Itinéraire/ }).first().waitFor();
+  const links = await p.page.getByRole('link', { name: /Itinéraire/ }).evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+  assert.ok(links.length >= 1 && links.every((l) => l.startsWith('https://www.google.com/maps/dir/?api=1&destination=')));
+  assert.equal(await p.page.getByRole('link', { name: 'Ouvrir dans Plans' }).count(), 0);
   await p.ctx.close();
 });
 await t('géolocalisation trop lente : message de délai dépassé', async () => {

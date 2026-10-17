@@ -61,9 +61,9 @@ const waitTrack = (page, ev, v) => {
   return p;
 };
 async function pastePoint(page, coords, idx = 0) {
-  await page.getByRole('button', { name: 'Coller des coordonnées' }).nth(idx).click();
+  await page.getByRole('button', { name: 'Depuis Google Maps' }).nth(idx).click();
   await page.locator('input[placeholder^="14.758140"]').nth(idx).fill(`${coords.lat}, ${coords.lng}`);
-  await page.getByRole('button', { name: 'Aller à ces coordonnées' }).first().click(); // seul le panneau ouvert est visible
+  await page.getByRole('button', { name: 'Placer ce point' }).first().click(); // seul le panneau ouvert est visible
   await page.locator('button:not([disabled])', { hasText: /^Valider ce point$/ }).first().click(); // le seul sélecteur actif est celui qu'on vient de placer
 }
 const row = async (id) => (await local.db.query(`select id, kind, share_token, encode(owner_hash,'hex') oh, status, label, locality, instruction, entry_lat, entry_lng,
@@ -131,16 +131,18 @@ await t('partage natif [SIMULÉ partage natif] : seule l’URL destinataire est 
 // ================================================================== B. destinataire : navigation, coordonnées repliées
 const visitor = await newPhone();
 const V = visitor.page;
-await t('destinataire anonyme : itinéraire voiture vers l’arrêt, à pied vers le lieu (URLs Google Maps officielles)', async () => {
+await t('destinataire anonyme : itinéraire voiture vers l’arrêt, à pied vers le lieu (iPhone : appli Google Maps directe + Plans)', async () => {
   await V.goto(URL0 + '#/a/' + meetShare);
   await V.getByRole('heading', { name: 'Réunion de quartier (test)' }).waitFor();
-  const links = await V.getByRole('link', { name: /Itinéraire/ }).evaluateAll((as) => as.map((a) => [a.textContent, a.href]));
+  const links = await V.getByRole('link', { name: /Itinéraire/ }).evaluateAll((as) => as.map((a) => [a.textContent, a.getAttribute('href')]));
   assert.equal(links.length, 2);
-  const car = dirParams(links[0][1]), walk = dirParams(links[1][1]);
-  assert.equal(car.path, 'https://www.google.com/maps/dir/');
-  assert.deepEqual([car.api, car.destination, car.mode], ['1', '14.746500,-17.493000', 'driving']);
-  assert.deepEqual([walk.api, walk.destination, walk.mode], ['1', '14.746100,-17.492500', 'walking']);
-  assert.match(links[0][1], /destination=14\.746500%2C-17\.493000/, 'virgule non encodée');
+  // iPhone : schéma officiel comgooglemaps:// (ouvre l'application avec la destination, sans détour par l'App Store)
+  const car = new URL(links[0][1]), walk = new URL(links[1][1]);
+  assert.equal(car.protocol, 'comgooglemaps:');
+  assert.deepEqual([car.searchParams.get('daddr'), car.searchParams.get('directionsmode')], ['14.746500,-17.493000', 'driving']);
+  assert.deepEqual([walk.searchParams.get('daddr'), walk.searchParams.get('directionsmode')], ['14.746100,-17.492500', 'walking']);
+  const plans = await V.getByRole('link', { name: 'Ouvrir dans Plans' }).evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+  assert.deepEqual(plans, ['https://maps.apple.com/?daddr=14.746500,-17.493000&dirflg=d', 'https://maps.apple.com/?daddr=14.746100,-17.492500&dirflg=w']);
   assert.equal(await V.evaluate(() => localStorage.length), 0);
 });
 

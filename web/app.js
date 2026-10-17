@@ -64,6 +64,33 @@
   function gmDir(p, mode) {
     return 'https://www.google.com/maps/dir/?api=1&destination=' + Number(p.lat).toFixed(6) + '%2C' + Number(p.lng).toFixed(6) + '&travelmode=' + (mode || 'driving');
   }
+  /* Plateforme. Sur iPhone, un lien https vers Google Maps passe souvent par une page « Ouvrir l'app »
+     puis l'App Store, et l'application s'ouvre sans la destination. Le schéma officiel comgooglemaps://
+     ouvre directement l'application installée avec la destination ; Plans (Apple) sert de repli. */
+  var UA = navigator.userAgent || '';
+  var IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var IS_ANDROID = /Android/.test(UA);
+  // Navigateurs intégrés d'applications (Facebook, Instagram, TikTok, Snapchat, LINE, appli Google, WebView Android) :
+  // ils n'ont souvent pas accès à la position, faute d'autorisation de l'application hôte.
+  var IN_APP = /FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|musical_ly|TikTok|BytedanceWebview|GSA\/|; wv\)/.test(UA);
+  function ll(p) { return Number(p.lat).toFixed(6) + ',' + Number(p.lng).toFixed(6); }
+  function iosGmDir(p, mode) { return 'comgooglemaps://?daddr=' + ll(p) + '&directionsmode=' + (mode || 'driving'); }
+  function appleDir(p, mode) { return 'https://maps.apple.com/?daddr=' + ll(p) + '&dirflg=' + (mode === 'walking' ? 'w' : 'd'); }
+  function gmOpenApp() {
+    return IS_IOS ? 'comgooglemaps://?center=14.7167,-17.4677&zoom=14' : 'https://www.google.com/maps/@14.7167,-17.4677,14z';
+  }
+  var SHORT_MAPS = /https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps)\/[^\s"'<>]+/i;
+  function resolveMapsLink(url) {
+    if (!API_URL) return Promise.reject(new ApiError('not_configured'));
+    return fetch(API_URL + '/functions/v1/fiila-resolve-maps', {
+      method: 'POST', headers: apiHeaders(), body: JSON.stringify({ url: url }), cache: 'no-store', credentials: 'omit'
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (b) {
+        if (res.ok && b && isFinite(b.lat) && isFinite(b.lng)) return { lat: +b.lat, lng: +b.lng };
+        throw new ApiError((b && b.error) || 'server');
+      });
+    }, function () { throw new ApiError('network'); });
+  }
   function baseUrl() { return CFG.publicUrl ? CFG.publicUrl.replace(/\/?$/, '/') : location.origin + location.pathname; }
   function shareUrl(token) { return baseUrl() + '#/a/' + token; }
   function requestUrl(token) { return baseUrl() + '#/d/' + token; }
@@ -320,6 +347,7 @@
   var DAKAR_VIEW = [14.7167, -17.4677];
   function parseCoords(s) {
     s = String(s || '');
+    try { s = decodeURIComponent(s.replace(/\+/g, ' ')); } catch (e) { /* texte brut */ }
     var m = s.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) || s.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) ||
       s.match(/(-?\d{1,2}\.\d+)\s*[,;\s]\s*(-?\d{1,3}\.\d+)/);
     if (!m) return null;
@@ -357,12 +385,23 @@
     var mapEl = h('div', { class: 'map', id: (opts.id || 'map') + '-canvas' });
     var mapBox = h('div', { class: 'map-box', 'aria-label': 'Carte : déplacez-la pour placer le repère au centre sur ' + opts.what },
       mapEl, h('div', { class: 'map-pin' }), h('div', { class: 'map-dot' }));
-    var pasteIn = h('input', { type: 'text', id: (opts.id || 'map') + '-paste', placeholder: '14.758140, -17.470320 ou lien Google Maps', autocomplete: 'off' });
-    var paste = h('div', { class: 'stack', hidden: true },
-      h('label', { for: (opts.id || 'map') + '-paste' }, 'Coordonnées ou lien Google Maps'),
+    var pid = (opts.id || 'map') + '-paste';
+    var pasteIn = h('input', { type: 'text', id: pid, placeholder: '14.758140, -17.470320 ou lien Google Maps', autocomplete: 'off', inputmode: 'url' });
+    pasteIn.addEventListener('paste', function () { setTimeout(usePaste, 0); });
+    var clipBtn = h('button', { class: 'btn', type: 'button', onclick: fromClipboard }, 'Coller le lien');
+    var paste = h('div', { class: 'stack gm-panel', hidden: true },
+      h('ol', { class: 'howto' },
+        h('li', null, 'Ouvrez Google Maps.'),
+        h('li', null, 'Faites un appui long exactement sur ' + opts.what + ' : un repère rouge apparaît.'),
+        h('li', null, 'Touchez « Partager », puis « Copier » (ou « Copier le lien »).'),
+        h('li', null, 'Revenez ici et touchez « Coller le lien ».')),
+      h('div', { class: 'row' },
+        h('a', { class: 'btn ghost', href: gmOpenApp(), target: IS_IOS ? null : '_blank', rel: 'noopener noreferrer' }, 'Ouvrir Google Maps'),
+        clipBtn),
+      h('label', { for: pid }, 'Ou collez ici le lien ou les coordonnées'),
       pasteIn,
-      h('button', { class: 'btn small', type: 'button', onclick: usePaste }, 'Aller à ces coordonnées'),
-      h('p', { class: 'hint' }, 'Dans Google Maps : appui long sur le lieu, puis copiez les chiffres affichés.'));
+      h('button', { class: 'btn small ghost', type: 'button', onclick: usePaste }, 'Placer ce point'));
+    var help = h('div', { class: 'stack', hidden: true });
 
     function say(t, cls) { msg.textContent = t || ''; msg.className = 'msg ' + (cls || 'info'); }
     function draw() {
@@ -393,19 +432,74 @@
       say('Point validé.', 'ok');
       draw();
     }
-    function usePaste() {
-      var c = parseCoords(pasteIn.value);
-      if (!c) { say('Coordonnées non reconnues. Exemple : 14.758140, -17.470320', 'err'); return; }
+    function placeFrom(c, how) {
       goTo(c.lat, c.lng, 18, 'paste');
-      paste.hidden = true;
-      say('Vérifiez que le repère est bien sur ' + opts.what + ', puis validez.', 'info');
+      paste.hidden = true; help.hidden = true;
+      say((how || 'Point récupéré.') + ' Vérifiez que le repère est bien sur ' + opts.what + ', puis validez.', 'info');
+    }
+    function usePaste() {
+      var v = String(pasteIn.value || '').trim();
+      if (!v) { say('Collez d’abord le lien copié dans Google Maps.', 'err'); return; }
+      var c = parseCoords(v);
+      if (c) { placeFrom(c); return; }
+      var m = v.match(SHORT_MAPS);
+      if (m) {
+        say('Lecture du lien Google Maps…', 'info');
+        clipBtn.disabled = true;
+        resolveMapsLink(m[0]).then(function (c2) { clipBtn.disabled = false; placeFrom(c2, 'Point récupéré depuis Google Maps.'); }, function (e) {
+          clipBtn.disabled = false;
+          if (e && e.code === 'network') say('Pas de connexion pour lire ce lien. Réessayez dans un instant.', 'err');
+          else say('Ce lien ne contient pas de point précis. Dans Google Maps, faites un appui long sur ' + opts.what + ' pour poser un repère rouge, puis partagez ce repère.', 'err');
+        });
+        return;
+      }
+      say('Lien ou coordonnées non reconnus. Copiez le lien depuis « Partager » dans Google Maps, ou des chiffres comme 14.758140, -17.470320.', 'err');
+    }
+    function fromClipboard() {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(function (t) {
+          if (!t) { pasteIn.focus(); say('Rien à coller : copiez d’abord le lien dans Google Maps.', 'err'); return; }
+          pasteIn.value = t; usePaste();
+        }, function () { pasteIn.focus(); say('Appuyez longuement dans le champ ci-dessous, puis « Coller ».', 'info'); });
+      } else { pasteIn.focus(); say('Appuyez longuement dans le champ ci-dessous, puis « Coller ».', 'info'); }
+    }
+    function showGm() { paste.hidden = false; help.hidden = true; }
+    function deniedHelp() {
+      var steps;
+      if (IN_APP) {
+        steps = [h('p', null, h('strong', null, 'Vous êtes dans le navigateur d’une application'), ', qui n’a pas accès à votre position.'),
+          h('p', null, IS_IOS ? 'Ouvrez Fii La dans Safari : touchez « ⋯ » ou le menu de l’application, puis « Ouvrir dans Safari » (ou « Ouvrir dans le navigateur »).'
+            : 'Ouvrez Fii La dans Chrome : touchez « ⋮ » ou le menu de l’application, puis « Ouvrir dans Chrome » (ou « Ouvrir dans le navigateur »).'),
+          h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(location.href, 'Lien de la page'); } }, 'Copier le lien de cette page')];
+      } else if (IS_IOS) {
+        steps = [h('p', null, h('strong', null, 'Autoriser la position sur iPhone')),
+          h('ol', { class: 'howto' },
+            h('li', null, 'Réglages › Confidentialité et sécurité › Service de localisation : activé.'),
+            h('li', null, 'Dans la même liste : Sites web Safari › « Lorsque l’app est active ».'),
+            h('li', null, 'Dans Safari, touchez « aA » (ou l’icône à gauche de l’adresse) › Réglages du site web › Position › Autoriser.'),
+            h('li', null, 'Revenez ici et touchez « Réessayer ».'))];
+      } else if (IS_ANDROID) {
+        steps = [h('p', null, h('strong', null, 'Autoriser la position sur Android')),
+          h('ol', { class: 'howto' },
+            h('li', null, 'Vérifiez que la localisation du téléphone est activée (volet des réglages rapides).'),
+            h('li', null, 'Dans Chrome, touchez l’icône à gauche de l’adresse › Autorisations › Position › Autoriser.'),
+            h('li', null, 'Revenez ici et touchez « Réessayer ».'))];
+      } else {
+        steps = [h('p', null, 'Autorisez la position pour ce site dans les réglages du navigateur, puis réessayez.')];
+      }
+      setKids(help, h('p', { class: 'msg err', role: 'alert' }, 'Accès à la position refusé. Voici comment l’autoriser, ou prenez le point dans Google Maps.'),
+        h('div', { class: 'notice' }, steps),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn', type: 'button', onclick: locate }, 'Réessayer'),
+          h('button', { class: 'btn ghost', type: 'button', onclick: showGm }, 'Prendre le point dans Google Maps')));
+      help.hidden = false;
     }
     function locate() {
-      if (!('geolocation' in navigator)) { say('La position n’est pas disponible sur cet appareil. Placez le repère sur la carte ou collez des coordonnées.', 'err'); return; }
+      if (!('geolocation' in navigator)) { say('La position n’est pas disponible sur cet appareil. Placez le repère sur la carte ou prenez le point dans Google Maps.', 'err'); return; }
       say('Recherche de votre position…', 'info');
       locBtn.disabled = true;
       navigator.geolocation.getCurrentPosition(function (pos) {
-        locBtn.disabled = false;
+        locBtn.disabled = false; help.hidden = true;
         acc = pos.coords.accuracy;
         goTo(pos.coords.latitude, pos.coords.longitude, 18, 'gps');
         if (map && window.L) {
@@ -416,7 +510,7 @@
         say(ai[1] + ' Ajustez la carte si le repère n’est pas exactement sur ' + opts.what + '.', ai[0] === 'bad' ? 'err' : 'info');
       }, function (err) {
         locBtn.disabled = false;
-        if (err.code === 1) say('Accès à la position refusé. Déplacez la carte pour placer le repère, ou collez des coordonnées.', 'err');
+        if (err.code === 1) { say(''); deniedHelp(); }
         else if (err.code === 3) say('La recherche de position a pris trop de temps. Réessayez, ou placez le repère à la main.', 'err');
         else say('Position indisponible pour le moment. Placez le repère à la main sur la carte.', 'err');
       }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
@@ -448,7 +542,7 @@
       else if (!opts.get() && opts.initial) say('Point repris du rendez-vous précédent. Vérifiez qu’il est toujours juste, puis validez.', 'info');
       draw();
     }, function () {
-      mapBox.replaceWith(h('p', { class: 'alert' }, 'La carte n’a pas pu se charger. Utilisez votre position ou collez des coordonnées.'));
+      mapBox.replaceWith(h('p', { class: 'alert' }, 'La carte n’a pas pu se charger. Utilisez votre position ou prenez le point dans Google Maps.'));
       paste.hidden = false;
       zoomOk = true;
       draw();
@@ -458,8 +552,8 @@
     return h('div', { class: 'stack' },
       mapBox,
       h('div', { class: 'row' }, locBtn,
-        h('button', { class: 'btn ghost', type: 'button', onclick: function () { paste.hidden = !paste.hidden; if (!paste.hidden) pasteIn.focus(); } }, 'Coller des coordonnées')),
-      paste, ptBox, confirmBtn, msg);
+        h('button', { class: 'btn ghost', type: 'button', onclick: function () { paste.hidden = !paste.hidden; if (!paste.hidden) help.hidden = true; } }, 'Depuis Google Maps')),
+      help, paste, ptBox, confirmBtn, msg);
   }
 
   /* ================================================================ photo */
@@ -581,8 +675,23 @@
     return h('section', { class: 'leg', 'aria-label': title },
       h('div', { class: 'leg-h' }, n ? h('span', { class: 'leg-n', 'aria-hidden': 'true' }, n) : null, h('h3', null, title)),
       note ? h('p', { class: 'note' }, note) : null,
-      h('a', { class: 'btn', href: gmDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, mode === 'walking' ? 'Itinéraire à pied (Google Maps)' : 'Itinéraire (Google Maps)'),
+      dirButtons(p, mode),
       coordLine(p));
+  }
+  function dirButtons(p, mode) {
+    var label = mode === 'walking' ? 'Itinéraire à pied (Google Maps)' : 'Itinéraire (Google Maps)';
+    if (!IS_IOS) return h('a', { class: 'btn', href: gmDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, label);
+    // iPhone : ouverture directe de l'application Google Maps ; si rien ne s'ouvre, on propose Plans.
+    var note = h('p', { class: 'hint', hidden: true, role: 'status' }, 'Google Maps ne s’est pas ouvert ? Il n’est peut-être pas installé : utilisez Plans.');
+    function tried() {
+      var t = setTimeout(function () { if (document.visibilityState === 'visible') note.hidden = false; }, 1600);
+      var stop = function () { clearTimeout(t); document.removeEventListener('visibilitychange', stop); window.removeEventListener('pagehide', stop); };
+      document.addEventListener('visibilitychange', stop); window.addEventListener('pagehide', stop);
+    }
+    return h('div', { class: 'stack tight' },
+      h('a', { class: 'btn', href: iosGmDir(p, mode), onclick: tried }, label),
+      h('a', { class: 'btn ghost small', href: appleDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, 'Ouvrir dans Plans'),
+      note);
   }
   function fiche(p, opts) {
     opts = opts || {};
@@ -600,7 +709,7 @@
           ? [leg('1', 'Arrêt voiture', p.stop, 'driving', p.walk ? 'Ensuite, à pied : ' + p.walk : 'La voiture ne peut pas aller jusqu’à l’entrée.'),
              leg('2', isMeeting ? 'Lieu du rendez-vous' : 'Entrée', p.entry, 'walking')]
           : leg(null, isMeeting ? 'Lieu du rendez-vous' : 'Entrée', p.entry, 'driving'),
-        h('p', { class: 'hint' }, 'L’itinéraire est calculé par Google Maps. Fii La indique le point exact ; le trajet proposé peut varier.'),
+        h('p', { class: 'hint' }, 'L’itinéraire est calculé par l’application de navigation. Fii La indique le point exact ; le trajet proposé peut varier.'),
         opts.footer || null));
   }
 
@@ -1600,7 +1709,8 @@
         h('ul', null,
           h('li', null, 'Ce que vous saisissez : nom du lieu, quartier, repère, point d’entrée, point d’arrêt voiture, photo, et pour un rendez-vous sa date.'),
           h('li', null, 'Pour une demande d’adresse : le nom du demandeur, la raison et la référence éventuelle.'),
-          h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.')),
+          h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.'),
+          h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.')),
         h('h2', null, 'Ce qui est obligatoire'),
         h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un rendez-vous : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),
         h('h2', null, 'Où sont stockées les données'),

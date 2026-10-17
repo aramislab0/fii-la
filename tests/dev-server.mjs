@@ -25,6 +25,25 @@ export async function startServer(port = 0) {
       res.writeHead(r.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(r.body));
     }
+    // Simulation de la fonction fiila-resolve-maps : mêmes règles d'extraction, liens courts de test fixes
+    // (aucun accès réseau vers Google pendant les tests).
+    if (url.pathname === '/functions/v1/fiila-resolve-maps') {
+      if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+      let body = '';
+      for await (const c of req) body += c;
+      let input = '';
+      try { input = String(JSON.parse(body || '{}').url || ''); } catch { res.writeHead(400); return res.end('{"error":"invalid"}'); }
+      const ex = await import('../supabase/functions/fiila-resolve-maps/extract.mjs');
+      const send = (s, b) => { res.writeHead(s, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(b)); };
+      const direct = ex.extractFromUrl(input);
+      if (direct) return send(200, direct);
+      let u; try { u = new URL(input); } catch { return send(400, { error: 'invalid' }); }
+      if (!ex.isShortMapsUrl(u)) return send(400, { error: 'unsupported' });
+      const FAKE = { '/fiilaTestPin': 'https://consent.google.com/m?continue=https://www.google.com/maps/search/14.758140,%2B-17.470320?entry%3Dtts' };
+      const loc = FAKE[u.pathname];
+      const c = loc ? (ex.extractFromUrl(loc) || ex.extractFromUrl(new URL(loc).searchParams.get('continue') || '')) : null;
+      return c ? send(200, c) : send(422, { error: 'not_found' });
+    }
     if (url.pathname === '/config.js') {
       res.writeHead(200, { 'Content-Type': 'text/javascript' });
       return res.end(`window.FIILA_CONFIG={supabaseUrl:location.origin,supabaseKey:'local-test-key',publicUrl:''};`);
