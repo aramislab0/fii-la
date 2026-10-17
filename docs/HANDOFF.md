@@ -100,6 +100,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 17/10 20:05 | Production après refonte : E2E 38/38 Chromium et 38/38 WebKit sur l'URL publique. Base : fiche du fondateur + une fiche « Test VP » créée par l'agent VP (à supprimer par lui) | journal de test sur le Mac |
 | 17/10 19:55 | Design system v1.1 appliqué (tokens Light/Dark, `theme.js`, sélecteur Clair/Sombre/Automatique, icônes de puces et d'états, étapes avec pictogrammes, confirmation destructive pleine, fiche en 2 colonnes sur ordinateur). Coordonnées retirées de l'interface. Audit UI/UX : libellés d'itinéraire raccourcis (« Itinéraire en voiture / à pied »), une seule action principale à l'étape carte, photo de rendez-vous en bouton secondaire, lien de partage sur une ligne. Tests locaux : SQL 31, E2E 38, découverte 23, circuit 20, social 23, parcours 12 | `e3628db` |
 | 17/10 19:40 | Design system v1.1 Light + Dark versé dans `docs/design-system/` (tokens CSS/JSON, composants sur les classes existantes, brief d'exécution, script de contrastes : 31/31 couples AA). v1.1 spécifie les fonctions du 17/10 : coordonnées repliées, Plans iPhone, Découverte, partage multi-canaux et panneau Instagram/TikTok, installation, position refusée, « Depuis Google Maps ». Code applicatif non modifié | `e3628db` |
 | 17/10 18:55 | Création de ce fichier HANDOFF, règle de mise à jour (`CLAUDE.md`), prompt de l'agent VP (`docs/PROMPT-VP.md`) | `8cad411` |
