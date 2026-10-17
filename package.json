@@ -15,7 +15,9 @@
     "test:shop": "node tests/shop.test.mjs",
     "test:couriers-sql": "node tests/couriers.sql.test.mjs",
     "test:couriers": "node tests/couriers.test.mjs",
-    "test:security": "node tests/security.sql.test.mjs"
+    "test:security": "node tests/security.sql.test.mjs",
+    "test:referrals-sql": "node tests/referrals.sql.test.mjs",
+    "test:referrals": "node tests/referrals.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",

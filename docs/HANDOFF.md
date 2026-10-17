@@ -64,6 +64,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 17/10 | Chaque article est noté par l'acheteur (achat vérifié, après livraison) | Fondateur |
 | 17/10 | Design system v1 (Light + Dark) = référence de la refonte d'interface ; application par le Builder sans toucher aux parcours ni aux textes ; ajout d'un sélecteur de thème Clair / Sombre / Automatique (seule addition au périmètre) | Fondateur |
 | 17/10 23:01 | Suivi 3D mis en attente ; publication réseaux sociaux à prévoir dans le périmètre sans tout développer ; parrainage par numéro voulu, croissance organique d'abord, publicité plus tard ; stratégie à proposer avant exécution | Fondateur |
+| 17/10 23:10 | Croissance : cible tout le Sénégal (boutiques, particuliers, livreurs) ; phase 0 à construire en entier, bouton « Publier » compris ; récompenses fixées plus tard (l'argent n'est pas exclu) | Fondateur |
 
 ## 4. En attente / prochaines actions
 
@@ -89,8 +90,10 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 21 | ~~Valider le plan d'audit~~ validé 22:10 et exécuté (lots 0 à 3) ; domaine dédié reporté à la fin (S2) | Fondateur | — |
 | 22 | Domaine dédié pour Fii La (audit S2), avant l'ouverture publique | Fondateur | Ouverture publique |
 | 23 | Suivi en direct 3D : proposition faite et **mise en attente** par le fondateur (17/10 23:01, « on validera plus tard »). Proposition conservée dans `ARCHITECTURE-RALI.md` §9 | Fondateur | — |
-| 24 | Publication des articles sur les réseaux de la boutique : périmètre posé (`ARCHITECTURE-RALI.md` §8), partage natif d'abord, API Meta/TikTok plus tard. Non construit | Fondateur → Builder | Validation de la stratégie de croissance |
-| 25 | Valider la stratégie de croissance et le parrainage par numéro (`docs/CROISSANCE.md` §8 : cible, récompenses, pilote, phase 0) | Fondateur | Construction de la phase 0 |
+| 24 | Publication des articles : brique 1 (partage natif, bouton « Publier ») construite 17/10 ; vitrine publique et API Meta/TikTok plus tard (`ARCHITECTURE-RALI.md` §8) | Builder, plus tard | Vitrine V3 |
+| 25 | ~~Valider la stratégie de croissance~~ phase 0 validée 17/10 23:10 et construite (`docs/CROISSANCE.md` §9) | Fondateur | — |
+| 27 | Fixer les récompenses du parrainage (boutiques, livreurs, particuliers ; argent possible) | Fondateur | Annonce du parrainage |
+| 28 | Créer son compte Fii La, puis le Builder le marque administrateur (SQL) pour ouvrir `#/stats` | Fondateur → Builder | Lecture des statistiques |
 | 26 | Ajouter au dossier CDP le traitement « parrainage » (lien parrain–filleul) si la phase 0 est validée | Fondateur | Usage réel du parrainage |
 | 16 | Revue VP de l'intégration Rali (parcours commerçant et client, `docs/screenshots/boutique/`) | VP | — |
 | 7 | ~~Alignement Fii La ↔ Rali~~ → tranché le 17/10 : intégration (voir décisions) | VP → fondateur | Feuille de route | (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |

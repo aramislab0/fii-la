@@ -995,6 +995,255 @@
         opts.footer || null));
   }
 
+  /* ================================================================ ORIGINE ET PARRAINAGE
+     Chaque lien Fii La reçu dit d'où vient la personne. On garde la première origine (30 jours) sur ce téléphone,
+     et on l'envoie au serveur juste après une création (boutique, livreur, adresse, rendez-vous).
+     Un lien de parrainage (#/r/CODE) remplace toujours une origine passive. Rien de personnel n'est stocké ici. */
+  var TOUCH_LS = 'fiila.touch', REF_LS = 'fiila.ref';
+  var TOUCH_DAYS = 30;
+  // Une page reçue n'écrit rien sur le téléphone sans action : l'origine d'un lien reçu reste en mémoire,
+  // et n'est gardée que si la personne passe à une création (adresse, rendez-vous, boutique, livreur, parrainage).
+  var touchMem = null;
+  function touchGet() {
+    var t = LS.get(TOUCH_LS, null);
+    if (t && t.at > Date.now() - TOUCH_DAYS * 864e5) return t;
+    return touchMem;
+  }
+  function noteTouch(p) {
+    var src = null, token = null;
+    if (p[0] === 'r' && p[1]) { src = 'link'; token = p[1].toUpperCase(); }
+    else if (p[0] === 'd' && p[1]) { src = 'request'; token = p[1]; }
+    else if (p[0] === 'f' && p[1]) { src = 'invoice'; token = p[1]; }
+    else if (p[0] === 'a' && p[1]) { src = 'address'; token = p[1]; }
+    else if (p[0] === 'l' && p[1]) { src = 'course'; token = p[1]; }
+    else if (p[0] === 's' && p[1]) { src = 'watch'; token = p[1]; }
+    else if (p[0] === 'livreur' && p[1] === 'invitation' && p[2]) { src = 'courier_invite'; token = p[2]; }
+    var creating = p[0] === 'new' || p[0] === 'boutique' || p[0] === 'livreur' || p[0] === 'parrainer' || (p[0] === 'rdv' && p[1] === 'nouveau');
+    if (creating && touchMem && !LS.get(TOUCH_LS, null)) LS.set(TOUCH_LS, touchMem);
+    if (!src || !/^[A-Za-z0-9_-]{6,100}$/.test(token)) return;
+    if (src === 'address' && owned.all().some(function (r) { return r.share === token; })) return; // sa propre fiche
+    var cur = touchGet();
+    if (cur && src !== 'link') return;
+    if (cur && cur.src === 'link' && cur.token === token) return;
+    var t = { src: src, token: token, at: Date.now() };
+    // Un lien de parrainage est une invitation ouverte volontairement : gardé tout de suite.
+    if (src === 'link') { touchMem = t; LS.set(TOUCH_LS, t); } else touchMem = t;
+  }
+  // Envoie l'origine d'une création. typed : numéro ou code tapé ; fallback : contexte de la page si aucune origine n'est gardée.
+  function attribute(kind, id, key, typed, fallback) {
+    var p = {}, t = touchGet() || fallback || null;
+    typed = String(typed || '').trim();
+    if (typed) {
+      if (typed.replace(/\D/g, '').length >= 7) p.phone = typed;
+      else p.code = typed.replace(/[\s-]/g, '').toUpperCase();
+    }
+    if (t && t.src && t.token) { p.src = t.src; p.token = t.token; }
+    return api('fiila_attribute', { p_kind: kind, p_id: id || null, p_key: key || null, p: p }).then(null, function () { /* sans effet */ });
+  }
+  // « Qui vous a parlé de Fii La ? » : replié, facultatif ; absent si la personne arrive par un lien de parrainage.
+  function referralAsk(id) {
+    var val = '';
+    var t = touchGet();
+    var el = t && t.src === 'link' ? null : h('details', { class: 'ref-ask', id: id },
+      h('summary', null, 'Quelqu’un vous a recommandé Fii La ?'),
+      textField({ id: id + '-input', label: 'Son numéro ou son code', optional: true, inputmode: 'text', max: 30,
+        placeholder: 'Ex. : 77 123 45 67 ou K7M2QD', onInput: function (v) { val = v; } }));
+    return { el: el, value: function () { return val; } };
+  }
+  function referralUrl(code) { return baseUrl() + '#/r/' + code; }
+  function referralMessage(kind, code) {
+    var url = referralUrl(code);
+    if (kind === 'shop') return 'Je reçois l’adresse de mes clientes en une photo avec Fii La : la bonne porte, un repère, le livreur arrive du premier coup. Crée ta boutique, c’est gratuit : ' + url;
+    if (kind === 'courier') return 'Avec Fii La, les boutiques m’envoient l’adresse exacte avec la photo de l’entrée. Plus besoin d’appeler pour trouver. Essaie : ' + url;
+    return 'J’envoie mon adresse en une photo avec Fii La : la bonne porte, un repère, où se garer. C’est gratuit : ' + url;
+  }
+  // Bandeau d'arrivée par lien de parrainage (accueil), tant que rien n'a été créé sur ce téléphone.
+  function inviteBanner() {
+    var t = touchGet();
+    if (!t || t.src !== 'link' || owned.all().length || shopKey() || courierKey()) return null;
+    var box = h('section', { class: 'card invite', id: 'invite-banner', hidden: true });
+    api('fiila_referral_public', { p_code: t.token }).then(function (r) {
+      if (r.state !== 'ok' || !r.name) return;
+      setKids(box, h('p', null, h('strong', null, r.name), ' vous invite sur Fii La.'),
+        h('p', { class: 'small muted' }, r.kind === 'shop' || r.kind === 'courier'
+          ? 'Recevez l’adresse exacte de vos clients en une photo. Gratuit, sans compte.'
+          : 'Créez votre adresse une fois, envoyez-la par un lien. Gratuit, sans compte.'),
+        r.kind === 'shop' || r.kind === 'courier'
+          ? h('div', { class: 'row' }, h('a', { class: 'btn', href: '#/boutique', id: 'invite-shop' }, 'Créer ma boutique'),
+              h('a', { class: 'btn ghost', href: '#/livreur' }, 'Je suis livreur'))
+          : null);
+      box.hidden = false;
+    }, function () { /* hors ligne : pas de bandeau */ });
+    return box;
+  }
+
+  var REF_KIND = { shop: 'Boutique', courier: 'Livreur', address: 'Adresse', meeting: 'Rendez-vous' };
+  function viewReferral(q) {
+    var forWho = q.pour === 'boutique' ? 'shop' : q.pour === 'livreur' ? 'courier' : 'person';
+    var key = forWho === 'shop' ? shopKey() : forWho === 'courier' ? courierKey() : ((LS.get(REF_LS, null) || {}).key || null);
+    var back = forWho === 'shop' ? backBtn('Ma boutique', '#/boutique') : forWho === 'courier' ? backBtn('Espace livreur', '#/livreur') : backBtn();
+    return api('fiila_referral_me', { p_for: forWho, p_key: key }).then(function (r) {
+      return r.referrer ? referralPage(forWho, r.referrer, back) : referralCardForm(back);
+    }, function (e) {
+      if (e.code === 'shop_required') { go('#/boutique'); return loading(); }
+      if (e.code === 'courier_required') { go('#/livreur'); return loading(); }
+      return page(back, stateCard('!', 'Impossible de charger le parrainage', errText(e), retryBtn()), footer());
+    });
+  }
+  function referralCardForm(back) {
+    var f = { name: '', phone: '' };
+    var err = h('div', { role: 'alert' });
+    var btn = h('button', { class: 'btn', type: 'button', id: 'ref-create', onclick: function () {
+      setKids(err);
+      if (!f.name.trim()) return errBox(err, new ApiError('name_required'));
+      btn.disabled = true;
+      api('fiila_referral_card_save', { p_key: null, p: { name: f.name.trim(), phone: f.phone.trim() || null } }).then(function (r) {
+        if (r.key) LS.set(REF_LS, { key: r.key });
+        render();
+      }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, 'Créer mon code');
+    return page(back,
+      h('div', { class: 'stack tight' }, h('h1', null, 'Inviter vos proches'),
+        h('p', { class: 'muted' }, 'Votre code et votre lien comptent chaque personne qui rejoint Fii La grâce à vous.')),
+      textField({ id: 'ref-name', label: 'Votre nom', max: 60, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
+      textField({ id: 'ref-phone', label: 'Votre numéro', optional: true, type: 'tel', inputmode: 'tel', onInput: function (v) { f.phone = v; },
+        hint: 'Vos proches pourront taper votre numéro au lieu du code. Il n’est jamais affiché.' }),
+      err, btn, footer());
+  }
+  function referralPage(forWho, ref, back) {
+    var msg = referralMessage(forWho, ref.code);
+    var intro = forWho === 'shop' ? 'Invitez d’autres boutiques et vos clientes. Chaque personne qui rejoint Fii La par votre lien, votre code ou votre numéro est comptée pour vous.'
+      : forWho === 'courier' ? 'Invitez les boutiques que vous livrez et d’autres livreurs. Chaque arrivée par votre lien, votre code ou votre numéro est comptée pour vous.'
+      : 'Invitez vos proches. Chaque personne qui rejoint Fii La par votre lien ou votre code est comptée pour vous.';
+    var recent = ref.recent || [];
+    return page(back,
+      h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Parrainage'), h('h1', null, forWho === 'person' ? 'Inviter vos proches' : 'Parrainer'),
+        h('p', { class: 'muted' }, intro)),
+      h('section', { class: 'card ref-card' },
+        h('p', { class: 'small muted' }, 'Votre code'),
+        h('p', { class: 'ref-code', id: 'ref-code' }, ref.code),
+        h('p', { class: 'small muted wrapword', id: 'ref-link' }, referralUrl(ref.code)),
+        h('div', { class: 'row' },
+          h('a', { class: 'btn', id: 'ref-whatsapp', href: waLink(msg), target: '_blank', rel: 'noopener' }, 'Envoyer sur WhatsApp'),
+          h('button', { class: 'btn ghost', type: 'button', id: 'ref-copy', onclick: function () { copy(referralUrl(ref.code), 'Lien'); } }, 'Copier le lien')),
+        ref.has_phone ? h('p', { class: 'small muted' }, 'À l’inscription, on peut aussi taper votre numéro.') : null),
+      h('div', { class: 'tiles', id: 'ref-stats' },
+        h('div', { class: 'tile' }, h('strong', null, String(ref.joined || 0)), h('span', null, (ref.joined || 0) > 1 ? 'arrivées grâce à vous' : 'arrivée grâce à vous')),
+        h('div', { class: 'tile' }, h('strong', null, String(ref.active || 0)), h('span', null, (ref.active || 0) > 1 ? 'actives' : 'active'))),
+      recent.length ? h('section', { class: 'stack tight' }, h('h2', null, 'Dernières arrivées'),
+        h('div', { class: 'list', id: 'ref-recent' }, recent.map(function (x) {
+          return h('div', { class: 'item' },
+            h('div', null, h('div', { class: 't' }, x.label || REF_KIND[x.kind] || ''), h('div', { class: 'small muted' }, (x.label ? REF_KIND[x.kind] + ' · ' : '') + shortDate(x.at))),
+            h('span', { class: 'chip ' + (x.active ? 'ok' : 'wait') }, x.active ? 'Active' : 'Pas encore active'));
+        })),
+        recent.some(function (x) { return x.kind === 'shop'; }) ? h('p', { class: 'small muted' }, 'Une boutique est active après 3 commandes de clientes différentes, dont une livrée.') : null)
+        : h('p', { class: 'small muted' }, 'Personne pour l’instant. Envoyez votre lien à quelqu’un qui envoie ou reçoit des colis.'),
+      forWho === 'person' ? h('details', null, h('summary', null, 'Supprimer mon code'),
+        h('div', { class: 'stack', style: 'margin-top:12px' },
+          h('p', { class: 'small' }, 'Votre nom et votre numéro sont effacés. Votre lien ne marchera plus.'),
+          h('button', { class: 'btn danger', type: 'button', id: 'ref-delete', onclick: function () {
+            api('fiila_referral_card_delete', { p_key: (LS.get(REF_LS, null) || {}).key || null }).then(function () { LS.del(REF_LS); toast('Code supprimé.'); go('#/'); },
+              function (e) { toast(errText(e)); });
+          } }, 'Supprimer'))) : null,
+      footer());
+  }
+
+  /* ----- publication d'un article sur les réseaux de la boutique (partage natif : aucun compte relié) */
+  function productCaption(pr, shop) {
+    var lines = [pr.name, fcfa(pr.price)];
+    if (pr.description) lines.push(pr.description.length > 160 ? pr.description.slice(0, 157).trim() + '…' : pr.description);
+    var n = shop && waNumber(shop.phone);
+    lines.push('', n ? 'Pour commander sur WhatsApp : https://wa.me/' + n : 'Pour commander, écrivez-nous en message privé.');
+    return lines.join('\n');
+  }
+  function dataUrlFile(dataUrl, name) {
+    var m = /^data:([^;,]+);base64,(.*)$/.exec(dataUrl || '');
+    if (!m) return null;
+    try {
+      var bin = atob(m[2]), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      var ext = m[1] === 'image/png' ? 'png' : m[1] === 'image/webp' ? 'webp' : 'jpg';
+      return new File([arr], name + '.' + ext, { type: m[1] });
+    } catch (e) { return null; }
+  }
+  function slugName(s) { return String(s || 'article').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 40) || 'article'; }
+  function publishBox(pr, shop, fresh) {
+    var count = pr.posts || 0;
+    var countEl = h('p', { class: 'small muted', id: 'post-count' }, count ? 'Publié ' + count + ' fois.' : '');
+    var more = h('div', { class: 'stack' });
+    var text = productCaption(pr, shop);
+    function logged() {
+      sapi('fiila_post_log', { p_product_id: pr.id }).then(function (r) { count = r.posts; countEl.textContent = 'Publié ' + count + ' fois.'; }, function () { /* sans effet */ });
+    }
+    function fallback() {
+      setKids(more,
+        h('p', { class: 'small' }, 'Enregistrez la photo, puis collez la légende dans votre publication.'),
+        h('div', { class: 'row' },
+          pr.photo ? h('a', { class: 'btn ghost', id: 'post-download', href: pr.photo, download: slugName(pr.name), onclick: logged }, 'Enregistrer la photo') : null,
+          h('button', { class: 'btn ghost', type: 'button', id: 'post-copy', onclick: function () { copy(text, 'Légende'); if (!pr.photo) logged(); } }, 'Copier la légende')),
+        h('pre', { class: 'caption', id: 'post-caption' }, text));
+    }
+    function publish() {
+      try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(null, function () { /* rien */ }); } catch (e) { /* rien */ }
+      var file = pr.photo ? dataUrlFile(pr.photo, slugName(pr.name)) : null;
+      var data = { text: text };
+      var canFiles = false;
+      try { canFiles = !!(file && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { canFiles = false; }
+      if (canFiles) data.files = [file];
+      if (navigator.share && (canFiles || !file)) {
+        navigator.share(data).then(function () { logged(); toast('Publié. La légende est aussi copiée.'); }, function (e) {
+          if (e && e.name === 'AbortError') return;
+          fallback();
+        });
+      } else fallback();
+    }
+    return h('section', { class: 'card', id: 'publish-box' },
+      h('h2', null, fresh ? 'Article ajouté. Publiez-le' : 'Publier sur vos réseaux'),
+      h('p', { class: 'small muted' }, 'La photo et la légende, prêtes pour Instagram, Facebook, TikTok ou votre statut WhatsApp.'),
+      h('button', { class: 'btn', type: 'button', id: 'product-publish', onclick: publish }, 'Publier'),
+      countEl, more);
+  }
+
+  /* ----- statistiques de croissance (compte administrateur seulement) */
+  var SOURCE_LABEL = { code: 'Code tapé', phone: 'Numéro tapé', link: 'Lien de parrainage', request: 'Demande d’adresse', invoice: 'Facture',
+    address: 'Adresse reçue', meeting: 'Rendez-vous reçu', course: 'Course livreur', watch: 'Suivi de livraison', courier_invite: 'Invitation livreur',
+    post: 'Publication', direct: 'Direct' };
+  function viewStats() {
+    if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.', h('a', { class: 'btn', href: '#/compte' + qs({ retour: 'stats' }) }, 'Se connecter')), footer());
+    return api('fiila_admin_stats', {}).then(function (s) {
+      var T = s.totals;
+      function tile(n, label) { return h('div', { class: 'tile' }, h('strong', null, String(n || 0)), h('span', null, label)); }
+      var src = Object.keys(s.sources || {}).sort(function (a, b) { return s.sources[b] - s.sources[a]; });
+      return page(backBtn(),
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fondateur'), h('h1', null, 'Croissance')),
+        h('div', { class: 'tiles', id: 'stats-totals' },
+          tile(T.shops, 'boutiques'), tile(T.couriers, 'livreurs'), tile(T.addresses, 'adresses actives'), tile(T.meetings, 'rendez-vous actifs'),
+          tile(T.orders, 'commandes'), tile(T.delivered, 'livrées'), tile(T.referred, 'arrivées parrainées'), tile(T.posts, 'publications')),
+        T.pending_phone ? h('p', { class: 'small muted' }, T.pending_phone + ' arrivée(s) avec un numéro pas encore inscrit comme parrain.') : null,
+        h('section', { class: 'stack tight' }, h('h2', null, 'D’où viennent les arrivées (30 jours)'),
+          src.length ? h('div', { class: 'list', id: 'stats-sources' }, src.map(function (k) {
+            return h('div', { class: 'item' }, h('div', { class: 't' }, SOURCE_LABEL[k] || k), h('strong', null, String(s.sources[k])));
+          })) : h('p', { class: 'small muted' }, 'Aucune arrivée enregistrée.')),
+        h('section', { class: 'stack tight' }, h('h2', null, 'Par semaine'),
+          s.weeks.length ? h('div', { class: 'list', id: 'stats-weeks' }, s.weeks.map(function (w) {
+            return h('div', { class: 'item' },
+              h('div', null, h('div', { class: 't' }, 'Semaine du ' + new Date(w.week + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })),
+                h('div', { class: 'small muted' }, Object.keys(w.kinds).map(function (k) { var n = w.kinds[k], l = (REF_KIND[k] || k).toLowerCase(); return n + ' ' + (n > 1 ? l.replace('rendez-vous', 'rendez-vous').replace(/(boutique|adresse|livreur)$/, '$1s') : l); }).join(' · '))),
+              h('strong', null, String(w.total)));
+          })) : h('p', { class: 'small muted' }, '—')),
+        h('section', { class: 'stack tight' }, h('h2', null, 'Meilleurs parrains'),
+          s.top.length ? h('div', { class: 'list', id: 'stats-top' }, s.top.map(function (x) {
+            return h('div', { class: 'item' },
+              h('div', null, h('div', { class: 't' }, x.name || x.code), h('div', { class: 'small muted' }, ({ shop: 'Boutique', courier: 'Livreur', person: 'Particulier' })[x.kind] + ' · ' + x.code)),
+              h('span', { class: 'item-end' }, h('strong', null, String(x.joined)), h('span', { class: 'small muted' }, ' dont ' + x.active + (x.active > 1 ? ' actives' : ' active'))));
+          })) : h('p', { class: 'small muted' }, 'Aucun parrainage pour l’instant.')),
+        footer());
+    }, function (e) {
+      if (e.code === 'not_allowed') return page(backBtn(), stateCard('!', 'Accès réservé', 'Ce compte n’a pas accès aux statistiques.'), footer());
+      return page(backBtn(), stateCard('!', 'Impossible de charger les statistiques', errText(e), retryBtn()), footer());
+    });
+  }
+
   /* ================================================================ routeur */
   var renderSeq = 0;
   function parseHash() {
@@ -1012,8 +1261,12 @@
     var seq = ++renderSeq;
     staleToast();
     var r = parseHash(), p = r.parts, view;
+    noteTouch(p);
     try {
       if (!p.length) view = viewHome();
+      else if (p[0] === 'r' && p[1]) { try { history.replaceState(null, '', location.pathname + location.search + '#/'); } catch (e) { /* rien */ } view = viewHome(); }
+      else if (p[0] === 'parrainer') view = viewReferral(r.q);
+      else if (p[0] === 'stats') view = viewStats();
       else if (p[0] === 'a' && p[1]) view = viewRecipient(p[1]);
       else if (p[0] === 'new') view = viewAddressForm(null, r.q);
       else if (p[0] === 'edit' && p[1]) view = viewAddressForm(p[1], r.q);
@@ -1033,7 +1286,7 @@
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
       else if (p[0] === 'livreur' && p[1] === 'invitation' && p[2]) view = viewCourierInvite(p[2]);
-      else if (p[0] === 'boutique' && p[1] === 'article' && p[2]) view = viewProductForm(p[2]);
+      else if (p[0] === 'boutique' && p[1] === 'article' && p[2]) view = viewProductForm(p[2], r.q);
       else if (p[0] === 'clients' && !p[1]) view = viewCustomers(r.q);
       else if (p[0] === 'clients' && p[1]) view = viewCustomer(p[1]);
       else if (p[0] === 'commande' && p[1] === 'nouvelle') view = viewOrderNew(r.q);
@@ -1116,6 +1369,7 @@
           who),
         h('p', { class: 'promise' }, 'Ton adresse, expliquée une seule fois.'),
         h('p', { class: 'muted small' }, 'La porte exacte, une photo, un repère, et l’endroit où la voiture peut s’arrêter.')),
+      inviteBanner(),
       h('nav', { class: 'actions', 'aria-label': 'Actions principales' },
         h('a', { class: 'btn big full', href: '#/new' }, 'Créer mon adresse'),
         h('a', { class: 'btn ghost', href: '#/', onclick: function (e) { e.preventDefault(); var el = document.getElementById('mes-adresses'); if (el) el.scrollIntoView(); } }, 'Mes adresses'),
@@ -1124,6 +1378,7 @@
         shopBtn),
       accountNudge(),
       listBox,
+      h('a', { class: 'btn link', id: 'invite-link', href: '#/parrainer', style: 'align-self:flex-start' }, 'Inviter un proche'),
       footer());
   }
 
@@ -1155,6 +1410,8 @@
   function retryBtn() { return h('button', { class: 'btn', type: 'button', onclick: render }, 'Réessayer'); }
 
   function addressWizard(d, ctx) {
+    // Origine : demandée seulement pour une adresse créée d'elle-même (pas en réponse à une demande, pas en modification).
+    var refAsk = ctx.editId || ctx.reqToken || ctx.retour ? null : referralAsk('add-ref');
     var step = 1;
     var root = h('div', { class: 'wrap' });
     function saveDraft() {
@@ -1225,7 +1482,8 @@
       } else {
         body = [h('h1', null, ctx.requester ? 'Ce que ' + ctx.requester + ' va recevoir' : 'Ce que verra la personne'),
           fiche({ kind: 'address', label: d.label.trim(), locality: d.locality.trim(), instruction: d.instruction.trim(), entry: d.entry, vehicle_ok: d.vehicle_ok, stop: d.stop, walk: d.walk.trim(), photo: d.photo }),
-          h('p', { class: 'hint' }, 'Modifiable à tout moment.')];
+          h('p', { class: 'hint' }, 'Modifiable à tout moment.'),
+          refAsk ? refAsk.el : null];
       }
       function onNext() {
         if (step === 1 && pickers.entry) pickers.entry.commit();
@@ -1270,6 +1528,8 @@
       }
       return api('fiila_create_place', { p: payload() }).then(function (r) {
         var stored = owned.put({ type: 'place', kind: 'address', id: r.id, owner: r.owner_token, share: r.share_token, label: d.label.trim(), created: Date.now() });
+        attribute('address', r.id, r.owner_token, refAsk ? refAsk.value() : '',
+          ctx.reqToken ? { src: 'request', token: ctx.reqToken } : ctx.retour ? { src: 'address', token: ctx.retour } : null);
         LS.del(DRAFT_KEY);
         LS.set('fiila.saved', true);
         track('fiche_created', ctx.reqToken ? 'address_request' : ctx.retour ? 'address_discovery' : 'address_direct');
@@ -2276,6 +2536,7 @@
       call.then(function (r) {
         if (ctx.editId) { owned.patch('place', ctx.editId, { label: p.label }); toast('Rendez-vous mis à jour. Le lien reste le même.'); go('#/m/' + ctx.editId); return; }
         var stored = owned.put({ type: 'place', kind: 'meeting', id: r.id, owner: r.owner_token, share: r.share_token, label: p.label, created: Date.now() });
+        attribute('meeting', r.id, r.owner_token, '', ctx.retour ? { src: 'address', token: ctx.retour } : null);
         if (ctx.draftKey) LS.del(ctx.draftKey);
         LS.set('fiila.saved', true);
         track('fiche_created', ctx.similarOf ? 'meeting_similar' : ctx.retour ? 'meeting_discovery' : 'meeting_direct');
@@ -2623,11 +2884,12 @@
   function shopForm(shop) {
     var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '', ninea: shop ? shop.ninea || '' : '' };
     var err = h('div', { role: 'alert' });
+    var ask = shop ? null : referralAsk('shop-ref');
     var btn = h('button', { class: 'btn', type: 'button', id: 'shop-save', onclick: function () {
       btn.disabled = true; setKids(err);
       sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: f.ninea.trim() || null } }).then(function (r) {
         if (r && r.key) LS.set(SHOP_LS, { id: r.shop.id, key: r.key, linked: authed() || undefined });
-        if (!shop) { track('shop_created', authed() ? 'account' : 'no_account'); bumpTx(); }
+        if (!shop) { track('shop_created', authed() ? 'account' : 'no_account'); bumpTx(); attribute('shop', null, r.key || shopKey(), ask.value()); }
         ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, shop ? 'Enregistrer' : 'Créer ma boutique');
@@ -2638,6 +2900,7 @@
       textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
       textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
       textField({ id: 'shop-ninea', label: 'NINEA', optional: true, max: 30, value: f.ninea, onInput: function (v) { f.ninea = v; } }),
+      ask ? ask.el : null,
       err, btn,
       shop ? courierSection(shop) : null,
       shop ? shopDeleteBox() : null,
@@ -2779,7 +3042,9 @@
       st.orders ? segField({ name: 'vue', id: 'orders-filter', value: vue,
         options: [['open', 'En cours'], ['unpaid', 'À encaisser'], ['done', 'Terminées'], ['all', 'Toutes']],
         onChange: function (v) { vue = v; try { history.replaceState(null, '', location.pathname + location.search + '#/boutique?vue=' + v); } catch (e) { /* rien */ } setKids(listBox, loading()); load(); } }) : null,
-      st.orders ? listBox : null, footer());
+      st.orders ? listBox : null,
+      h('a', { class: 'btn link', id: 'shop-referral', href: '#/parrainer?pour=boutique', style: 'align-self:flex-start' }, 'Parrainer une boutique'),
+      footer());
   }
 
   /* ----- clients */
@@ -3159,14 +3424,14 @@
         footer());
     }, failPage('Impossible de charger les articles', 'boutique/articles'));
   }
-  function viewProductForm(id) {
+  function viewProductForm(id, q) {
     if (id === 'nouveau') return productForm(null);
-    return sapi('fiila_products', { p_all: true }).then(function (rows) {
-      var pr = rows.filter(function (x) { return x.id === id; })[0];
-      return pr ? productForm(pr) : page(backBtn('Mes articles', '#/boutique/articles'), stateCard('?', 'Article introuvable', ''), footer());
+    return Promise.all([sapi('fiila_products', { p_all: true }), sapi('fiila_shop_get', {}).then(null, function () { return {}; })]).then(function (rr) {
+      var pr = rr[0].filter(function (x) { return x.id === id; })[0];
+      return pr ? productForm(pr, rr[1].shop, q && q.publier === '1') : page(backBtn('Mes articles', '#/boutique/articles'), stateCard('?', 'Article introuvable', ''), footer());
     }, failPage('Impossible de charger l’article', 'boutique/articles'));
   }
-  function productForm(pr) {
+  function productForm(pr, shop, fresh) {
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
     var original = f.photo;
     var err = h('div', { role: 'alert' });
@@ -3180,12 +3445,15 @@
       var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active };
       if (f.photo !== original) p.photo = f.photo ? f.photo.replace(/^data:[^,]+,/, '') : '';
       btn.disabled = true;
-      sapi('fiila_product_save', { p: p }).then(function () {
+      sapi('fiila_product_save', { p: p }).then(function (res) {
         if (!pr) track('product_created', f.photo ? 'photo' : 'no_photo');
+        var nid = res && (res.id || (res.product && res.product.id));
+        if (!pr && nid && p.active !== false) { go('#/boutique/article/' + nid + '?publier=1'); return; }
         toast(pr ? 'Article mis à jour.' : 'Article ajouté.'); go('#/boutique/articles');
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, pr ? 'Enregistrer' : 'Ajouter l’article');
     return page(backBtn('Mes articles', '#/boutique/articles'),
+      pr && pr.active ? publishBox(pr, shop, fresh) : null,
       h('h1', null, pr ? 'Modifier l’article' : 'Nouvel article'),
       photoBox,
       textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; } }),
@@ -3236,6 +3504,7 @@
   function courierForm(pre, onDone) {
     var f = { name: (pre && pre.name) || '', phone: (pre && pre.phone) || '', vehicle: 'moto', zone: '' };
     var err = h('div', { role: 'alert' });
+    var ask = pre ? null : referralAsk('cr-ref');
     var btn = h('button', { class: 'btn', type: 'button', id: 'courier-register', onclick: function () {
       setKids(err);
       if (!f.name.trim()) return errBox(err, new ApiError('name_required'));
@@ -3243,6 +3512,7 @@
       api('fiila_courier_register', { p: { name: f.name.trim(), phone: f.phone.trim() || null, vehicle: f.vehicle, zone: f.zone.trim() || null } }).then(function (r) {
         LS.set(COURIER_LS, { key: r.key });
         track('courier_registered', pre ? 'invite' : 'direct');
+        attribute('courier', null, r.key, ask ? ask.value() : '');
         onDone(r);
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'Créer mon espace livreur');
@@ -3251,6 +3521,7 @@
       textField({ id: 'cr-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
       segField({ legend: 'Vous livrez en', name: 'cr-vehicle', id: 'cr-vehicle', value: f.vehicle, options: Object.keys(VEHICLES).map(function (k) { return [k, VEHICLES[k]]; }), onChange: function (v) { f.vehicle = v; } }),
       textField({ id: 'cr-zone', label: 'Zone', optional: true, max: 60, value: f.zone, placeholder: 'Ex. : Yoff, Ngor, Almadies', onInput: function (v) { f.zone = v; } }),
+      ask ? ask.el : null,
       err, btn);
   }
   function viewCourierHome() {
@@ -3310,6 +3581,7 @@
       h('h2', null, 'Mes courses'), list,
       r.shops.length ? h('p', { class: 'small muted' }, 'Livreur attitré de : ' + r.shops.map(function (s) { return s.name; }).join(', ') + '.')
         : h('p', { class: 'small muted' }, 'Aucune boutique pour l’instant. Demandez à la boutique de vous inviter.'),
+      h('a', { class: 'btn link', id: 'courier-referral', href: '#/parrainer?pour=livreur', style: 'align-self:flex-start' }, 'Parrainer une boutique ou un livreur'),
       h('details', null, h('summary', null, 'Supprimer mon espace livreur'),
         h('div', { class: 'stack', style: 'margin-top:12px' },
           h('p', { class: 'small' }, 'Vos boutiques ne pourront plus vous envoyer de courses.'),
@@ -3420,6 +3692,9 @@
           h('li', null, 'Si vous ouvrez une boutique : son nom, son téléphone et son NINEA s’ils sont indiqués ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii La les héberge pour lui.'),
           h('li', null, 'Si vous êtes livreur : votre nom, et si vous les indiquez votre téléphone, votre moyen de livraison et votre zone. Vos boutiques voient votre nom, votre téléphone et votre note ; les clients voient votre prénom.'),
           h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom. Le commerçant voit la moyenne de ses articles.'),
+          h('li', null, 'Origine et parrainage : quand vous créez une adresse, un rendez-vous, une boutique ou un espace livreur, Fii La note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
+          h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro. Le numéro n’est jamais affiché ; il sert seulement à vous reconnaître quand quelqu’un le tape. Les personnes qui ouvrent votre lien voient votre prénom.'),
+          h('li', null, 'Publication d’un article : Fii La compte seulement qu’une publication a été faite, pas le réseau choisi.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),
         h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un rendez-vous : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),
@@ -3432,6 +3707,7 @@
           h('li', null, 'Demande d’adresse : valable 7 jours, effacée 30 jours après son expiration.'),
           h('li', null, 'Empreinte de l’adresse IP : 24 heures.'),
           h('li', null, 'Commandes, factures et clients d’une boutique : 24 mois au plus, ou moins si le commerçant les supprime. Compte et boutique : jusqu’à leur suppression.'),
+          h('li', null, 'Origine d’une arrivée : autant que la fiche, la boutique ou l’espace livreur concerné. Code de parrainage : jusqu’à ce que vous le supprimiez (page « Inviter un proche »).'),
           h('li', null, 'Adresse donnée à un commerçant pour une commande : il peut la réutiliser pour vos commandes suivantes tant que son lien reste actif. La désactiver ou la supprimer la lui retire.')),
         h('h2', null, 'Vos droits'),
         h('p', null, 'Depuis le téléphone qui a créé la fiche (ou avec sa clé de gestion), vous pouvez à tout moment la consulter, la modifier, désactiver son lien ou la supprimer définitivement.'),

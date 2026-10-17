@@ -23,6 +23,8 @@ const EXPECTED_FUNCTIONS = [
   'fiila_shop_courier', 'fiila_shop_delete',
   // durcissement (20261017250000)
   'fiila_meeting_guest_remove',
+  // origine et parrainage, publications, statistiques (20261018000000)
+  'fiila_admin_stats', 'fiila_attribute', 'fiila_post_log', 'fiila_referral_card_delete', 'fiila_referral_card_save', 'fiila_referral_me', 'fiila_referral_public',
 ].sort();
 const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
@@ -35,7 +37,7 @@ const expectedMigrations = readdirSync(new URL('../supabase/migrations/', import
 check('migrations appliquées dans l’ordre (' + expectedMigrations.length + ')', migrations.map((m) => m.version).join(',') === expectedMigrations.join(','), migrations.map((m) => m.version));
 
 const tables = await q(`select table_name from information_schema.tables where table_schema = 'fiila' order by 1`);
-check('tables présentes', ['courier_invites', 'courier_reviews', 'couriers', 'customers', 'metrics', 'orders', 'payments', 'places', 'products', 'profiles', 'reviews', 'rate_events', 'requests', 'retired_tokens', 'settings', 'shops', 'trackers'].every((t) => tables.some((r) => r.table_name === t)), tables.map((r) => r.table_name));
+check('tables présentes', ['courier_invites', 'courier_reviews', 'couriers', 'customers', 'metrics', 'orders', 'payments', 'places', 'posts', 'products', 'profiles', 'referrals', 'referrers', 'reviews', 'rate_events', 'requests', 'retired_tokens', 'settings', 'shops', 'trackers'].every((t) => tables.some((r) => r.table_name === t)), tables.map((r) => r.table_name));
 
 const usage = await q(`select has_schema_privilege('anon', 'fiila', 'usage') as anon, has_schema_privilege('authenticated', 'fiila', 'usage') as auth`);
 check('schéma fiila fermé à anon et authenticated', !usage[0].anon && !usage[0].auth, usage[0]);

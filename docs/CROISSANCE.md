@@ -1,6 +1,6 @@
 # Fii La : stratégie de croissance organique et parrainage
 
-> Statut : **proposition du 17/10/2026, à valider par le fondateur.** Rien n'est construit.
+> Statut : proposition du 17/10/2026. **Décisions du fondateur (17/10 23:10)** : cible = tout le Sénégal, boutiques et commerçants, particuliers (qui commandent et envoient) et leurs livreurs ; phase 0 validée et construite (voir §9) ; récompenses fixées plus tard par le fondateur, l'argent n'est pas exclu.
 > Document interne.
 
 ## 1. Verdict
@@ -124,3 +124,14 @@ Ne pas viser « tout le Sénégal ». Viser un groupe dense où tout le monde se
 2. Récompenses : mois offerts de la future offre Pro pour les boutiques, plus de courses pour les livreurs, rien en argent ?
 3. Qui pilote les 20 boutiques fondatrices ?
 4. Feu vert pour la phase 0, y compris le bouton « Publier » ?
+
+## 9. Phase 0 construite (17/10/2026)
+
+- **Origine de chaque arrivée** (boutique, livreur, adresse, rendez-vous) : lien de parrainage, code tapé, numéro tapé, ou lien reçu (demande, facture, adresse, rendez-vous, course, suivi, invitation de livreur), sinon « direct ». Première origine gardée 30 jours sur le téléphone ; un lien de parrainage la remplace.
+- **Parrainage par numéro** : à la création d'une boutique, d'un espace livreur ou d'une adresse, « Quelqu'un vous a recommandé Fii La ? » (replié, facultatif) accepte un numéro ou un code. Un numéro pas encore inscrit est gardé et rattaché dès que la personne crée son code ou ouvre une boutique ou un espace livreur avec ce numéro.
+- **Espace « Parrainer »** : boutique, livreur et particulier (« Inviter un proche », avec ou sans compte). Code de 6 caractères, lien `#/r/CODE`, message WhatsApp prêt, compteur des arrivées et des arrivées actives, dernières arrivées.
+- **Bandeau d'invitation** sur l'accueil quand on arrive par un lien de parrainage (prénom ou nom de la boutique seulement).
+- **Bouton « Publier »** sur chaque article : feuille de partage du téléphone avec la photo et la légende (prix, lien WhatsApp de commande), légende copiée ; repli ordinateur : enregistrer la photo, copier la légende. Nombre de publications compté.
+- **Statistiques fondateur** `#/stats` : totaux, origines sur 30 jours, arrivées par semaine, meilleurs parrains. Réservées à un compte marqué administrateur par SQL.
+- **Garde-fous** : pas de parrainage de soi-même (même boutique, livreur, compte ou numéro), une seule origine par arrivée, enregistrée dans l'heure qui suit la création, réponse neutre (on ne dit jamais si un numéro est inscrit), aucun numéro affiché, suppression du code par son titulaire.
+- **Récompenses** : rien n'est attribué. Le comptage « actif » est prêt pour les règles que fixera le fondateur. **Point d'attention si l'argent est retenu** : sans vérification du numéro par SMS, prévoir un contrôle manuel avant chaque paiement et un plafond.

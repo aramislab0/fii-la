@@ -313,7 +313,31 @@ await t('articles : ajout avec photo et prix', async () => {
   await P.fill('#product-name', 'Bissap 1 L');
   await P.fill('#product-price', '1500');
   await P.click('#product-save');
-  await P.getByText('Article ajouté.').waitFor();
+  await P.locator('#publish-box').getByText('Article ajouté. Publiez-le').waitFor();
+  await shot(P, '09a-article-publier');
+  // Partage natif simulé : photo et légende transmises, publication comptée.
+  await P.evaluate(() => {
+    window.__shared = null;
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: (d) => { window.__shared = { text: d.text, files: (d.files || []).map((f) => f.name + '|' + f.type) }; return Promise.resolve(); } });
+  });
+  await P.click('#product-publish');
+  await P.locator('#post-count').getByText('Publié 1 fois.').waitFor();
+  const shared = await P.evaluate(() => window.__shared);
+  if (!/Bissap 1 L/.test(shared.text) || !/1 500 FCFA/.test(shared.text)) throw new Error('légende : ' + shared.text);
+  if (!/^bissap-1-l\.(png|jpg|webp)\|image\//.test(shared.files[0] || '')) throw new Error('photo non partagée : ' + JSON.stringify(shared.files));
+  // Partage annulé : rien n'est compté.
+  await P.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: () => Promise.reject(Object.assign(new Error('x'), { name: 'AbortError' })) }));
+  await P.click('#product-publish');
+  await P.waitForTimeout(400);
+  if (await P.locator('#post-count').textContent() !== 'Publié 1 fois.') throw new Error('annulation comptée');
+  // Sans partage de fichiers (ordinateur) : photo à enregistrer et légende à copier.
+  await P.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined }); });
+  await P.click('#product-publish');
+  await P.locator('#post-caption').getByText('Bissap 1 L').waitFor();
+  await P.locator('#post-download').waitFor();
+  await shot(P, '09b-article-publier-repli');
+  await P.goto(URL0 + '#/boutique/articles');
   await P.locator('#products').getByText('Bissap 1 L').waitFor();
   await P.locator('#products img.thumb').waitFor();
   await shot(P, '09-articles');

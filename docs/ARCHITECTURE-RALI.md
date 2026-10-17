@@ -137,3 +137,11 @@ Proposition faite le 17/10, non validée. Rien n'est construit.
 - **Non retenu :** 3D photoréaliste (Google, Mapbox) : payante et trop lourde pour la 3G.
 - **Étapes proposées :** prototype seul avec un faux trajet → test iPhone du fondateur → branchement livraison puis rendez-vous → plus tard trajet calé sur les rues (service d'itinéraire, choix de coût).
 - **Questions ouvertes pour le fondateur :** ambiance (« Dakar au crépuscule » ou graphique façon jeu), véhicules du départ, périmètre (livraison seule ou aussi rendez-vous), feu vert du prototype.
+
+## 10. Croissance : origine, parrainage, publications (construit le 17/10/2026)
+
+- Tables `fiila.referrers` (parrain : boutique, livreur ou particulier avec clé ou compte ; code unique ; numéro normalisé jamais renvoyé), `fiila.referrals` (une ligne par arrivée : type, cible, source, parrain ou numéro en attente), `fiila.posts` (publication d'un article), `profiles.is_admin`.
+- RPC : `fiila_attribute`, `fiila_referral_me`, `fiila_referral_card_save`, `fiila_referral_card_delete`, `fiila_referral_public`, `fiila_post_log`, `fiila_admin_stats` ; `fiila_products` renvoie `posts`.
+- Arrivée active : boutique = 3 clientes différentes et une commande livrée ; livreur = une course terminée ; adresse ou rendez-vous = fiche active.
+- Client : `noteTouch()` dans le routeur, `attribute()` après chaque création, `referralAsk()`, vues `#/r/CODE`, `#/parrainer[?pour=boutique|livreur]`, `#/stats`, `publishBox()`.
+- Migration `20261018000000_fiila_referrals.sql`. Tests : `tests/referrals.sql.test.mjs`, `tests/referrals.test.mjs`, publication dans `tests/shop.test.mjs`.
