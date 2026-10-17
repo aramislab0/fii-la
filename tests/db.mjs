@@ -17,6 +17,15 @@ export async function createDb() {
       if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
     end $$;
     grant usage on schema public to anon, authenticated;
+    -- Équivalent minimal du schéma auth de Supabase (GoTrue) : utilisateurs et auth.uid().
+    create schema if not exists auth;
+    create table if not exists auth.users (id uuid primary key, email text unique, created_at timestamptz default now());
+    create or replace function auth.uid() returns uuid language sql stable as $$
+      select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
+                      (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid
+    $$;
+    grant usage on schema auth to anon, authenticated;
+    grant execute on function auth.uid() to anon, authenticated;
   `);
   const dir = join(root, 'supabase', 'migrations');
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) {
@@ -25,8 +34,15 @@ export async function createDb() {
   return db;
 }
 
-// Appelle une fonction RPC comme le ferait PostgREST : rôle anon, en-têtes de requête exposés.
-export async function rpc(db, fn, args = {}, { ip = '203.0.113.7', role = 'anon' } = {}) {
+// Crée un utilisateur de test (équivalent d'une inscription GoTrue) et renvoie son identifiant.
+export async function createUser(db, email) {
+  const r = await db.query('insert into auth.users (id, email) values (gen_random_uuid(), $1) returning id', [email]);
+  return r.rows[0].id;
+}
+
+// Appelle une fonction RPC comme le ferait PostgREST : rôle anon (ou authenticated avec uid), en-têtes exposés.
+export async function rpc(db, fn, args = {}, { ip = '203.0.113.7', role = 'anon', uid = null } = {}) {
+  if (uid) role = 'authenticated';
   if (!/^fiila_[a-z_]+$/.test(fn)) return { status: 404, body: { code: 'PGRST202', message: 'not found' } };
   const keys = Object.keys(args);
   for (const k of keys) if (!/^[a-z_]+$/.test(k)) return { status: 400, body: { message: 'bad arg' } };
@@ -39,6 +55,7 @@ export async function rpc(db, fn, args = {}, { ip = '203.0.113.7', role = 'anon'
     const out = await db.transaction(async (tx) => {
       await tx.exec(`set local role ${role}`);
       await tx.query(`select set_config('request.headers', $1, true)`, [JSON.stringify({ 'x-forwarded-for': ip })]);
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [uid ? JSON.stringify({ sub: uid, role: 'authenticated' }) : '']);
       const res = await tx.query(call, params);
       return res.rows[0].r;
     });

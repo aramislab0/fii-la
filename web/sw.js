@@ -4,7 +4,7 @@
    - Réseau d'abord : une nouvelle version déployée est servie dès qu'elle est joignable.
    - Ne touche jamais aux appels à l'API (autre origine, ou /rest/ en local), ni aux tuiles de carte,
      ni à aucune requête autre que GET : aucun contenu de fiche n'est mis en cache. */
-var CACHE = 'fiila-shell-v2';
+var CACHE = 'fiila-shell-v3';
 var SHELL = [
   './', 'index.html', 'theme.js', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest',
   'fonts/montserrat-latin-400-normal.woff2', 'fonts/montserrat-latin-600-normal.woff2', 'fonts/montserrat-latin-800-normal.woff2',
@@ -31,7 +31,7 @@ self.addEventListener('fetch', function (event) {
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.indexOf('/rest/') >= 0) return;
+  if (/\/(rest|auth|functions)\//.test(url.pathname)) return;
   event.respondWith(
     fetch(req).then(function (res) {
       if (res && res.ok && res.type === 'basic') {

@@ -1,0 +1,85 @@
+{
+  "moteur": "chromium",
+  "version": "141.0.7390.37",
+  "date": "2026-10-17T20:47:26.514Z",
+  "reussis": 19,
+  "total": 19,
+  "results": [
+    {
+      "ok": true,
+      "name": "accueil sans compte : « Se connecter » et « Ma boutique » visibles, rien n’est imposé"
+    },
+    {
+      "ok": true,
+      "name": "inscription : compte créé, fiche du téléphone rattachée, nom affiché sur l’accueil"
+    },
+    {
+      "ok": true,
+      "name": "profil : téléphone et photo enregistrés ; mauvais numéro refusé"
+    },
+    {
+      "ok": true,
+      "name": "carnet : classer l’adresse « Maison », visible dans « Mes adresses »"
+    },
+    {
+      "ok": true,
+      "name": "second téléphone : connexion, l’adresse du compte est là et se gère sans clé"
+    },
+    {
+      "ok": true,
+      "name": "session expirée : le jeton est rafraîchi sans que l’utilisateur le voie"
+    },
+    {
+      "ok": true,
+      "name": "boutique : création, tableau de bord vide"
+    },
+    {
+      "ok": true,
+      "name": "nouvelle commande : client, deux articles, total calculé, numéro 0001"
+    },
+    {
+      "ok": true,
+      "name": "cliente : la facture s’ouvre sans compte, sans téléphone affiché, avec « Donner mon adresse »"
+    },
+    {
+      "ok": true,
+      "name": "commerçant : adresse reçue, livraison lancée, lien livreur prêt"
+    },
+    {
+      "ok": true,
+      "name": "livreur puis cliente : la position du livreur apparaît sur la facture de la cliente"
+    },
+    {
+      "ok": true,
+      "name": "paiement Wave puis livraison : la commande passe « Terminée »"
+    },
+    {
+      "ok": true,
+      "name": "client connu : la deuxième commande reprend son adresse, sans la redemander"
+    },
+    {
+      "ok": true,
+      "name": "tableau de bord : compteurs et filtres"
+    },
+    {
+      "ok": true,
+      "name": "annulation : la cliente voit « Commande annulée »"
+    },
+    {
+      "ok": true,
+      "name": "mode sombre : facture lisible"
+    },
+    {
+      "ok": true,
+      "name": "déconnexion : les fiches du téléphone restent, la boutique demande une connexion"
+    },
+    {
+      "ok": true,
+      "name": "suppression du compte : tout ce qui est rattaché est effacé"
+    },
+    {
+      "ok": true,
+      "name": "aucune erreur JavaScript"
+    }
+  ]
+}

@@ -153,7 +153,19 @@
       var list = owned.all().map(function (r) { return r.type === type && r.id === id ? Object.assign({}, r, fields) : r; });
       LS.set('fiila.owned', list);
     },
-    remove: function (type, id) { LS.set('fiila.owned', owned.all().filter(function (r) { return !(r.type === type && r.id === id); })); }
+    remove: function (type, id) { LS.set('fiila.owned', owned.all().filter(function (r) { return !(r.type === type && r.id === id); })); },
+    // Fiche gérable ici : clé de ce téléphone, ou compte connecté (le serveur vérifie, owner = null).
+    get: function (type, id) {
+      var r = owned.find(type, id);
+      if (r) return r;
+      return authed() ? { type: type, id: id, owner: null, account: true } : null;
+    },
+    // Mise à jour qui crée l'entrée locale si la fiche n'est connue que par le compte.
+    upsert: function (type, id, fields) {
+      var r = owned.find(type, id);
+      if (r) owned.patch(type, id, fields);
+      else owned.put(Object.assign({ type: type, id: id, owner: null, created: Date.now() }, fields));
+    }
   };
 
   /* ================================================================ API */
@@ -187,7 +199,40 @@
     place_revoked: 'Cette adresse est désactivée. Choisissez-en une autre.',
     not_an_address: 'Choisissez une adresse, pas un rendez-vous.',
     invalid_kind: 'Type de fiche non valide.',
-    invalid_payload: 'Données non valides.'
+    invalid_payload: 'Données non valides.',
+    // comptes
+    auth_required: 'Connectez-vous pour continuer.',
+    session_expired: 'Votre session a expiré. Reconnectez-vous.',
+    invalid_credentials: 'E-mail ou mot de passe incorrect.',
+    user_already_exists: 'Un compte existe déjà avec cet e-mail. Connectez-vous.',
+    email_exists: 'Un compte existe déjà avec cet e-mail. Connectez-vous.',
+    weak_password: 'Mot de passe trop court : 8 caractères au moins.',
+    same_password: 'Choisissez un mot de passe différent de l’actuel.',
+    email_address_invalid: 'Cette adresse e-mail n’est pas valide.',
+    validation_failed: 'Vérifiez l’e-mail et le mot de passe.',
+    email_not_confirmed: 'Confirmez d’abord votre e-mail : ouvrez le lien reçu par e-mail.',
+    over_email_send_rate_limit: 'Trop d’e-mails envoyés. Réessayez dans une heure.',
+    over_request_rate_limit: 'Trop de tentatives. Réessayez dans quelques minutes.',
+    signup_disabled: 'Les inscriptions sont fermées pour le moment.',
+    phone_invalid: 'Numéro de téléphone non valide.',
+    invalid_tag: 'Étiquette non valide.',
+    // boutique
+    shop_required: 'Créez d’abord votre boutique.',
+    shop_name_required: 'Donnez un nom à votre boutique.',
+    customer_name_required: 'Indiquez le nom du client.',
+    customer_not_found: 'Client introuvable.',
+    order_not_found: 'Commande introuvable.',
+    items_required: 'Ajoutez au moins un article.',
+    item_label_required: 'Chaque article doit avoir un nom.',
+    invalid_qty: 'Quantité non valide.',
+    invalid_price: 'Montant non valide.',
+    invalid_method: 'Moyen de paiement non valide.',
+    invalid_status: 'Statut non valide.',
+    not_fulfilled: 'Le client n’a pas encore donné son adresse.',
+    order_closed: 'Cette commande est clôturée.',
+    address_already: 'L’adresse est déjà reçue ou demandée.',
+    payment_not_found: 'Paiement introuvable.',
+    too_many: 'Limite atteinte.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
   ApiError.prototype = Object.create(Error.prototype);
@@ -195,10 +240,121 @@
 
   function apiHeaders() {
     var headers = { 'Content-Type': 'application/json', apikey: API_KEY, Accept: 'application/json' };
-    if (/^eyJ/.test(API_KEY)) headers.Authorization = 'Bearer ' + API_KEY;
+    if (SESSION && SESSION.access_token) headers.Authorization = 'Bearer ' + SESSION.access_token;
+    else if (/^eyJ/.test(API_KEY)) headers.Authorization = 'Bearer ' + API_KEY;
     return headers;
   }
-  function api(fn, args) {
+
+  /* ================================================================ COMPTE (Supabase Auth, sans bibliothèque)
+     Le compte est facultatif. Connecté, chaque appel porte le jeton d'accès : le serveur reconnaît
+     alors les fiches du compte (auth.uid()) en plus des clés de gestion du téléphone. */
+  var SESSION_KEY = 'fiila.session';
+  var SESSION = LS.get(SESSION_KEY, null);
+  var ME = null; // profil chargé : { email, display_name, avatar, shop }
+  function authed() { return !!(SESSION && SESSION.access_token); }
+  function nowSec() { return Math.floor(Date.now() / 1000); }
+  function saveSession(s) {
+    if (!s || !s.access_token) { SESSION = null; ME = null; LS.del(SESSION_KEY); return null; }
+    SESSION = { access_token: s.access_token, refresh_token: s.refresh_token,
+      expires_at: s.expires_at || (nowSec() + (s.expires_in || 3600)),
+      user: s.user ? { id: s.user.id, email: s.user.email } : (SESSION && SESSION.user) || null };
+    LS.set(SESSION_KEY, SESSION);
+    return SESSION;
+  }
+  function authCall(path, method, body, withToken) {
+    if (!API_URL) return Promise.reject(new ApiError('not_configured'));
+    if (navigator.onLine === false) return Promise.reject(new ApiError('network'));
+    var headers = { 'Content-Type': 'application/json', apikey: API_KEY };
+    if (withToken && SESSION) headers.Authorization = 'Bearer ' + SESSION.access_token;
+    return fetch(API_URL + '/auth/v1' + path, {
+      method: method, headers: headers, body: body ? JSON.stringify(body) : undefined, cache: 'no-store', credentials: 'omit'
+    }).then(function (res) {
+      return res.text().then(function (txt) {
+        var b = null;
+        try { b = txt ? JSON.parse(txt) : null; } catch (e) { b = null; }
+        if (res.ok) return b;
+        var code = (b && (b.error_code || b.code || b.error)) || 'server';
+        if (code === 'invalid_grant' && /confirm/i.test((b && (b.error_description || b.msg)) || '')) code = 'email_not_confirmed';
+        if (code === 'invalid_grant') code = 'invalid_credentials';
+        if (res.status === 429) code = 'over_request_rate_limit';
+        throw new ApiError(typeof code === 'string' ? code : 'server');
+      });
+    }, function () { throw new ApiError('network'); });
+  }
+  var refreshing = null;
+  function refreshSession() {
+    if (!SESSION || !SESSION.refresh_token) return Promise.reject(new ApiError('session_expired'));
+    if (refreshing) return refreshing;
+    refreshing = authCall('/token?grant_type=refresh_token', 'POST', { refresh_token: SESSION.refresh_token }).then(function (s) {
+      refreshing = null; saveSession(s); return s;
+    }, function (e) {
+      refreshing = null;
+      if (e.code !== 'network' && e.code !== 'timeout') { saveSession(null); throw new ApiError('session_expired'); }
+      throw e;
+    });
+    return refreshing;
+  }
+  function freshToken() {
+    if (!SESSION || SESSION.expires_at - 60 > nowSec()) return Promise.resolve();
+    return refreshSession().then(function () {}, function () {});
+  }
+  // Après connexion : les fiches de ce téléphone rejoignent le compte (seules celles dont on a la clé).
+  function afterLogin(name) {
+    var items = owned.all().filter(function (r) { return r.owner; }).map(function (r) { return { type: r.type, id: r.id, owner: r.owner }; });
+    return (items.length ? api('fiila_claim', { p_items: items.slice(0, 200) }) : Promise.resolve({ claimed: 0 })).then(function (c) {
+      return (name ? api('fiila_profile_save', { p: { display_name: name } }) : api('fiila_me', {})).then(function (me) { ME = me; return c; });
+    });
+  }
+  var account = {
+    signUp: function (email, password, name) {
+      return authCall('/signup?redirect_to=' + encodeURIComponent(baseUrl()), 'POST', { email: email, password: password, data: { display_name: name || undefined } })
+        .then(function (r) {
+          if (r && r.access_token) { saveSession(r); track('account_created', 'account'); return afterLogin(name).then(function (c) { return { session: true, claimed: c.claimed }; }); }
+          return { confirm: true };
+        });
+    },
+    signIn: function (email, password) {
+      return authCall('/token?grant_type=password', 'POST', { email: email, password: password }).then(function (r) {
+        saveSession(r); return afterLogin(null);
+      });
+    },
+    signOut: function () {
+      var done = function () {
+        saveSession(null);
+        // On garde sur ce téléphone les fiches dont il a la clé ; celles du compte seul disparaissent d'ici.
+        LS.set('fiila.owned', owned.all().filter(function (r) { return r.owner; }));
+      };
+      return authCall('/logout', 'POST', null, true).then(done, done);
+    },
+    setPassword: function (pw) { return freshToken().then(function () { return authCall('/user', 'PUT', { password: pw }, true); }); },
+    recover: function (email) { return authCall('/recover?redirect_to=' + encodeURIComponent(baseUrl()), 'POST', { email: email }); },
+    me: function () {
+      if (!authed()) return Promise.resolve(null);
+      if (ME) return Promise.resolve(ME);
+      return api('fiila_me', {}).then(function (m) { ME = m; return m; }, function (e) { if (e.code === 'session_expired' || e.code === 'auth_required') { saveSession(null); return null; } throw e; });
+    }
+  };
+  // Retour d'un lien reçu par e-mail (confirmation, mot de passe oublié) : #access_token=…&type=…
+  (function captureAuthRedirect() {
+    var hs = (location.hash || '').replace(/^#/, '');
+    if (!/(^|&)(access_token|error)=/.test(hs)) return;
+    var p = new URLSearchParams(hs);
+    var dest = '#/compte';
+    if (p.get('access_token')) {
+      saveSession({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token'),
+        expires_at: +p.get('expires_at') || 0, expires_in: +p.get('expires_in') || 3600 });
+      dest = p.get('type') === 'recovery' ? '#/compte?mdp=1' : '#/compte?bienvenue=1';
+    } else dest = '#/compte?lien=invalide';
+    try { history.replaceState(null, '', location.pathname + location.search + dest); } catch (e) { location.hash = dest; }
+  })();
+
+  function api(fn, args, retried) {
+    return freshToken().then(function () { return rawApi(fn, args); }).catch(function (e) {
+      if (e.code === 'jwt_expired' && !retried && SESSION) return refreshSession().then(function () { return api(fn, args, true); });
+      throw e;
+    });
+  }
+  function rawApi(fn, args) {
     if (!API_URL) return Promise.reject(new ApiError('not_configured'));
     if (navigator.onLine === false) return Promise.reject(new ApiError('network'));
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -212,6 +368,7 @@
         var body = null;
         try { body = txt ? JSON.parse(txt) : null; } catch (e) { body = null; }
         if (res.ok) return body;
+        if (res.status === 401) throw new ApiError(SESSION ? 'jwt_expired' : 'server');
         var m = body && body.message && /fiila:([a-z_]+)/.exec(body.message);
         throw new ApiError(m ? m[1] : 'server');
       });
@@ -250,6 +407,11 @@
      Jamais d'adresse, de coordonnées, de photo, de clé ni de jeton de lien.
      Envoi silencieux : un échec n'a aucun effet sur l'affichage ou la création. */
   var TRACKABLE = {
+    account_created: ['account'],
+    shop_created: ['shop'],
+    order_created: ['new_customer', 'known_customer', 'known_address'],
+    invoice_opened: ['order'],
+    payment_recorded: ['cash', 'wave', 'orange_money', 'card', 'other'],
     discovery_shown: ['address', 'meeting'],
     discovery_cta: ['address', 'meeting'],
     fiche_created: ['address_direct', 'address_discovery', 'address_request', 'meeting_direct', 'meeting_discovery', 'meeting_similar'],
@@ -633,13 +795,13 @@
     return 'data:image/jpeg;base64,' + btoa(s);
   }
   // Réduit, recompresse en JPEG puis retire les métadonnées (dont la position GPS).
-  function compressPhoto(file) {
+  function compressPhoto(file, maxSide) {
     if (!file || !/^image\//.test(file.type || '')) return Promise.reject(new Error('Ce fichier n’est pas une image.'));
     if (file.size > 25 * 1024 * 1024) return Promise.reject(new Error('Image trop lourde (25 Mo maximum).'));
     return blobToImage(file).then(function (img) {
       var w = img.width || img.naturalWidth, hh = img.height || img.naturalHeight;
       if (!w || !hh) throw new Error('Impossible de lire cette image.');
-      var max = 1280, s = Math.min(1, max / Math.max(w, hh));
+      var max = maxSide || 1280, s = Math.min(1, max / Math.max(w, hh));
       var c = document.createElement('canvas');
       c.width = Math.round(w * s); c.height = Math.round(hh * s);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
@@ -687,8 +849,9 @@
   function textField(o) {
     var counter = o.max ? h('span', { class: 'counter', 'aria-hidden': 'true' }, (o.value || '').length + ' / ' + o.max) : null;
     var input = h(o.multiline ? 'textarea' : 'input', {
-      id: o.id, type: o.multiline ? null : 'text', maxlength: o.max ? String(o.max) : null, placeholder: o.placeholder || null,
-      value: o.value || '', autocomplete: 'off', 'aria-describedby': o.hint ? o.id + '-hint' : null,
+      id: o.id, type: o.multiline ? null : (o.type || 'text'), maxlength: o.max ? String(o.max) : null, placeholder: o.placeholder || null,
+      value: o.value || '', autocomplete: o.autocomplete || 'off', inputmode: o.inputmode || null, required: o.required || null,
+      'aria-describedby': o.hint ? o.id + '-hint' : null,
       oninput: function (e) { if (counter) counter.textContent = e.target.value.length + ' / ' + o.max; o.onInput(e.target.value); }
     });
     return h('div', { class: 'field' },
@@ -775,6 +938,14 @@
       else if (p[0] === 'l' && p[1]) view = viewCourier(p[1]);
       else if (p[0] === 's' && p[1]) view = viewWatch(p[1]);
       else if (p[0] === 'cle') view = viewRestore(null);
+      else if (p[0] === 'compte') view = viewAccount(r.q);
+      else if (p[0] === 'boutique' && !p[1]) view = viewShop(r.q);
+      else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
+      else if (p[0] === 'clients' && !p[1]) view = viewCustomers(r.q);
+      else if (p[0] === 'clients' && p[1]) view = viewCustomer(p[1]);
+      else if (p[0] === 'commande' && p[1] === 'nouvelle') view = viewOrderNew(r.q);
+      else if (p[0] === 'commande' && p[1]) view = viewOrder(p[1], r.q);
+      else if (p[0] === 'f' && p[1]) view = viewInvoice(p[1]);
       else if (p[0] === 'confidentialite') view = viewPrivacy();
       else view = page(backBtn(), stateCard('?', 'Page introuvable', 'Ce lien n’est pas valide.'));
     } catch (e) {
@@ -792,7 +963,7 @@
   function viewHome() {
     var listBox = h('div', { class: 'stack' });
     var recs = owned.all();
-    if (recs.length) {
+    if (recs.length || authed()) {
       listBox.append(loading('Chargement de vos fiches…'));
       api('fiila_owned_summaries', { p_items: recs.map(function (r) { return { type: r.type, id: r.id, owner: r.owner }; }) })
         .then(function (rows) { drawLists(rows, false); }, function (e) {
@@ -821,11 +992,11 @@
         h('section', { class: 'stack', id: 'mes-adresses', 'aria-labelledby': 'h-adr' },
           h('h2', { id: 'h-adr' }, 'Mes adresses'),
           addrs.length ? h('div', { class: 'list' }, addrs.map(function (x) {
-            return item(x, '#/m/' + x.id, x.label || 'Adresse', x.locality,
+            return item(x, '#/m/' + x.id, x.label || 'Adresse', [x.tag ? TAGS[x.tag] : null, x.locality].filter(Boolean).join(' · '),
               x.cached ? null : x.status === 'active' ? chip('ok', 'Lien actif') : chip('off', 'Lien désactivé'));
           })) : h('div', { class: 'card' },
-            h('p', null, 'Aucune adresse sur ce téléphone.'),
-            h('p', { class: 'small muted' }, 'Vos fiches sont liées à ce téléphone. Pour en gérer une depuis un autre appareil, utilisez sa clé de gestion.'))),
+            h('p', null, authed() ? 'Aucune adresse pour l’instant.' : 'Aucune adresse sur ce téléphone.'),
+            authed() ? null : h('p', { class: 'small muted' }, 'Connectez-vous pour retrouver vos adresses sur tous vos téléphones.'))),
         reqs.length ? h('section', { class: 'stack', 'aria-labelledby': 'h-req' }, h('h2', { id: 'h-req' }, 'Mes demandes'),
           h('div', { class: 'list' }, reqs.map(function (x) {
             return item(x, '#/demande/' + x.id, x.purpose || 'Demande', x.requester_name ? 'De : ' + x.requester_name : null,
@@ -838,16 +1009,26 @@
           }))) : null);
     }
 
+    var who = h('a', { class: 'who', id: 'account-link', href: '#/compte' }, authed() ? avatarEl(null, 32) : null, authed() ? 'Mon compte' : 'Se connecter');
+    if (authed()) account.me().then(function (me) {
+      if (!me) { setKids(who, 'Se connecter'); return; }
+      setKids(who, avatarEl(me, 32), h('span', { class: 'who-name' }, me.display_name || 'Mon compte'));
+      if (me.shop) shopBtn.textContent = me.shop.name;
+    }, function () { /* hors ligne : on garde le lien */ });
+    var shopBtn = h('a', { class: 'btn ghost full', id: 'shop-link', href: '#/boutique' }, 'Ma boutique');
     return page(
       h('header', { class: 'stack tight' },
-        h('div', { class: 'brand' }, h('span', { class: 'mark', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La'))),
+        h('div', { class: 'brand-row' },
+          h('div', { class: 'brand' }, h('span', { class: 'mark', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La'))),
+          who),
         h('p', { class: 'promise' }, 'Ton adresse, expliquée une seule fois.'),
         h('p', { class: 'muted small' }, 'La porte exacte, une photo, un repère, et l’endroit où la voiture peut s’arrêter.')),
       h('nav', { class: 'actions', 'aria-label': 'Actions principales' },
         h('a', { class: 'btn big full', href: '#/new' }, 'Créer mon adresse'),
         h('a', { class: 'btn ghost', href: '#/', onclick: function (e) { e.preventDefault(); var el = document.getElementById('mes-adresses'); if (el) el.scrollIntoView(); } }, 'Mes adresses'),
         h('a', { class: 'btn ghost', href: '#/demande/nouvelle' }, 'Demander une adresse'),
-        h('a', { class: 'btn ghost full', href: '#/rdv/nouveau' }, 'Créer un rendez-vous')),
+        h('a', { class: 'btn ghost full', href: '#/rdv/nouveau' }, 'Créer un rendez-vous'),
+        shopBtn),
       listBox,
       footer());
   }
@@ -859,17 +1040,17 @@
   function viewAddressForm(editId, q) {
     var reqToken = q && q.d && /^[A-Za-z0-9_-]{16,64}$/.test(q.d) ? q.d : null;
     if (editId) {
-      var rec = owned.find('place', editId);
+      var rec = owned.get('place', editId);
       if (!rec) return page(backBtn(), stateCard('?', 'Fiche introuvable sur ce téléphone', 'Utilisez sa clé de gestion pour la gérer ici.'));
-      return api('fiila_get_owned', { p_id: editId, p_owner: rec.owner }).then(function (pl) {
+      return api('fiila_get_owned', { p_id: editId, p_owner: rec.owner || null }).then(function (pl) {
         var d = { label: pl.label || '', locality: pl.locality || '', entry: { lat: pl.entry.lat, lng: pl.entry.lng, acc: pl.entry_acc, src: 'saved' },
           vehicle_ok: pl.vehicle_ok, stop: pl.stop ? { lat: pl.stop.lat, lng: pl.stop.lng, src: 'saved' } : null,
           walk: pl.walk || '', instruction: pl.instruction || '', photo: pl.photo || null };
-        return addressWizard(d, { editId: editId, owner: rec.owner, originalPhoto: pl.photo || null });
+        return addressWizard(d, { editId: editId, owner: rec.owner || null, originalPhoto: pl.photo || null });
       }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger la fiche', errText(e), retryBtn())); });
     }
     var draft = LS.get(DRAFT_KEY, null) || blankAddress();
-    return addressWizard(draft, { reqToken: reqToken, retour: tokenParam(q && q.retour) });
+    return addressWizard(draft, { reqToken: reqToken, f: tokenParam(q && q.f), retour: tokenParam(q && q.retour) });
   }
   function retryBtn() { return h('button', { class: 'btn', type: 'button', onclick: render }, 'Réessayer'); }
 
@@ -946,7 +1127,7 @@
       setKids(root, 
         step > 1 ? h('button', { class: 'back', type: 'button', onclick: function () { step--; draw(); } }, '← Étape précédente')
           : ctx.retour ? backBtn('Revenir à la fiche reçue', '#/a/' + ctx.retour)
-          : backBtn(ctx.reqToken ? 'Retour à la demande' : ctx.editId ? 'Retour à la fiche' : 'Accueil', ctx.reqToken ? '#/d/' + ctx.reqToken : ctx.editId ? '#/m/' + ctx.editId : '#/'),
+          : backBtn(ctx.reqToken ? 'Retour à la demande' : ctx.editId ? 'Retour à la fiche' : 'Accueil', ctx.reqToken ? '#/d/' + ctx.reqToken + qs({ f: ctx.f }) : ctx.editId ? '#/m/' + ctx.editId : '#/'),
         h('div', { class: 'stack tight' },
           h('p', { class: 'eyebrow' }, (ctx.editId ? 'Modifier · ' : '') + 'Étape ' + step + ' sur 4'),
           h('div', { class: 'steps', 'aria-hidden': 'true' }, [1, 2, 3, 4].map(function (i) { return h('i', { class: i <= step ? 'on' : '' }); }))),
@@ -967,7 +1148,7 @@
     }
     function publish() {
       if (ctx.editId) {
-        return api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner, p: payload() }).then(function (pl) {
+        return api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner || null, p: payload() }).then(function (pl) {
           owned.patch('place', ctx.editId, { label: pl.label });
           toast('Modifications enregistrées. Le lien reste le même.');
           go('#/m/' + ctx.editId);
@@ -980,7 +1161,7 @@
         track('fiche_created', ctx.reqToken ? 'address_request' : ctx.retour ? 'address_discovery' : 'address_direct');
         if (!stored) toast('Fiche enregistrée, mais ce téléphone n’a pas pu garder la clé de gestion. Copiez-la sur la page suivante.');
         else toast('Adresse enregistrée.');
-        if (ctx.reqToken) go('#/d/' + ctx.reqToken + '?sel=' + r.id);
+        if (ctx.reqToken) go('#/d/' + ctx.reqToken + qs({ sel: r.id, f: ctx.f }));
         else go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour, nouveau: '1' }));
       });
     }
@@ -993,9 +1174,10 @@
     var q = parseHash().q;
     var rec = owned.find('place', id);
     var owner = rec ? rec.owner : q.k;
-    if (!owner) return page(backBtn(), stateCard('?', 'Cette fiche n’est pas gérée sur ce téléphone', 'Ouvrez sa clé de gestion sur ce téléphone pour la gérer ici.', h('a', { class: 'btn', href: '#/cle' }, 'Restaurer une clé')));
-    return api('fiila_get_owned', { p_id: id, p_owner: owner }).then(function (pl) {
+    if (!owner && !authed()) return page(backBtn(), stateCard('?', 'Cette fiche n’est pas gérée sur ce téléphone', 'Ouvrez sa clé de gestion sur ce téléphone pour la gérer ici.', h('a', { class: 'btn', href: '#/cle' }, 'Restaurer une clé')));
+    return api('fiila_get_owned', { p_id: id, p_owner: owner || null }).then(function (pl) {
       if (rec && rec.share !== pl.share_token) owned.patch('place', id, { share: pl.share_token, label: pl.label });
+      owner = owner || null;
       return manageView(pl, owner, tokenParam(q.retour), q.nouveau === '1');
     }, function (e) {
       if (e.code === 'not_found') {
@@ -1019,7 +1201,7 @@
 
     function act(fn, okText, then) {
       if (busy) return; busy = true;
-      api(fn, { p_id: pl.id, p_owner: owner }).then(function (res) {
+      api(fn, { p_id: pl.id, p_owner: owner || null }).then(function (res) {
         busy = false; toast(okText); then(res);
       }, function (e) { busy = false; setKids(zone, h('p', { class: 'alert' }, errText(e))); });
     }
@@ -1040,7 +1222,7 @@
         setKids(qrBox, h('img', { src: qr.createDataURL(6), alt: 'QR code : ' + url, id: 'qr-img' }));
       }, function () { qrBox.replaceWith(h('p', { class: 'small muted' }, 'QR code indisponible pour le moment.')); });
     }
-    var key = keyUrl('place', pl.id, owner);
+    var key = owner ? keyUrl('place', pl.id, owner) : null;
 
     var variant = isMeeting ? 'meeting' : 'address';
     return page(
@@ -1074,6 +1256,8 @@
         h('button', { class: 'btn danger', type: 'button', id: 'delete', onclick: askDelete }, 'Supprimer')),
       pl.status !== 'active' && !expired ? h('p', { class: 'hint' }, 'Le lien désactivé n’affiche plus aucune information. Un nouveau lien le remplacera définitivement.') : null,
       zone,
+      !isMeeting ? tagPicker(pl, owner) : null,
+      !key ? h('p', { class: 'hint' }, 'Fiche rattachée à votre compte : retrouvez-la sur tous vos téléphones en vous connectant.') :
       h('details', null,
         h('summary', null, 'Clé de gestion (pour un autre téléphone)'),
         h('div', { class: 'stack', style: 'margin-top:10px' },
@@ -1545,8 +1729,8 @@
     var err = h('div', { role: 'alert' });
     function create(ev) {
       var b = ev && ev.currentTarget; if (b) b.disabled = true; setKids(err);
-      api('fiila_start_delivery', { p_kind: kindParam, p_id: rec.id, p_owner: rec.owner }).then(function (r) {
-        owned.patch(type, rec.id, { delivery: { courier: r.courier_token, watch: r.watch_token } });
+      api('fiila_start_delivery', { p_kind: kindParam, p_id: rec.id, p_owner: rec.owner || null }).then(function (r) {
+        owned.upsert(type, rec.id, { delivery: { courier: r.courier_token, watch: r.watch_token } });
         track('delivery_started', kindParam);
         draw();
       }, function (e) { if (b) b.disabled = false; setKids(err, h('p', { class: 'alert' }, errText(e))); });
@@ -1693,9 +1877,9 @@
 
   /* ================================================================ DEMANDE D'ADRESSE */
   function viewRequestNew(q) {
-    var src = q && q.depuis ? owned.find('request', q.depuis) : null;
+    var src = q && q.depuis ? owned.get('request', q.depuis) : null;
     if (src) {
-      return api('fiila_get_request_owner', { p_id: src.id, p_owner: src.owner }).then(function (old) {
+      return api('fiila_get_request_owner', { p_id: src.id, p_owner: src.owner || null }).then(function (old) {
         return requestForm({ requester_name: old.requester_name || '', purpose: old.purpose || '', order_ref: '' });
       }, function () { return requestForm({ requester_name: '', purpose: '', order_ref: '' }); });
     }
@@ -1729,13 +1913,13 @@
   }
 
   function viewRequestOwner(id) {
-    var rec = owned.find('request', id);
+    var rec = owned.get('request', id);
     if (!rec) return page(backBtn(), stateCard('?', 'Demande introuvable sur ce téléphone', 'Ouvrez sa clé de gestion pour la voir ici.'));
-    return api('fiila_get_request_owner', { p_id: id, p_owner: rec.owner }).then(function (q) {
+    return api('fiila_get_request_owner', { p_id: id, p_owner: rec.owner || null }).then(function (q) {
       var url = requestUrl(q.share_token);
       var msg = q.requester_name + ' vous demande votre adresse pour : ' + q.purpose + (q.order_ref ? ' (réf. ' + q.order_ref + ')' : '') + '.\nRépondez ici : ' + url;
       var zone = h('div', { class: 'stack' });
-      var key = keyUrl('request', q.id, rec.owner);
+      var key = rec.owner ? keyUrl('request', q.id, rec.owner) : null;
       var head = h('div', { class: 'stack tight' },
         h('p', { class: 'eyebrow' }, 'Demande d’adresse'),
         h('h1', { class: 'wrapword' }, q.purpose),
@@ -1746,12 +1930,12 @@
           h('p', { class: 'small' }, 'Vous ne verrez plus la réponse. L’adresse du client n’est pas supprimée : elle lui appartient.'),
           h('div', { class: 'row' },
             h('button', { class: 'btn danger-fill', type: 'button', onclick: function () {
-              api('fiila_delete_request', { p_id: q.id, p_owner: rec.owner }).then(function () { owned.remove('request', q.id); toast('Demande supprimée.'); go('#/'); },
+              api('fiila_delete_request', { p_id: q.id, p_owner: rec.owner || null }).then(function () { owned.remove('request', q.id); toast('Demande supprimée.'); go('#/'); },
                 function (e) { setKids(zone, h('p', { class: 'alert' }, errText(e))); });
             } }, 'Supprimer'),
             h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(zone); } }, 'Annuler'))));
       } }, 'Supprimer la demande');
-      var keyBox = h('details', null, h('summary', null, 'Clé de gestion de la demande'),
+      var keyBox = !key ? null : h('details', null, h('summary', null, 'Clé de gestion de la demande'),
         h('div', { class: 'stack', style: 'margin-top:10px' },
           h('p', { class: 'small' }, 'Permet de consulter la réponse depuis un autre téléphone. Ne la partagez pas.'),
           h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(key, 'Clé de gestion'); } }, 'Copier la clé de gestion')));
@@ -1798,19 +1982,20 @@
       var err = h('div', { role: 'alert' });
       var mine = owned.all().filter(function (x) { return x.type === 'place' && (x.kind || 'address') === 'address'; });
       var sel = q && q.sel;
+      var backInvoice = tokenParam(q && q.f);
 
       function showPreview() {
         setKids(prev);
         if (!sel) return;
-        var rec = owned.find('place', sel);
+        var rec = owned.get('place', sel);
         if (!rec) return;
         prev.append(loading('Préparation de l’aperçu…'));
-        api('fiila_get_owned', { p_id: sel, p_owner: rec.owner }).then(function (pl) {
+        api('fiila_get_owned', { p_id: sel, p_owner: rec.owner || null }).then(function (pl) {
           var send = h('button', { class: 'btn', type: 'button', id: 'send-address', onclick: function () {
             send.disabled = true; send.textContent = 'Envoi…'; setKids(err);
-            api('fiila_fulfill_request', { p_token: token, p_place_id: sel, p_place_owner: rec.owner }).then(function () {
+            api('fiila_fulfill_request', { p_token: token, p_place_id: sel, p_place_owner: rec.owner || null }).then(function () {
               setKids(app, page(stateCard('✓', 'Adresse envoyée', r.requester_name + ' peut maintenant voir votre fiche. Vous pouvez la désactiver ou la supprimer à tout moment depuis « Mes adresses ».',
-                h('a', { class: 'btn', href: '#/m/' + sel }, 'Gérer mon adresse')), footer()));
+                backInvoice ? h('a', { class: 'btn', id: 'back-invoice', href: '#/f/' + backInvoice }, 'Revenir à ma commande') : h('a', { class: 'btn', href: '#/m/' + sel }, 'Gérer mon adresse')), footer()));
               window.scrollTo(0, 0);
             }, function (e) {
               send.disabled = false; send.textContent = 'Réessayer l’envoi';
@@ -1821,23 +2006,24 @@
         }, function (e) { setKids(prev, h('p', { class: 'alert' }, errText(e))); });
       }
 
-      if (mine.length) {
+      if (mine.length || authed()) {
         api('fiila_owned_summaries', { p_items: mine.map(function (x) { return { type: 'place', id: x.id, owner: x.owner }; }) }).then(function (rows) {
-          var usable = rows.filter(function (x) { return !x.missing && x.status === 'active'; });
+          var usable = rows.filter(function (x) { return !x.missing && x.status === 'active' && (x.kind || 'address') === 'address'; });
           if (sel && !usable.some(function (x) { return x.id === sel; })) sel = null;
           if (!sel && usable.length === 1) sel = usable[0].id;
           setKids(listBox);
           add(listBox, usable.length ? [h('h2', null, 'Choisir une de mes adresses'),
             h('div', { class: 'choice one', role: 'radiogroup' }, usable.map(function (x) {
               return h('label', null, h('input', { type: 'radio', name: 'pick', value: x.id, checked: x.id === sel, onchange: function () { sel = x.id; showPreview(); } }),
-                h('span', { class: 'wrapword' }, x.label + (x.locality ? ' · ' + x.locality : '')));
+                h('span', { class: 'wrapword' }, (x.tag ? TAGS[x.tag] + ' · ' : '') + x.label + (x.locality ? ' · ' + x.locality : '')));
             }))] : h('p', { class: 'muted' }, 'Aucune adresse active sur ce téléphone.'));
           showPreview();
         }, function (e) { setKids(listBox, h('p', { class: 'alert' }, errText(e))); });
       } else setKids(listBox, h('p', { class: 'muted' }, 'Vous n’avez pas encore d’adresse Fii La sur ce téléphone.'));
 
-      return page(head, listBox,
-        h('a', { class: mine.length ? 'btn ghost' : 'btn', href: '#/new?d=' + token }, 'Créer une nouvelle adresse'),
+      return page(head, r.shop ? h('p', { class: 'small muted' }, 'Pour cette livraison et les suivantes : ' + r.requester_name + ' pourra réutiliser l’adresse envoyée tant que son lien reste actif. Vous pouvez la désactiver à tout moment.') : null,
+        listBox,
+        h('a', { class: mine.length ? 'btn ghost' : 'btn', href: '#/new' + qs({ d: token, f: backInvoice || undefined }) }, 'Créer une nouvelle adresse'),
         prev, footer());
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la demande', errText(e), retryBtn())); });
   }
@@ -1849,9 +2035,9 @@
   }
   function viewMeetingForm(editId, q) {
     if (editId) {
-      var rec = owned.find('place', editId);
+      var rec = owned.get('place', editId);
       if (!rec) return page(backBtn(), stateCard('?', 'Rendez-vous introuvable sur ce téléphone', ''));
-      return api('fiila_get_owned', { p_id: editId, p_owner: rec.owner }).then(function (pl) {
+      return api('fiila_get_owned', { p_id: editId, p_owner: rec.owner || null }).then(function (pl) {
         var s = dakarParts(pl.starts_at);
         var hours = Math.round((new Date(pl.expires_at) - new Date(pl.starts_at)) / 3600e3);
         return meetingForm({
@@ -1874,11 +2060,11 @@
   // Repris : lieu (à reconfirmer), arrêt voiture (à reconfirmer), trajet à pied, indications, photo, durée d'affichage.
   // Jamais repris : nom, date et heure, liens, clé de gestion, statut (désactivé, expiré).
   function viewSimilarMeeting(sourceId) {
-    var rec = owned.find('place', sourceId);
+    var rec = owned.get('place', sourceId);
     if (!rec) return page(backBtn(), stateCard('?', 'Rendez-vous introuvable sur ce téléphone', 'Ouvrez sa clé de gestion pour le réutiliser ici.'));
     var key = MEETING_DRAFT + '.similaire.' + sourceId;
     var saved = LS.get(key, null);
-    return api('fiila_get_owned', { p_id: sourceId, p_owner: rec.owner }).then(function (pl) {
+    return api('fiila_get_owned', { p_id: sourceId, p_owner: rec.owner || null }).then(function (pl) {
       if (pl.kind !== 'meeting') return page(backBtn(), stateCard('?', 'Ce n’est pas un rendez-vous', ''));
       var hours = Math.round((new Date(pl.expires_at) - new Date(pl.starts_at)) / 3600e3);
       var f = saved || {
@@ -1928,7 +2114,7 @@
       };
       if (!ctx.editId || f.photo !== ctx.originalPhoto) p.photo = f.photo ? f.photo.replace(/^data:[^,]+,/, '') : null;
       btn.disabled = true; btn.textContent = 'Enregistrement…'; setKids(err);
-      var call = ctx.editId ? api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner, p: p }) : api('fiila_create_place', { p: p });
+      var call = ctx.editId ? api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner || null, p: p }) : api('fiila_create_place', { p: p });
       call.then(function (r) {
         if (ctx.editId) { owned.patch('place', ctx.editId, { label: p.label }); toast('Rendez-vous mis à jour. Le lien reste le même.'); go('#/m/' + ctx.editId); return; }
         var stored = owned.put({ type: 'place', kind: 'meeting', id: r.id, owner: r.owner_token, share: r.share_token, label: p.label, created: Date.now() });
@@ -2018,6 +2204,642 @@
     });
   }
 
+  /* ================================================================ COMPTE, CARNET D'ADRESSES, BOUTIQUE
+     Rali dans Fii La : un compte (facultatif) qui garde les adresses de l'utilisateur sur tous ses
+     téléphones, et pour un commerçant une boutique : clients, commandes, facture partageable,
+     demande d'adresse liée, livraison suivie, paiements enregistrés. Paiement en ligne : plus tard. */
+  var TAGS = { home: 'Maison', work: 'Bureau', shop: 'Boutique', other: 'Autre' };
+  var PAY_METHODS = { cash: 'Espèces', wave: 'Wave', orange_money: 'Orange Money', other: 'Autre' };
+  function fcfa(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' FCFA'; }
+  function initials(me) {
+    var n = ((me && (me.display_name || me.email)) || '').trim();
+    return n ? n.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0); }).join('').toUpperCase() : '';
+  }
+  function avatarEl(me, size) {
+    var st = 'width:' + size + 'px;height:' + size + 'px;font-size:' + Math.round(size * 0.38) + 'px';
+    if (me && me.avatar) return h('img', { class: 'avatar', src: me.avatar, alt: '', style: st });
+    return h('span', { class: 'avatar', style: st, 'aria-hidden': 'true' }, initials(me));
+  }
+  // Numéro pour un lien WhatsApp direct : 9 chiffres sénégalais → indicatif 221 ajouté.
+  function waNumber(phone) {
+    var d = String(phone || '').replace(/\D/g, '').replace(/^00/, '');
+    if (/^[37]\d{8}$/.test(d)) d = '221' + d;
+    return d.length >= 8 && d.length <= 15 ? d : '';
+  }
+  function waTo(phone, text) { var n = waNumber(phone); return n ? 'https://wa.me/' + n + '?text=' + encodeURIComponent(text) : waLink(text); }
+  function invoiceUrl(token) { return baseUrl() + '#/f/' + token; }
+  function safeRetour(v) { return v && /^[a-z0-9\/-]{1,40}$/i.test(v) ? '#/' + v.replace(/^\/+/, '') : '#/'; }
+  function segField(o) {
+    // o : { legend, name, options: [[value, label]], value, onChange, id }
+    return h('fieldset', { class: 'segfield', id: o.id || null }, o.legend ? h('legend', null, o.legend) : null,
+      h('div', { class: 'segs' }, o.options.map(function (opt) {
+        return h('label', null, h('input', { type: 'radio', name: o.name, value: opt[0], checked: o.value === opt[0] ? 'checked' : null,
+          onchange: function () { o.onChange(opt[0]); } }), opt[1]);
+      })));
+  }
+  function passwordField(id, label, ac, onInput) {
+    var inp = h('input', { id: id, type: 'password', autocomplete: ac, maxlength: '72', oninput: function (e) { onInput(e.target.value); } });
+    var tog = h('button', { class: 'btn ghost small pw-toggle', type: 'button', 'aria-controls': id, 'aria-pressed': 'false', onclick: function () {
+      var show = inp.type === 'password';
+      inp.type = show ? 'text' : 'password';
+      tog.textContent = show ? 'Masquer' : 'Afficher';
+      tog.setAttribute('aria-pressed', String(show));
+    } }, 'Afficher');
+    return h('div', { class: 'field' }, h('label', { for: id }, label), h('div', { class: 'pw-row' }, inp, tog));
+  }
+  function needLogin(retour, title, text) {
+    return page(backBtn(), stateCard('?', title, text,
+      h('a', { class: 'btn', id: 'login-cta', href: '#/compte' + qs({ retour: retour }) }, 'Se connecter ou créer un compte')), footer());
+  }
+  function failPage(title, retour) {
+    return function (e) {
+      if (e.code === 'session_expired' || e.code === 'auth_required') return needLogin(retour, 'Reconnectez-vous', 'Votre session a expiré.');
+      return page(backBtn(), stateCard('!', title, errText(e), retryBtn()), footer());
+    };
+  }
+  function errBox(box, e) { setKids(box, h('p', { class: 'alert' }, errText(e))); }
+
+  // Classement d'une adresse dans le carnet (maison, bureau, boutique, autre).
+  function tagPicker(pl, owner) {
+    var opts = Object.keys(TAGS).map(function (k) { return [k, TAGS[k]]; });
+    return segField({ legend: 'Classer cette adresse', name: 'tag', id: 'tag-pick', options: opts, value: pl.tag || null, onChange: function (k) {
+      api('fiila_set_tag', { p_id: pl.id, p_owner: owner || null, p_tag: k }).then(function () { toast('Classée : ' + TAGS[k] + '.'); }, function (e) { toast(errText(e)); });
+    } });
+  }
+
+  /* ----- compte : connexion, inscription, mot de passe oublié */
+  function viewAccount(q) {
+    q = q || {};
+    if (q.lien === 'invalide') return page(backBtn(), stateCard('!', 'Lien expiré ou déjà utilisé', 'Demandez un nouveau lien depuis la page de connexion.', h('a', { class: 'btn', href: '#/compte' }, 'Se connecter')), footer());
+    if (!authed()) return authForm(q);
+    return account.me().then(function (me) {
+      if (!me) return authForm(q);
+      if (q.bienvenue === '1') afterLogin(null).then(function () {}, function () {});
+      return profileView(me, q);
+    }, failPage('Impossible de charger votre compte', 'compte'));
+  }
+
+  function authForm(q) {
+    var mode = q.mode === 'inscription' ? 'signup' : 'login';
+    var f = { email: '', password: '', name: '' };
+    var retour = safeRetour(q.retour);
+    var root = h('div', { class: 'wrap' });
+    function draw() {
+      var err = h('div', { role: 'alert' });
+      var btn = h('button', { class: 'btn', type: 'submit', id: 'auth-submit' },
+        mode === 'signup' ? 'Créer mon compte' : mode === 'forgot' ? 'Recevoir un lien' : 'Se connecter');
+      function submit(ev) {
+        ev.preventDefault();
+        setKids(err);
+        var email = f.email.trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return errBox(err, new ApiError('email_address_invalid'));
+        if (mode === 'signup' && f.password.length < 8) return errBox(err, new ApiError('weak_password'));
+        if (mode === 'login' && !f.password) return errBox(err, new ApiError('invalid_credentials'));
+        btn.disabled = true;
+        var label = btn.textContent; btn.textContent = 'Un instant…';
+        var p = mode === 'signup' ? account.signUp(email, f.password, f.name.trim())
+          : mode === 'forgot' ? account.recover(email) : account.signIn(email, f.password);
+        p.then(function (r) {
+          if (mode === 'forgot') {
+            setKids(root, backBtn(), stateCard('✓', 'Vérifiez vos e-mails', 'Si un compte existe pour ' + email + ', un lien pour choisir un nouveau mot de passe vient d’être envoyé.'), footer());
+            return;
+          }
+          if (r && r.confirm) {
+            setKids(root, backBtn(), stateCard('✓', 'Vérifiez vos e-mails', 'Ouvrez le lien envoyé à ' + email + ' pour activer votre compte.'), footer());
+            return;
+          }
+          var n = r && r.claimed;
+          toast((mode === 'signup' ? 'Compte créé.' : 'Connecté.') + (n ? ' ' + n + (n > 1 ? ' fiches de ce téléphone rattachées.' : ' fiche de ce téléphone rattachée.') : ''));
+          go(retour);
+        }, function (e) {
+          btn.disabled = false; btn.textContent = label;
+          errBox(err, e);
+        });
+      }
+      var tabs = mode === 'forgot' ? null : h('div', { class: 'tabs', role: 'tablist' },
+        h('button', { type: 'button', role: 'tab', id: 'tab-login', 'aria-selected': String(mode === 'login'), onclick: function () { mode = 'login'; draw(); } }, 'Se connecter'),
+        h('button', { type: 'button', role: 'tab', id: 'tab-signup', 'aria-selected': String(mode === 'signup'), onclick: function () { mode = 'signup'; draw(); } }, 'Créer un compte'));
+      setKids(root, backBtn(),
+        h('div', { class: 'stack tight' },
+          h('h1', null, mode === 'forgot' ? 'Mot de passe oublié' : 'Mon compte'),
+          h('p', { class: 'muted' }, mode === 'forgot' ? 'Recevez un lien par e-mail pour en choisir un nouveau.' : 'Vos adresses et votre boutique, sur tous vos téléphones.')),
+        tabs,
+        h('form', { class: 'stack', novalidate: true, onsubmit: submit },
+          mode === 'signup' ? textField({ id: 'acc-name', label: 'Votre nom', max: 60, value: f.name, autocomplete: 'name', onInput: function (v) { f.name = v; } }) : null,
+          textField({ id: 'acc-email', label: 'E-mail', type: 'email', autocomplete: 'email', inputmode: 'email', max: 254, value: f.email, onInput: function (v) { f.email = v; } }),
+          mode !== 'forgot' ? passwordField('acc-pass', mode === 'signup' ? 'Mot de passe (8 caractères au moins)' : 'Mot de passe',
+            mode === 'signup' ? 'new-password' : 'current-password', function (v) { f.password = v; }) : null,
+          err, btn),
+        mode === 'login' ? h('button', { class: 'btn link', type: 'button', id: 'forgot', style: 'align-self:flex-start', onclick: function () { mode = 'forgot'; draw(); } }, 'Mot de passe oublié ?') : null,
+        mode === 'forgot' ? h('button', { class: 'btn link', type: 'button', style: 'align-self:flex-start', onclick: function () { mode = 'login'; draw(); } }, 'Revenir à la connexion') : null,
+        mode === 'signup' ? h('p', { class: 'hint' }, 'Les fiches déjà créées sur ce téléphone rejoindront votre compte.') : null,
+        footer());
+    }
+    draw();
+    return root;
+  }
+
+  function profileView(me, q) {
+    var f = { display_name: me.display_name || '', phone: me.phone || '' };
+    var msg = h('div', { role: 'status' });
+    var avatarBox = h('div', { class: 'avatar-box' });
+    function drawAvatar() {
+      var file = h('input', { type: 'file', accept: 'image/*', id: 'avatar-in', hidden: true, onchange: function () {
+        var fl = file.files && file.files[0];
+        if (!fl) return;
+        compressPhoto(fl, 360).then(function (d) { return save({ avatar: d.replace(/^data:[^,]+,/, '') }, 'Photo enregistrée.'); },
+          function (e) { setKids(msg, h('p', { class: 'alert' }, e.message || errText(e))); });
+      } });
+      setKids(avatarBox, avatarEl(me, 72),
+        h('div', { class: 'stack tight' },
+          h('strong', { class: 'wrapword' }, me.display_name || 'Sans nom'),
+          h('span', { class: 'small muted wrapword', id: 'me-email' }, me.email || ''),
+          h('div', { class: 'row', style: 'gap:8px' },
+            h('label', { class: 'btn ghost small', for: 'avatar-in', id: 'avatar-pick' }, me.avatar ? 'Changer la photo' : 'Ajouter une photo'),
+            me.avatar ? h('button', { class: 'btn ghost small', type: 'button', onclick: function () { save({ avatar: '' }, 'Photo retirée.'); } }, 'Retirer') : null)),
+        file);
+    }
+    function save(extra, okText) {
+      setKids(msg);
+      return api('fiila_profile_save', { p: Object.assign({ display_name: f.display_name.trim() || null, phone: f.phone.trim() || null }, extra || {}) })
+        .then(function (m) { ME = me = m; drawAvatar(); toast(okText || 'Profil enregistré.'); },
+          function (e) { setKids(msg, h('p', { class: 'alert' }, errText(e))); });
+    }
+    drawAvatar();
+
+    var pw = '';
+    var pwMsg = h('div', { role: 'status' });
+    var pwBox = h('details', { id: 'pw-box', open: q.mdp === '1' ? true : null },
+      h('summary', null, 'Changer le mot de passe'),
+      h('form', { class: 'stack', style: 'margin-top:12px', novalidate: true, onsubmit: function (ev) {
+        ev.preventDefault();
+        if (pw.length < 8) return errBox(pwMsg, new ApiError('weak_password'));
+        var b = ev.currentTarget.querySelector('button[type=submit]'); b.disabled = true;
+        account.setPassword(pw).then(function () {
+          b.disabled = false; setKids(pwMsg, h('p', { class: 'saved-ok' }, icon('check', 18), 'Mot de passe changé.'));
+          if (q.mdp === '1') history.replaceState(null, '', location.pathname + location.search + '#/compte');
+        }, function (e) { b.disabled = false; errBox(pwMsg, e); });
+      } },
+        passwordField('new-pass', 'Nouveau mot de passe (8 caractères au moins)', 'new-password', function (v) { pw = v; }),
+        pwMsg, h('button', { class: 'btn', type: 'submit', id: 'pw-save' }, 'Enregistrer le mot de passe')));
+
+    var delZone = h('div', { class: 'stack' });
+    function askDelete() {
+      setKids(delZone, h('div', { class: 'confirm', role: 'alertdialog', 'aria-label': 'Confirmer la suppression du compte' },
+        h('p', null, h('strong', null, 'Supprimer définitivement votre compte ?')),
+        h('p', { class: 'small' }, 'Vos adresses enregistrées sur le compte, votre boutique, vos clients, commandes et factures seront effacés. Les liens déjà envoyés ne fonctionneront plus.'),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn danger-fill', type: 'button', id: 'confirm-delete-account', onclick: function (ev) {
+            ev.currentTarget.disabled = true;
+            api('fiila_delete_account', {}).then(function () {
+              return account.signOut();
+            }).then(function () { toast('Compte supprimé.'); go('#/'); }, function (e) { errBox(delZone, e); });
+          } }, 'Supprimer mon compte'),
+          h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(delZone); } }, 'Annuler'))));
+    }
+
+    return page(backBtn(),
+      q.bienvenue === '1' ? h('p', { class: 'saved-ok', role: 'status' }, icon('check', 18), 'Compte activé.') : null,
+      q.mdp === '1' ? h('div', { class: 'notice' }, 'Choisissez maintenant votre nouveau mot de passe.') : null,
+      h('section', { class: 'card' }, avatarBox, msg),
+      h('section', { class: 'card' },
+        h('h2', null, 'Profil'),
+        textField({ id: 'me-name', label: 'Nom affiché', max: 60, value: f.display_name, autocomplete: 'name', onInput: function (v) { f.display_name = v; } }),
+        textField({ id: 'me-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', autocomplete: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+        h('button', { class: 'btn', type: 'button', id: 'me-save', onclick: function () { save(null); } }, 'Enregistrer')),
+      h('nav', { class: 'list', 'aria-label': 'Raccourcis' },
+        h('a', { class: 'item', href: '#/' }, h('div', null, h('div', { class: 't' }, 'Mes adresses'), h('div', { class: 'small muted' }, 'Maison, bureau, boutique…')), h('span', { class: 'chev' }, icon('chev', 18))),
+        h('a', { class: 'item', href: '#/boutique', id: 'go-shop' }, h('div', null, h('div', { class: 't' }, me.shop ? me.shop.name : 'Ma boutique'),
+          h('div', { class: 'small muted' }, me.shop ? 'Commandes, clients, factures' : 'Vendre et livrer avec Fii La')), h('span', { class: 'chev' }, icon('chev', 18)))),
+      pwBox,
+      h('button', { class: 'btn ghost', type: 'button', id: 'logout', onclick: function () { account.signOut().then(function () { toast('Déconnecté.'); go('#/'); }); } }, 'Se déconnecter'),
+      h('details', null, h('summary', null, 'Supprimer mon compte'),
+        h('div', { class: 'stack', style: 'margin-top:12px' },
+          h('p', { class: 'small' }, 'Les fiches restées seulement sur un téléphone, sans compte, ne sont pas concernées.'),
+          h('button', { class: 'btn danger', type: 'button', id: 'delete-account', onclick: askDelete }, 'Supprimer mon compte'), delZone)),
+      footer());
+  }
+
+  /* ----- boutique */
+  function viewShop(q) {
+    if (!authed()) return needLogin('boutique', 'Votre boutique sur Fii La', 'Commandes, factures, adresses des clients et livraisons suivies au même endroit.');
+    return api('fiila_shop_get', {}).then(function (r) {
+      return r.shop ? shopDashboard(r, q || {}) : shopForm(null);
+    }, failPage('Impossible de charger la boutique', 'boutique'));
+  }
+  function viewShopSettings() {
+    if (!authed()) return needLogin('boutique/reglages', 'Connectez-vous', '');
+    return api('fiila_shop_get', {}).then(function (r) { return shopForm(r.shop); }, failPage('Impossible de charger la boutique', 'boutique'));
+  }
+  function shopForm(shop) {
+    var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '', ninea: shop ? shop.ninea || '' : '' };
+    var err = h('div', { role: 'alert' });
+    var btn = h('button', { class: 'btn', type: 'button', id: 'shop-save', onclick: function () {
+      btn.disabled = true; setKids(err);
+      api('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: f.ninea.trim() || null } }).then(function () {
+        if (!shop) track('shop_created', 'shop');
+        ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
+      }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, shop ? 'Enregistrer' : 'Créer ma boutique');
+    return page(backBtn(shop ? 'Ma boutique' : 'Accueil', shop ? '#/boutique' : '#/'),
+      h('div', { class: 'stack tight' },
+        h('h1', null, shop ? 'Réglages de la boutique' : 'Créer ma boutique'),
+        shop ? null : h('p', { class: 'muted' }, 'Ces informations apparaissent sur vos factures.')),
+      textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
+      textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+      textField({ id: 'shop-ninea', label: 'NINEA', optional: true, max: 30, value: f.ninea, onInput: function (v) { f.ninea = v; } }),
+      err, btn, footer());
+  }
+
+  // L'étape suivante d'une commande, en un seul repère.
+  function orderStage(o) {
+    if (o.status === 'cancelled') return ['off', 'Annulée'];
+    var paid = o.pay_state === 'paid';
+    if (o.delivery_state === 'delivered') return paid ? ['ok', 'Terminée'] : ['wait', 'À encaisser'];
+    if (o.address_state === 'pending') return ['wait', 'Adresse attendue'];
+    if (o.address_state !== 'received') return ['off', 'Adresse à redemander'];
+    if (o.delivery_state === 'on_the_way') return ['wait', 'En route'];
+    if (o.delivery_state === 'arrived') return ['ok', 'Livreur arrivé'];
+    return ['wait', 'À livrer'];
+  }
+  function stageChip(o) {
+    var st = orderStage(o);
+    return h('span', { class: 'chip ' + st[0] }, icon(st[0] === 'ok' ? 'check' : st[0] === 'wait' ? 'clock' : 'ban', 12), st[1]);
+  }
+  function orderItem(o) {
+    return h('a', { class: 'item', href: '#/commande/' + o.id },
+      h('div', null,
+        h('div', { class: 't' }, 'N° ' + o.ref + ' · ' + o.customer_name),
+        h('div', { class: 'small muted' }, fcfa(o.total) + (o.pay_state === 'partial' ? ' · acompte ' + fcfa(o.paid) : o.pay_state === 'paid' && o.total > 0 ? ' · payée' : '') + ' · ' + shortDate(o.created_at))),
+      h('span', { class: 'item-end' }, stageChip(o), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))));
+  }
+  function shopDashboard(r, q) {
+    var shop = r.shop, st = r.stats || {};
+    var vue = ['open', 'unpaid', 'done', 'all'].indexOf(q.vue) >= 0 ? q.vue : 'open';
+    var listBox = h('div', { class: 'list', id: 'orders' }, loading('Chargement des commandes…'));
+    function load() {
+      api('fiila_orders', { p_filter: vue === 'all' ? null : vue }).then(function (rows) {
+        setKids(listBox, rows.length ? rows.map(orderItem) : h('div', { class: 'card' },
+          h('p', { class: 'muted' }, vue === 'open' ? 'Aucune commande en cours.' : vue === 'unpaid' ? 'Rien à encaisser.' : 'Aucune commande.')));
+      }, function (e) { errBox(listBox, e); });
+    }
+    load();
+    function tile(n, label, href) {
+      return h('a', { class: 'tile', href: href }, h('strong', null, String(n || 0)), h('span', null, label));
+    }
+    return page(backBtn(),
+      h('div', { class: 'stack tight' },
+        h('p', { class: 'eyebrow' }, 'Ma boutique'),
+        h('div', { class: 'brand-row' }, h('h1', { class: 'wrapword', id: 'shop-title' }, shop.name),
+          h('a', { class: 'btn ghost small', href: '#/boutique/reglages' }, 'Réglages'))),
+      h('a', { class: 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'Nouvelle commande'),
+      h('div', { class: 'tiles' },
+        tile(st.open, 'en cours', '#/boutique?vue=open'),
+        tile(st.unpaid, 'à encaisser', '#/boutique?vue=unpaid'),
+        tile(st.customers, st.customers === 1 ? 'client' : 'clients', '#/clients')),
+      segField({ name: 'vue', id: 'orders-filter', value: vue,
+        options: [['open', 'En cours'], ['unpaid', 'À encaisser'], ['done', 'Terminées'], ['all', 'Toutes']],
+        onChange: function (v) { vue = v; try { history.replaceState(null, '', location.pathname + location.search + '#/boutique?vue=' + v); } catch (e) { /* rien */ } setKids(listBox, loading()); load(); } }),
+      listBox, footer());
+  }
+
+  /* ----- clients */
+  function viewCustomers(q) {
+    if (!authed()) return needLogin('clients', 'Connectez-vous', 'Vos clients sont rattachés à votre boutique.');
+    var term = (q && q.q) || '';
+    var listBox = h('div', { class: 'list', id: 'customers' }, loading());
+    var timer;
+    function load() {
+      api('fiila_customers', { p_query: term.trim() || null }).then(function (rows) {
+        setKids(listBox, rows.length ? rows.map(function (c) {
+          return h('a', { class: 'item', href: '#/clients/' + c.id },
+            h('div', null, h('div', { class: 't' }, c.name), h('div', { class: 'small muted' }, [c.phone, c.orders ? c.orders + ' commande' + (c.orders > 1 ? 's' : '') : null].filter(Boolean).join(' · '))),
+            h('span', { class: 'item-end' }, c.has_address ? h('span', { class: 'chip ok' }, icon('check', 12), 'Adresse') : null, h('span', { class: 'chev' }, icon('chev', 18))));
+        }) : h('div', { class: 'card' }, h('p', { class: 'muted' }, term ? 'Aucun client trouvé.' : 'Vos clients apparaissent ici dès leur première commande.')));
+      }, function (e) {
+        if (e.code === 'shop_required') { go('#/boutique'); return; }
+        errBox(listBox, e);
+      });
+    }
+    load();
+    var search = h('input', { type: 'search', id: 'customer-search', placeholder: 'Nom ou téléphone', value: term, 'aria-label': 'Rechercher un client',
+      oninput: function (e) { term = e.target.value; clearTimeout(timer); timer = setTimeout(load, 250); } });
+    return page(backBtn('Ma boutique', '#/boutique'), h('h1', null, 'Clients'), search, listBox, footer());
+  }
+
+  function viewCustomer(id) {
+    if (!authed()) return needLogin('clients/' + id, 'Connectez-vous', '');
+    return api('fiila_customer_get', { p_id: id }).then(function (c) {
+      var f = { name: c.name, phone: c.phone || '' };
+      var err = h('div', { role: 'alert' });
+      var zone = h('div', { class: 'stack' });
+      return page(backBtn('Clients', '#/clients'),
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Client'), h('h1', { class: 'wrapword' }, c.name),
+          c.has_address ? h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Adresse connue : pas besoin de la redemander')
+            : h('p', { class: 'small muted' }, 'L’adresse sera demandée à la prochaine commande.')),
+        h('a', { class: 'btn', id: 'customer-order', href: '#/commande/nouvelle' + qs({ client: c.id }) }, 'Nouvelle commande'),
+        c.phone ? h('a', { class: 'btn ghost', href: waTo(c.phone, ''), target: '_blank', rel: 'noopener noreferrer' }, 'Écrire sur WhatsApp') : null,
+        c.order_list.length ? h('section', { class: 'stack' }, h('h2', null, 'Commandes'), h('div', { class: 'list' }, c.order_list.map(orderItem))) : null,
+        h('details', null, h('summary', null, 'Modifier le client'),
+          h('div', { class: 'stack', style: 'margin-top:12px' },
+            textField({ id: 'cu-name', label: 'Nom', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
+            textField({ id: 'cu-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+            err,
+            h('button', { class: 'btn', type: 'button', onclick: function () {
+              api('fiila_customer_save', { p: { id: c.id, name: f.name.trim(), phone: f.phone.trim() || null } }).then(function () { toast('Client mis à jour.'); render(); }, function (e) { errBox(err, e); });
+            } }, 'Enregistrer'),
+            h('button', { class: 'btn danger', type: 'button', id: 'customer-delete', onclick: function () {
+              setKids(zone, h('div', { class: 'confirm' },
+                h('p', null, h('strong', null, 'Retirer ce client de votre fichier ?')),
+                h('p', { class: 'small' }, 'Ses commandes passées restent, avec son nom. Son adresse n’est plus mémorisée par la boutique.'),
+                h('div', { class: 'row' },
+                  h('button', { class: 'btn danger-fill', type: 'button', onclick: function () {
+                    api('fiila_customer_delete', { p_id: c.id }).then(function () { toast('Client retiré.'); go('#/clients'); }, function (e) { errBox(zone, e); });
+                  } }, 'Retirer'),
+                  h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(zone); } }, 'Annuler'))));
+            } }, 'Retirer ce client'), zone)),
+        footer());
+    }, failPage('Client introuvable', 'clients'));
+  }
+
+  /* ----- nouvelle commande */
+  var ORDER_DRAFT = 'fiila.draft.order';
+  function viewOrderNew(q) {
+    if (!authed()) return needLogin('commande/nouvelle', 'Connectez-vous', 'Les commandes sont rattachées à votre boutique.');
+    return api('fiila_customers', { p_query: null }).then(function (customers) {
+      var pre = q && q.client ? customers.filter(function (c) { return c.id === q.client; })[0] : null;
+      return orderForm(customers, pre || null);
+    }, function (e) {
+      if (e.code === 'shop_required') { go('#/boutique'); return loading(); }
+      return failPage('Impossible de préparer la commande', 'commande/nouvelle')(e);
+    });
+  }
+  function orderForm(customers, pre) {
+    var saved = pre ? null : LS.get(ORDER_DRAFT, null);
+    var d = saved || { cust: null, name: '', phone: '', items: [{ label: '', qty: '1', price: '' }], note: '' };
+    if (pre) d.cust = { id: pre.id, name: pre.name, phone: pre.phone, has_address: pre.has_address };
+    var root = h('div', { class: 'wrap' });
+    var custBox = h('div', { class: 'stack' });
+    var itemsBox = h('div', { class: 'stack', id: 'items' });
+    var totalEl = h('strong', { id: 'order-total' });
+    var err = h('div', { role: 'alert' });
+    var btn = h('button', { class: 'btn', type: 'button', id: 'order-create', onclick: submit }, 'Créer la commande');
+    function keep() { LS.set(ORDER_DRAFT, d); }
+    function num(v) { var n = parseInt(String(v).replace(/[\s  .]/g, ''), 10); return isFinite(n) ? n : NaN; }
+    function total() {
+      return d.items.reduce(function (a, it) { var q = num(it.qty), p = num(it.price); return a + (q > 0 && p >= 0 ? q * p : 0); }, 0);
+    }
+    function refreshTotal() { totalEl.textContent = fcfa(total()); keep(); }
+
+    function drawCustomer() {
+      if (d.cust) {
+        setKids(custBox, h('div', { class: 'picked' },
+          h('div', null, h('div', { class: 't', id: 'picked-name' }, d.cust.name), h('div', { class: 'small muted' },
+            [d.cust.phone, d.cust.has_address ? 'adresse connue' : 'adresse à demander'].filter(Boolean).join(' · '))),
+          h('button', { class: 'btn ghost small', type: 'button', onclick: function () { d.cust = null; keep(); drawCustomer(); } }, 'Changer')));
+        return;
+      }
+      var matches = h('div', { class: 'list', id: 'customer-matches' });
+      function showMatches() {
+        var t = (d.name + ' ' + d.phone).trim().toLowerCase();
+        var dn = d.phone.replace(/\D/g, '');
+        var found = !t ? [] : customers.filter(function (c) {
+          return (d.name.trim() && c.name.toLowerCase().indexOf(d.name.trim().toLowerCase()) >= 0) ||
+            (dn.length >= 4 && (c.phone || '').replace(/\D/g, '').indexOf(dn) >= 0);
+        }).slice(0, 4);
+        setKids(matches, found.map(function (c) {
+          return h('button', { class: 'item', type: 'button', onclick: function () { d.cust = { id: c.id, name: c.name, phone: c.phone, has_address: c.has_address }; keep(); drawCustomer(); } },
+            h('div', null, h('div', { class: 't' }, c.name), h('div', { class: 'small muted' }, [c.phone, c.has_address ? 'adresse connue' : null].filter(Boolean).join(' · '))),
+            h('span', { class: 'small' }, 'Choisir'));
+        }));
+      }
+      setKids(custBox,
+        textField({ id: 'cust-name', label: 'Nom du client', max: 60, value: d.name, autocomplete: 'off', onInput: function (v) { d.name = v; keep(); showMatches(); } }),
+        textField({ id: 'cust-phone', label: 'Téléphone (WhatsApp)', optional: true, type: 'tel', inputmode: 'tel', value: d.phone, onInput: function (v) { d.phone = v; keep(); showMatches(); } }),
+        matches);
+      showMatches();
+    }
+
+    function drawItems() {
+      setKids(itemsBox, d.items.map(function (it, i) {
+        return h('div', { class: 'line-item' },
+          h('input', { type: 'text', class: 'li-label', placeholder: 'Article', maxlength: '80', value: it.label, 'aria-label': 'Article ' + (i + 1),
+            oninput: function (e) { it.label = e.target.value; keep(); } }),
+          h('input', { type: 'text', class: 'li-qty', inputmode: 'numeric', value: it.qty, placeholder: 'Qté', 'aria-label': 'Quantité', oninput: function (e) { it.qty = e.target.value; refreshTotal(); } }),
+          h('input', { type: 'text', class: 'li-price', inputmode: 'numeric', placeholder: 'Prix unitaire (FCFA)', value: it.price, 'aria-label': 'Prix unitaire en FCFA', oninput: function (e) { it.price = e.target.value; refreshTotal(); } }),
+          d.items.length > 1 ? h('button', { class: 'btn ghost small li-del', type: 'button', 'aria-label': 'Retirer cet article', onclick: function () { d.items.splice(i, 1); drawItems(); refreshTotal(); } }, '×') : h('span', { class: 'li-del' }));
+      }), h('button', { class: 'btn ghost small', type: 'button', id: 'add-item', style: 'align-self:flex-start', onclick: function () {
+        d.items.push({ label: '', qty: '1', price: '' }); drawItems(); keep();
+        var all = itemsBox.querySelectorAll('.li-label'); if (all.length) all[all.length - 1].focus();
+      } }, '+ Ajouter un article'));
+    }
+
+    function submit() {
+      setKids(err);
+      var items = d.items.filter(function (it) { return it.label.trim() || String(it.price).trim(); }).map(function (it) {
+        return { label: it.label.trim(), qty: num(it.qty), price: num(it.price) };
+      });
+      if (!d.cust && !d.name.trim()) return errBox(err, new ApiError('customer_name_required'));
+      if (!items.length) return errBox(err, new ApiError('items_required'));
+      for (var i = 0; i < items.length; i++) {
+        if (!items[i].label) return errBox(err, new ApiError('item_label_required'));
+        if (!(items[i].qty >= 1)) return errBox(err, new ApiError('invalid_qty'));
+        if (!(items[i].price >= 0)) return errBox(err, new ApiError('invalid_price'));
+      }
+      btn.disabled = true; btn.textContent = 'Création…';
+      var p = { items: items, note: d.note.trim() || null };
+      if (d.cust) p.customer_id = d.cust.id; else p.customer = { name: d.name.trim(), phone: d.phone.trim() || null };
+      api('fiila_order_create', { p: p }).then(function (o) {
+        LS.del(ORDER_DRAFT);
+        track('order_created', o.address_state === 'received' ? 'known_address' : d.cust ? 'known_customer' : 'new_customer');
+        go('#/commande/' + o.id + '?nouveau=1');
+      }, function (e) { btn.disabled = false; btn.textContent = 'Réessayer'; errBox(err, e); });
+    }
+
+    drawCustomer(); drawItems(); refreshTotal();
+    setKids(root, backBtn('Ma boutique', '#/boutique'),
+      h('h1', null, 'Nouvelle commande'),
+      h('section', { class: 'card' }, h('h2', null, 'Client'), custBox),
+      h('section', { class: 'card' }, h('h2', null, 'Articles'),
+        h('div', { class: 'line-head', 'aria-hidden': 'true' }, h('span', null, 'Article'), h('span', null, 'Qté'), h('span', null, 'Prix (FCFA)'), h('span')),
+        itemsBox,
+        h('div', { class: 'total-row' }, h('span', null, 'Total'), totalEl)),
+      textField({ id: 'order-note', label: 'Note pour le client', optional: true, max: 200, value: d.note, onInput: function (v) { d.note = v; keep(); } }),
+      err, btn,
+      saved ? h('button', { class: 'btn link', type: 'button', style: 'align-self:flex-start', onclick: function () { LS.del(ORDER_DRAFT); render(); } }, 'Effacer le brouillon') : null,
+      footer());
+    return root;
+  }
+
+  /* ----- une commande (commerçant) */
+  function viewOrder(id, q) {
+    if (!authed()) return needLogin('commande/' + id, 'Connectez-vous', 'Cette commande est rattachée à votre boutique.');
+    return Promise.all([api('fiila_order_get', { p_id: id }), account.me()]).then(function (res) {
+      return orderView(res[0], (res[1] && res[1].shop) || {}, q || {});
+    }, failPage('Commande introuvable', 'boutique'));
+  }
+  function orderView(o, shop, q) {
+    var COURIER_KEY = 'fiila.order.courier.' + o.id;
+    var link = invoiceUrl(o.share_token);
+    var closed = o.status !== 'open';
+    var shopName = shop.name || 'votre boutique';
+    function refresh(next) { if (next) o = next; setKids(app, orderView(o, shop, {})); }
+    function call(fn, args, okText) {
+      return api(fn, Object.assign({ p_id: o.id }, args || {})).then(function (next) { if (okText) toast(okText); refresh(next); return next; },
+        function (e) { toast(errText(e)); throw e; });
+    }
+    var msgClient = 'Bonjour ' + o.customer_name + ', voici votre commande N° ' + o.ref + ' chez ' + shopName + ' : ' + fcfa(o.total) + '.\n' +
+      (o.address_state === 'pending' ? 'Indiquez votre adresse de livraison ici : ' : 'Détail et suivi de la livraison : ') + link;
+
+    // 1. Client et adresse
+    var addr;
+    if (o.address_state === 'received') {
+      addr = [h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Adresse reçue'),
+        h('details', { id: 'order-address' }, h('summary', null, 'Voir l’adresse'), h('div', { style: 'margin-top:12px' }, o.place ? fiche(o.place) : null))];
+    } else if (o.address_state === 'pending') {
+      addr = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de l’adresse'),
+        h('p', { class: 'small muted' }, 'Le client donne son adresse depuis le lien de la commande.')];
+    } else {
+      addr = [h('div', { class: 'notice' }, o.address_state === 'expired' ? 'La demande d’adresse a expiré.' : o.address_state === 'revoked' ? 'Le client a retiré son adresse.' : 'Aucune adresse pour cette commande.'),
+        closed ? null : h('button', { class: 'btn', type: 'button', id: 'ask-address', onclick: function (ev) { ev.currentTarget.disabled = true; call('fiila_order_request_address', null, 'Nouvelle demande prête. Renvoyez le lien au client.').catch(function () {}); } }, 'Redemander l’adresse')];
+    }
+
+    // 2. Envoyer au client
+    var send = closed && o.status === 'cancelled' ? null : h('section', { class: 'card', id: 'send-client' },
+      h('h2', null, 'Envoyer au client'),
+      h('a', { class: 'btn lime', id: 'send-invoice', href: waTo(o.customer_phone, msgClient), target: '_blank', rel: 'noopener noreferrer',
+        onclick: function () { track('share_initiated', 'whatsapp'); } }, o.address_state === 'pending' ? 'Envoyer la commande et demander l’adresse' : 'Envoyer la facture'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn ghost small', type: 'button', id: 'copy-invoice', onclick: function () { copy(link, 'Lien'); } }, 'Copier le lien'),
+        h('a', { class: 'btn ghost small', href: '#/f/' + o.share_token, id: 'open-invoice' }, 'Voir la facture')));
+
+    // 3. Livraison
+    var deliv = null;
+    if (!closed && o.address_state === 'received') {
+      var cour = LS.get(COURIER_KEY, null);
+      var dErr = h('div', { role: 'alert' });
+      var startBtn = h('button', { class: cour ? 'btn ghost small' : 'btn big', type: 'button', id: 'start-delivery', onclick: function () {
+        startBtn.disabled = true;
+        api('fiila_order_delivery', { p_id: o.id }).then(function (r) {
+          LS.set(COURIER_KEY, r.courier_token); track('delivery_started', 'order');
+          api('fiila_order_get', { p_id: o.id }).then(function (n) { refresh(n); }, function () { render(); });
+        }, function (e) { startBtn.disabled = false; errBox(dErr, e); });
+      } }, cour ? 'Autre livreur' : 'Envoyer au livreur');
+      var courierUrl = cour ? baseUrl() + '#/l/' + cour : null;
+      deliv = h('section', { class: 'card', id: 'order-delivery' }, h('h2', null, 'Livraison'),
+        cour ? h('a', { class: 'btn lime', id: 'send-courier', target: '_blank', rel: 'noopener noreferrer',
+          href: waLink('Livraison N° ' + o.ref + ' pour ' + o.customer_name + ' : adresse exacte et photo de l’entrée. Ouvrez le lien et touchez « Démarrer la livraison » : ' + courierUrl) }, 'Envoyer le lien au livreur (WhatsApp)') : null,
+        cour ? h('button', { class: 'btn ghost small', type: 'button', id: 'copy-courier', onclick: function () { copy(courierUrl, 'Lien livreur'); } }, 'Copier le lien livreur') : null,
+        startBtn, dErr,
+        o.watch_token ? deliveryWatch(o.watch_token) : null,
+        h('button', { class: 'btn', type: 'button', id: 'mark-delivered', onclick: function (ev) { ev.currentTarget.disabled = true; LS.del(COURIER_KEY); call('fiila_order_set_status', { p_status: 'delivered' }, 'Commande livrée.').catch(function () {}); } }, 'Marquer comme livrée'),
+        h('p', { class: 'hint' }, 'Le client suit le livreur depuis le lien de sa commande.'));
+    } else if (o.status === 'delivered') {
+      deliv = h('section', { class: 'card', id: 'order-delivery' }, h('h2', null, 'Livraison'),
+        h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Livrée le ' + shortDate(o.delivered_at)),
+        h('button', { class: 'btn link', type: 'button', style: 'align-self:flex-start', onclick: function () { call('fiila_order_set_status', { p_status: 'open' }, 'Commande rouverte.').catch(function () {}); } }, 'Ce n’est pas encore livré'));
+    }
+
+    // 4. Paiement
+    var remaining = Math.max(0, o.total - o.paid);
+    var pay = { amount: remaining ? String(remaining) : '', method: 'cash' };
+    var pErr = h('div', { role: 'alert' });
+    var payments = o.payments || [];
+    var paySec = o.status === 'cancelled' ? null : h('section', { class: 'card', id: 'order-payment' },
+      h('h2', null, 'Paiement'),
+      h('div', { class: 'total-row' }, h('span', null, 'Total'), h('strong', null, fcfa(o.total))),
+      o.paid ? h('div', { class: 'total-row' }, h('span', null, 'Reçu'), h('span', null, fcfa(o.paid))) : null,
+      h('div', { class: 'total-row' }, h('span', null, 'Reste'), h('strong', { id: 'remaining' }, remaining ? fcfa(remaining) : 'Payée')),
+      payments.length ? h('ul', { class: 'pay-list' }, payments.map(function (pm) {
+        return h('li', null, h('span', null, fcfa(pm.amount) + ' · ' + (PAY_METHODS[pm.method] || pm.method) + ' · ' + shortDate(pm.created_at)),
+          pm.source === 'manual' ? h('button', { class: 'btn link', type: 'button', onclick: function () { call('fiila_order_payment_delete', { p_payment_id: pm.id }, 'Paiement retiré.').catch(function () {}); } }, 'Retirer') : null);
+      })) : null,
+      remaining ? h('details', { id: 'pay-add' },
+        h('summary', null, 'Enregistrer un paiement reçu'),
+        h('div', { class: 'stack', style: 'margin-top:12px' },
+          textField({ id: 'pay-amount', label: 'Montant (FCFA)', inputmode: 'numeric', value: pay.amount, max: 12, onInput: function (v) { pay.amount = v; } }),
+          segField({ name: 'pay-method', id: 'pay-method', value: pay.method, options: Object.keys(PAY_METHODS).map(function (k) { return [k, PAY_METHODS[k]]; }), onChange: function (v) { pay.method = v; } }),
+          pErr,
+          h('button', { class: 'btn', type: 'button', id: 'pay-save', onclick: function (ev) {
+            var n = parseInt(String(pay.amount).replace(/\D/g, ''), 10);
+            if (!(n > 0)) return errBox(pErr, new ApiError('invalid_price'));
+            ev.currentTarget.disabled = true;
+            call('fiila_order_payment_add', { p_amount: n, p_method: pay.method }, 'Paiement enregistré.').then(function () { track('payment_recorded', pay.method); }, function () {});
+          } }, 'Enregistrer'))) : null);
+
+    // 5. Articles
+    var items = h('section', { class: 'card' }, h('h2', null, 'Articles'), invoiceTable(o.items, o.total), o.note ? h('p', { class: 'small muted wrapword' }, o.note) : null);
+
+    var zone = h('div', { class: 'stack' });
+    var endActions = o.status === 'cancelled'
+      ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { call('fiila_order_set_status', { p_status: 'open' }, 'Commande rouverte.').catch(function () {}); } }, 'Rouvrir la commande')
+      : o.status === 'open' ? h('button', { class: 'btn danger', type: 'button', id: 'cancel-order', onclick: function () {
+        setKids(zone, h('div', { class: 'confirm' },
+          h('p', null, h('strong', null, 'Annuler la commande N° ' + o.ref + ' ?')),
+          h('p', { class: 'small' }, 'Le lien envoyé au client affichera « commande annulée ». Le suivi du livreur s’arrête.'),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn danger-fill', type: 'button', id: 'confirm-cancel', onclick: function () { LS.del(COURIER_KEY); call('fiila_order_set_status', { p_status: 'cancelled' }, 'Commande annulée.').catch(function () {}); } }, 'Annuler la commande'),
+            h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(zone); } }, 'Retour'))));
+      } }, 'Annuler la commande') : null;
+
+    return page(backBtn('Ma boutique', '#/boutique'),
+      h('div', { class: 'stack tight' },
+        h('p', { class: 'eyebrow' }, 'Commande N° ' + o.ref),
+        h('h1', { class: 'wrapword' }, o.customer_id ? h('a', { href: '#/clients/' + o.customer_id, class: 'plain' }, o.customer_name) : o.customer_name),
+        h('div', { class: 'row', style: 'align-items:center;gap:10px' }, stageChip(o), h('span', { class: 'small muted' }, fcfa(o.total) + ' · ' + shortDate(o.created_at)))),
+      q.nouveau === '1' ? h('p', { class: 'saved-ok', role: 'status', id: 'order-created' }, icon('check', 18),
+        o.address_state === 'pending' ? 'Commande créée. Envoyez-la au client : il donnera son adresse depuis le même lien.' : 'Commande créée. L’adresse du client est déjà connue.') : null,
+      h('section', { class: 'card', id: 'order-client' }, h('h2', null, 'Adresse de livraison'), addr),
+      send, deliv, paySec, items, endActions, zone, footer());
+  }
+
+  function invoiceTable(items, total) {
+    return h('table', { class: 'inv' },
+      h('thead', null, h('tr', null, h('th', null, 'Article'), h('th', { class: 'n' }, 'Qté'), h('th', { class: 'n' }, 'Prix'), h('th', { class: 'n' }, 'Montant'))),
+      h('tbody', null, (items || []).map(function (it) {
+        return h('tr', null, h('td', { class: 'wrapword' }, it.label), h('td', { class: 'n' }, String(it.qty)), h('td', { class: 'n' }, fcfa(it.price)), h('td', { class: 'n' }, fcfa(it.qty * it.price)));
+      })),
+      h('tfoot', null, h('tr', null, h('td', { colspan: '3' }, 'Total'), h('td', { class: 'n' }, fcfa(total)))));
+  }
+
+  /* ----- facture vue par le client (lien partagé) */
+  function viewInvoice(token) {
+    return api('fiila_order_public', { p_token: token }).then(function (r) {
+      if (r.state === 'cancelled') return page(stateCard('⦸', 'Commande annulée', 'La commande N° ' + r.ref + ' de ' + r.shop.name + ' a été annulée.'), footer());
+      if (r.state !== 'ok') return page(stateCard('?', 'Commande introuvable', 'Vérifiez que le lien a été copié en entier.'), footer());
+      track('invoice_opened', 'order');
+      var o = r.order, s = r.shop;
+      var remaining = Math.max(0, o.total - o.paid);
+      var act = [];
+      if (o.address_state === 'pending' && o.request_token) {
+        act.push(h('section', { class: 'card highlight no-print', id: 'give-address' },
+          h('h2', null, 'Où faut-il livrer ?'),
+          h('a', { class: 'btn big', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'Donner mon adresse de livraison'),
+          h('p', { class: 'hint' }, 'Vous choisissez ce que vous envoyez, et vous pouvez le retirer à tout moment.')));
+      } else if (o.address_state === 'received' && o.delivery_state !== 'delivered') {
+        act.push(h('p', { class: 'saved-ok no-print', id: 'address-ok' }, icon('check', 18), 'Adresse de livraison reçue par ' + s.name + '.'));
+      }
+      if (o.watch_token) act.push(h('div', { class: 'no-print' }, deliveryWatch(o.watch_token)));
+      if (o.delivery_state === 'delivered') act.push(h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Livrée'));
+      var pg = page(
+        act,
+        h('article', { class: 'card invoice', id: 'invoice' },
+          h('header', { class: 'inv-head' },
+            h('div', null, h('p', { class: 'eyebrow' }, 'Facture'), h('h1', { class: 'wrapword' }, s.name),
+              s.phone ? h('p', { class: 'small muted' }, s.phone) : null, s.ninea ? h('p', { class: 'small muted' }, 'NINEA ' + s.ninea) : null),
+            h('div', { class: 'inv-meta' }, h('strong', null, 'N° ' + o.ref), h('span', { class: 'small muted' }, shortDate(o.created_at)))),
+          h('p', null, 'Client : ', h('strong', { class: 'wrapword' }, o.customer_name)),
+          invoiceTable(o.items, o.total),
+          o.paid ? h('div', { class: 'total-row' }, h('span', null, 'Déjà payé'), h('span', null, fcfa(o.paid))) : null,
+          h('div', { class: 'total-row big' }, h('span', null, remaining ? 'Reste à payer' : 'Statut'), h('strong', { id: 'inv-remaining' }, remaining ? fcfa(remaining) : 'Payée')),
+          o.note ? h('p', { class: 'small muted wrapword' }, o.note) : null),
+        h('button', { class: 'btn ghost no-print', type: 'button', id: 'print', onclick: function () { window.print(); } }, 'Télécharger ou imprimer'),
+        h('p', { class: 'hint no-print', style: 'text-align:center' }, 'Commande gérée avec Fii La.'),
+        footer());
+      return pg;
+    }, function (e) { return page(stateCard('!', 'Impossible d’afficher la commande', errText(e), retryBtn())); });
+  }
+
   /* ================================================================ CONFIDENTIALITÉ */
   function viewPrivacy() {
     return page(backBtn(),
@@ -2030,6 +2852,8 @@
           h('li', null, 'Pour une demande d’adresse : le nom du demandeur, la raison et la référence éventuelle.'),
           h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.'),
           h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.'),
+          h('li', null, 'Si vous créez un compte (facultatif) : votre e-mail, votre mot de passe (géré par Supabase Auth, jamais visible en clair), et si vous les ajoutez votre nom, votre téléphone et votre photo de profil.'),
+          h('li', null, 'Si vous ouvrez une boutique : son nom, son téléphone et son NINEA s’ils sont indiqués ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii La les héberge pour lui.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),
         h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un rendez-vous : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),
@@ -2040,12 +2864,14 @@
           h('li', null, 'Adresse : jusqu’à ce que vous la supprimiez.'),
           h('li', null, 'Rendez-vous : le lieu cesse d’être affiché à la date choisie, puis la fiche est effacée 30 jours plus tard.'),
           h('li', null, 'Demande d’adresse : valable 7 jours, effacée 30 jours après son expiration.'),
-          h('li', null, 'Empreinte de l’adresse IP : 24 heures.')),
+          h('li', null, 'Empreinte de l’adresse IP : 24 heures.'),
+          h('li', null, 'Compte, boutique, clients, commandes et factures : jusqu’à la suppression du compte (depuis « Mon compte »), ou d’un client par le commerçant.'),
+          h('li', null, 'Adresse donnée à un commerçant pour une commande : il peut la réutiliser pour vos commandes suivantes tant que son lien reste actif. La désactiver ou la supprimer la lui retire.')),
         h('h2', null, 'Vos droits'),
         h('p', null, 'Depuis le téléphone qui a créé la fiche (ou avec sa clé de gestion), vous pouvez à tout moment la consulter, la modifier, désactiver son lien ou la supprimer définitivement.'),
         h('h2', null, 'Ce qui n’est pas collecté'),
         h('ul', null,
-          h('li', null, 'Pas de compte, pas de numéro de téléphone, pas de contacts, pas de pièce d’identité.'),
+          h('li', null, 'Pas de compte obligatoire, pas d’accès à vos contacts, pas de pièce d’identité. Aucun paiement en ligne n’est traité par Fii La pour le moment.'),
           h('li', null, 'Pas de suivi de position : votre position n’est lue qu’au moment où vous appuyez sur « Utiliser ma position ».'),
           h('li', null, 'Les données de localisation contenues dans les photos sont retirées avant l’envoi, et le serveur refuse les photos qui en contiennent encore.'),
           h('li', null, 'Pas de publicité ni d’outil de suivi. Fii La compte seulement, par jour et sans aucun identifiant, quelques actions (par exemple « une fiche a été créée » ou « un lien a été copié »), pour savoir si le service est utile. Si votre navigateur envoie le signal « ne pas suivre », rien n’est compté.')),

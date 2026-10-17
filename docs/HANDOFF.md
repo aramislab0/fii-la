@@ -2,7 +2,7 @@
 
 > Fichier de passation entre agents. **Mis à jour à chaque action** (code, déploiement, décision, test, doc).
 > Règle : toute session qui modifie le projet met à jour « État actuel » et ajoute une ligne au « Journal » dans le même commit.
-> Dernière mise à jour : **17/10/2026 21:00 (Dakar)** — commit de référence : voir `git log -1`.
+> Dernière mise à jour : **17/10/2026 21:10 (Dakar)** — commit de référence : voir `git log -1`.
 
 ## 0. Équipe et rôles
 
@@ -21,7 +21,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 **Contexte stratégique (décisions du fondateur, prises hors de ce dépôt, 15–16/10/2026)** :
 - Fii La est une commande d'un ami ; elle devient le **moteur d'adresse et de livraison du produit Rali** (« bon de commande WhatsApp par lien » pour vendeuses social commerce à Dakar). « Rali » = nom de travail, non validé pour lancement (antériorité à vérifier).
 - Fii La pourra plus tard ramener ses utilisateurs pertinents vers Rali.
-- **Aucune intégration Rali n'existe dans ce code à ce jour.** Point d'alignement à suivre par le VP.
+- **17/10 : Rali est intégré à Fii La** (comptes, carnet d'adresses, boutique, commandes, factures, clients, livraison, paiements saisis à la main). Architecture : `docs/ARCHITECTURE-RALI.md`. Paiement en ligne Wave / Orange Money : prévu, non activé.
 
 ## 2. État actuel (17/10/2026)
 
@@ -36,6 +36,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Données réelles | Aucune ouverture publique. Base : uniquement les fiches de test personnelles du fondateur, aucune donnée de test automatique | — |
 | Test terrain (5 chauffeurs, 30 arrivées) | **Non démarré** — attend le récépissé CDP | `docs/FICHE-TEST-TERRAIN.md` |
 | Suivi en direct | **Livré (17/10)** : lien livreur + lien de suivi client (livraison), « Qui arrive » pour l'organisateur d'un rendez-vous. Heure d'arrivée estimée sur le téléphone, sans service payant. Dernière position seulement, effacée à l'arrivée | `supabase/migrations/20261017100000_fiila_tracking.sql`, `tests/tracking.test.mjs` |
+| Comptes et boutique (Rali) | **Construit et testé en local (17/10), pas encore en production** : migration `20261017220000_fiila_accounts_shops` à appliquer ; réglages Auth du tableau de bord Supabase à faire par le fondateur (§4 #12) | `docs/ARCHITECTURE-RALI.md`, `tests/accounts.sql.test.mjs` (21), `tests/shop.test.mjs` (19) |
 | Interface | **Design system v1.1 appliqué** (Light + Dark, sélecteur de thème, 6 cartes, contrastes AA). Aucune coordonnée affichée. Audit UI/UX fait et corrigé le 17/10 | `docs/design-system/README.md`, `web/styles.css` |
 
 ## 3. Décisions en vigueur
@@ -53,6 +54,8 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 17/10 | Après validation de la version web, construction d'une application mobile native (suivi en arrière-plan fiable) | Fondateur |
 | 17/10 | Ne plus afficher de coordonnées GPS à l'utilisateur (destinataire et création) : la complexité reste en arrière-plan | Fondateur |
 | 17/10 | Tenir ce fichier HANDOFF à jour à chaque action ; un agent VP valide l'alignement produit | Fondateur |
+| 17/10 | Intégrer tout le produit Rali dans Fii La : comptes (profil, photo, mot de passe), carnet d'adresses secret (maison, bureau, boutique), boutique (clients, commandes numérotées, factures, demande d'adresse, livraisons, paiements). Paiement Wave / Orange Money en dernier : prévu dans le modèle, non intégré | Fondateur |
+| 17/10 | Compte facultatif : tout reste utilisable sans compte (clé de gestion). Connexion par e-mail + mot de passe (gratuit) ; pas de SMS (payant) | Builder, à confirmer fondateur |
 | 17/10 | Design system v1 (Light + Dark) = référence de la refonte d'interface ; application par le Builder sans toucher aux parcours ni aux textes ; ajout d'un sélecteur de thème Clair / Sombre / Automatique (seule addition au périmètre) | Fondateur |
 
 ## 4. En attente / prochaines actions
@@ -68,7 +71,12 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 9 | Signaler à la CDP le nouveau traitement « suivi en direct » (dossier en cours) avant usage avec de vrais livreurs | Fondateur | Usage réel du suivi |
 | 10 | Alléger les textes de l'interface (retour fondateur du 17/10 : trop de petites indications) | Builder | Prochain test |
 | 11 | Application mobile native, après validation de la version web | Builder, VP | — |
-| 7 | Alignement Fii La ↔ Rali (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
+| 12 | Supabase → Authentication : Site URL et Redirect URL = `https://aramislab0.github.io/fii-la/` ; pour le pilote, désactiver « Confirm email » **ou** brancher un SMTP (Resend / Brevo, offre gratuite à confirmer) — sans SMTP, « mot de passe oublié » ne marche pas pour de vrais utilisateurs | Fondateur | Mise en production des comptes |
+| 13 | Appliquer la migration comptes/boutique en production puis `verify-db` | Builder (après #12) | Mise en production |
+| 14 | Ajouter au dossier CDP : comptes (e-mail, profil, photo), données clients des commerçants (nom, téléphone, commandes, paiements). Le commerçant est responsable de ses données clients | Fondateur | Usage réel des comptes |
+| 15 | Paiement en ligne : choisir l'opérateur (Wave Business, Orange Money, agrégateur), coûts et contrat | Fondateur | Bouton « Payer » sur la facture |
+| 16 | Revue VP de l'intégration Rali (parcours commerçant et client, `docs/screenshots/boutique/`) | VP | — |
+| 7 | ~~Alignement Fii La ↔ Rali~~ → tranché le 17/10 : intégration (voir décisions) | VP → fondateur | Feuille de route | (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
 | 8 | Régler la facture de l'organisation Supabase « AramisLab » (autres projets) | Fondateur | Hors Fii La |
 
 ## 5. Comment vérifier (pour le VP ou tout agent)
@@ -107,6 +115,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 17/10 21:10 | Rali intégré à Fii La : migration `20261017220000_fiila_accounts_shops` (comptes, profil, carnet étiqueté, boutique, clients, commandes, factures, paiements, livraison par commande), client Auth sans bibliothèque, écrans `#/compte`, `#/boutique`, `#/clients`, `#/commande/…`, facture `#/f/…`. Tests locaux : comptes/boutique SQL 21/21, parcours boutique 19/19 Chromium ; non-régression SQL 37, E2E 38, circuit 20, découverte 23, social 23. Note `docs/ARCHITECTURE-RALI.md`. Production : migration à appliquer | ce commit |
 | 17/10 21:25 | Migration `fiila_tracking` appliquée en production (directement sur la base, le CLI Supabase du Mac restant bloqué) ; `verify-db` : 5 migrations, 20 fonctions, schéma fermé. Sonde de production des 6 fonctions de suivi : OK (données supprimées). E2E en production 38/38 Chromium et WebKit ; suite suivi 12/12 WebKit | journal de session |
 | 17/10 21:10 | ~~En attente~~ (résolu à 21:25) : interface du suivi en ligne (GitHub Pages), mais migration `20261017100000_fiila_tracking` **pas encore appliquée** en production. Le CLI Supabase du Mac reste bloqué (probable fenêtre Trousseau macOS) ; l'application via le connecteur Supabase a été annulée côté fondateur. Les boutons de suivi échouent en production tant que la migration n'est pas appliquée | journal de session |
 | 17/10 21:00 | Suivi en direct : migration `fiila_tracking` (table `trackers`, 6 fonctions), pages livreur `#/l/…` et suivi `#/s/…`, « Envoyer au livreur » (demande reçue) et « Faire venir un livreur » (adresse), « Prévenir l'organisateur » et « Qui arrive » (rendez-vous), bouton Waze. Tests locaux : SQL 37, E2E 38, circuit 20, découverte 23, social 23, suivi 12, parcours 12 | `6330f09` |

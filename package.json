@@ -10,7 +10,9 @@
     "test:discovery": "node tests/discovery.test.mjs",
     "test:circuit": "node tests/circuit.test.mjs",
     "test:social": "node tests/social.test.mjs",
-    "test:tracking": "node tests/tracking.test.mjs"
+    "test:tracking": "node tests/tracking.test.mjs",
+    "test:accounts": "node tests/accounts.sql.test.mjs",
+    "test:shop": "node tests/shop.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",
