@@ -97,7 +97,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
-| 17/10 18:55 | Création de ce fichier HANDOFF, règle de mise à jour (`CLAUDE.md`), prompt de l'agent VP (`docs/PROMPT-VP.md`) | ce commit |
+| 17/10 18:55 | Création de ce fichier HANDOFF, règle de mise à jour (`CLAUDE.md`), prompt de l'agent VP (`docs/PROMPT-VP.md`) | `8cad411` |
 | 17/10 18:50 | Nettoyage des données de test laissées par un test interrompu (fiche réelle du fondateur conservée) | base : 1 fiche |
 | 17/10 18:45 | Suite complète en production : 37/37 Chromium et WebKit | journal de test sur le Mac |
 | 17/10 18:40 | Correctifs iPhone : itinéraire par l'application Google Maps (plus de détour App Store) + Plans ; aide pas à pas si la position est refusée ; import « Depuis Google Maps » (lien partagé → point) ; fonction `fiila-resolve-maps` déployée | `ba1352e`, `9dc41a5`, `9d02c77` |
