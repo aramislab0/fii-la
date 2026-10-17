@@ -29,7 +29,10 @@ let failed = 0;
 async function t(name, fn) {
   const t0 = Date.now();
   try { await fn(); results.push({ ok: true, name, ms: Date.now() - t0 }); console.log('PASS', name); }
-  catch (e) { failed++; results.push({ ok: false, name, err: String(e.message || e).slice(0, 400) }); console.log('FAIL', name, '\n   ', e.message); }
+  catch (e) {
+    failed++; results.push({ ok: false, name, err: String(e.message || e).slice(0, 400) }); console.log('FAIL', name, '\n   ', e.message);
+    try { if (globalThis.__shotOnFail) await globalThis.__shotOnFail(name); } catch {}
+  }
 }
 
 const ENTRY = { latitude: 14.758140, longitude: -17.470320 };
@@ -100,6 +103,7 @@ function decodeQr(pngBuf) {
 // --------------------------------------------------------------------------- scénario
 const owner = await newPhone();
 const A = owner.page;
+globalThis.__shotOnFail = (n) => A.screenshot({ path: `${SHOTS}/${ENGINE}-echec-${n.slice(0, 24).replace(/[^a-z0-9]+/gi, '-')}.png`, fullPage: true });
 let shareUrl, placeId, createBody;
 
 await t('accueil : 4 actions, création en premier', async () => {
