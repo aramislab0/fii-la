@@ -271,7 +271,7 @@ await t('livraison : seul le demandeur d’une adresse reçue crée les liens li
   await ok('fiila_position', { p_token: D.courier_token, p_status: 'live', p_lat: 14.70, p_lng: -17.45, p_acc: 12 });
   const w1 = await ok('fiila_watch', { p_token: D.watch_token });
   assert.equal(w1.tracker.status, 'live'); assert.equal(w1.tracker.pos.lat, 14.7);
-  assert.deepEqual(w1.dest.entry, { lat: base.entry.lat, lng: base.entry.lng });
+  assert.deepEqual(w1.dest.entry, { lat: 14.758, lng: -17.47 }, 'destination arrondie à ~100 m dans le suivi');
   // propriétaire d'une adresse : il peut aussi faire venir un livreur
   const D2 = await ok('fiila_start_delivery', { p_kind: 'place', p_id: P.id, p_owner: P.owner_token });
   assert.equal((await ok('fiila_courier_view', { p_token: D2.courier_token })).state, 'ok');
@@ -343,11 +343,11 @@ await t('suivi : expiré = fermé, positions effacées au ménage', async () => 
   await db.query(`update fiila.trackers set expires_at = now() - interval '1 hour' where watch_token = $1`, [D.watch_token]);
   assert.equal((await ok('fiila_watch', { p_token: D.watch_token })).state, 'expired');
   await ko('fiila_position', { p_token: D.courier_token, p_status: 'live', p_lat: 14.7, p_lng: -17.45, p_acc: 5 }, 'expired');
-  await db.query(`select fiila.housekeeping()`);
+  await db.query(`update fiila.settings set value = '1970-01-01T00:00:00Z' where key = 'housekeeping_at'`); await db.query(`select fiila.housekeeping()`);
   const r = await db.query(`select lat from fiila.trackers where watch_token = $1`, [D.watch_token]);
   assert.equal(r.rows[0].lat, null);
   await db.query(`update fiila.trackers set expires_at = now() - interval '2 days' where watch_token = $1`, [D.watch_token]);
-  await db.query(`select fiila.housekeeping()`);
+  await db.query(`update fiila.settings set value = '1970-01-01T00:00:00Z' where key = 'housekeeping_at'`); await db.query(`select fiila.housekeeping()`);
   assert.equal((await db.query(`select count(*)::int n from fiila.trackers where watch_token = $1`, [D.watch_token])).rows[0].n, 0);
   await ok('fiila_delete_place', { p_id: P.id, p_owner: P.owner_token });
 });

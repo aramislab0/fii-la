@@ -135,6 +135,7 @@ await t('propriétaire d’une adresse : « Faire venir un livreur » sur sa pro
   const p = await newPhone({ owned: [{ type: 'place', id: client.id, owner: client.owner_token, share: client.share_token, kind: 'address', label: 'Maison du client (test)' }] });
   pages.push(p.page);
   await p.page.goto(URL0 + '#/m/' + client.id);
+  await p.page.locator('#more summary').click();
   await p.page.getByRole('button', { name: 'Faire venir un livreur' }).click();
   await p.page.getByRole('heading', { name: 'Livraison' }).waitFor();
   assert.equal(await p.page.locator('#send-watch').count(), 0, 'pas de lien client pour soi-même');
@@ -188,7 +189,7 @@ await t('organisateur : « Qui arrive » avec heure d’arrivée et invités pas
   pages.push(o.page);
   await o.page.goto(URL0 + '#/m/' + meet.id);
   await o.page.getByRole('heading', { name: 'Qui arrive' }).waitFor();
-  await o.page.getByText(/Assane Niang · environ \d+ min/).waitFor();
+  await o.page.getByText(/Assane Niang en route · environ \d+ min/).waitFor();
   await o.page.getByText('Fatou n’est pas encore parti').waitFor();
   await shot(o.page, '05-organisateur');
   await o.ctx.close();

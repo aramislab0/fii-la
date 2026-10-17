@@ -41,7 +41,7 @@ export async function createUser(db, email) {
 }
 
 // Appelle une fonction RPC comme le ferait PostgREST : rôle anon (ou authenticated avec uid), en-têtes exposés.
-export async function rpc(db, fn, args = {}, { ip = '203.0.113.7', role = 'anon', uid = null } = {}) {
+export async function rpc(db, fn, args = {}, { ip = '203.0.113.7', role = 'anon', uid = null, loginAt = null } = {}) {
   if (uid) role = 'authenticated';
   if (!/^fiila_[a-z_]+$/.test(fn)) return { status: 404, body: { code: 'PGRST202', message: 'not found' } };
   const keys = Object.keys(args);
@@ -55,7 +55,7 @@ export async function rpc(db, fn, args = {}, { ip = '203.0.113.7', role = 'anon'
     const out = await db.transaction(async (tx) => {
       await tx.exec(`set local role ${role}`);
       await tx.query(`select set_config('request.headers', $1, true)`, [JSON.stringify({ 'x-forwarded-for': ip })]);
-      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [uid ? JSON.stringify({ sub: uid, role: 'authenticated' }) : '']);
+      await tx.query(`select set_config('request.jwt.claims', $1, true)`, [uid ? JSON.stringify({ sub: uid, role: 'authenticated', amr: [{ method: 'password', timestamp: loginAt ?? Math.floor(Date.now() / 1000) }] }) : '']);
       const res = await tx.query(call, params);
       return res.rows[0].r;
     });

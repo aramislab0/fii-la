@@ -88,7 +88,8 @@ async function pastePoint(page, coords) {
   await page.getByRole('button', { name: 'Depuis Google Maps' }).first().click();
   await page.locator('input[placeholder^="Collez"]').first().fill(`${coords.lat}, ${coords.lng}`);
   await page.getByRole('button', { name: 'Placer ce point' }).first().click();
-  await page.getByRole('button', { name: 'Valider ce point' }).first().click();
+  const v = page.getByRole('button', { name: 'Valider ce point' });
+  if (await v.count()) await v.first().click();
 }
 function lum([r, g, b]) {
   const f = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -130,8 +131,8 @@ await t('destinataire anonyme : fiche, photo et itinéraire visibles sans compte
 
 await t('bloc découverte : après les informations d’arrivée, secondaire, sans recouvrement', async () => {
   const d = R.locator('#discover');
-  await d.getByRole('heading', { name: 'Et si on te trouvait aussi facilement ?' }).waitFor();
-  await d.getByText('Crée ton adresse avec ta photo d’entrée et tes repères. Partage-la à tes visiteurs et livreurs.').waitFor();
+  await d.getByRole('heading', { name: 'Votre adresse aussi, en une photo' }).waitFor();
+  await d.getByText('La porte, un repère, où se garer. Un lien à envoyer.').waitFor();
   const order = await R.evaluate(() => {
     const f = document.querySelector('article.fiche'), b = document.getElementById('discover');
     return { after: !!(f.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING), ficheBottom: f.getBoundingClientRect().bottom + scrollY,
@@ -177,7 +178,6 @@ await t('CTA adresse : ouvre la création existante, vierge (aucune donnée de l
   await cta;
   await R.getByRole('heading', { name: 'Où est l’entrée ?' }).waitFor();
   assert.match(R.url(), /#\/new\?retour=/);
-  await R.getByText('Aucun point choisi').waitFor();
   assert.equal(await R.locator('.pt').first().getAttribute('data-point'), '', 'coordonnées pré-remplies');
   assert.equal(await R.evaluate(() => localStorage.getItem('fiila.draft.address')), null, 'brouillon pré-rempli');
   await shot(R, 'creation-depuis-decouverte');
@@ -192,17 +192,18 @@ await t('retour à la fiche reçue depuis la création', async () => {
 
 await t('création complète : aucune donnée de l’expéditeur dans la nouvelle fiche', async () => {
   await pastePoint(R, { lat: 14.6901, lng: -17.4467 });
-  await R.getByRole('button', { name: 'Continuer' }).click();
+  await R.locator('#wizard-next').click();
   await R.getByLabel('Oui').check();
   await R.getByRole('link', { name: 'Revenir à la fiche reçue (le brouillon est gardé)' }).waitFor();
-  await R.getByRole('button', { name: 'Continuer' }).click();
-  for (const id of ['label', 'locality', 'instruction']) assert.equal(await R.locator('#' + id).inputValue(), '', id + ' pré-rempli');
+  await R.locator('#wizard-next').click();
+  await R.locator('#add-locality').waitFor();
+  for (const id of ['label', 'instruction']) assert.equal(await R.locator('#' + id).inputValue(), '', id + ' pré-rempli');
   assert.equal(await R.locator('img.photo-prev').count(), 0, 'photo pré-remplie');
   await R.locator('#label').fill('Ma boutique (test)');
   await R.locator('#instruction').fill('Porte jaune, à côté du tailleur');
-  await R.getByRole('button', { name: 'Continuer' }).click();
+  await R.locator('#wizard-next').click();
   const created = waitTrack(R, 'fiche_created', 'address_discovery');
-  await R.getByRole('button', { name: 'Enregistrer et obtenir mon lien' }).click();
+  await R.locator('#wizard-next').click();
   await R.getByRole('heading', { name: 'Partager' }).waitFor();
   await created;
   const body = R.__creates.at(-1);
@@ -258,10 +259,10 @@ const M = anon2.page;
 await t('CTA rendez-vous : texte adapté, ouvre la création de rendez-vous, vierge', async () => {
   await M.goto(meetUrl);
   await M.getByRole('heading', { name: 'Baptême EXPEDITEUR' }).waitFor();
-  await M.locator('#discover').getByRole('heading', { name: 'Tu organises aussi un rassemblement ?' }).waitFor();
-  await M.getByText('Partage le lieu, l’heure et les indications dans une seule fiche.').waitFor();
+  await M.locator('#discover').getByRole('heading', { name: 'Votre prochain rendez-vous' }).waitFor();
+  await M.getByText('Le lieu, l’heure et le chemin dans un seul lien.').waitFor();
   await shot(M, 'destinataire-rendez-vous-light');
-  await M.getByRole('link', { name: 'Créer mon rendez-vous' }).click();
+  await M.getByRole('link', { name: 'Créer un rendez-vous' }).click();
   await M.getByRole('heading', { name: 'Créer un rendez-vous' }).waitFor();
   assert.match(M.url(), /#\/rdv\/nouveau\?retour=/);
   assert.equal(await M.locator('#m-label').inputValue(), '');
@@ -272,7 +273,7 @@ await t('CTA rendez-vous : texte adapté, ouvre la création de rendez-vous, vie
 });
 
 await t('rendez-vous créé depuis la découverte : mesuré, sans donnée de l’expéditeur, retour possible', async () => {
-  await M.getByRole('link', { name: 'Créer mon rendez-vous' }).click();
+  await M.getByRole('link', { name: 'Créer un rendez-vous' }).click();
   await M.locator('#m-label').fill('Anniversaire (test)');
   await pastePoint(M, { lat: 14.68, lng: -17.45 });
   const created = waitTrack(M, 'fiche_created', 'meeting_discovery');
@@ -334,7 +335,7 @@ await t('mesure en panne (requêtes rejetées ou sans réponse) : affichage et c
     await p.page.goto(meetUrl);
     await p.page.getByRole('heading', { name: 'Baptême EXPEDITEUR' }).waitFor();
     await p.page.locator('#discover').scrollIntoViewIfNeeded();
-    await p.page.getByRole('link', { name: 'Créer mon rendez-vous' }).click();
+    await p.page.getByRole('link', { name: 'Créer un rendez-vous' }).click();
     await p.page.locator('#m-label').fill('Test panne mesure ' + mode);
     await pastePoint(p.page, { lat: 14.69, lng: -17.44 });
     await p.page.getByRole('button', { name: 'Créer le rendez-vous' }).click();

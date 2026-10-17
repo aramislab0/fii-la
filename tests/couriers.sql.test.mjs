@@ -38,6 +38,9 @@ await t('invitation : le commerçant invite, seul celui qui a le lien l’accept
   await ko('fiila_courier_accept', { p_token: 'x'.repeat(22), p_courier_key: CK }, 'not_found');
   const a = await ok('fiila_courier_accept', { p_token: INV, p_courier_key: CK });
   assert.equal(a.shop, 'Boutique Livraison [TEST]');
+  const pend = await ok('fiila_shop_get', { p_key: SK });
+  assert.equal(pend.shop.courier_confirmed, false, 'livreur en attente de confirmation par la boutique');
+  await ok('fiila_shop_courier', { p_key: SK, p_action: 'confirm' });
   await ko('fiila_courier_accept', { p_token: INV, p_courier_key: CK2 }, 'already_used');
   const shop = await ok('fiila_shop_get', { p_key: SK });
   assert.equal(shop.shop.courier.name, 'Moussa Diallo [TEST]'); assert.equal(shop.shop.courier_auto, true);
@@ -111,11 +114,36 @@ await t('envoi automatique coupé : rien ne part ; envoi manuel au livreur attit
 await t('livreur indisponible : aucune course ne lui est envoyée', async () => {
   const inv = (await ok('fiila_courier_invite', { p_key: SK, p_name: null, p_phone: null })).token;
   await ok('fiila_courier_accept', { p_token: inv, p_courier_key: CK });
+  await ok('fiila_shop_courier', { p_key: SK, p_action: 'confirm' });
   await ok('fiila_shop_courier', { p_key: SK, p_action: 'auto_on' });
   await ok('fiila_courier_update', { p_key: CK, p: { active: false } });
   const o4 = await ok('fiila_order_create', { p_key: SK, p: { customer_id: O1.customer_id, items: [{ label: 'Boucles', qty: 1, price: 1000 }] } });
   assert.equal(o4.delivery_state, 'to_ship');
   await ok('fiila_courier_update', { p_key: CK, p: { active: true } });
+});
+
+await t('sécurité : livreur non confirmé ne reçoit rien ; remplacé, il perd ses courses et ne peut plus clôturer', async () => {
+  const SK2 = (await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique S5 [TEST]' } })).key;
+  const inv1 = (await ok('fiila_courier_invite', { p_key: SK2, p_name: null, p_phone: null })).token;
+  await ok('fiila_courier_accept', { p_token: inv1, p_courier_key: CK2 });
+  const pl = await ok('fiila_create_place', { p: addr('Adresse S5 [TEST]') });
+  const o = await ok('fiila_order_create', { p_key: SK2, p: { customer: { name: 'S5 [TEST]' }, items: [{ label: 'x', qty: 1, price: 1 }] } });
+  await ok('fiila_fulfill_request', { p_token: o.request_token, p_place_id: pl.id, p_place_owner: pl.owner_token });
+  assert.equal((await ok('fiila_courier_me', { p_key: CK2 })).courses.length, 0, 'aucune course avant confirmation');
+  await ok('fiila_shop_courier', { p_key: SK2, p_action: 'confirm' });
+  const me = await ok('fiila_courier_me', { p_key: CK2 });
+  assert.equal(me.courses.length, 1, 'la confirmation envoie les commandes prêtes');
+  const oldTok = me.courses[0].token;
+  await ok('fiila_shop_courier', { p_key: SK2, p_action: 'remove' });
+  assert.equal((await ok('fiila_courier_me', { p_key: CK2 })).courses.length, 0);
+  assert.equal((await ok('fiila_courier_view', { p_token: oldTok })).state, 'expired');
+  await ko('fiila_courier_done', { p_key: CK2, p_send: oldTok }, 'not_found');
+  const st = await ok('fiila_order_get', { p_key: SK2, p_id: o.id });
+  assert.equal(st.status, 'open');
+  await ko('fiila_courier_review', { p_token: o.share_token, p_rating: 1 }, 'not_delivered');
+  await ok('fiila_order_set_status', { p_key: SK2, p_id: o.id, p_status: 'delivered' });
+  await ko('fiila_courier_review', { p_token: o.share_token, p_rating: 1 }, 'no_courier'); // pas clôturée par le livreur
+  await ok('fiila_shop_delete', { p_key: SK2 });
 });
 
 await t('suppression de la boutique : commandes, demandes, articles effacés ; adresse de la cliente intacte ; livreur intact', async () => {

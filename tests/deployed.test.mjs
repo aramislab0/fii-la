@@ -77,7 +77,8 @@ async function pastePoint(page, coords) {
   await page.getByRole('button', { name: 'Depuis Google Maps' }).first().click();
   await page.locator('input[placeholder^="Collez"]').first().fill(`${coords.lat}, ${coords.lng}`);
   await page.getByRole('button', { name: 'Placer ce point' }).first().click();
-  await page.getByRole('button', { name: 'Valider ce point' }).first().click();
+  const v = page.getByRole('button', { name: 'Valider ce point' });
+  if (await v.count()) await v.first().click();
 }
 async function rpcFrom(page, fn, args) {
   return page.evaluate(async ([fn, args]) => {
@@ -120,15 +121,15 @@ await t('configuration publique : URL HTTPS de l’API et clé publique seulemen
 await t('1. propriétaire : créer une adresse avec photo', async () => {
   await A.goto(URL0 + '#/new');
   await pastePoint(A, A_POINT);
-  await A.getByRole('button', { name: 'Continuer' }).click();
+  await A.locator('#wizard-next').click();
   await A.getByLabel('Oui').check();
-  await A.getByRole('button', { name: 'Continuer' }).click();
+  await A.locator('#wizard-next').click();
   await A.locator('#label').fill(A_LABEL);
   await A.locator('#photo').setInputFiles('tests/fixtures/door-with-exif.jpg');
   await A.locator('img.photo-prev').waitFor();
   await A.locator('#instruction').fill(A_INSTR);
-  await A.getByRole('button', { name: 'Continuer' }).click();
-  await A.getByRole('button', { name: 'Enregistrer et obtenir mon lien' }).click();
+  await A.locator('#wizard-next').click();
+  await A.locator('#wizard-next').click();
   await A.getByRole('heading', { name: 'Partager' }).waitFor();
   shareUrl = await A.locator('#share-url').textContent();
   placeId = A.url().match(/#\/m\/([0-9a-f-]{36})/)[1];
@@ -164,17 +165,17 @@ await t('3. bouton découverte : création vierge d’une 2e adresse', async () 
   await B.locator('#discover').scrollIntoViewIfNeeded();
   await B.locator('#discover-cta').click();
   await B.getByRole('heading', { name: 'Où est l’entrée ?' }).waitFor();
-  await B.getByText('Aucun point choisi').waitFor();
+  
   await pastePoint(B, B_POINT);
-  await B.getByRole('button', { name: 'Continuer' }).click();
+  await B.locator('#wizard-next').click();
   await B.getByLabel('Oui').check();
-  await B.getByRole('button', { name: 'Continuer' }).click();
-  for (const id of ['label', 'locality', 'instruction']) assert.equal(await B.locator('#' + id).inputValue(), '', id + ' pré-rempli');
+  await B.locator('#wizard-next').click();
+  for (const id of ['label', 'instruction']) assert.equal(await B.locator('#' + id).inputValue(), '', id + ' pré-rempli');
   assert.equal(await B.locator('img.photo-prev').count(), 0, 'photo pré-remplie');
   await B.locator('#label').fill(`Boutique test ${stamp}`);
   await B.locator('#instruction').fill('Porte jaune à côté du tailleur');
-  await B.getByRole('button', { name: 'Continuer' }).click();
-  await B.getByRole('button', { name: 'Enregistrer et obtenir mon lien' }).click();
+  await B.locator('#wizard-next').click();
+  await B.locator('#wizard-next').click();
   await B.getByRole('heading', { name: 'Partager' }).waitFor();
   const body = B.__creates.at(-1);
   for (const s of [A_LABEL, A_INSTR, '14.75814', shareUrl.split('#/a/')[1]]) assert.ok(!body.includes(s), 'donnée de l’expéditeur reprise : ' + s);

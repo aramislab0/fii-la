@@ -250,6 +250,7 @@ await t('mesure : nouveaux événements acceptés, variantes inventées refusée
 
 await t('suppression du compte : fiches, boutique, clients, commandes et profil effacés ; fiches anonymes intactes', async () => {
   const anon = await ok('fiila_create_place', { p: addr('Anonyme [TEST]') });
+  await ko('fiila_delete_account', {}, 'reauth_required', { uid: U1, loginAt: Math.floor(Date.now() / 1000) - 3600 });
   await ok('fiila_delete_account', {}, as1);
   for (const [tbl, col] of [['places', 'user_id'], ['requests', 'user_id'], ['shops', 'user_id'], ['profiles', 'user_id']]) {
     const r = await db.query(`select count(*)::int n from fiila.${tbl} where ${col} = $1`, [U1]);

@@ -45,7 +45,10 @@
   function backBtn(label, href) {
     return h('a', { class: 'btn back', href: href || '#/' }, '← ' + (label || 'Accueil'));
   }
-  function footer() {
+  // Pied de page : complet sur les écrans de gestion ; réduit sur les pages reçues par lien.
+  function footer(minimal) {
+    if (minimal) return h('footer', { class: 'foot foot-min' },
+      h('div', { class: 'foot-links' }, h('a', { href: '#/', class: 'foot-brand' }, 'Fii La'), h('a', { href: '#/confidentialite' }, 'Données et confidentialité')));
     return h('footer', { class: 'foot' },
       themeSwitch(),
       h('div', { class: 'foot-links' },
@@ -79,6 +82,10 @@
     }
     return h('fieldset', { class: 'theme-switch' }, h('legend', null, 'Thème'),
       h('div', { class: 'segs' }, opt('light', 'Clair'), opt('dark', 'Sombre'), opt('auto', 'Automatique')));
+  }
+  // En-tête discret des pages reçues par lien : de quoi il s'agit, en un coup d'œil.
+  function brandBar(kind) {
+    return h('div', { class: 'brand-bar' }, h('span', { class: 'mark small', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La')), kind ? h('span', { class: 'brand-kind' }, kind) : null);
   }
   var STATE_ICONS = { '?': 'help', '!': 'alert', '⦸': 'ban', '⌛': 'hourglass', '✓': 'check' };
   function stateCard(glyph, title, text, extra) {
@@ -241,7 +248,9 @@
     courier_required: 'Espace livreur introuvable sur ce téléphone.',
     invalid_vehicle: 'Moyen de livraison non valide.',
     already_used: 'Cette invitation a déjà été acceptée.',
-    no_courier: 'Aucun livreur attitré disponible.'
+    no_courier: 'Aucun livreur attitré disponible.',
+    reauth_required: 'Saisissez à nouveau votre mot de passe.',
+    not_allowed: 'Action non autorisée.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
   ApiError.prototype = Object.create(Error.prototype);
@@ -307,26 +316,51 @@
     if (!SESSION || SESSION.expires_at - 60 > nowSec()) return Promise.resolve();
     return refreshSession().then(function () {}, function () {});
   }
-  // Après connexion : les fiches de ce téléphone rejoignent le compte (seules celles dont on a la clé).
-  function afterLogin(name) {
-    var items = owned.all().filter(function (r) { return r.owner; }).map(function (r) { return { type: r.type, id: r.id, owner: r.owner }; });
+  // Ce que ce téléphone pourrait rattacher au compte : fiches dont il a la clé, boutique non rattachée.
+  // Jamais automatique : l'utilisateur confirme (audit S1, un lien piégé ne doit rien pouvoir rattacher).
+  function pendingClaims() {
+    var items = owned.all().filter(function (r) { return r.owner && !r.claimed; });
     var sk = LS.get('fiila.shop', null);
+    return { items: items, shop: sk && sk.key && !sk.linked ? sk : null, count: items.length + (sk && sk.key && !sk.linked ? 1 : 0) };
+  }
+  function claimNow() {
+    var pc = pendingClaims();
+    var items = pc.items.map(function (r) { return { type: r.type, id: r.id, owner: r.owner }; });
     return (items.length ? api('fiila_claim', { p_items: items.slice(0, 200) }) : Promise.resolve({ claimed: 0 })).then(function (c) {
-      return sk && sk.key ? api('fiila_shop_claim', { p_key: sk.key }).then(function (r) {
-        if (r && r.claimed) LS.set('fiila.shop', Object.assign({}, sk, { linked: true }));
+      LS.set('fiila.owned', owned.all().map(function (r) { return r.owner ? Object.assign({}, r, { claimed: true }) : r; }));
+      return pc.shop ? api('fiila_shop_claim', { p_key: pc.shop.key }).then(function (r) {
+        if (r && r.claimed) LS.set('fiila.shop', Object.assign({}, pc.shop, { linked: true }));
         return c;
       }, function () { return c; }) : c;
-    }).then(function (c) {
-      return (name ? api('fiila_profile_save', { p: { display_name: name } }) : api('fiila_me', {})).then(function (me) { ME = me; return c; });
+    });
+  }
+  function afterLogin(name) {
+    return (name ? api('fiila_profile_save', { p: { display_name: name } }) : api('fiila_me', {})).then(function (me) { ME = me; return me; });
+  }
+  // PKCE : le lien reçu par e-mail ne contient qu'un code, échangé avec un secret resté sur ce téléphone.
+  // Un lien fabriqué par un tiers ne peut donc ouvrir aucune session ici.
+  function b64url(bytes) { var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function pkceStart(kind) {
+    var v = new Uint8Array(32); crypto.getRandomValues(v);
+    var verifier = b64url(v);
+    LS.set('fiila.pkce', { verifier: verifier, kind: kind, at: Date.now() });
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)).then(function (d) {
+      return { code_challenge: b64url(new Uint8Array(d)), code_challenge_method: 's256' };
     });
   }
   var account = {
     signUp: function (email, password, name, source) {
-      return authCall('/signup?redirect_to=' + encodeURIComponent(baseUrl()), 'POST', { email: email, password: password, data: { display_name: name || undefined } })
-        .then(function (r) {
-          if (r && r.access_token) { saveSession(r); track('account_created', source === 'nudge' || source === 'shop' ? source : 'account'); return afterLogin(name).then(function (c) { return { session: true, claimed: c.claimed }; }); }
-          return { confirm: true };
-        });
+      return pkceStart('signup').then(function (pk) {
+        return authCall('/signup?redirect_to=' + encodeURIComponent(baseUrl()), 'POST',
+          Object.assign({ email: email, password: password, data: { display_name: name || undefined } }, pk));
+      }).then(function (r) {
+        if (r && r.access_token) {
+          LS.del('fiila.pkce'); saveSession(r);
+          track('account_created', source === 'nudge' || source === 'shop' ? source : 'account');
+          return afterLogin(name).then(function () { return { session: true }; });
+        }
+        return { confirm: true };
+      });
     },
     signIn: function (email, password) {
       return authCall('/token?grant_type=password', 'POST', { email: email, password: password }).then(function (r) {
@@ -345,25 +379,36 @@
       return authCall('/logout', 'POST', null, true).then(done, done);
     },
     setPassword: function (pw) { return freshToken().then(function () { return authCall('/user', 'PUT', { password: pw }, true); }); },
-    recover: function (email) { return authCall('/recover?redirect_to=' + encodeURIComponent(baseUrl()), 'POST', { email: email }); },
+    recover: function (email) {
+      return pkceStart('recovery').then(function (pk) {
+        return authCall('/recover?redirect_to=' + encodeURIComponent(baseUrl()), 'POST', Object.assign({ email: email }, pk));
+      });
+    },
     me: function () {
       if (!authed()) return Promise.resolve(null);
       if (ME) return Promise.resolve(ME);
       return api('fiila_me', {}).then(function (m) { ME = m; return m; }, function (e) { if (e.code === 'session_expired' || e.code === 'auth_required') { saveSession(null); return null; } throw e; });
     }
   };
-  // Retour d'un lien reçu par e-mail (confirmation, mot de passe oublié) : #access_token=…&type=…
-  (function captureAuthRedirect() {
+  // Retour d'un lien e-mail : seul « ?code=… » (PKCE) est accepté, avec le secret gardé sur ce téléphone.
+  // Tout jeton passé dans l'URL (#access_token=…) est ignoré et effacé.
+  var authBoot = (function () {
     var hs = (location.hash || '').replace(/^#/, '');
-    if (!/(^|&)(access_token|error)=/.test(hs)) return;
-    var p = new URLSearchParams(hs);
-    var dest = '#/compte';
-    if (p.get('access_token')) {
-      saveSession({ access_token: p.get('access_token'), refresh_token: p.get('refresh_token'),
-        expires_at: +p.get('expires_at') || 0, expires_in: +p.get('expires_in') || 3600 });
-      dest = p.get('type') === 'recovery' ? '#/compte?mdp=1' : '#/compte?bienvenue=1';
-    } else dest = '#/compte?lien=invalide';
-    try { history.replaceState(null, '', location.pathname + location.search + dest); } catch (e) { location.hash = dest; }
+    if (/(^|&)(access_token|refresh_token|error)=/.test(hs)) {
+      try { history.replaceState(null, '', location.pathname + '#/compte?lien=invalide'); } catch (e) { location.hash = '#/compte?lien=invalide'; }
+      return Promise.resolve();
+    }
+    var qp = new URLSearchParams(location.search || '');
+    var code = qp.get('code');
+    if (!code) return Promise.resolve();
+    var pk = LS.get('fiila.pkce', null);
+    LS.del('fiila.pkce');
+    var clean = function (dest) { try { history.replaceState(null, '', location.pathname + dest); } catch (e) { location.hash = dest; } };
+    if (!pk || !pk.verifier || Date.now() - pk.at > 3600e3) { clean('#/compte?lien=invalide'); return Promise.resolve(); }
+    return authCall('/token?grant_type=pkce', 'POST', { auth_code: code, code_verifier: pk.verifier }).then(function (r) {
+      saveSession(r);
+      clean(pk.kind === 'recovery' ? '#/compte?mdp=1' : '#/compte?bienvenue=1');
+    }, function () { clean('#/compte?lien=invalide'); });
   })();
 
   function api(fn, args, retried) {
@@ -409,7 +454,13 @@
       return;
     }
     setKids(t, box); t.hidden = false;
-    toastTimer = setTimeout(function () { t.hidden = true; }, 3200);
+    t.dataset.seq = String(renderSeq);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+  // Un message ne survit qu'à la page qui suit l'action (jamais deux changements de page).
+  function staleToast() {
+    var t = document.getElementById('toast');
+    if (t && !t.hidden && +t.dataset.seq < renderSeq - 1) t.hidden = true;
   }
   function copy(text, label, onDone) {
     var done = function () { toast((label || 'Texte') + ' copié.'); if (onDone) onDone(); };
@@ -603,7 +654,7 @@
 
     var msg = h('p', { class: 'msg', role: 'status', 'aria-live': 'polite' });
     var ptBox = h('div', { class: 'pt' });
-    var confirmBtn = h('button', { class: 'btn', type: 'button', onclick: confirm }, 'Valider ce point');
+    var confirmBtn = h('button', { class: 'btn', type: 'button', onclick: confirm, hidden: opts.onePress || null }, 'Valider ce point');
     var mapEl = h('div', { class: 'map', id: (opts.id || 'map') + '-canvas' });
     var mapBox = h('div', { class: 'map-box', 'aria-label': 'Carte : déplacez-la pour placer le repère au centre sur ' + opts.what },
       mapEl, h('div', { class: 'map-pin' }), h('div', { class: 'map-dot' }));
@@ -635,15 +686,17 @@
       ptBox.className = 'pt' + (c ? ' set' : '');
       ptBox.setAttribute('data-point', center ? fmt(center) : ''); // pour les tests ; jamais affiché
       var ai = accInfo(c || (center ? { src: src, acc: acc } : null));
-      setKids(ptBox, 
+      if (opts.onePress) setKids(ptBox, ai && center && ai[0] !== 'neutral' ? h('p', { class: 'acc ' + ai[0] }, ai[1]) : null);
+      else setKids(ptBox,
         c ? h('p', { class: 'acc good' }, icon('check', 18), 'Point validé pour ' + opts.what) : h('p', { class: 'acc neutral' }, center ? 'Point pas encore validé' : 'Aucun point choisi'),
         ai && center ? h('p', { class: 'acc ' + ai[0] }, ai[1]) : null);
       confirmBtn.disabled = !center || !zoomOk || !!c;
       if (typeof locBtn !== 'undefined' && locBtn) locBtn.className = center ? 'btn ghost' : 'btn'; // une seule action principale à la fois
       confirmBtn.textContent = c ? 'Point validé' : 'Valider ce point';
+      if (opts.onMove) opts.onMove();
     }
     function moved(newSrc) {
-      if (opts.get()) { opts.set(null); say('Le repère a bougé : validez à nouveau.', 'info'); }
+      if (opts.get()) { opts.set(null); if (!opts.onePress) say('Le repère a bougé : validez à nouveau.', 'info'); }
       if (newSrc) { src = newSrc; if (newSrc !== 'gps') acc = null; }
       draw();
     }
@@ -652,17 +705,19 @@
       if (map) { programmatic = true; map.setView([lat, lng], zoom || 18, { animate: false }); programmatic = false; zoomOk = map.getZoom() >= 16; }
       else zoomOk = true;
       moved(newSrc);
+      // Point exact connu (position du téléphone, lien Google Maps) : retenu tel quel, sans dérive de la carte.
+      if (opts.onePress && (newSrc === 'gps' || newSrc === 'paste')) confirm();
     }
     function confirm() {
       if (!center || !zoomOk) return;
       opts.set({ lat: +center.lat.toFixed(7), lng: +center.lng.toFixed(7), acc: src === 'gps' ? acc : null, src: src || 'manual' });
-      say('Point validé.', 'ok');
+      if (!opts.onePress) say('Point validé.', 'ok');
       draw();
     }
     function placeFrom(c, how) {
       goTo(c.lat, c.lng, 18, 'paste');
       paste.hidden = true; help.hidden = true; gmBtn.setAttribute('aria-expanded', 'false');
-      say((how || 'Point récupéré.') + ' Vérifiez que le repère est bien sur ' + opts.what + ', puis validez.', 'info');
+      say((how || 'Point récupéré.') + ' Vérifiez le repère.', 'info');
     }
     function usePaste() {
       var v = String(pasteIn.value || '').trim();
@@ -734,7 +789,7 @@
           accCircle = window.L.circle([pos.coords.latitude, pos.coords.longitude], { radius: Math.min(acc, 2000), color: '#1E4A34', weight: 1, fillOpacity: 0.08, interactive: false }).addTo(map);
         }
         var ai = accInfo({ src: 'gps', acc: acc });
-        say(ai[1] + ' Ajustez la carte si le repère n’est pas exactement sur ' + opts.what + '.', ai[0] === 'bad' ? 'err' : 'info');
+        say(opts.onePress ? '' : ai[1], ai[0] === 'bad' ? 'err' : 'info');
       }, function (err) {
         locBtn.disabled = false;
         if (err.code === 1) { say(''); deniedHelp(); }
@@ -765,7 +820,7 @@
         draw();
       });
       setTimeout(function () { programmatic = true; map.invalidateSize(); programmatic = false; }, 60); // recalage d'affichage : ne doit pas déplacer le point
-      if (!center) say('Utilisez votre position, ou déplacez et zoomez la carte jusqu’à ' + opts.what + '.', 'info');
+      if (!center) say('', 'info');
       else if (!opts.get() && opts.initial) say('Point repris du rendez-vous précédent. Vérifiez qu’il est toujours juste, puis validez.', 'info');
       draw();
     }, function () {
@@ -776,11 +831,15 @@
     });
 
     draw();
-    return h('div', { class: 'stack' },
+    var el = h('div', { class: 'stack' },
       mapBox,
       h('div', { class: 'row' }, locBtn,
         gmBtn),
       help, paste, ptBox, confirmBtn, msg);
+    // Mode « un seul geste » : le bouton de l'étape valide le point affiché au centre de la carte.
+    el.ready = function () { return !!opts.get() || (!!center && zoomOk); };
+    el.commit = function () { if (!opts.get() && center && zoomOk) confirm(); return !!opts.get(); };
+    return el;
   }
 
   /* ================================================================ photo */
@@ -867,7 +926,7 @@
         h('div', { class: 'row' },
           h('button', { class: p || opts.optional ? 'btn ghost' : 'btn', type: 'button', onclick: function () { inp.click(); } }, p ? 'Remplacer la photo' : 'Prendre ou choisir une photo'),
           p ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { opts.set(null); draw(); } }, 'Retirer') : null),
-        opts.label ? null : h('p', { class: 'hint' }, 'Photographiez la porte, pas toute la maison, et évitez les visages et plaques. La photo est réduite et ses données de localisation sont retirées avant l’envoi.'),
+        opts.label ? null : h('p', { class: 'hint' }, 'La porte, pas la maison.'),
         inp, msg);
     }
     draw();
@@ -875,12 +934,14 @@
   }
 
   function textField(o) {
-    var counter = o.max ? h('span', { class: 'counter', 'aria-hidden': 'true' }, (o.value || '').length + ' / ' + o.max) : null;
+    // Compteur affiché seulement près de la limite (80 %).
+    var near = function (n) { return o.max && n >= o.max * 0.8; };
+    var counter = o.max ? h('span', { class: 'counter', 'aria-hidden': 'true', hidden: !near((o.value || '').length) || null }, (o.value || '').length + ' / ' + o.max) : null;
     var input = h(o.multiline ? 'textarea' : 'input', {
       id: o.id, type: o.multiline ? null : (o.type || 'text'), maxlength: o.max ? String(o.max) : null, placeholder: o.placeholder || null,
       value: o.value || '', autocomplete: o.autocomplete || 'off', inputmode: o.inputmode || null, required: o.required || null,
       'aria-describedby': o.hint ? o.id + '-hint' : null,
-      oninput: function (e) { if (counter) counter.textContent = e.target.value.length + ' / ' + o.max; o.onInput(e.target.value); }
+      oninput: function (e) { if (counter) { counter.textContent = e.target.value.length + ' / ' + o.max; counter.hidden = !near(e.target.value.length); } o.onInput(e.target.value); }
     });
     return h('div', { class: 'field' },
       h('label', { for: o.id }, o.label, o.optional ? h('span', { class: 'hint' }, ' (facultatif)') : null),
@@ -931,7 +992,6 @@
           ? [leg('1', 'Arrêt voiture', p.stop, 'driving', p.walk ? 'Ensuite, à pied : ' + p.walk : 'La voiture ne peut pas aller jusqu’à l’entrée.'),
              leg('2', isMeeting ? 'Lieu du rendez-vous' : 'Entrée', p.entry, 'walking')]
           : leg(null, isMeeting ? 'Lieu du rendez-vous' : 'Entrée', p.entry, 'driving'),
-        h('p', { class: 'hint' }, 'L’itinéraire est calculé par l’application de navigation. Fii La indique le point exact ; le trajet proposé peut varier.'),
         opts.footer || null));
   }
 
@@ -950,6 +1010,7 @@
   function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
   function render() {
     var seq = ++renderSeq;
+    staleToast();
     var r = parseHash(), p = r.parts, view;
     try {
       if (!p.length) view = viewHome();
@@ -1083,7 +1144,13 @@
       }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger la fiche', errText(e), retryBtn())); });
     }
     var draft = LS.get(DRAFT_KEY, null) || blankAddress();
-    return addressWizard(draft, { reqToken: reqToken, f: tokenParam(q && q.f), retour: tokenParam(q && q.retour) });
+    var ctx0 = { reqToken: reqToken, f: tokenParam(q && q.f), retour: tokenParam(q && q.retour) };
+    if (!reqToken) return addressWizard(draft, ctx0);
+    // Réponse à une demande : le dernier bouton envoie directement l'adresse au demandeur.
+    return api('fiila_get_request_public', { p_token: reqToken }).then(function (r) {
+      if (r.state === 'pending') ctx0.requester = r.requester_name;
+      return addressWizard(draft, ctx0);
+    }, function () { return addressWizard(draft, ctx0); });
   }
   function retryBtn() { return h('button', { class: 'btn', type: 'button', onclick: render }, 'Réessayer'); }
 
@@ -1094,60 +1161,75 @@
       if (ctx.editId) return;
       if (!LS.set(DRAFT_KEY, d)) { var copyD = Object.assign({}, d, { photo: null }); LS.set(DRAFT_KEY, copyD); }
     }
+    var pickers = {};
     function valid() {
-      if (step === 1) return d.entry ? '' : 'Validez d’abord le point de l’entrée.';
+      if (step === 1) return d.entry || (pickers.entry && pickers.entry.ready()) ? '' : 'point';
       if (step === 2) {
-        if (d.vehicle_ok == null) return 'Répondez Oui ou Non.';
-        if (d.vehicle_ok === false && !d.stop) return 'Validez le point d’arrêt de la voiture.';
+        if (d.vehicle_ok == null) return 'choice';
+        if (d.vehicle_ok === false && !(d.stop || (pickers.stop && pickers.stop.ready()))) return 'stop';
         return '';
       }
       if (step === 3) {
-        if (!d.label.trim()) return 'Donnez un nom au lieu.';
-        if (!d.photo && !d.instruction.trim()) return 'Ajoutez une photo de l’entrée ou un repère.';
+        if (!d.label.trim()) return 'label';
+        if (!d.photo && !d.instruction.trim()) return 'photo';
         return '';
       }
       return '';
     }
     function draw() {
       var why = h('p', { class: 'hint', role: 'status' });
-      var next = h('button', { class: 'btn', type: 'button', onclick: onNext }, step < 4 ? 'Continuer' : (ctx.editId ? 'Enregistrer les modifications' : 'Enregistrer et obtenir mon lien'));
+      var finalLabel = ctx.editId ? 'Enregistrer' : ctx.requester ? 'Envoyer à ' + ctx.requester : 'Enregistrer et partager';
+      var next = h('button', { class: 'btn', type: 'button', id: 'wizard-next', onclick: onNext }, step === 1 ? 'C’est l’entrée' : step < 4 ? 'Continuer' : finalLabel);
       var err = h('div', { role: 'alert' });
-      function refresh() { var w = valid(); next.disabled = !!w; why.textContent = w; }
+      // Pas de phrase d'aide : le bouton reste grisé tant qu'il manque quelque chose (audit : moins de texte).
+      function refresh() { var w = valid(); next.disabled = !!w; why.textContent = w === 'label' ? 'Donnez un nom au lieu.' : w === 'photo' ? 'Ajoutez une photo ou un repère.' : ''; }
       function onChange() { saveDraft(); refresh(); }
       var body;
       if (step === 1) {
+        pickers.entry = mapPicker({ id: 'entry', what: 'l’entrée', onePress: true, onMove: function () { refresh(); },
+          get: function () { return d.entry; }, set: function (p) { d.entry = p; onChange(); } });
         body = [h('h1', null, 'Où est l’entrée ?'),
-          h('p', { class: 'muted' }, 'Placez le repère devant la porte d’entrée, pas au milieu de la rue.'),
-          mapPicker({ id: 'entry', what: 'l’entrée', get: function () { return d.entry; }, set: function (p) { d.entry = p; onChange(); } })];
+          h('p', { class: 'muted' }, 'Le repère devant la porte.'),
+          pickers.entry];
       } else if (step === 2) {
         var stopBox = h('div', { class: 'stack' });
         var drawStop = function () {
           setKids(stopBox);
+          pickers.stop = null;
           if (d.vehicle_ok === false) add(stopBox, [
             h('h2', null, 'Où la voiture doit-elle s’arrêter ?'),
-            mapPicker({ id: 'stop', what: 'l’arrêt voiture', get: function () { return d.stop; }, set: function (p) { d.stop = p; onChange(); } }),
+            (pickers.stop = mapPicker({ id: 'stop', what: 'l’arrêt voiture', onePress: true, onMove: function () { refresh(); },
+              get: function () { return d.stop; }, set: function (p) { d.stop = p; onChange(); } })),
             textField({ id: 'walk', label: 'Du point d’arrêt jusqu’à l’entrée', multiline: true, max: 200, value: d.walk, placeholder: 'Ex. : prendre la ruelle à gauche de la pharmacie, 3e porte', onInput: function (v) { d.walk = v; onChange(); } })]);
         };
         var pick = function (v) { return function () { d.vehicle_ok = v; if (v) { d.stop = null; d.walk = ''; } drawStop(); onChange(); }; };
         body = [h('h1', null, 'Une voiture peut-elle arriver devant l’entrée ?'),
-          h('p', { class: 'muted' }, 'Taxi, livreur en voiture ou chauffeur.'),
           h('div', { class: 'choice', role: 'radiogroup', 'aria-label': 'Accès voiture' },
             h('label', null, h('input', { type: 'radio', name: 'veh', id: 'veh-yes', checked: d.vehicle_ok === true, onchange: pick(true) }), 'Oui'),
             h('label', null, h('input', { type: 'radio', name: 'veh', id: 'veh-no', checked: d.vehicle_ok === false, onchange: pick(false) }), 'Non')),
           stopBox];
         drawStop();
       } else if (step === 3) {
+        // La photo d'abord : c'est elle qui fait reconnaître l'entrée.
+        var locBox = h('div', { class: 'stack' });
+        var drawLoc = function (open) {
+          setKids(locBox, open || d.locality ? textField({ id: 'locality', label: 'Quartier', optional: true, max: 60, value: d.locality, placeholder: 'Ex. : Yoff Virage', onInput: function (v) { d.locality = v; onChange(); } })
+            : h('button', { class: 'btn link', type: 'button', id: 'add-locality', style: 'align-self:flex-start', onclick: function () { drawLoc(true); var i = document.getElementById('locality'); if (i) i.focus(); } }, 'Ajouter le quartier'));
+        };
+        drawLoc(false);
         body = [h('h1', null, 'Comment reconnaître l’entrée ?'),
-          textField({ id: 'label', label: 'Nom du lieu', max: 60, value: d.label, placeholder: 'Ex. : Mon atelier', onInput: function (v) { d.label = v; onChange(); } }),
-          textField({ id: 'locality', label: 'Quartier ou localité', optional: true, max: 60, value: d.locality, placeholder: 'Ex. : Yoff Virage', onInput: function (v) { d.locality = v; onChange(); } }),
           photoField({ id: 'photo', get: function () { return d.photo; }, set: function (p) { d.photo = p; onChange(); } }),
-          textField({ id: 'instruction', label: 'Repère et accès', multiline: true, max: 280, value: d.instruction, placeholder: 'Ex. : porte verte après le manguier, sonner deux fois', hint: 'Dans la langue de votre choix.', onInput: function (v) { d.instruction = v; onChange(); } })];
+          textField({ id: 'instruction', label: 'Repère', multiline: true, max: 280, value: d.instruction, placeholder: 'Ex. : porte verte après le manguier', onInput: function (v) { d.instruction = v; onChange(); } }),
+          textField({ id: 'label', label: 'Nom du lieu', max: 60, value: d.label, placeholder: 'Ex. : Chez Awa', onInput: function (v) { d.label = v; onChange(); } }),
+          locBox];
       } else {
-        body = [h('h1', null, 'Voici ce que verra la personne'),
+        body = [h('h1', null, ctx.requester ? 'Ce que ' + ctx.requester + ' va recevoir' : 'Ce que verra la personne'),
           fiche({ kind: 'address', label: d.label.trim(), locality: d.locality.trim(), instruction: d.instruction.trim(), entry: d.entry, vehicle_ok: d.vehicle_ok, stop: d.stop, walk: d.walk.trim(), photo: d.photo }),
-          h('div', { class: 'notice' }, 'Toute personne qui reçoit le lien peut l’ouvrir et le transférer. Vous pourrez modifier la fiche, désactiver le lien ou tout supprimer à tout moment.')];
+          h('p', { class: 'hint' }, 'Modifiable à tout moment.')];
       }
       function onNext() {
+        if (step === 1 && pickers.entry) pickers.entry.commit();
+        if (step === 2 && pickers.stop) pickers.stop.commit();
         if (valid()) return;
         if (step < 4) { step++; draw(); window.scrollTo(0, 0); return; }
         next.disabled = true; next.textContent = 'Enregistrement…'; setKids(err);
@@ -1165,7 +1247,6 @@
           h('p', { class: 'eyebrow' }, (ctx.editId ? 'Modifier · ' : '') + 'Étape ' + step + ' sur 4'),
           h('div', { class: 'steps', 'aria-hidden': 'true' }, [1, 2, 3, 4].map(function (i) { return h('i', { class: i <= step ? 'on' : '' }); }))),
         h('div', { class: 'stack' }, body), err, h('div', { class: 'stack' }, next, why),
-        !ctx.editId ? h('p', { class: 'hint' }, 'Votre brouillon reste sur ce téléphone jusqu’à l’enregistrement.') : null,
         ctx.retour && step > 1 ? h('a', { class: 'btn link', href: '#/a/' + ctx.retour, style: 'align-self:flex-start' }, 'Revenir à la fiche reçue (le brouillon est gardé)') : null);
     }
     function payload() {
@@ -1194,6 +1275,11 @@
         track('fiche_created', ctx.reqToken ? 'address_request' : ctx.retour ? 'address_discovery' : 'address_direct');
         if (!stored) toast('Fiche enregistrée, mais ce téléphone n’a pas pu garder la clé de gestion. Copiez-la sur la page suivante.');
         else toast('Adresse enregistrée.');
+        if (ctx.reqToken && ctx.requester) {
+          return api('fiila_fulfill_request', { p_token: ctx.reqToken, p_place_id: r.id, p_place_owner: r.owner_token }).then(function () {
+            setKids(app, sentView(ctx.requester, r.share_token, r.id, ctx.f)); window.scrollTo(0, 0);
+          }, function () { go('#/d/' + ctx.reqToken + qs({ sel: r.id, f: ctx.f })); });
+        }
         if (ctx.reqToken) go('#/d/' + ctx.reqToken + qs({ sel: r.id, f: ctx.f }));
         else go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour, nouveau: '1' }));
       });
@@ -1227,8 +1313,8 @@
     var active = pl.status === 'active' && !expired;
     var url = shareUrl(pl.share_token);
     var msg = isMeeting
-      ? pl.label + ' — ' + whenText(pl.starts_at) + '\nLe lieu exact et comment arriver : ' + url
-      : pl.label + ' — voici comment trouver l’entrée : ' + url;
+      ? pl.label + ', ' + whenText(pl.starts_at) + '. Le lieu et le chemin : ' + url
+      : pl.label + '. L’entrée, avec la photo : ' + url;
     var zone = h('div', { class: 'stack' });
     var busy = false;
 
@@ -1264,18 +1350,22 @@
         h('p', { class: 'eyebrow' }, isMeeting ? 'Mon rendez-vous' : 'Mon adresse'),
         h('h1', { class: 'wrapword' }, pl.label),
         isMeeting ? h('p', { class: 'muted' }, whenText(pl.starts_at)) : null,
-        justSaved && active ? h('p', { class: 'saved-ok', role: 'status', id: 'saved-ok' }, icon('check', 18), 'Enregistré. Envoyez maintenant le lien à vos visiteurs ou livreurs.') : null,
+        justSaved && active ? h('p', { class: 'saved-ok', role: 'status', id: 'saved-ok' }, icon('check', 18), 'Enregistré.') : null,
         h('div', { class: 'row', style: 'align-items:center' },
           h('span', { class: 'chip ' + (active ? 'ok' : 'off'), style: 'flex:0 0 auto' }, icon(active ? 'check' : expired ? 'hourglass' : 'ban', 12),
             expired ? 'Expiré' : pl.status === 'active' ? 'Lien actif' : 'Lien désactivé'),
           h('span', { class: 'small muted' }, isMeeting && !expired ? 'Visible jusqu’au ' + shortDate(pl.expires_at) : 'Modifiée le ' + shortDate(pl.updated_at)))),
       active ? sharePanel({ kind: variant, url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null,
         ids: { url: 'share-url', copy: 'copy-link', native: 'share-native' } }) : null,
-      active ? h('section', { class: 'card', 'aria-label': 'QR code' },
-        h('p', { class: 'small' }, h('strong', null, 'QR code'), ' : à afficher ou imprimer près de l’entrée ou sur une commande. Gardez aussi le lien : le QR code est un accès de secours.'),
-        qrBox) : null,
       isMeeting && active ? guestsPanel(pl, owner) : null,
-      !isMeeting && active ? deliveryPanel({ id: pl.id, owner: owner }, 'place') : null,
+      // Un seul bouton fort sur cet écran (partager) : le reste se range dans « Plus ».
+      active ? h('details', { class: 'more', id: 'more' }, h('summary', null, 'Plus'),
+        h('div', { class: 'stack', style: 'margin-top:12px' },
+          !isMeeting ? deliveryPanel({ id: pl.id, owner: owner }, 'place') : null,
+          !isMeeting ? tagPicker(pl, owner) : null,
+          h('section', { class: 'card', 'aria-label': 'QR code' },
+            h('p', { class: 'small' }, h('strong', null, 'QR code'), ' · à imprimer près de la porte.'),
+            qrBox))) : null,
       installSlot(),
       expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
       isMeeting ? h('a', { class: expired ? 'btn' : 'btn ghost', id: 'similar', href: '#/rdv/nouveau' + qs({ depuis: pl.id }) }, 'Créer un rendez-vous similaire') : null,
@@ -1289,7 +1379,7 @@
         h('button', { class: 'btn danger', type: 'button', id: 'delete', onclick: askDelete }, 'Supprimer')),
       pl.status !== 'active' && !expired ? h('p', { class: 'hint' }, 'Le lien désactivé n’affiche plus aucune information. Un nouveau lien le remplacera définitivement.') : null,
       zone,
-      !isMeeting ? tagPicker(pl, owner) : null,
+      !isMeeting && !active ? tagPicker(pl, owner) : null,
       !key ? h('p', { class: 'hint' }, 'Fiche rattachée à votre compte : retrouvez-la sur tous vos téléphones en vous connectant.') :
       h('details', null,
         h('summary', null, 'Clé de gestion (pour un autre téléphone)'),
@@ -1321,7 +1411,8 @@
     link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
     car: 'M5 16h14M6 16l1.5-5h9L18 16M5 16v3h2v-2M19 16v3h-2v-2M8 13.5h.01M16 13.5h.01',
     door: 'M6 21V4h12v17M3 21h18M14.5 12.5h.01',
-    chev: 'M9 6l6 6-6 6'
+    chev: 'M9 6l6 6-6 6',
+    star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z'
   };
   function icon(name, size) {
     var ns = 'http://www.w3.org/2000/svg';
@@ -1344,7 +1435,7 @@
     return 'https://www.facebook.com/dialog/share?app_id=' + encodeURIComponent(facebookAppId()) + '&display=page&href=' +
       encodeURIComponent(url) + '&redirect_uri=' + encodeURIComponent(baseUrl());
   }
-  var PRIVACY_NOTICE = 'Toute personne ayant ce lien peut consulter la fiche et le retransmettre.';
+  var PRIVACY_NOTICE = 'Toute personne qui a le lien voit la fiche.';
 
   // o : { kind: 'address'|'meeting'|'request', url, msg, title, when, photo, ids: { url, copy, native } }
   function sharePanel(o) {
@@ -1398,7 +1489,7 @@
         channelBtn('tiktok', 'TikTok')),
       fbHelp,
       visualBox,
-      h('p', { class: 'hint' }, 'Les applications s’ouvrent avec le lien prêt : c’est vous qui publiez ou envoyez. Si une application ne s’ouvre pas, utilisez « Copier le lien ».'));
+      null);
     return panel;
   }
 
@@ -1670,9 +1761,12 @@
           st === 'error' ? h('p', { class: 'msg err' }, info === 'denied' ? 'Position refusée. Autorisez-la dans les réglages du téléphone, puis réessayez.' : 'Position indisponible. Réessayez dans un instant.') : null,
           st === 'stopped' ? h('p', { class: 'muted' }, 'Partage arrêté.') : null,
           h('button', { class: 'btn big', type: 'button', id: 'live-start', onclick: function () { track('tracking_shared', o.kind); sh.start(); } }, st === 'idle' ? o.startLabel : 'Reprendre le partage'),
-          h('p', { class: 'hint' }, o.who + ' verra votre position jusqu’à votre arrivée. Rien n’est gardé ensuite.'));
+          h('p', { class: 'hint' }, o.who + ' votre position jusqu’à l’arrivée, puis elle est effacée.'));
       } else if (st === 'arrived') {
-        setKids(box, h('p', { class: 'live-big' }, icon('check', 22), 'Arrivée confirmée'));
+        setKids(box, h('p', { class: 'live-big' }, icon('check', 22), 'Arrivée confirmée'),
+          // Fin de parcours : le bon moment pour proposer la suite (rétention).
+          o.kind === 'guest' ? h('a', { class: 'btn ghost', id: 'guest-create', href: '#/rdv/nouveau' }, 'Créer votre rendez-vous')
+            : h('a', { class: 'btn ghost', id: 'courier-more', href: '#/livreur' }, courierKey() ? 'Mes courses' : 'Recevoir les courses de vos boutiques'));
       } else {
         setKids(box,
           h('p', { class: 'live-big' }, h('span', { class: 'live-dot', 'aria-hidden': 'true' }), st === 'starting' ? 'Recherche de votre position…' : 'Position partagée'),
@@ -1731,24 +1825,25 @@
     else if (t.status === 'stopped') { big = name ? name + ' a arrêté le partage' : 'Partage arrêté'; cls += ' muted'; }
     else if (!t.pos) { big = name ? name + ' n’est pas encore parti' : 'Pas encore parti'; cls += ' muted'; }
     else {
-      big = [h('span', { class: 'live-dot', 'aria-hidden': 'true' }), (name ? name + ' · ' : 'En route · ') + etaText(etaMin(t.pos, dest))];
+      big = [h('span', { class: 'live-dot', 'aria-hidden': 'true' }), (name ? name + ' en route · ' : 'En route · ') + etaText(etaMin(t.pos, dest))];
       small = 'Position ' + agoText(t.pos.at);
     }
     return h('div', { class: 'stack tight' }, h('p', { class: cls }, big), small ? h('p', { class: 'hint' }, small) : null);
   }
 
   // Suivi d'une livraison (lien de suivi, ou intégré chez le demandeur).
-  function deliveryWatch(watchToken) {
+  // La carte n'apparaît que lorsque le livreur roule ; avant, une seule ligne d'état.
+  function deliveryWatch(watchToken, courierName) {
     var status = h('div', { role: 'status' }, loading('Chargement du suivi…'));
     var mapW = null;
-    var box = h('section', { class: 'card live', id: 'delivery-watch' }, h('h2', null, 'Suivi du livreur'), status);
+    var box = h('section', { class: 'card live', id: 'delivery-watch' }, status);
     function load() {
       api('fiila_watch', { p_token: watchToken }).then(function (r) {
-        if (r.state !== 'ok') { setKids(status, h('p', { class: 'muted' }, r.state === 'expired' ? 'Cette livraison est terminée.' : 'Suivi indisponible.')); if (mapW) mapW.el.hidden = true; return; }
+        if (r.state !== 'ok') { setKids(status, h('p', { class: 'muted' }, r.state === 'expired' ? 'Livraison terminée.' : 'Suivi indisponible.')); if (mapW) mapW.el.hidden = true; return; }
         var t = r.tracker;
-        if (!mapW) { mapW = liveMap(r.dest.entry); box.append(mapW.el); }
-        mapW.update(t.pos ? [{ id: t.id, pos: t.pos, trail: t.trail }] : []);
-        setKids(status, statusLine(t, r.dest.stop || r.dest.entry, null));
+        if (t.pos && !mapW) { mapW = liveMap(r.dest.entry); box.append(mapW.el); }
+        if (mapW) { mapW.el.hidden = !t.pos; mapW.update(t.pos ? [{ id: t.id, pos: t.pos, trail: t.trail }] : []); }
+        setKids(status, statusLine(t, r.dest.stop || r.dest.entry, courierName || null));
       }, function (e) { setKids(status, h('p', { class: 'alert' }, errText(e))); });
     }
     load(); poll(box, load, 15000);
@@ -1772,7 +1867,7 @@
       var cur = owned.find(type, rec.id) || {};
       var d = cur.delivery;
       if (!d) {
-        setKids(box, h('button', { class: 'btn big', type: 'button', id: 'start-delivery', onclick: create }, type === 'request' ? 'Envoyer au livreur' : 'Faire venir un livreur'), err);
+        setKids(box, h('button', { class: type === 'request' ? 'btn big' : 'btn ghost', type: 'button', id: 'start-delivery', onclick: create }, type === 'request' ? 'Envoyer au livreur' : 'Faire venir un livreur'), err);
         return;
       }
       var courierUrl = baseUrl() + '#/l/' + d.courier, watchUrl = baseUrl() + '#/s/' + d.watch;
@@ -1797,8 +1892,8 @@
       if (r.state === 'expired') return page(stateCard('⌛', 'Livraison terminée', 'Ce lien n’est plus actif.'), footer());
       if (r.state !== 'ok') return page(stateCard('⦸', 'Lien livreur indisponible', 'L’adresse a été désactivée ou le lien n’est pas valide.'), footer());
       var pg = page(courierKey() ? backBtn('Mes courses', '#/livreur') : null, h('p', { class: 'eyebrow' }, 'Livraison'),
-        liveShare(token, r.place.entry, { kind: 'courier', title: 'Prêt à partir ?', startLabel: 'Démarrer la livraison', who: 'L’expéditeur et le client', initial: r.status }),
-        fiche(r.place, { wide: true }), footer());
+        liveShare(token, r.place.entry, { kind: 'courier', title: 'Prêt à partir ?', startLabel: 'Démarrer la livraison', who: 'L’expéditeur et le client voient', initial: r.status }),
+        fiche(r.place, { wide: true }), footer(true));
       pg.classList.add('wide');
       return pg;
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la livraison', errText(e), retryBtn())); });
@@ -1806,7 +1901,7 @@
 
   // Lien de suivi envoyé au client.
   function viewWatch(token) {
-    return Promise.resolve(page(h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fii La'), h('h1', null, 'Votre livraison')), deliveryWatch(token), footer()));
+    return Promise.resolve(page(brandBar('Livraison'), h('h1', null, 'Votre livraison'), deliveryWatch(token), footer(true)));
   }
 
   // Invité d'un rendez-vous : accepte de partager son trajet avec l'organisateur.
@@ -1815,7 +1910,7 @@
     var box = h('div', { class: 'stack', id: 'guest' });
     function draw() {
       var g = LS.get(KEY, null);
-      if (g && g.token) { setKids(box, liveShare(g.token, place.entry, { kind: 'guest', title: 'Prévenir l’organisateur', startLabel: 'Je pars maintenant', who: 'Seul l’organisateur' })); return; }
+      if (g && g.token) { setKids(box, liveShare(g.token, place.entry, { kind: 'guest', title: 'Prévenir l’organisateur', startLabel: 'Je pars maintenant', who: 'Seul l’organisateur voit' })); return; }
       var nameIn = h('input', { type: 'text', id: 'guest-name', maxlength: '40', autocomplete: 'given-name', placeholder: 'Votre prénom' });
       var err = h('div', { role: 'alert' });
       setKids(box, h('section', { class: 'card' },
@@ -1827,8 +1922,7 @@
             LS.set(KEY, { token: r.guest_token, name: nameIn.value.trim() }); track('meeting_joined', 'guest'); draw();
           }, function (e) { b.disabled = false; setKids(err, h('p', { class: 'alert' }, errText(e))); });
         } }, 'Je viens'),
-        err,
-        h('p', { class: 'hint' }, 'Seul l’organisateur voit votre trajet, et seulement quand vous le démarrez.')));
+        err));
     }
     draw();
     return box;
@@ -1843,8 +1937,13 @@
     function load() {
       api('fiila_meeting_guests', { p_id: pl.id, p_owner: owner }).then(function (r) {
         var gs = r.guests || [];
-        if (!gs.length) { setKids(list, h('p', { class: 'muted' }, 'Personne pour l’instant. Les invités qui acceptent de partager leur trajet apparaîtront ici.')); mapW.el.hidden = true; return; }
-        setKids(list, gs.map(function (g) { return h('div', { class: 'guest' }, statusLine(g, pl.entry, g.name)); }));
+        if (!gs.length) { setKids(list, h('p', { class: 'muted' }, 'Personne pour l’instant.')); mapW.el.hidden = true; return; }
+        setKids(list, gs.map(function (g) {
+          return h('div', { class: 'guest' }, statusLine(g, pl.entry, g.name),
+            h('button', { class: 'btn link small', type: 'button', 'aria-label': 'Retirer ' + g.name, onclick: function () {
+              api('fiila_meeting_guest_remove', { p_id: pl.id, p_owner: owner, p_guest_id: g.id }).then(function () { toast(g.name + ' retiré.'); load(); }, function (e) { toast(errText(e)); });
+            } }, 'Retirer'));
+        }));
         var moving = gs.filter(function (g) { return g.pos; });
         mapW.el.hidden = !moving.length;
         mapW.update(moving.map(function (g) { return { id: g.id, pos: g.pos, trail: g.trail, label: g.name }; }));
@@ -1862,9 +1961,13 @@
       if (r.state === 'ok') {
         document.title = 'Fii La';
         var mine = owned.all().filter(function (x) { return x.type === 'place' && x.share === token; })[0];
-        var pg = page(fiche(r.place, { wide: true }), !mine && r.place.kind === 'meeting' ? guestBlock(token, r.place) : null,
-          mine ? ownerBlock(mine) : discoveryBlock(r.place.kind, token),
-          h('p', { class: 'hint', style: 'text-align:center' }, 'Fiche partagée avec Fii La. Fii La ne demande pas votre position pour l’afficher.'));
+        var isMeet = r.place.kind === 'meeting';
+        var joined = isMeet && LS.get('fiila.guest.' + token, null);
+        // Rendez-vous : « Créer le vôtre » seulement après l'arrivée de l'invité, pas avant qu'il ait agi.
+        var showDiscover = !mine && (!joined || joined.arrived);
+        var pg = page(brandBar(isMeet ? 'Rendez-vous' : 'Adresse'), fiche(r.place, { wide: true }), !mine && isMeet ? guestBlock(token, r.place) : null,
+          mine ? ownerBlock(mine) : showDiscover ? discoveryBlock(r.place.kind, token) : null,
+          footer(true));
         pg.classList.add('wide');
         return pg;
       }
@@ -1886,8 +1989,7 @@
   // Le propriétaire qui ouvre son propre lien (depuis WhatsApp, par exemple) retrouve sa gestion, pas une invitation à créer.
   function ownerBlock(rec) {
     return h('section', { class: 'discover', id: 'owner-block', 'aria-labelledby': 'owner-title' },
-      h('h2', { id: 'owner-title' }, 'Cette fiche est la vôtre'),
-      h('p', null, 'Vous l’avez créée sur ce téléphone. Vous pouvez la partager à nouveau, la modifier ou la désactiver.'),
+      h('h2', { id: 'owner-title' }, 'C’est votre fiche'),
       h('a', { class: 'btn ghost discover-cta', id: 'owner-manage', href: '#/m/' + rec.id }, 'Gérer et partager'));
   }
 
@@ -1897,13 +1999,13 @@
     var isMeeting = kind === 'meeting';
     var variant = isMeeting ? 'meeting' : 'address';
     var block = h('section', { class: 'discover', id: 'discover', 'aria-labelledby': 'discover-title' },
-      h('h2', { id: 'discover-title' }, isMeeting ? 'Tu organises aussi un rassemblement ?' : 'Et si on te trouvait aussi facilement ?'),
+      h('h2', { id: 'discover-title' }, isMeeting ? 'Votre prochain rendez-vous' : 'Votre adresse aussi, en une photo'),
       h('p', null, isMeeting
-        ? 'Partage le lieu, l’heure et les indications dans une seule fiche.'
-        : 'Crée ton adresse avec ta photo d’entrée et tes repères. Partage-la à tes visiteurs et livreurs.'),
+        ? 'Le lieu, l’heure et le chemin dans un seul lien.'
+        : 'La porte, un repère, où se garer. Un lien à envoyer.'),
       h('a', { class: 'btn ghost discover-cta', id: 'discover-cta', href: (isMeeting ? '#/rdv/nouveau' : '#/new') + qs({ retour: token }),
-        onclick: function () { track('discovery_cta', variant); } }, isMeeting ? 'Créer mon rendez-vous' : 'Créer mon Fii La'),
-      h('p', { class: 'hint' }, 'Gratuit, sans compte et sans application à installer. Ta fiche se gère depuis ce téléphone.'));
+        onclick: function () { track('discovery_cta', variant); } }, isMeeting ? 'Créer un rendez-vous' : 'Créer mon adresse'),
+      h('p', { class: 'hint' }, 'Gratuit. Sans compte.'));
     trackWhenVisible(block, 'discovery_shown', variant);
     return block;
   }
@@ -1999,17 +2101,39 @@
     });
   }
 
+  // Adresse envoyée : confirmation courte, puis le meilleur moment pour la partager à ses proches.
+  function sentView(name, shareToken, placeId, backInvoice) {
+    var sent = Number(LS.get('fiila.sent', 0) || 0) + 1;
+    LS.set('fiila.sent', sent);
+    var url = shareToken ? shareUrl(shareToken) : null;
+    return page(
+      h('section', { class: 'card state', id: 'sent' },
+        h('div', { class: 'big', 'aria-hidden': 'true' }, icon('check', 26)),
+        h('h2', null, name + ' a votre adresse.'),
+        backInvoice ? h('a', { class: 'btn', id: 'back-invoice', href: '#/f/' + backInvoice }, 'Revenir à ma commande') : null),
+      url ? h('section', { class: 'card', id: 'share-close' },
+        h('h2', null, 'Votre adresse est prête'),
+        h('p', { class: 'small muted' }, 'Envoyez-la à vos proches : ils vous trouveront sans appeler.'),
+        h('a', { class: 'btn lime', id: 'share-relatives', href: waLink('Mon adresse, avec la photo de l’entrée : ' + url), target: '_blank', rel: 'noopener noreferrer',
+          onclick: function () { track('share_initiated', 'whatsapp_address'); } }, 'Envoyer sur WhatsApp'),
+        h('a', { class: 'btn link', href: '#/m/' + placeId, style: 'align-self:flex-start' }, 'Voir mon adresse')) : null,
+      !authed() && sent >= 2 ? nudgeCard('sent-nudge', 'Gardez vos adresses', 'Retrouvez-les même si vous changez de téléphone.',
+        '#/compte' + qs({ mode: 'inscription', source: 'nudge' }), function () { LS.set('fiila.nudge.until', Date.now() + 14 * 864e5); }) : null,
+      footer(true));
+  }
+
   function viewRequestPublic(token, q) {
     return api('fiila_get_request_public', { p_token: token }).then(function (r) {
       if (r.state === 'fulfilled') return page(stateCard('✓', 'Demande déjà traitée', 'Cette demande a déjà reçu une adresse.'), footer());
       if (r.state === 'expired') return page(stateCard('⌛', 'Demande expirée', 'Demandez un nouveau lien à la personne.'), footer());
       if (r.state !== 'pending') return page(stateCard('?', 'Demande introuvable', 'Vérifiez que le lien a été copié en entier.'), footer());
 
+      var fromInvoice = !!tokenParam(q && q.f);
+      var showRef = r.order_ref && r.purpose.indexOf(r.order_ref.replace(/^N° /, '')) < 0;
       var head = h('section', { class: 'card' },
-        h('p', { class: 'eyebrow' }, 'Demande d’adresse'),
         h('h1', { class: 'wrapword', style: 'font-size:24px' }, r.requester_name + ' vous demande votre adresse'),
-        h('p', { class: 'wrapword' }, 'Pour : ' + r.purpose + (r.order_ref ? ' (réf. ' + r.order_ref + ')' : '')),
-        h('p', { class: 'small muted' }, 'Identité non vérifiée par Fii La. Répondez seulement si vous attendez cette demande.'));
+        h('p', { class: 'wrapword' }, (r.shop ? r.purpose.replace(/^Livraison de la commande/, 'Pour la commande') : 'Pour : ' + r.purpose) + (showRef ? ' · ' + r.order_ref : '')),
+        fromInvoice ? null : h('p', { class: 'small muted' }, 'Répondez seulement si vous attendez cette demande.'));
       var listBox = h('div', { class: 'stack' }, loading('Recherche de vos adresses sur ce téléphone…'));
       var prev = h('div', { class: 'stack' });
       var err = h('div', { role: 'alert' });
@@ -2027,15 +2151,14 @@
           var send = h('button', { class: 'btn', type: 'button', id: 'send-address', onclick: function () {
             send.disabled = true; send.textContent = 'Envoi…'; setKids(err);
             api('fiila_fulfill_request', { p_token: token, p_place_id: sel, p_place_owner: rec.owner || null }).then(function () {
-              setKids(app, page(stateCard('✓', 'Adresse envoyée', r.requester_name + ' peut maintenant voir votre fiche. Vous pouvez la désactiver ou la supprimer à tout moment depuis « Mes adresses ».',
-                backInvoice ? h('a', { class: 'btn', id: 'back-invoice', href: '#/f/' + backInvoice }, 'Revenir à ma commande') : h('a', { class: 'btn', href: '#/m/' + sel }, 'Gérer mon adresse')), footer()));
+              setKids(app, sentView(r.requester_name, pl.share_token || (owned.find('place', sel) || {}).share, sel, backInvoice));
               window.scrollTo(0, 0);
             }, function (e) {
               send.disabled = false; send.textContent = 'Réessayer l’envoi';
               setKids(err, h('p', { class: 'alert' }, errText(e)));
             });
-          } }, 'Envoyer mon adresse à ' + r.requester_name);
-          setKids(prev, h('h2', null, 'Voici exactement ce qui sera envoyé'), fiche(pl), err, send);
+          } }, 'Envoyer à ' + r.requester_name);
+          setKids(prev, send, err, h('details', null, h('summary', null, 'Voir ce qui sera envoyé'), h('div', { style: 'margin-top:12px' }, fiche(pl))));
         }, function (e) { setKids(prev, h('p', { class: 'alert' }, errText(e))); });
       }
 
@@ -2049,15 +2172,17 @@
             h('div', { class: 'choice one', role: 'radiogroup' }, usable.map(function (x) {
               return h('label', null, h('input', { type: 'radio', name: 'pick', value: x.id, checked: x.id === sel, onchange: function () { sel = x.id; showPreview(); } }),
                 h('span', { class: 'wrapword' }, (x.tag ? TAGS[x.tag] + ' · ' : '') + x.label + (x.locality ? ' · ' + x.locality : '')));
-            }))] : h('p', { class: 'muted' }, 'Aucune adresse active sur ce téléphone.'));
+            }))] : null);
           showPreview();
         }, function (e) { setKids(listBox, h('p', { class: 'alert' }, errText(e))); });
-      } else setKids(listBox, h('p', { class: 'muted' }, 'Vous n’avez pas encore d’adresse Fii La sur ce téléphone.'));
+      } else setKids(listBox);
 
-      return page(head, r.shop ? h('p', { class: 'small muted' }, 'Pour cette livraison et les suivantes : ' + r.requester_name + ' pourra réutiliser l’adresse envoyée tant que son lien reste actif. Vous pouvez la désactiver à tout moment.') : null,
+      return page(brandBar('Demande d’adresse'), head,
         listBox,
-        h('a', { class: mine.length ? 'btn ghost' : 'btn', href: '#/new' + qs({ d: token, f: backInvoice || undefined }) }, 'Créer une nouvelle adresse'),
-        prev, footer());
+        h('a', { class: mine.length ? 'btn ghost' : 'btn', id: 'new-address-for-request', href: '#/new' + qs({ d: token, f: backInvoice || undefined }) }, mine.length ? 'Créer une autre adresse' : 'Créer mon adresse'),
+        prev,
+        r.shop ? h('p', { class: 'hint' }, 'La boutique pourra la réutiliser. Vous pouvez l’arrêter.') : null,
+        footer(true));
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la demande', errText(e), retryBtn())); });
   }
 
@@ -2312,7 +2437,6 @@
     if (!authed()) return authForm(q);
     return account.me().then(function (me) {
       if (!me) return authForm(q);
-      if (q.bienvenue === '1') afterLogin(null).then(function () {}, function () {});
       return profileView(me, q);
     }, failPage('Impossible de charger votre compte', 'compte'));
   }
@@ -2346,9 +2470,9 @@
             setKids(root, backBtn(), stateCard('✓', 'Vérifiez vos e-mails', 'Ouvrez le lien envoyé à ' + email + ' pour activer votre compte.'), footer());
             return;
           }
-          var n = r && r.claimed;
-          toast((mode === 'signup' ? 'Compte créé.' : 'Connecté.') + (n ? ' ' + n + (n > 1 ? ' fiches de ce téléphone rattachées.' : ' fiche de ce téléphone rattachée.') : ''));
-          go(retour);
+          toast(mode === 'signup' ? 'Compte créé.' : 'Connecté.');
+          if (pendingClaims().count) go('#/compte' + qs({ rattacher: '1', retour: q.retour }));
+          else go(retour);
         }, function (e) {
           btn.disabled = false; btn.textContent = label;
           errBox(err, e);
@@ -2365,7 +2489,7 @@
         h('form', { class: 'stack', novalidate: true, onsubmit: submit },
           mode === 'signup' ? textField({ id: 'acc-name', label: 'Votre nom', max: 60, value: f.name, autocomplete: 'name', onInput: function (v) { f.name = v; } }) : null,
           textField({ id: 'acc-email', label: 'E-mail', type: 'email', autocomplete: 'email', inputmode: 'email', max: 254, value: f.email, onInput: function (v) { f.email = v; } }),
-          mode !== 'forgot' ? passwordField('acc-pass', mode === 'signup' ? 'Mot de passe (8 caractères au moins)' : 'Mot de passe',
+          mode !== 'forgot' ? passwordField('acc-pass', 'Mot de passe',
             mode === 'signup' ? 'new-password' : 'current-password', function (v) { f.password = v; }) : null,
           err, btn),
         mode === 'login' ? h('button', { class: 'btn link', type: 'button', id: 'forgot', style: 'align-self:flex-start', onclick: function () { mode = 'forgot'; draw(); } }, 'Mot de passe oublié ?') : null,
@@ -2377,6 +2501,27 @@
     return root;
   }
 
+  // Rattachement explicite des fiches et de la boutique de ce téléphone au compte connecté.
+  function claimCard(me, q) {
+    var pc = pendingClaims();
+    if (!pc.count || Date.now() < (LS.get('fiila.claim.later', 0) || 0)) return null;
+    var parts = [];
+    var n = pc.items.length;
+    if (n) parts.push(n + (n > 1 ? ' fiches' : ' fiche'));
+    if (pc.shop) parts.push('votre boutique');
+    var card = h('section', { class: 'card nudge', id: 'claim-card' },
+      h('h2', null, 'Rattacher à votre compte ?'),
+      h('p', { class: 'small' }, parts.join(' et ') + ' de ce téléphone, au compte ' + (me.email || '') + '.'),
+      h('div', { class: 'row' },
+        h('button', { class: 'btn small', type: 'button', id: 'claim-yes', onclick: function (ev) {
+          ev.currentTarget.disabled = true;
+          claimNow().then(function () { toast('Rattaché à votre compte.'); go(q.retour ? safeRetour(q.retour) : '#/compte'); }, function (e) { toast(errText(e)); });
+        } }, 'Rattacher'),
+        h('button', { class: 'btn ghost small', type: 'button', id: 'claim-no', onclick: function () {
+          LS.set('fiila.claim.later', Date.now() + 30 * 864e5); card.remove(); if (q.retour) go(safeRetour(q.retour));
+        } }, 'Pas maintenant')));
+    return card;
+  }
   function profileView(me, q) {
     var f = { display_name: me.display_name || '', phone: me.phone || '' };
     var msg = h('div', { role: 'status' });
@@ -2418,26 +2563,34 @@
           if (q.mdp === '1') history.replaceState(null, '', location.pathname + location.search + '#/compte');
         }, function (e) { b.disabled = false; errBox(pwMsg, e); });
       } },
-        passwordField('new-pass', 'Nouveau mot de passe (8 caractères au moins)', 'new-password', function (v) { pw = v; }),
+        passwordField('new-pass', 'Nouveau mot de passe', 'new-password', function (v) { pw = v; }),
         pwMsg, h('button', { class: 'btn', type: 'submit', id: 'pw-save' }, 'Enregistrer le mot de passe')));
 
     var delZone = h('div', { class: 'stack' });
     function askDelete() {
+      var pw = '';
+      var dErr = h('div', { role: 'alert' });
       setKids(delZone, h('div', { class: 'confirm', role: 'alertdialog', 'aria-label': 'Confirmer la suppression du compte' },
         h('p', null, h('strong', null, 'Supprimer définitivement votre compte ?')),
-        h('p', { class: 'small' }, 'Vos adresses enregistrées sur le compte, votre boutique, vos clients, commandes et factures seront effacés. Les liens déjà envoyés ne fonctionneront plus.'),
+        h('p', { class: 'small' }, 'Adresses du compte, boutique, clients, commandes et factures seront effacés.'),
+        passwordField('delete-pass', 'Votre mot de passe', 'current-password', function (v) { pw = v; }),
+        dErr,
         h('div', { class: 'row' },
           h('button', { class: 'btn danger-fill', type: 'button', id: 'confirm-delete-account', onclick: function (ev) {
-            ev.currentTarget.disabled = true;
-            api('fiila_delete_account', {}).then(function () {
+            var b = ev.currentTarget; b.disabled = true; setKids(dErr);
+            // connexion récente exigée par le serveur : on revérifie le mot de passe
+            account.signIn(me.email, pw).then(function () {
+              return api('fiila_delete_account', {});
+            }).then(function () {
               return account.signOut();
-            }).then(function () { toast('Compte supprimé.'); go('#/'); }, function (e) { errBox(delZone, e); });
+            }).then(function () { toast('Compte supprimé.'); go('#/'); }, function (e) { b.disabled = false; errBox(dErr, e); });
           } }, 'Supprimer mon compte'),
           h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(delZone); } }, 'Annuler'))));
     }
 
     return page(backBtn(),
       q.bienvenue === '1' ? h('p', { class: 'saved-ok', role: 'status' }, icon('check', 18), 'Compte activé.') : null,
+      claimCard(me, q),
       q.mdp === '1' ? h('div', { class: 'notice' }, 'Choisissez maintenant votre nouveau mot de passe.') : null,
       h('section', { class: 'card' }, avatarBox, msg),
       h('section', { class: 'card' },
@@ -2500,42 +2653,52 @@
       sapi('fiila_shop_courier', { p_action: action }).then(function () { toast(okText); render(); }, function (e) { errBox(err, e); });
     }
     var c = shop.courier, inv = shop.courier_invite;
+    if (c && !shop.courier_confirmed) {
+      // Audit S4 : le livreur qui a ouvert l'invitation n'est actif qu'après confirmation par la boutique.
+      add(box, [
+        h('p', { id: 'courier-to-confirm' }, h('strong', null, c.name), ' a accepté votre invitation.'),
+        h('p', { class: 'small muted' }, [c.phone, VEHICLES[c.vehicle]].filter(Boolean).join(' · ')),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn', type: 'button', id: 'courier-confirm', onclick: function () { act('confirm', c.name + ' est votre livreur.'); } }, 'C’est bien lui'),
+          h('button', { class: 'btn ghost', type: 'button', id: 'courier-refuse', onclick: function () { act('remove', 'Refusé.'); } }, 'Ce n’est pas lui')),
+        err]);
+      return box;
+    }
     if (c) {
-      box.append(
-        h('p', null, h('strong', null, c.name), ' · ', VEHICLES[c.vehicle] || '', c.reviews ? ' · ' + stars(c.rating) + ' (' + c.reviews + ')' : ''),
-        c.active === false ? h('p', { class: 'notice' }, 'Indisponible pour le moment : les courses ne lui sont pas envoyées.') : null,
+      add(box, [
+        h('p', null, h('strong', null, c.name), ' · ', VEHICLES[c.vehicle] || '', c.reviews ? [' · ', ratingEl(c.rating, c.reviews)] : null),
+        c.active === false ? h('p', { class: 'notice' }, 'Indisponible : les courses ne lui sont pas envoyées.') : null,
         segField({ legend: 'Envoi des courses', name: 'courier-auto', id: 'courier-auto', value: shop.courier_auto ? 'on' : 'off',
           options: [['on', 'Automatique'], ['off', 'Manuel']],
-          onChange: function (v) { act(v === 'on' ? 'auto_on' : 'auto_off', v === 'on' ? 'Envoi automatique activé.' : 'Envoi manuel.'); } }),
-        h('p', { class: 'hint' }, shop.courier_auto ? 'Dès que le client donne son adresse, la course arrive sur la page de ' + c.name + '.' : 'Vous envoyez chaque course depuis la commande.'),
+          onChange: function (v) { act(v === 'on' ? 'auto_on' : 'auto_off', v === 'on' ? 'Envoi automatique.' : 'Envoi manuel.'); } }),
         h('button', { class: 'btn ghost small', type: 'button', id: 'courier-remove', style: 'align-self:flex-start', onclick: function () { act('remove', 'Livreur retiré.'); } }, 'Retirer ce livreur'),
-        err);
+        err]);
       return box;
     }
     var f = { name: inv ? inv.name || '' : '', phone: inv ? inv.phone || '' : '' };
     var sendBox = h('div', { class: 'stack' });
-    function showSend(tok) {
-      var link = baseUrl() + '#/livreur/invitation/' + tok;
-      var text = (shop.name) + ' vous propose d’être son livreur attitré sur Fii La : vous recevrez ses courses directement. Acceptez ici : ' + link;
-      setKids(sendBox, h('a', { class: 'btn lime', id: 'courier-invite-send', href: waTo(f.phone, text), target: '_blank', rel: 'noopener noreferrer',
-        onclick: function () { track('courier_invited', 'whatsapp'); } }, 'Envoyer l’invitation sur WhatsApp'),
-        h('button', { class: 'btn ghost small', type: 'button', style: 'align-self:flex-start', onclick: function () { copy(link, 'Lien d’invitation'); } }, 'Copier le lien'));
-    }
-    box.append(
-      inv ? h('p', { class: 'small muted', id: 'courier-pending' }, 'Invitation en attente' + (inv.name ? ' : ' + inv.name : '') + '. Elle reste valable 7 jours.') :
-        h('p', { class: 'small muted' }, 'Votre livreur reçoit vos courses automatiquement, avec l’adresse exacte et la photo de l’entrée.'),
-      textField({ id: 'courier-name', label: 'Nom du livreur', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
-      textField({ id: 'courier-phone', label: 'Son numéro WhatsApp', type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+    add(box, [
+      inv ? h('p', { class: 'small muted', id: 'courier-pending' }, 'Invitation envoyée' + (inv.name ? ' à ' + inv.name : '') + '.') : null,
+      textField({ id: 'courier-name', label: 'Nom', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
+      textField({ id: 'courier-phone', label: 'WhatsApp', type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
       err,
       h('button', { class: 'btn', type: 'button', id: 'courier-invite', onclick: function (ev) {
         setKids(err);
         if (!f.phone.trim()) return errBox(err, new ApiError('phone_invalid'));
         var b = ev.currentTarget; b.disabled = true;
-        sapi('fiila_courier_invite', { p_name: f.name.trim() || null, p_phone: f.phone.trim() }).then(function (r) { b.disabled = false; showSend(r.token); },
-          function (e) { b.disabled = false; errBox(err, e); });
-      } }, inv ? 'Préparer une nouvelle invitation' : 'Inviter mon livreur'),
+        sapi('fiila_courier_invite', { p_name: f.name.trim() || null, p_phone: f.phone.trim() }).then(function (r) {
+          b.disabled = false;
+          var link = baseUrl() + '#/livreur/invitation/' + r.token;
+          var wa = waTo(f.phone, shop.name + ' vous invite à livrer ses commandes avec Fii La. Acceptez ici : ' + link);
+          track('courier_invited', 'whatsapp');
+          // un seul bouton à la fois : l'invitation prête remplace « Inviter »
+          b.hidden = true;
+          setKids(sendBox, h('a', { class: 'btn lime', id: 'courier-invite-send', href: wa, target: '_blank', rel: 'noopener noreferrer' }, 'Envoyer sur WhatsApp'),
+            h('button', { class: 'btn ghost small', type: 'button', style: 'align-self:flex-start', onclick: function () { copy(link, 'Lien'); } }, 'Copier le lien'));
+        }, function (e) { b.disabled = false; errBox(err, e); });
+      } }, 'Inviter sur WhatsApp'),
       sendBox,
-      inv ? h('button', { class: 'btn link', type: 'button', style: 'align-self:flex-start', onclick: function () { act('cancel_invite', 'Invitation annulée.'); } }, 'Annuler l’invitation') : null);
+      inv ? h('button', { class: 'btn link', type: 'button', style: 'align-self:flex-start', onclick: function () { act('cancel_invite', 'Invitation annulée.'); } }, 'Annuler l’invitation') : null]);
     return box;
   }
 
@@ -2590,7 +2753,7 @@
           h('p', { class: 'muted' }, vue === 'open' ? 'Aucune commande en cours.' : vue === 'unpaid' ? 'Rien à encaisser.' : 'Aucune commande.')));
       }, function (e) { errBox(listBox, e); });
     }
-    load();
+    if (st.orders) load();
     function tile(n, label, href) {
       return h('a', { class: 'tile', href: href }, h('strong', null, String(n || 0)), h('span', null, label));
     }
@@ -2599,17 +2762,24 @@
         h('p', { class: 'eyebrow' }, 'Ma boutique'),
         h('div', { class: 'brand-row' }, h('h1', { class: 'wrapword', id: 'shop-title' }, shop.name),
           h('a', { class: 'btn ghost small', href: '#/boutique/reglages' }, 'Réglages'))),
-      h('a', { class: 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'Nouvelle commande'),
-      shop.account || authed() ? null : shopAccountCard(),
-      h('div', { class: 'tiles' },
+      // Boutique neuve : une seule première étape, pas de tableau de bord vide.
+      !st.orders && !st.products ? h('section', { class: 'card', id: 'first-product' },
+        h('h2', null, 'Ajoutez votre premier article'),
+        h('p', { class: 'small muted' }, 'Une photo, un prix. Il sera prêt pour vos commandes.'),
+        h('a', { class: 'btn', href: '#/boutique/article/nouveau' }, 'Ajouter un article')) : null,
+      h('a', { class: !st.orders && !st.products ? 'btn ghost full' : 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'Nouvelle commande'),
+      // Compte proposé quand la boutique tourne (3 commandes), pas dès sa création.
+      shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard(),
+      st.orders ? h('div', { class: 'tiles' },
         tile(st.open, 'en cours', '#/boutique?vue=open'),
         tile(st.unpaid, 'à encaisser', '#/boutique?vue=unpaid'),
         tile(st.products, st.products === 1 ? 'article' : 'articles', '#/boutique/articles'),
-        tile(st.customers, st.customers === 1 ? 'client' : 'clients', '#/clients')),
-      segField({ name: 'vue', id: 'orders-filter', value: vue,
+        tile(st.customers, st.customers === 1 ? 'client' : 'clients', '#/clients')) :
+        st.products ? h('a', { class: 'btn link', href: '#/boutique/articles', style: 'align-self:flex-start' }, 'Mes articles (' + st.products + ')') : null,
+      st.orders ? segField({ name: 'vue', id: 'orders-filter', value: vue,
         options: [['open', 'En cours'], ['unpaid', 'À encaisser'], ['done', 'Terminées'], ['all', 'Toutes']],
-        onChange: function (v) { vue = v; try { history.replaceState(null, '', location.pathname + location.search + '#/boutique?vue=' + v); } catch (e) { /* rien */ } setKids(listBox, loading()); load(); } }),
-      listBox, footer());
+        onChange: function (v) { vue = v; try { history.replaceState(null, '', location.pathname + location.search + '#/boutique?vue=' + v); } catch (e) { /* rien */ } setKids(listBox, loading()); load(); } }) : null,
+      st.orders ? listBox : null, footer());
   }
 
   /* ----- clients */
@@ -2823,8 +2993,7 @@
       addr = [h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Adresse reçue'),
         h('details', { id: 'order-address' }, h('summary', null, 'Voir l’adresse'), h('div', { style: 'margin-top:12px' }, o.place ? fiche(o.place) : null))];
     } else if (o.address_state === 'pending') {
-      addr = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de l’adresse'),
-        h('p', { class: 'small muted' }, 'Le client donne son adresse depuis le lien de la commande.')];
+      addr = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de l’adresse')];
     } else {
       addr = [h('div', { class: 'notice' }, o.address_state === 'expired' ? 'La demande d’adresse a expiré.' : o.address_state === 'revoked' ? 'Le client a retiré son adresse.' : 'Aucune adresse pour cette commande.'),
         closed ? null : h('button', { class: 'btn', type: 'button', id: 'ask-address', onclick: function (ev) { ev.currentTarget.disabled = true; call('fiila_order_request_address', null, 'Nouvelle demande prête. Renvoyez le lien au client.').catch(function () {}); } }, 'Redemander l’adresse')];
@@ -2875,7 +3044,7 @@
         startBtn, dErr,
         o.watch_token ? deliveryWatch(o.watch_token) : null,
         h('button', { class: 'btn', type: 'button', id: 'mark-delivered', onclick: function (ev) { ev.currentTarget.disabled = true; LS.del(COURIER_KEY); call('fiila_order_set_status', { p_status: 'delivered' }, 'Commande livrée.').catch(function () {}); } }, 'Marquer comme livrée'),
-        h('p', { class: 'hint' }, 'Le client suit le livreur depuis le lien de sa commande.'));
+        null);
     } else if (o.status === 'delivered') {
       deliv = h('section', { class: 'card', id: 'order-delivery' }, h('h2', null, 'Livraison'),
         h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Livrée le ' + shortDate(o.delivered_at)),
@@ -2930,7 +3099,7 @@
         h('h1', { class: 'wrapword' }, o.customer_id ? h('a', { href: '#/clients/' + o.customer_id, class: 'plain' }, o.customer_name) : o.customer_name),
         h('div', { class: 'row', style: 'align-items:center;gap:10px' }, stageChip(o), h('span', { class: 'small muted' }, fcfa(o.total) + ' · ' + shortDate(o.created_at)))),
       q.nouveau === '1' ? h('p', { class: 'saved-ok', role: 'status', id: 'order-created' }, icon('check', 18),
-        o.address_state === 'pending' ? 'Commande créée. Envoyez-la au client : il donnera son adresse depuis le même lien.' : 'Commande créée. L’adresse du client est déjà connue.') : null,
+        o.address_state === 'pending' ? 'Commande créée.' : 'Commande créée. Adresse déjà connue.') : null,
       h('section', { class: 'card', id: 'order-client' }, h('h2', null, 'Adresse de livraison'), addr),
       send, deliv, paySec, items, endActions, zone, footer());
   }
@@ -2973,7 +3142,9 @@
   }
 
   /* ----- articles de la boutique (catalogue) */
-  function stars(n) { var r = Math.round(Number(n) || 0); return '★★★★★'.slice(0, r) + '☆☆☆☆☆'.slice(0, 5 - r); }
+  // Note : une étoile dessinée + « 4,8 (12) », sans caractères ★ ☆.
+  function ratingText(r, n) { return String(Number(r).toFixed(1)).replace('.', ',') + ' (' + n + ')'; }
+  function ratingEl(r, n) { return h('span', { class: 'rating' }, icon('star', 14), ratingText(r, n)); }
   function viewProducts() {
     return sapi('fiila_products', { p_all: true }).then(function (rows) {
       return page(backBtn('Ma boutique', '#/boutique'),
@@ -2982,7 +3153,7 @@
           return h('a', { class: 'item product-item', href: '#/boutique/article/' + pr.id },
             pr.photo ? h('img', { class: 'thumb', src: pr.photo, alt: '' }) : h('span', { class: 'thumb empty', 'aria-hidden': 'true' }),
             h('div', { style: 'flex:1;min-width:0' }, h('div', { class: 't' }, pr.name),
-              h('div', { class: 'small muted' }, fcfa(pr.price) + (pr.reviews ? ' · ' + stars(pr.rating) + ' (' + pr.reviews + ')' : ''))),
+              h('div', { class: 'small muted' }, fcfa(pr.price), pr.reviews ? [' · ', ratingEl(pr.rating, pr.reviews)] : null)),
             h('span', { class: 'item-end' }, pr.active ? null : h('span', { class: 'chip neutral' }, 'Masqué'), h('span', { class: 'chev' }, icon('chev', 18))));
         })) : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Ajoutez vos articles avec leur photo et leur prix : vous les choisirez en un geste dans vos commandes.')),
         footer());
@@ -3036,9 +3207,9 @@
   }
 
   // Notes de l'acheteur, sur la facture d'une commande livrée.
-  function reviewBox(token, items, shopName) {
-    var box = h('section', { class: 'card no-print', id: 'reviews' }, h('h2', null, 'Notez vos articles'),
-      h('p', { class: 'small muted' }, 'Votre note aide ' + shopName + ' et les prochains clients.'));
+  function reviewBox(token, items, shopName, courier) {
+    var box = h('section', { class: 'card no-print', id: 'reviews' }, h('h2', null, 'Votre avis'));
+    if (courier) box.append(courierRateRow(token, courier));
     items.forEach(function (it) {
       var cur = it.my_rating || 0;
       var row = h('div', { class: 'rate-row' });
@@ -3050,7 +3221,7 @@
                 api('fiila_review', { p_token: token, p_product_id: it.product_id, p_rating: n, p_comment: null }).then(function () {
                   cur = n; draw(); track('review_left', String(n)); toast('Merci pour votre note.');
                 }, function (e) { toast(errText(e)); });
-              } }, n <= cur ? '★' : '☆');
+              } }, icon('star', 28));
           })));
       }
       draw();
@@ -3106,7 +3277,7 @@
         var st = { waiting: ['wait', 'À récupérer'], live: ['wait', 'En route'], arrived: ['ok', 'Arrivé'] }[k.status] || ['wait', 'À récupérer'];
         return h('section', { class: 'card course' },
           h('div', { class: 'brand-row' }, h('strong', null, k.shop + ' · N° ' + k.ref), h('span', { class: 'chip ' + st[0] }, st[1])),
-          h('p', { class: 'wrapword' }, k.customer + ' — ' + k.dest + (k.locality ? ' · ' + k.locality : '')),
+          h('p', { class: 'wrapword' }, k.customer + ' · ' + k.dest + (k.locality ? ', ' + k.locality : '')),
           due ? h('p', { class: 'small' }, 'À encaisser : ', h('strong', null, fcfa(due))) : h('p', { class: 'small muted' }, 'Déjà payée'),
           h('div', { class: 'row' },
             h('a', { class: 'btn', href: '#/l/' + k.token }, 'Ouvrir la course'),
@@ -3115,14 +3286,14 @@
             ev.currentTarget.disabled = true;
             api('fiila_courier_done', { p_key: courierKey(), p_send: k.token }).then(function () { track('courier_done', 'courier'); toast('Livraison confirmée.'); load(); },
               function (e) { toast(errText(e)); });
-          } }, 'Livrée'));
+          } }, 'C’est livré'));
       }) : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucune course pour l’instant. Gardez cette page ouverte : les nouvelles courses s’affichent toutes seules.')));
     }
     function load() {
       api('fiila_courier_me', { p_key: courierKey() }).then(function (n) {
         if (n.courses.length > seen) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) { /* rien */ } toast('Nouvelle course.'); }
         seen = n.courses.length;
-        document.title = (n.courses.length ? '(' + n.courses.length + ') ' : '') + 'Fii La — livreur';
+        document.title = (n.courses.length ? '(' + n.courses.length + ') ' : '') + 'Fii La · Livreur';
         draw(n.courses);
       }, function () { /* hors ligne : on réessaie au prochain tour */ });
     }
@@ -3131,13 +3302,14 @@
       h('div', { class: 'stack tight' },
         h('p', { class: 'eyebrow' }, 'Espace livreur'),
         h('h1', { class: 'wrapword' }, c.name),
-        h('p', { class: 'small muted' }, [VEHICLES[c.vehicle], c.zone, c.reviews ? stars(c.rating) + ' (' + c.reviews + ')' : null, r.done_today ? r.done_today + ' livrée(s) aujourd’hui' : null].filter(Boolean).join(' · '))),
+        h('p', { class: 'small muted' }, [VEHICLES[c.vehicle], c.zone, r.done_today ? r.done_today + ' livrée' + (r.done_today > 1 ? 's' : '') + ' aujourd’hui' : null].filter(Boolean).join(' · '),
+          c.reviews ? [' · ', ratingEl(c.rating, c.reviews)] : null)),
       segField({ name: 'cr-active', id: 'cr-active', value: c.active === false ? 'off' : 'on', options: [['on', 'Disponible'], ['off', 'Indisponible']], onChange: function (v) {
         api('fiila_courier_update', { p_key: courierKey(), p: { active: v === 'on' } }).then(function () { toast(v === 'on' ? 'Vous recevez les courses.' : 'Plus de nouvelles courses pour l’instant.'); }, function (e) { toast(errText(e)); });
       } }),
       h('h2', null, 'Mes courses'), list,
       r.shops.length ? h('p', { class: 'small muted' }, 'Livreur attitré de : ' + r.shops.map(function (s) { return s.name; }).join(', ') + '.')
-        : h('p', { class: 'small muted' }, 'Aucune boutique pour l’instant. Demandez à vos boutiques de vous inviter depuis Fii La (Réglages de la boutique → Livreur attitré).'),
+        : h('p', { class: 'small muted' }, 'Aucune boutique pour l’instant. Demandez à la boutique de vous inviter.'),
       h('details', null, h('summary', null, 'Supprimer mon espace livreur'),
         h('div', { class: 'stack', style: 'margin-top:12px' },
           h('p', { class: 'small' }, 'Vos boutiques ne pourront plus vous envoyer de courses.'),
@@ -3161,25 +3333,25 @@
       return page(
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Invitation'),
           h('h1', { class: 'wrapword' }, r.shop + ' vous propose d’être son livreur attitré'),
-          h('p', { class: 'muted' }, 'Vous recevrez ses courses directement sur votre espace livreur, avec l’adresse exacte et la photo de l’entrée.')),
+          h('p', { class: 'muted' }, 'Ses courses arrivent ici, avec la photo de l’entrée.')),
         courierKey() ? h('button', { class: 'btn big', type: 'button', id: 'courier-accept', onclick: function (ev) { ev.currentTarget.disabled = true; accept(); } }, 'Accepter') :
           courierForm({ name: r.name, phone: r.phone }, function () { accept(); }),
         err, footer());
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher l’invitation', errText(e), retryBtn())); });
   }
   // Note de la livraison par le client.
-  function courierRateBox(token, cour) {
+  function courierRateRow(token, cour) {
     var cur = cour.my_rating || 0;
-    var box = h('section', { class: 'card no-print', id: 'courier-rate' });
+    var box = h('div', { id: 'courier-rate' });
     function draw() {
-      setKids(box, h('h2', null, 'Notez la livraison'),
-        h('div', { class: 'rate-row' }, h('span', null, cour.name),
+      setKids(box,
+        h('div', { class: 'rate-row' }, h('span', null, 'Livraison · ' + cour.name),
           h('span', { class: 'stars', role: 'radiogroup', 'aria-label': 'Note de la livraison' }, [1, 2, 3, 4, 5].map(function (n) {
             return h('button', { type: 'button', class: 'star' + (n <= cur ? ' on' : ''), role: 'radio', 'aria-checked': String(n === cur), 'aria-label': 'Livraison ' + n + ' sur 5',
               onclick: function () {
                 api('fiila_courier_review', { p_token: token, p_rating: n }).then(function () { cur = n; draw(); track('courier_review', String(n)); toast('Merci pour votre note.'); },
                   function (e) { toast(errText(e)); });
-              } }, n <= cur ? '★' : '☆');
+              } }, icon('star', 28));
           }))));
     }
     draw();
@@ -3194,26 +3366,30 @@
       track('invoice_opened', 'order');
       var o = r.order, s = r.shop;
       var remaining = Math.max(0, o.total - o.paid);
+      var delivered = o.delivery_state === 'delivered';
+      var stateText = delivered ? 'Livrée' : o.delivery_state === 'on_the_way' ? 'En route' : o.delivery_state === 'arrived' ? 'Livreur arrivé'
+        : o.address_state === 'pending' ? 'Adresse attendue' : 'En préparation';
       var act = [];
-      if (o.address_state === 'pending' && o.request_token && o.delivery_state !== 'delivered') {
-        act.push(h('section', { class: 'card highlight no-print', id: 'give-address' },
-          h('h2', null, 'Où faut-il livrer ?'),
-          h('a', { class: 'btn big', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'Donner mon adresse de livraison'),
-          h('p', { class: 'hint' }, 'Vous choisissez ce que vous envoyez, et vous pouvez le retirer à tout moment.')));
-      } else if (o.address_state === 'received' && o.delivery_state !== 'delivered') {
-        act.push(h('p', { class: 'saved-ok no-print', id: 'address-ok' }, icon('check', 18), 'Adresse de livraison reçue par ' + s.name + '.'));
+      if (o.address_state === 'pending' && o.request_token && !delivered) {
+        act.push(h('a', { class: 'btn big no-print', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'Donner mon adresse de livraison'));
       }
-      if (o.watch_token) act.push(h('div', { class: 'no-print' }, deliveryWatch(o.watch_token)));
-      if (o.delivery_state === 'delivered') act.push(h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Livrée'));
+      if (o.watch_token) act.push(h('div', { class: 'no-print' }, deliveryWatch(o.watch_token, o.courier && o.courier.name)));
+      // « Votre avis » : articles et livraison dans un seul bloc, une fois la commande livrée.
       var rateable = (o.items || []).filter(function (it) { return it.product_id; });
-      if (o.can_review && rateable.length) act.push(reviewBox(token, rateable, s.name));
-      if (o.can_review && o.courier) act.push(courierRateBox(token, o.courier));
-      else if (o.courier && o.watch_token) act.push(h('p', { class: 'small muted no-print' }, 'Livreur : ' + o.courier.name));
+      var canCourier = o.courier && o.courier.can_rate;
+      if (o.can_review && (rateable.length || canCourier)) act.push(reviewBox(token, rateable, s.name, canCourier ? o.courier : null));
       var pg = page(
+        brandBar('Commande'),
+        h('header', { class: 'stack tight no-print', id: 'order-head' },
+          h('h1', { class: 'wrapword' }, s.name),
+          h('div', { class: 'row', style: 'align-items:center;gap:10px' },
+            h('span', { class: 'chip ' + (delivered ? 'ok' : 'wait') }, icon(delivered ? 'check' : 'clock', 12), stateText),
+            h('span', { class: 'small muted' }, 'N° ' + o.ref + ' · ' + fcfa(o.total))),
+          o.address_state === 'received' && !delivered ? h('p', { class: 'small muted', id: 'address-ok' }, 'Adresse reçue par la boutique.') : null),
         act,
         h('article', { class: 'card invoice', id: 'invoice' },
           h('header', { class: 'inv-head' },
-            h('div', null, h('p', { class: 'eyebrow' }, 'Facture'), h('h1', { class: 'wrapword' }, s.name),
+            h('div', null, h('p', { class: 'eyebrow' }, 'Facture'), h('h2', { class: 'wrapword' }, s.name),
               s.phone ? h('p', { class: 'small muted' }, s.phone) : null, s.ninea ? h('p', { class: 'small muted' }, 'NINEA ' + s.ninea) : null),
             h('div', { class: 'inv-meta' }, h('strong', null, 'N° ' + o.ref), h('span', { class: 'small muted' }, shortDate(o.created_at)))),
           h('p', null, 'Client : ', h('strong', { class: 'wrapword' }, o.customer_name)),
@@ -3222,8 +3398,8 @@
           h('div', { class: 'total-row big' }, h('span', null, remaining ? 'Reste à payer' : 'Statut'), h('strong', { id: 'inv-remaining' }, remaining ? fcfa(remaining) : 'Payée')),
           o.note ? h('p', { class: 'small muted wrapword' }, o.note) : null),
         h('button', { class: 'btn ghost no-print', type: 'button', id: 'print', onclick: function () { window.print(); } }, 'Télécharger ou imprimer'),
-        h('p', { class: 'hint no-print', style: 'text-align:center' }, 'Commande gérée avec Fii La.'),
-        footer());
+        delivered && !shopKey() ? h('a', { class: 'btn link no-print', id: 'sell-too', href: '#/boutique', style: 'align-self:center' }, 'Vous vendez aussi sur WhatsApp ? Créez votre boutique') : null,
+        footer(true));
       return pg;
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la commande', errText(e), retryBtn())); });
   }
@@ -3255,7 +3431,7 @@
           h('li', null, 'Rendez-vous : le lieu cesse d’être affiché à la date choisie, puis la fiche est effacée 30 jours plus tard.'),
           h('li', null, 'Demande d’adresse : valable 7 jours, effacée 30 jours après son expiration.'),
           h('li', null, 'Empreinte de l’adresse IP : 24 heures.'),
-          h('li', null, 'Compte, boutique, clients, commandes et factures : jusqu’à la suppression du compte (depuis « Mon compte »), ou d’un client par le commerçant.'),
+          h('li', null, 'Commandes, factures et clients d’une boutique : 24 mois au plus, ou moins si le commerçant les supprime. Compte et boutique : jusqu’à leur suppression.'),
           h('li', null, 'Adresse donnée à un commerçant pour une commande : il peut la réutiliser pour vos commandes suivantes tant que son lien reste actif. La désactiver ou la supprimer la lui retire.')),
         h('h2', null, 'Vos droits'),
         h('p', null, 'Depuis le téléphone qui a créé la fiche (ou avec sa clé de gestion), vous pouvez à tout moment la consulter, la modifier, désactiver son lien ou la supprimer définitivement.'),
@@ -3291,5 +3467,5 @@
     }
   } catch (e) { /* facultatif */ }
 
-  render();
+  authBoot.then(render, render);
 })();

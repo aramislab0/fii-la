@@ -4,19 +4,38 @@
 // sont suivies. Rien n'est enregistré. Aucune clé privilégiée.
 import { extractFromUrl, extractFromHtml, isShortMapsUrl, isGoogleHost } from './extract.mjs';
 
+// Origines autorisées : le site public et le développement local (audit S8 : pas de relais ouvert à tous).
+const ORIGINS = ['https://aramislab0.github.io', 'http://localhost', 'http://127.0.0.1'];
+const originOk = (o: string | null) => !!o && ORIGINS.some((a) => o === a || o.startsWith(a + ':') || o.startsWith(a + '/'));
+// Limite simple par adresse IP et par instance : 30 lectures par minute.
+const hits = new Map<string, number[]>();
+function limited(ip: string) {
+  const now = Date.now();
+  const arr = (hits.get(ip) || []).filter((t) => now - t < 60_000);
+  arr.push(now);
+  hits.set(ip, arr);
+  if (hits.size > 5000) hits.clear();
+  return arr.length > 30;
+}
 const CORS = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://aramislab0.github.io',
+  'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'content-type, apikey, authorization, accept, x-client-info',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
-const json = (b: unknown, status = 200) =>
-  new Response(JSON.stringify(b), { status, headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  const origin = req.headers.get('origin');
+  const cors = { ...CORS, 'Access-Control-Allow-Origin': originOk(origin) ? (origin as string) : CORS['Access-Control-Allow-Origin'] };
+  const json = (b: unknown, status = 200) =>
+    new Response(JSON.stringify(b), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (req.method !== 'POST') return json({ error: 'method' }, 405);
+  if (!originOk(origin)) return json({ error: 'origin' }, 403);
+  const ip = req.headers.get('cf-connecting-ip') || (req.headers.get('x-forwarded-for') || '').split(',').pop()!.trim() || 'unknown';
+  if (limited(ip)) return json({ error: 'rate_limited' }, 429);
   let input = '';
   try { const b = await req.json(); input = String(b?.url ?? '').trim().slice(0, 600); } catch { return json({ error: 'invalid' }, 400); }
 

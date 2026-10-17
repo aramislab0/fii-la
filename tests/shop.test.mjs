@@ -90,10 +90,17 @@ await t('inscription : compte créé, fiche du téléphone rattachée, nom affic
   await M.fill('#acc-pass', PASS);
   await shot(M, '01-inscription');
   await M.click('#auth-submit');
-  await M.getByText(/Compte créé\. 1 fiche de ce téléphone rattachée/).waitFor();
-  await M.locator('#account-link').getByText('Awa Test').waitFor();
+  await M.getByText('Compte créé.').waitFor();
+  // rien n'est rattaché sans confirmation (audit S1)
+  await M.locator('#claim-card').getByText('1 fiche de ce téléphone').waitFor();
+  const r0 = await local.db.query('select p.user_id is not null as linked from fiila.places p where p.id = $1', [before.id]);
+  assert.equal(r0.rows[0].linked, false);
+  await M.click('#claim-yes');
+  await M.getByText('Rattaché à votre compte.').waitFor();
   const r = await local.db.query('select p.user_id is not null as linked from fiila.places p where p.id = $1', [before.id]);
   assert.equal(r.rows[0].linked, true);
+  await M.goto(URL0);
+  await M.locator('#account-link').getByText('Awa Test').waitFor();
 });
 
 await t('profil : téléphone et photo enregistrés ; mauvais numéro refusé', async () => {
@@ -113,6 +120,7 @@ await t('profil : téléphone et photo enregistrés ; mauvais numéro refusé', 
 
 await t('carnet : classer l’adresse « Maison », visible dans « Mes adresses »', async () => {
   await M.goto(URL0 + '#/m/' + before.id);
+  await M.locator('#more summary').click();
   await M.locator('#tag-pick').getByText('Maison').click();
   await M.getByText('Classée : Maison.').waitFor();
   await M.goto(URL0);
@@ -153,7 +161,8 @@ await t('boutique : création, tableau de bord vide', async () => {
   await M.fill('#shop-phone', '33 800 00 00');
   await M.click('#shop-save');
   await M.locator('#shop-title').getByText('Boutique Awa (test)').waitFor();
-  await M.getByText('Aucune commande en cours.').waitFor();
+  await M.locator('#first-product').waitFor(); // boutique neuve : une seule première étape
+  assert.equal(await M.locator('.tiles').count(), 0, 'pas de compteurs à zéro');
 });
 
 await t('nouvelle commande : client, deux articles, total calculé, numéro 0001', async () => {
@@ -192,9 +201,9 @@ await t('cliente : la facture s’ouvre sans compte, sans téléphone affiché, 
   await shot(C.page, '05-facture-cliente');
   await C.page.click('#give-address-btn');
   await C.page.getByText('Boutique Awa (test) vous demande votre adresse').waitFor();
-  await C.page.getByText(/pourra réutiliser l’adresse/).waitFor();
+  await C.page.getByText('La boutique pourra la réutiliser. Vous pouvez l’arrêter.').waitFor();
   await C.page.click('#send-address');
-  await C.page.getByText('Adresse envoyée').waitFor();
+  await C.page.getByText('a votre adresse.').waitFor();
   await C.page.click('#back-invoice');
   await C.page.locator('#address-ok').waitFor();
 });
@@ -247,7 +256,7 @@ await t('client connu : la deuxième commande reprend son adresse, sans la redem
   await M.locator('.li-label').first().fill('Sac');
   await M.locator('.li-price').first().fill('5000');
   await M.click('#order-create');
-  await M.getByText('L’adresse du client est déjà connue.').waitFor();
+  await M.getByText('Commande créée. Adresse déjà connue.').waitFor();
   await M.getByText('Commande N° 0002').waitFor();
   await M.getByText('À livrer').first().waitFor();
 });
@@ -290,11 +299,9 @@ await t('boutique sans compte : créée en un geste, le compte est proposé, pas
   await S.page.fill('#shop-name', 'Boutique Binta (test)');
   await S.page.click('#shop-save');
   await S.page.locator('#shop-title').getByText('Boutique Binta (test)').waitFor();
-  await S.page.locator('#shop-nudge').waitFor();
   const key = await S.page.evaluate(() => JSON.parse(localStorage.getItem('fiila.shop')).key);
   assert.ok(key && key.length > 40);
-  await S.page.click('#shop-nudge-later');
-  assert.equal(await S.page.locator('#shop-nudge').count(), 0);
+  assert.equal(await S.page.locator('#shop-nudge').count(), 0, 'pas de compte proposé dès la création');
 });
 
 await t('articles : ajout avec photo et prix', async () => {
@@ -338,19 +345,24 @@ await t('notes : après livraison, la cliente note l’article depuis sa facture
   await C.page.getByRole('radio', { name: '4 sur 5' }).click();
   await C.page.getByText('Merci pour votre note.').waitFor();
   await P.goto(URL0 + '#/boutique/articles');
-  await P.locator('#products').getByText('★★★★☆ (1)').waitFor();
+  await P.locator('#products').getByText('4,0 (1)').waitFor();
   await shot(C.page, '11-facture-note');
 });
 
 await t('compte proposé dans la boutique : inscription, la boutique rejoint le compte', async () => {
   const P = globalThis.SP;
-  await P.evaluate(() => localStorage.removeItem('fiila.nudge.shop'));
+  // le compte est proposé quand la boutique tourne : 3 commandes
+  const key = await P.evaluate(() => JSON.parse(localStorage.getItem('fiila.shop')).key);
+  for (const n of [1, 2]) await rpc(local.db, 'fiila_order_create', { p_key: key, p: { customer: { name: 'Client ' + n + ' (test)' }, items: [{ label: 'x', qty: 1, price: 100 }] } });
   await P.goto(URL0 + '#/boutique');
+  await P.locator('#shop-nudge').waitFor();
   await P.click('#shop-nudge-yes');
   await P.fill('#acc-name', 'Binta Test');
   await P.fill('#acc-email', 'binta.test@example.invalid');
   await P.fill('#acc-pass', PASS);
   await P.click('#auth-submit');
+  await P.locator('#claim-card').getByText('votre boutique').waitFor();
+  await P.click('#claim-yes');
   await P.locator('#shop-title').getByText('Boutique Binta (test)').waitFor();
   assert.equal(await P.locator('#shop-nudge').count(), 0);
   const r = (await local.db.query(`select user_id is not null as linked from fiila.shops where name = 'Boutique Binta (test)'`)).rows[0];
@@ -377,6 +389,10 @@ await t('suppression du compte : tout ce qui est rattaché est effacé', async (
   await M.goto(URL0 + '#/compte');
   await M.locator('details').filter({ hasText: 'Supprimer mon compte' }).locator('summary').click();
   await M.click('#delete-account');
+  await M.fill('#delete-pass', 'mauvais-mot-de-passe');
+  await M.click('#confirm-delete-account');
+  await M.getByText('E-mail ou mot de passe incorrect.').waitFor();
+  await M.fill('#delete-pass', PASS);
   await M.click('#confirm-delete-account');
   await M.getByText('Compte supprimé.').waitFor();
   const n = async (sql) => (await local.db.query(sql)).rows[0].n;
@@ -385,6 +401,45 @@ await t('suppression du compte : tout ce qui est rattaché est effacé', async (
   assert.equal(await n(`select count(*)::int n from fiila.shops where name = 'Boutique Binta (test)'`), 1, 'l’autre boutique reste');
   assert.equal(await n(`select count(*)::int n from fiila.places where id = '${before.id}'`), 0);
   assert.equal(await n(`select count(*)::int n from fiila.places where id = '${clientPlace.id}'`), 1, 'l’adresse de la cliente lui appartient');
+});
+
+await t('S1 : un lien piégé #access_token=… n’ouvre aucune session et ne rattache rien', async () => {
+  const forged = await (await fetch(URL0 + '__test/forge-session?email=' + encodeURIComponent('binta.test@example.invalid'))).json();
+  assert.ok(forged && forged.access_token);
+  const V = await newPhone({ owned: [{ type: 'place', kind: 'address', id: clientPlace.id, owner: clientPlace.owner_token, share: clientPlace.share_token, label: 'Chez la cliente (test)' }] });
+  await V.page.goto(URL0 + '#access_token=' + forged.access_token + '&refresh_token=' + forged.refresh_token + '&expires_in=3600&type=signup');
+  await V.page.getByText('Lien expiré ou déjà utilisé').waitFor();
+  assert.equal(await V.page.evaluate(() => localStorage.getItem('fiila.session')), null);
+  const r = await local.db.query('select user_id from fiila.places where id = $1', [clientPlace.id]);
+  assert.equal(r.rows[0].user_id, null);
+  assert.ok(!V.page.url().includes('access_token'), 'jeton retiré de l’adresse');
+  await V.ctx.close();
+});
+
+await t('mot de passe oublié (PKCE) : le lien marche sur le téléphone qui l’a demandé, pas ailleurs', async () => {
+  const R = await newPhone();
+  await R.page.goto(URL0 + '#/compte');
+  await R.page.click('#forgot');
+  await R.page.fill('#acc-email', 'binta.test@example.invalid');
+  await R.page.click('#auth-submit');
+  await R.page.getByText('Vérifiez vos e-mails').waitFor();
+  const { code } = await (await fetch(URL0 + '__test/last-recovery')).json();
+  const O = await newPhone(); // autre téléphone : pas de secret PKCE
+  await O.page.goto(URL0 + '?code=' + code + '#/');
+  await O.page.getByText('Lien expiré ou déjà utilisé').waitFor();
+  await O.ctx.close();
+  await R.page.reload();
+  await R.page.click('#forgot');
+  await R.page.fill('#acc-email', 'binta.test@example.invalid');
+  await R.page.click('#auth-submit');
+  await R.page.getByText('Vérifiez vos e-mails').waitFor();
+  const { code: code2 } = await (await fetch(URL0 + '__test/last-recovery')).json();
+  await R.page.goto(URL0 + '?code=' + code2 + '#/');
+  await R.page.getByText('Choisissez maintenant votre nouveau mot de passe.').waitFor();
+  await R.page.fill('#new-pass', 'nouveau-mdp-test-2');
+  await R.page.click('#pw-save');
+  await R.page.getByText('Mot de passe changé.').waitFor();
+  await R.ctx.close();
 });
 
 await t('aucune erreur JavaScript', async () => {

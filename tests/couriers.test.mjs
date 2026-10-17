@@ -84,7 +84,10 @@ await t('livreur : ouvre l’invitation, crée son espace sans compte, accepte',
   await L.getByText('Aucune course pour l’instant.').waitFor();
   await L.getByText('Livreur attitré de : Boutique Fatim (test).').waitFor();
   await S.reload();
-  await S.locator('#courier-section').getByText('Ibou', { exact: true }).waitFor();
+  // la boutique confirme que c'est bien son livreur (audit S4)
+  await S.locator('#courier-to-confirm').getByText('Ibou').waitFor();
+  await S.click('#courier-confirm');
+  await S.getByText('Ibou est votre livreur.').waitFor();
   await S.locator('#courier-auto').getByText('Automatique').waitFor();
 });
 
@@ -101,7 +104,7 @@ await t('commande → la cliente donne son adresse → la course arrive seule ch
   await C.click('#give-address-btn');
   await C.click('#send-address');
   await C.click('#back-invoice');
-  await C.getByText('Livreur : Ibou').waitFor();
+  await C.getByText('Ibou n’est pas encore parti').waitFor();
   await L.reload();
   await L.locator('#courses').getByText('Boutique Fatim (test) · N° 0001').waitFor();
   await L.locator('#courses').getByText('À encaisser :').waitFor();
@@ -116,12 +119,12 @@ await t('livreur : démarre la course ; la cliente le voit en route sur sa factu
   await L.getByRole('button', { name: 'Démarrer la livraison' }).click();
   await L.getByText('Position partagée').waitFor();
   await C.reload();
-  await C.getByText(/En route · environ \d+ min/).waitFor();
+  await C.getByText(/Ibou en route · environ \d+ min/).waitFor();
 });
 
 await t('livreur : « Livrée » → commande livrée ; la cliente note la livraison', async () => {
   await L.goto(URL0 + '#/livreur');
-  await L.locator('#courses').getByRole('button', { name: 'Livrée' }).click();
+  await L.locator('#courses').getByRole('button', { name: 'C’est livré' }).click();
   await L.getByText('Livraison confirmée.').waitFor();
   await L.getByText('Aucune course pour l’instant.').waitFor();
   await C.reload();
@@ -130,7 +133,7 @@ await t('livreur : « Livrée » → commande livrée ; la cliente note la livra
   await C.getByText('Merci pour votre note.').waitFor();
   await shot(C, '03-note-livraison');
   await L.reload();
-  await L.getByText(/★★★★★ \(1\)/).waitFor();
+  await L.getByText('5,0 (1)').waitFor();
   await S.goto(URL0 + '#/boutique?vue=done');
   await S.locator('#orders').getByText('N° 0001 · Ndeye (test)').waitFor();
 });

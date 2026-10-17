@@ -77,8 +77,11 @@ async function confirmPointByPaste(page, scopeIdx, coords) {
   const inputs = page.locator('input[placeholder^="Collez"]');
   await inputs.nth(scopeIdx).fill(`${coords.lat}, ${coords.lng}`);
   await page.getByRole('button', { name: 'Placer ce point' }).nth(scopeIdx).click();
-  await page.getByRole('button', { name: 'Valider ce point' }).nth(scopeIdx).click();
+  // Dans l'assistant d'adresse, le bouton de l'étape valide le point (un seul geste) ; ailleurs, « Valider ce point ».
+  const v = page.getByRole('button', { name: 'Valider ce point' });
+  if (await v.count() > scopeIdx) await v.nth(scopeIdx).click();
 }
+const next = (page) => page.locator('#wizard-next').click();
 async function rpcFromPage(page, fn, args) {
   return page.evaluate(async ([fn, args]) => {
     const c = window.FIILA_CONFIG;
@@ -115,8 +118,7 @@ await t('création : géolocalisation après action explicite, précision affich
   await A.locator('.pt[data-point="14.758140, -17.470320"]').first().waitFor({ state: 'attached' });
   assert.equal(await A.getByText('14.758140').count(), 0, 'coordonnées affichées à l’utilisateur');
   await shot(A, '02-carte-entree');
-  await A.getByRole('button', { name: 'Valider ce point' }).click();
-  await A.getByText('Point validé pour l’entrée').waitFor();
+  await A.getByRole('button', { name: 'C’est l’entrée' }).waitFor();
 });
 
 await t('correction manuelle : déplacer la carte invalide le point et change les coordonnées', async () => {
@@ -126,44 +128,41 @@ await t('correction manuelle : déplacer la carte invalide le point et change le
   await A.mouse.down();
   await A.mouse.move(box.x + box.width / 2 - 40, box.y + box.height / 2 + 30, { steps: 5 });
   await A.mouse.up();
-  await A.getByText('Le repère a bougé : validez à nouveau.').waitFor();
   await A.waitForFunction(() => { const c = document.querySelector('.pt'); return c && c.dataset.point && c.dataset.point !== '14.758140, -17.470320'; });
   // retour au point exact pour la suite du test
   await A.getByRole('button', { name: 'Utiliser ma position' }).click();
   await A.locator('.pt[data-point="14.758140, -17.470320"]').first().waitFor({ state: 'attached' });
-  await A.getByRole('button', { name: 'Valider ce point' }).click();
-  await A.getByText('Point validé pour l’entrée').waitFor();
-  await byText(A, 'Continuer').click();
+  await A.getByRole('button', { name: 'C’est l’entrée' }).click();
 });
 
 await t('arrêt voiture distinct + instructions à pied', async () => {
   await A.getByRole('heading', { name: /Une voiture peut-elle arriver/ }).waitFor();
   await A.getByLabel('Non').check();
   await confirmPointByPaste(A, 0, STOP);
-  await A.getByText('Point validé pour l’arrêt voiture').waitFor();
   await A.getByLabel('Du point d’arrêt jusqu’à l’entrée').fill('Prendre la ruelle à gauche de la boutique de tissus, 40 m.');
   await shot(A, '03-arret-voiture');
-  await byText(A, 'Continuer').click();
+  await next(A);
 });
 
 const LONG = 'Porte-verte-après-le-manguier-' + 'x'.repeat(220);
 await t('photo : compressée, métadonnées GPS retirées avant envoi ; fichier non image refusé', async () => {
   await A.getByLabel('Nom du lieu').fill('Atelier <img src=x onerror=alert(1)> Ndèye « Ébène »');
-  await A.getByLabel(/Quartier ou localité/).fill('Yoff Virage');
+  await A.click('#add-locality');
+  await A.getByLabel(/Quartier/).fill('Yoff Virage');
   await A.locator('#photo').setInputFiles('tests/fixtures/not-image.txt');
   await A.getByText('Ce fichier n’est pas une image.').waitFor();
   await A.locator('#photo').setInputFiles('tests/fixtures/door-with-exif.jpg');
   await A.locator('img.photo-prev').waitFor();
-  await A.getByLabel('Repère et accès').fill(LONG);
+  await A.getByLabel('Repère').fill(LONG);
   await shot(A, '04-reperes');
-  await byText(A, 'Continuer').click();
-  await A.getByRole('heading', { name: 'Voici ce que verra la personne' }).waitFor();
+  await next(A);
+  await A.getByRole('heading', { name: 'Ce que verra la personne' }).waitFor();
   await shot(A, '05-apercu');
 });
 
 await t('enregistrement en échec réseau : message clair, saisie conservée, puis réussite', async () => {
   await A.route('**/rest/v1/rpc/fiila_create_place', (r) => r.abort('failed'));
-  await byText(A, 'Enregistrer et obtenir mon lien').click();
+  await next(A);
   await A.getByText(/Connexion impossible/).waitFor();
   assert.equal(await A.getByText('Adresse enregistrée.').count(), 0, '« enregistrée » affiché à tort');
   const draft = await A.evaluate(() => JSON.parse(localStorage.getItem('fiila.draft.address')));
@@ -196,6 +195,7 @@ await t('lien de partage sans clé propriétaire ; clé gardée localement', asy
 });
 
 await t('QR code : se décode exactement en lien de la fiche', async () => {
+  await A.locator('#more summary').click();
   const img = A.locator('#qr-img');
   await img.waitFor();
   await A.waitForFunction(() => { const i = document.querySelector('#qr-img'); return i && i.complete && i.naturalWidth > 0; });
@@ -282,11 +282,11 @@ await t('modification : même lien, contenu mis à jour chez le destinataire', a
   await A.getByRole('heading', { level: 1, name: /Atelier/ }).waitFor();
   await byText(A, 'Modifier').click();
   await A.getByText('Étape 1 sur 4').waitFor();
-  await byText(A, 'Continuer').click();
-  await byText(A, 'Continuer').click();
-  await A.getByLabel('Repère et accès').fill('Porte verte, sonner deux fois.');
-  await byText(A, 'Continuer').click();
-  await byText(A, 'Enregistrer les modifications').click();
+  await next(A);
+  await next(A);
+  await A.getByLabel('Repère').fill('Porte verte, sonner deux fois.');
+  await next(A);
+  await next(A);
   await A.getByText('Modifications enregistrées. Le lien reste le même.').waitFor();
   assert.equal(await A.locator('#share-url').textContent(), shareUrl);
   await openB(shareUrl);
@@ -329,10 +329,9 @@ await t('géolocalisation refusée : marche à suivre iPhone, réessayer, et poi
   } else {
     await input.fill('https://www.google.com/maps/search/14.758140,+-17.470320?entry=tts');
     await p.page.getByRole('button', { name: 'Placer ce point' }).first().click();
-    await p.page.getByText(/Vérifiez que le repère est bien sur l’entrée/).waitFor();
+    await p.page.getByText(/Vérifiez le repère/).waitFor();
   }
-  await p.page.getByRole('button', { name: 'Valider ce point' }).first().click();
-  await p.page.getByText('Point validé pour l’entrée').waitFor();
+  await p.page.getByRole('button', { name: 'C’est l’entrée' }).waitFor();
   assert.equal(await p.page.locator('.pt').first().getAttribute('data-point'), '14.758140, -17.470320');
   await p.ctx.close();
 });
@@ -346,7 +345,7 @@ await t('Google Maps : lien sans point précis → consigne claire ; coordonnée
   await p.page.getByText(/ne contient pas de point précis/).waitFor();
   await input.fill('https://www.google.com/maps/search/14.746500,+-17.493000?entry=tts');
   await p.page.getByRole('button', { name: 'Placer ce point' }).first().click();
-  await p.page.getByText(/Vérifiez que le repère est bien sur l’entrée/).waitFor();
+  await p.page.getByText(/Vérifiez le repère/).waitFor();
   assert.equal(await p.page.locator('.pt').first().getAttribute('data-point'), '14.746500, -17.493000');
   await p.ctx.close();
 });
@@ -394,23 +393,22 @@ await t('demande : le commerçant crée la demande', async () => {
 await t('demande : le client voit qui demande, crée son adresse, prévisualise et envoie', async () => {
   await C.goto(requestUrl);
   await C.getByText('Boutique Ndèye vous demande votre adresse').waitFor();
-  await C.getByText(/Identité non vérifiée/).waitFor();
+  await C.getByText(/Répondez seulement si vous attendez cette demande/).waitFor();
   await shot(C, '10-demande-client');
-  await byText(C, 'Créer une nouvelle adresse').click();
+  await C.click('#new-address-for-request');
   await C.getByRole('button', { name: 'Utiliser ma position' }).click();
   await C.locator('.pt[data-point="14.758140, -17.470320"]').first().waitFor({ state: 'attached' });
-  await C.getByRole('button', { name: 'Valider ce point' }).click();
-  await byText(C, 'Continuer').click();
+  await next(C);
   await C.getByLabel('Oui').check();
-  await byText(C, 'Continuer').click();
+  await next(C);
   await C.getByLabel('Nom du lieu').fill('Maison du client (test)');
-  await C.getByLabel('Repère et accès').fill('Portail bleu face à l’école');
-  await byText(C, 'Continuer').click();
-  await byText(C, 'Enregistrer et obtenir mon lien').click();
-  await C.getByText('Voici exactement ce qui sera envoyé').waitFor();
+  await C.getByLabel('Repère').fill('Portail bleu face à l’école');
+  await next(C);
+  await C.getByRole('heading', { name: 'Ce que Boutique Ndèye va recevoir' }).waitFor();
   await C.getByText('Portail bleu face à l’école').waitFor();
-  await C.locator('#send-address').click();
-  await C.getByText('Adresse envoyée').waitFor();
+  await C.getByRole('button', { name: 'Envoyer à Boutique Ndèye' }).click();
+  await C.getByText('Boutique Ndèye a votre adresse.').waitFor();
+  await C.locator('#share-relatives').waitFor(); // proposer de l'envoyer aux proches
 });
 
 await t('demande : un visiteur du lien public ne voit jamais la réponse', async () => {

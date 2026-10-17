@@ -1,9 +1,9 @@
 {
   "moteur": "chromium",
   "version": "141.0.7390.37",
-  "date": "2026-10-17T21:15:00.745Z",
-  "reussis": 24,
-  "total": 24,
+  "date": "2026-10-17T22:42:20.702Z",
+  "reussis": 26,
+  "total": 26,
   "results": [
     {
       "ok": true,
@@ -96,6 +96,14 @@
     {
       "ok": true,
       "name": "suppression du compte : tout ce qui est rattaché est effacé"
+    },
+    {
+      "ok": true,
+      "name": "S1 : un lien piégé #access_token=… n’ouvre aucune session et ne rattache rien"
+    },
+    {
+      "ok": true,
+      "name": "mot de passe oublié (PKCE) : le lien marche sur le téléphone qui l’a demandé, pas ailleurs"
     },
     {
       "ok": true,

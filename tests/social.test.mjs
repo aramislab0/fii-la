@@ -81,7 +81,7 @@ for (const kind of ['address', 'meeting', 'request']) {
     await O.locator('.share-panel').waitFor();
     for (const n of ['Préparer un message WhatsApp', 'Copier le lien', 'Telegram', 'Facebook : copier le lien', 'Instagram / Story', 'TikTok'])
       await O.locator('.share-panel').getByText(n, { exact: true }).first().waitFor();
-    assert.equal(await O.locator('#privacy-note').textContent(), 'Toute personne ayant ce lien peut consulter la fiche et le retransmettre.');
+    assert.equal(await O.locator('#privacy-note').textContent(), 'Toute personne qui a le lien voit la fiche.');
     const url = await O.locator('.share-panel .sharelink').textContent();
     assert.equal(url, recipientUrl[kind]);
     const hrefs = await panelHrefs(O);

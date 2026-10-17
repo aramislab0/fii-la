@@ -15,27 +15,31 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 function makeAuth(db) {
   const users = new Map();      // email -> { id, email, pw }
   const access = new Map();     // jeton d'accès -> { uid, exp }
-  const refresh = new Map();    // jeton de rafraîchissement -> uid
+  const refresh = new Map();    // jeton de rafraîchissement -> { uid, loginAt }
+  const codes = new Map();      // code PKCE -> { uid, challenge }
+  let lastRecovery = null;
   const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const hash = (pw) => createHash('sha256').update('fiila-test:' + pw).digest('hex');
   let ttl = 3600;
-  function session(u) {
+  function session(u, loginAt = Math.floor(Date.now() / 1000)) {
     const exp = Math.floor(Date.now() / 1000) + ttl;
-    const at = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: u.id, email: u.email, role: 'authenticated', exp }) + '.' + randomBytes(16).toString('base64url');
+    const at = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: u.id, email: u.email, role: 'authenticated', exp, amr: [{ method: 'password', timestamp: loginAt }] }) + '.' + randomBytes(16).toString('base64url');
     const rt = randomBytes(18).toString('base64url');
-    access.set(at, { uid: u.id, exp }); refresh.set(rt, u.id);
+    access.set(at, { uid: u.id, exp, loginAt }); refresh.set(rt, { uid: u.id, loginAt });
     return { access_token: at, token_type: 'bearer', expires_in: ttl, expires_at: exp, refresh_token: rt, user: { id: u.id, email: u.email } };
   }
   const byId = (id) => [...users.values()].find((u) => u.id === id);
   return {
     expireAll() { for (const v of access.values()) v.exp = 0; },
+    lastRecovery() { return lastRecovery; },
+    forgeSession(email) { const u = users.get(email); return u ? session(u) : null; },
     setTtl(s) { ttl = s; },
     uidFor(authz) {
       const tok = /^Bearer (.+)$/.exec(authz || '');
       if (!tok || tok[1].split('.').length !== 3) return { uid: null };
       const a = access.get(tok[1]);
       if (!a || a.exp <= Math.floor(Date.now() / 1000)) return { expired: true };
-      return { uid: a.uid };
+      return { uid: a.uid, loginAt: a.loginAt };
     },
     async handle(path, method, q, body, authz) {
       const err = (status, code, msg) => [status, { code: status, error_code: code, msg }];
@@ -57,10 +61,18 @@ function makeAuth(db) {
         return [200, session(u)];
       }
       if (path === '/token' && method === 'POST' && q.get('grant_type') === 'refresh_token') {
-        const uid = refresh.get(body.refresh_token);
-        const u = uid && byId(uid);
+        const rt = refresh.get(body.refresh_token);
+        const u = rt && byId(rt.uid);
         if (!u) return err(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
         refresh.delete(body.refresh_token);
+        return [200, session(u, rt.loginAt)];
+      }
+      if (path === '/token' && method === 'POST' && q.get('grant_type') === 'pkce') {
+        const c = codes.get(body.auth_code);
+        codes.delete(body.auth_code);
+        const ok = c && createHash('sha256').update(String(body.code_verifier || '')).digest('base64url') === c.challenge;
+        const u = ok && byId(c.uid);
+        if (!u) return err(400, 'bad_code_verifier', 'code challenge does not match previously saved code verifier');
         return [200, session(u)];
       }
       const who = this.uidFor(authz);
@@ -82,7 +94,15 @@ function makeAuth(db) {
         if (tok) access.delete(tok[1]);
         return [204, null];
       }
-      if (path === '/recover' && method === 'POST') return [200, {}];
+      if (path === '/recover' && method === 'POST') {
+        const u = users.get(String(body.email || '').trim().toLowerCase());
+        if (u && body.code_challenge) {
+          const code = randomUUID();
+          codes.set(code, { uid: u.id, challenge: body.code_challenge });
+          lastRecovery = { code };
+        }
+        return [200, {}];
+      }
       return err(404, 'not_found', 'not found');
     }
   };
@@ -94,6 +114,8 @@ export async function startServer(port = 0) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/__test/expire-tokens') { auth.expireAll(); res.writeHead(204); return res.end(); }
+    if (url.pathname === '/__test/last-recovery') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(auth.lastRecovery())); }
+    if (url.pathname === '/__test/forge-session') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(auth.forgeSession(url.searchParams.get('email')))); }
     const am = url.pathname.match(/^\/auth\/v1(\/[a-z]+)$/);
     if (am) {
       if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
@@ -115,7 +137,7 @@ export async function startServer(port = 0) {
       const ip = req.headers['x-test-ip'] || '127.0.0.1';
       const who = auth.uidFor(req.headers.authorization);
       if (who.expired) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end('{"code":"PGRST301","message":"JWT expired"}'); }
-      const r = await rpc(db, m[1], args, { ip, uid: who.uid });
+      const r = await rpc(db, m[1], args, { ip, uid: who.uid, loginAt: who.loginAt });
       res.writeHead(r.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(r.body));
     }

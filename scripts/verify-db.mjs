@@ -21,6 +21,8 @@ const EXPECTED_FUNCTIONS = [
   'fiila_courier_accept', 'fiila_courier_delete', 'fiila_courier_done', 'fiila_courier_invite', 'fiila_courier_invite_get',
   'fiila_courier_me', 'fiila_courier_register', 'fiila_courier_review', 'fiila_courier_update', 'fiila_order_dispatch',
   'fiila_shop_courier', 'fiila_shop_delete',
+  // durcissement (20261017250000)
+  'fiila_meeting_guest_remove',
 ].sort();
 const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
