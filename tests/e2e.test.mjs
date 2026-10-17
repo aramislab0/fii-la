@@ -131,12 +131,18 @@ await t('création : géolocalisation après action explicite, précision affich
 });
 
 await t('correction manuelle : déplacer la carte invalide le point et change les coordonnées', async () => {
+  // En production, la carte (Leaflet) se charge à la demande : on attend qu'elle soit prête avant de la déplacer.
+  await A.locator('.map.leaflet-container').first().waitFor();
   await A.locator('.map').scrollIntoViewIfNeeded();
-  const box = await A.locator('.map').boundingBox();
-  await A.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await A.mouse.down();
-  await A.mouse.move(box.x + box.width / 2 - 40, box.y + box.height / 2 + 30, { steps: 5 });
-  await A.mouse.up();
+  const moved = () => A.evaluate(() => { const c = document.querySelector('.pt'); return !!(c && c.dataset.point && c.dataset.point !== '14.758140, -17.470320'); });
+  for (let i = 0; i < 3 && !(await moved()); i++) {
+    const box = await A.locator('.map').boundingBox();
+    await A.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await A.mouse.down();
+    await A.mouse.move(box.x + box.width / 2 - 40, box.y + box.height / 2 + 30, { steps: 8 });
+    await A.mouse.up();
+    await A.waitForTimeout(600);
+  }
   await A.waitForFunction(() => { const c = document.querySelector('.pt'); return c && c.dataset.point && c.dataset.point !== '14.758140, -17.470320'; });
   // retour au point exact pour la suite du test
   await A.getByRole('button', { name: 'Utiliser ma position' }).click();
