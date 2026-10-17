@@ -103,7 +103,12 @@ function decodeQr(pngBuf) {
 // --------------------------------------------------------------------------- scénario
 const owner = await newPhone();
 const A = owner.page;
-globalThis.__shotOnFail = (n) => A.screenshot({ path: `${SHOTS}/${ENGINE}-echec-${n.slice(0, 24).replace(/[^a-z0-9]+/gi, '-')}.png`, fullPage: true });
+globalThis.__shotOnFail = async (n) => {
+  console.log('    état :', await A.evaluate(() => JSON.stringify({ hash: location.hash, pt: [...document.querySelectorAll('.pt')].map((e) => e.dataset.point),
+    msg: [...document.querySelectorAll('.msg')].map((e) => e.textContent), next: (document.getElementById('wizard-next') || {}).disabled,
+    h1: (document.querySelector('h1') || {}).textContent, toast: (document.getElementById('toast') || {}).textContent })).catch((e) => String(e)));
+  await A.screenshot({ path: `${SHOTS}/${ENGINE}-echec-${n.slice(0, 24).replace(/[^a-z0-9]+/gi, '-')}.png`, fullPage: true });
+};
 let shareUrl, placeId, createBody;
 
 await t('accueil : 4 actions, création en premier', async () => {
