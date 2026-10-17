@@ -84,6 +84,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 18 | ~~V2 livreurs : livreur attitré d'abord, pas d'API WhatsApp payante~~ tranché 17/10 21:25 et construit | Fondateur | — |
 | 20 | Notification web push du livreur (gratuite) pour l'alerter page fermée ; puis inscription publique des livreurs | Builder, après retour terrain | V2 suite |
 | 19 | Fixer le seuil d'ouverture de la marketplace (boutiques actives, commandes livrées) | Fondateur | V3 |
+| 21 | **Valider le plan d'audit** (lot 0 urgent : S1 avant le test téléphones) et décider : domaine dédié (S2), durées de conservation (S14) | Fondateur | Test terrain |
 | 16 | Revue VP de l'intégration Rali (parcours commerçant et client, `docs/screenshots/boutique/`) | VP | — |
 | 7 | ~~Alignement Fii La ↔ Rali~~ → tranché le 17/10 : intégration (voir décisions) | VP → fondateur | Feuille de route | (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
 | 8 | Régler la facture de l'organisation Supabase « AramisLab » (autres projets) | Fondateur | Hors Fii La |
@@ -124,6 +125,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 17/10 22:00 | Audit sécurité + UX/UI avant le test terrain (lecture seule, rien modifié) : 1 faille critique prouvée (S1, session piégée par lien `#access_token` + rattachement automatique), 2 élevées (origine partagée github.io, limites IP), 3 défauts visibles (« null », message contradictoire, faute). Plan en 4 lots proposé au fondateur, en attente de validation | `docs/AUDIT-2026-10-17.md` |
 | 17/10 21:33 | Production : migration `20261017240000_fiila_couriers` appliquée ; `verify-db` 8/8 (8 migrations, 57 fonctions) ; sonde livreur en production (invitation, acceptation, course automatique, « Livrée », note, suppression boutique et livreur) OK puis effacée ; E2E production 38/38 Chromium et WebKit ; livreurs 8/8 et boutique 24/24 WebKit (Mac). Non-régression locale complète : 10 suites, 221 tests. Base : 3 fiches (fondateur ×2, Test VP) | journaux Mac |
 | 17/10 21:45 | V2 livreur attitré : tables `couriers`, `courier_invites`, `courier_reviews` ; course automatique à la réponse du client ou à la création si l'adresse est connue ; espace livreur `#/livreur` ; invitation `#/livreur/invitation/…` ; réglages boutique (livreur, envoi auto/manuel, suppression de la boutique) ; note de la livraison sur la facture. Tests locaux : livreurs SQL 10/10, livreurs E2E 8/8 (suite complète en cours) | ce commit |
 | 17/10 21:25 | Production : migration `20261017230000_fiila_shop_open_products` appliquée ; `verify-db` 8/8 (7 migrations, 45 fonctions) ; sonde boutique sans compte (création, article, commande, facture, note refusée avant livraison, mauvaise clé) OK puis supprimée ; E2E production 38/38 Chromium et WebKit (un premier passage lancé pendant le déploiement GitHub Pages avait échoué, relancé une fois le site à jour) ; parcours boutique 24/24 WebKit (Mac, local). Base : 3 fiches (fondateur ×2, Test VP), aucune boutique | journaux Mac |
