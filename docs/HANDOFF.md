@@ -97,11 +97,12 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 25 | ~~Valider la stratégie de croissance~~ phase 0 validée 17/10 23:10 et construite (`docs/CROISSANCE.md` §9) | Fondateur | — |
 | 27 | Fixer les récompenses du parrainage (boutiques, livreurs, particuliers ; argent possible) | Fondateur | Annonce du parrainage |
 | 29 | Supprimer 1 fiche « Maison du client (test) » et 1 demande « Boutique Ndèye » restées en production après l'arrêt d'une série de tests (23:32) : suppression SQL refusée à l'exécution, en attente d'accord du fondateur | Fondateur → Builder | Base propre |
-| 33 | Ajouter au dossier CDP le traitement « repère vocal » (enregistrement audio facultatif lié à une adresse) | Fondateur | Usage réel |
+| 33 | Déposer le complément CDP préparé dans `docs/CONFORMITE-CDP.md` §2 bis (comptes, boutique, livreurs, parrainage, repère vocal) — le texte est prêt ; ~~rédaction~~ faite 18/10 | Fondateur | Usage réel |
+| 33b | (remplacé par 33) Ajouter au dossier CDP le traitement « repère vocal » (enregistrement audio facultatif lié à une adresse) | Fondateur | Usage réel |
 | 32 | ~~Valider la proposition « icônes et hiérarchie »~~ validée 18/10 21:18 avec le repère vocal, et appliquée ; (`docs/PROPOSITION-UX-ICONES.md`, maquette `docs/screenshots/proposition-icones.png`) ; décider : repère vocal, wolof | Fondateur | Suite de la refonte |
 | 31 | ~~Valider le lot 1 v1.2~~ validé 18/10 21:13 (« tout fonctionne ») ; + accueil + gestion (branche `design-v1.2`, captures `docs/screenshots/design-v1.2-*.png`) avant mise en production et extension aux autres écrans | Fondateur | Lots 2 à 5 |
 | 30 | ~~Valider l'audit design~~ lancé 18/10 06:28 ; « calme et sûr » (`docs/AUDIT-DESIGN-2026-10-18.md`) : direction v1.2, deux règles v1.1 touchées (titres 800, tuiles non filtrées), plan en 5 lots ; premier pas proposé = lot 1 + accueil avec captures avant/après | Fondateur | Refonte v1.2 |
-| 28 | Créer son compte Fii La, puis le Builder le marque administrateur (SQL) pour ouvrir `#/stats` | Fondateur → Builder | Lecture des statistiques |
+| 28 | ~~Compte administrateur~~ fait 18/10 23:20 : compte du fondateur marqué administrateur, `#/stats` ouvert | Fondateur → Builder | Lecture des statistiques |
 | 26 | Ajouter au dossier CDP le traitement « parrainage » (lien parrain–filleul) si la phase 0 est validée | Fondateur | Usage réel du parrainage |
 | 16 | Revue VP de l'intégration Rali (parcours commerçant et client, `docs/screenshots/boutique/`) | VP | — |
 | 7 | ~~Alignement Fii La ↔ Rali~~ → tranché le 17/10 : intégration (voir décisions) | VP → fondateur | Feuille de route | (quelles données, quel parcours, quel moment) | VP → fondateur | Feuille de route |
@@ -143,6 +144,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 18/10 23:20 | Accord fondateur (« je valide tout ») : complément CDP rédigé (§2 bis) ; compte du fondateur marqué administrateur (SQL, `is_admin = true`) ; suppression des 2 restes de test refusée à l'exécution par la fenêtre de confirmation, à relancer | `docs/CONFORMITE-CDP.md` |
 | 18/10 21:46 | Production vérifiée : E2E déployé 38/38 Chromium et 38/38 WebKit ; WebKit local parrainage 8/8, boutique 26/26. Base : données réelles du fondateur (fiches, 1 boutique, 1 livreur, 1 compte) intactes ; restent 1 fiche et 1 demande de test du 17/10 en attente d'accord de suppression | journaux Mac `e2e-c.log`, `e2e-w.log`, `ref-w.log`, `shop-w.log` |
 | 18/10 21:40 | Interface v1.2 (calme et sûr + icônes) et repère vocal mis en production : migration `20261018100000_fiila_voice` appliquée, `verify-db` 11 migrations / 67 fonctions OK ; branche `design-v1.2` fusionnée dans `main`. Tests locaux : SQL 101, E2E 38, circuit 20, découverte 23, social 23, suivi 12, boutique 26, livreurs 8, parrainage 8, vocal 5 | `5aef262` |
 | 18/10 21:30 | Retour fondateur : lot 1 fonctionne ; demande moins de boutons, hiérarchie, icônes (lecteurs peu à l'aise). Analyse et maquette 4 écrans proposées, rien appliqué | `docs/PROPOSITION-UX-ICONES.md` |

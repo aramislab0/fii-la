@@ -47,6 +47,29 @@ Constaté dans le code au commit `9576bc8`.
 
 **Ce que Fii La ne traite pas** : comptes, numéros de téléphone, contacts, pièces d’identité, données biométriques, données de santé, suivi de position (la position n’est lue qu’à la demande), cookies de suivi. Le texte libre peut toutefois contenir n’importe quoi, si l’utilisateur l’écrit.
 
+## 2 bis. Compléments à déclarer (traitements ajoutés depuis le dépôt du 17/10)
+
+> Préparé le 18/10/2026 pour le fondateur, qui dépose le complément auprès de la CDP. Le Builder ne contacte pas la CDP. Validé par le fondateur le 18/10 23:14 (« je valide tout »).
+>
+> **Attention :** la phrase « Ce que Fii La ne traite pas : comptes, numéros de téléphone… » du §2 n'est plus exacte. Ce complément la remplace.
+
+| Donnée | Personnes concernées | Finalité | Durée de conservation | Destinataires |
+|---|---|---|---|---|
+| Compte (facultatif) : e-mail, mot de passe géré par Supabase Auth, nom, téléphone, photo de profil | Utilisateurs qui créent un compte | Retrouver ses fiches et sa boutique sur plusieurs téléphones | Jusqu'à la suppression du compte (fonction disponible dans l'application) | Personne d'autre |
+| Boutique : nom, téléphone, NINEA ; clients du commerçant (nom, téléphone) ; commandes, factures, paiements enregistrés | Commerçants ; leurs clients | Gestion des commandes et des livraisons | 24 mois au plus pour commandes et clients (décision du 17/10), ou jusqu'à suppression par le commerçant | Le commerçant ; le client voit sa propre facture par son lien |
+| Livreur : nom, téléphone, moyen de livraison, zone ; courses ; notes reçues | Livreurs | Recevoir les courses des boutiques | Jusqu'à la suppression de l'espace livreur | Les boutiques qui l'ont choisi ; le client voit le prénom |
+| Notes d'articles et de livraisons (1 à 5, sans nom) | Acheteurs | Qualité | Avec la commande | Le commerçant voit la moyenne |
+| **Origine et parrainage** : d'où vient une nouvelle boutique, un livreur, une adresse ou un rendez-vous (lien reçu, code, numéro tapé) ; fiche de parrainage (nom, numéro facultatif, jamais affiché) | Nouveaux utilisateurs ; parrains | Mesurer le bouche-à-oreille ; récompenses futures | Autant que la fiche, la boutique ou l'espace livreur concerné ; code supprimable par son titulaire | Le parrain voit qu'une arrivée a eu lieu (nom d'une boutique, prénom d'un livreur, rien pour un particulier) ; le fondateur voit des chiffres agrégés |
+| Publication d'un article (date seulement, pas le réseau choisi) | Commerçants | Mesure | Avec l'article | Le commerçant |
+| **Repère vocal** (facultatif) : enregistrement audio de 30 s au plus, lié à une adresse | Créateur de la fiche ; toute personne dont la voix est enregistrée | Guider le visiteur ou le livreur, notamment pour les personnes qui lisent peu | Jusqu'au retrait par le propriétaire ou la suppression de la fiche | Toute personne qui a le lien de la fiche ; le livreur de la course |
+| Statistiques de croissance (agrégées) | Aucune personne identifiable | Pilotage | Sans limite | Comptes administrateurs (le fondateur) |
+
+**Points à signaler dans le complément**
+- **Micro.** Il n'est activé qu'à l'appui sur « Enregistrer », après l'autorisation du navigateur. Un repère vocal peut contenir des données que la personne choisit de dire.
+- **Numéro du parrain.** Le numéro tapé pour un parrain est conservé, même si cette personne n'est pas encore inscrite, pour lui rattacher l'arrivée plus tard. Il n'est jamais affiché.
+- **Responsables des données clients.** Le commerçant est responsable des données de ses propres clients ; Fii La les héberge pour lui.
+- **Prestataires.** Inchangés : Supabase (Paris), GitHub Pages, OpenStreetMap.
+
 ## 3. Lecture des dispositions
 
 **Application de la loi**
