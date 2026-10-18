@@ -3285,12 +3285,12 @@
     return sapi('fiila_shop_get', {}).then(function (r) { return shopForm(r.shop); }, failPage('Impossible de charger la boutique', 'boutique'));
   }
   function shopForm(shop) {
-    var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '', ninea: shop ? shop.ninea || '' : '' };
+    var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '' };
     var err = h('div', { role: 'alert' });
     var ask = shop ? null : referralAsk('shop-ref');
     var btn = h('button', { class: 'btn', type: 'button', id: 'shop-save', onclick: function () {
       btn.disabled = true; setKids(err);
-      sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: f.ninea.trim() || null } }).then(function (r) {
+      sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: null } }).then(function (r) {
         if (r && r.key) LS.set(SHOP_LS, { id: r.shop.id, key: r.key, linked: authed() || undefined });
         if (!shop) { track('shop_created', authed() ? 'account' : 'no_account'); bumpTx(); attribute('shop', null, r.key || shopKey(), ask.value()); }
         ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
@@ -3302,7 +3302,6 @@
         shop ? null : h('p', { class: 'muted' }, 'Ces informations apparaissent sur vos factures.')),
       textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
       textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
-      textField({ id: 'shop-ninea', label: 'NINEA', optional: true, max: 30, value: f.ninea, onInput: function (v) { f.ninea = v; } }),
       ask ? ask.el : null,
       err, btn,
       shop ? vitrineSection(shop) : null,
@@ -4100,7 +4099,7 @@
         h('article', { class: 'card invoice', id: 'invoice' },
           h('header', { class: 'inv-head' },
             h('div', null, h('p', { class: 'eyebrow' }, 'Facture'), h('h2', { class: 'wrapword' }, s.name),
-              s.phone ? h('p', { class: 'small muted' }, s.phone) : null, s.ninea ? h('p', { class: 'small muted' }, 'NINEA ' + s.ninea) : null),
+              s.phone ? h('p', { class: 'small muted' }, s.phone) : null),
             h('div', { class: 'inv-meta' }, h('strong', null, 'N° ' + o.ref), h('span', { class: 'small muted' }, shortDate(o.created_at)))),
           h('p', null, 'Client : ', h('strong', { class: 'wrapword' }, o.customer_name)),
           invoiceTable(o.items, o.total),
@@ -4127,7 +4126,7 @@
           h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.'),
           h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.'),
           h('li', null, 'Si vous créez un compte (facultatif) : votre e-mail, votre mot de passe (géré par Supabase Auth, jamais visible en clair), et si vous les ajoutez votre nom, votre téléphone et votre photo de profil.'),
-          h('li', null, 'Si vous ouvrez une boutique : son nom, son téléphone et son NINEA s’ils sont indiqués ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii La les héberge pour lui.'),
+          h('li', null, 'Si vous ouvrez une boutique : son nom et son téléphone s’il est indiqué ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii La les héberge pour lui.'),
           h('li', null, 'Si vous êtes livreur : votre nom, et si vous les indiquez votre téléphone, votre moyen de livraison et votre zone. Vos boutiques voient votre nom, votre téléphone et votre note ; les clients voient votre prénom.'),
           h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom. Le commerçant voit la moyenne de ses articles.'),
           h('li', null, 'Origine et parrainage : quand vous créez une adresse, un rendez-vous, une boutique ou un espace livreur, Fii La note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),

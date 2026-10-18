@@ -71,6 +71,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 18/10 21:18 | Design v1.2 + « icônes et hiérarchie » validés en entier ; repère vocal ajouté au périmètre | Fondateur |
 | 18/10 23:16 | Prochaine fonction : vitrine publique de la boutique (choisie parmi kit de lancement, alertes livreur, vitrine, suivi 3D) ; CDP pris en charge par le fondateur | Fondateur |
 | 18/10 23:31 | Vitrine : 3 modèles au choix et personnalisation simple (« comme Shopify ») | Fondateur |
+| 18/10 23:50 | NINEA retiré de l'application (réglages de la boutique, facture, confidentialité) ; la colonne reste en base, vidée à chaque enregistrement de la boutique | Fondateur |
 
 ## 4. En attente / prochaines actions
 
@@ -147,6 +148,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 18/10 23:55 | NINEA retiré (champ, facture, page confidentialité) ; tests boutique 26/26, vitrine 7/7, livreurs 8/8 | ce commit |
 | 18/10 23:39 | Modèles de vitrine en production : migration `20261019100000_fiila_vitrine_themes` appliquée, `verify-db` 13 migrations / 71 fonctions OK ; E2E déployé 38/38 Chromium et WebKit ; WebKit local vitrine 7/7, parrainage 8/8, boutique 26/26 | `8901e75` |
 | 18/10 23:27 | Vitrine en production : migration `20261019000000_fiila_vitrine` appliquée, `verify-db` 12 migrations / 71 fonctions OK ; E2E déployé 38/38 Chromium et WebKit ; WebKit local vitrine 6/6, parrainage 8/8, boutique 26/26 ; données réelles du fondateur intactes | `c2e4849` |
 | 18/10 23:20 | Accord fondateur (« je valide tout ») : complément CDP rédigé (§2 bis) ; compte du fondateur marqué administrateur (SQL, `is_admin = true`) ; suppression des 2 restes de test refusée à l'exécution par la fenêtre de confirmation, à relancer | `docs/CONFORMITE-CDP.md` |
