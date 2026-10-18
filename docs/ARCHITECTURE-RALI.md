@@ -145,3 +145,12 @@ Proposition faite le 17/10, non validée. Rien n'est construit.
 - Arrivée active : boutique = 3 clientes différentes et une commande livrée ; livreur = une course terminée ; adresse ou rendez-vous = fiche active.
 - Client : `noteTouch()` dans le routeur, `attribute()` après chaque création, `referralAsk()`, vues `#/r/CODE`, `#/parrainer[?pour=boutique|livreur]`, `#/stats`, `publishBox()`.
 - Migration `20261018000000_fiila_referrals.sql`. Tests : `tests/referrals.sql.test.mjs`, `tests/referrals.test.mjs`, publication dans `tests/shop.test.mjs`.
+
+## 11. Vitrine publique (construite le 19/10/2026)
+
+- `shops.slug` (unique, lisible, tiré du nom), `shops.public` (fermée par défaut), `shops.about` ; `orders.source` (`shop` | `vitrine`).
+- RPC : `fiila_shop_vitrine` (ouvrir, fermer, présenter), `fiila_vitrine` (lecture publique, sans photos), `fiila_vitrine_photo` (photo d'un article, à l'affichage), `fiila_vitrine_order` (commande en ligne : prix de la base, 20 articles et 99 par article au plus, nom et numéro obligatoires, 10 commandes par heure et par IP).
+- Une commande en ligne ne reprend **jamais** une adresse connue du client : un numéro tapé ne suffit pas à faire livrer chez quelqu'un. La personne donne son adresse depuis la facture.
+- Client : `#/b/<slug>` (panier en mémoire, rien d'écrit sur le téléphone), `#/b/<slug>?a=<article>` (article mis en avant, utilisé par la légende « Publier »), confirmation sur la facture (`?nouvelle=1`) avec « Prévenir la boutique sur WhatsApp ». Réglages : « Ma vitrine en ligne ».
+- Parrainage : une boutique ouverte après la visite d'une vitrine est comptée pour cette vitrine (source `vitrine`).
+- Restent pour la marketplace (V3) : catégories, recherche, modération, mise en avant.

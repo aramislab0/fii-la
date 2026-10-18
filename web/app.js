@@ -229,6 +229,11 @@
     shop_required: 'Créez d’abord votre boutique.',
     shop_name_required: 'Donnez un nom à votre boutique.',
     customer_name_required: 'Indiquez le nom du client.',
+    your_name_required: 'Indiquez votre nom.',
+    phone_required: 'Indiquez votre numéro WhatsApp.',
+    voice_invalid: 'Enregistrement non reconnu. Réessayez.',
+    voice_too_large: 'Enregistrement trop long (30 secondes au plus).',
+    slug_unavailable: 'Nom de vitrine indisponible. Réessayez.',
     customer_not_found: 'Client introuvable.',
     order_not_found: 'Commande introuvable.',
     items_required: 'Ajoutez au moins un article.',
@@ -1103,6 +1108,147 @@
     return h('section', { class: 'stack tight' }, voicePlayer(pl.share_token, 'share', pl.voice_secs));
   }
 
+
+  /* ================================================================ VITRINE PUBLIQUE DE LA BOUTIQUE
+     #/b/<slug> : articles visibles, panier en mémoire (rien n'est écrit sur le téléphone), commande en ligne.
+     La commande crée la demande d'adresse : la personne donne son adresse depuis la facture. */
+  function vitrineUrl(slug, productId) { return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : ''); }
+  function viewVitrine(slug, q) {
+    if (!/^[a-z0-9-]{3,40}$/.test(slug)) return page(brandBar('Boutique'), stateCard('?', 'Vitrine introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
+    return api('fiila_vitrine', { p_slug: slug }).then(function (r) {
+      if (r.state === 'closed') return page(brandBar('Boutique'), stateCard('⦸', r.shop.name, 'La vitrine est fermée pour le moment.'), footer(true));
+      if (r.state !== 'ok') return page(brandBar('Boutique'), stateCard('?', 'Vitrine introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
+      return vitrinePage(slug, r.shop, r.products, q || {});
+    }, function (e) { return page(brandBar('Boutique'), stateCard('!', 'Impossible d’afficher la vitrine', errText(e), retryBtn()), footer(true)); });
+  }
+  function vitrinePage(slug, shop, products, q) {
+    var cart = {}; // id → quantité
+    var byId = {}; products.forEach(function (p) { byId[p.id] = p; });
+    var bar = h('div', { class: 'cartbar', hidden: true });
+    var root = h('div', { class: 'stack' });
+    function count() { return Object.keys(cart).reduce(function (n, k) { return n + cart[k]; }, 0); }
+    function total() { return Object.keys(cart).reduce(function (n, k) { return n + cart[k] * byId[k].price; }, 0); }
+    function refreshBar() {
+      var n = count();
+      bar.hidden = !n;
+      setKids(bar, iconBtn('button', { class: 'btn big', type: 'button', id: 'cart-go', onclick: checkout }, 'box',
+        'Commander · ' + n + ' article' + (n > 1 ? 's' : '') + ' · ' + fcfa(total())));
+    }
+    function stepper(p) {
+      var box = h('div', { class: 'qty' });
+      function draw() {
+        var n = cart[p.id] || 0;
+        setKids(box, n ? [
+          h('button', { class: 'qbtn', type: 'button', 'aria-label': 'Retirer un ' + p.name, onclick: function () { if (--cart[p.id] <= 0) delete cart[p.id]; draw(); refreshBar(); } }, '−'),
+          h('span', { class: 'qn', 'aria-live': 'polite' }, String(n)),
+          h('button', { class: 'qbtn', type: 'button', 'aria-label': 'Ajouter un ' + p.name, onclick: function () { if (cart[p.id] < 99) cart[p.id]++; draw(); refreshBar(); } }, '+')]
+          : iconBtn('button', { class: 'btn small add-btn', type: 'button', 'data-add': p.id, onclick: function () { cart[p.id] = 1; draw(); refreshBar(); } }, 'plus', 'Ajouter', 18));
+      }
+      draw();
+      return box;
+    }
+    function card(p) {
+      var img = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 32));
+      if (p.has_photo) lazyPhoto(img, function () {
+        return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; });
+      }, p.name);
+      return h('article', { class: 'vcard' + (q.a === p.id ? ' focus' : ''), id: 'p-' + p.id },
+        img,
+        h('div', { class: 'vbody' },
+          h('h3', { class: 'wrapword' }, p.name),
+          h('p', { class: 'vprice' }, fcfa(p.price)),
+          p.reviews ? ratingEl(p.rating, p.reviews) : null,
+          p.description ? h('p', { class: 'small muted vdesc' }, p.description) : null,
+          stepper(p)));
+    }
+    function list() {
+      setKids(root,
+        h('header', { class: 'vhead' },
+          h('span', { class: 'vavatar', 'aria-hidden': 'true' }, (shop.name || '?').trim().charAt(0).toUpperCase()),
+          h('div', null, h('h1', { class: 'wrapword' }, shop.name),
+            shop.reviews ? ratingEl(shop.rating, shop.reviews) : null,
+            shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null)),
+        products.length ? h('div', { class: 'vgrid', id: 'vitrine-products' }, products.map(card))
+          : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun article pour le moment.')),
+        h('p', { class: 'safe-line' }, icon('lock', 18), 'Commande sans compte. Vous donnez votre adresse à la dernière étape.'));
+      refreshBar();
+      if (q.a && byId[q.a]) setTimeout(function () { var el = document.getElementById('p-' + q.a); if (el) el.scrollIntoView({ block: 'center' }); }, 60);
+    }
+    function checkout() {
+      var f = { name: '', phone: '', note: '' };
+      var err = h('div', { role: 'alert' });
+      var send = iconBtn('button', { class: 'btn big', type: 'button', id: 'order-send', onclick: function () {
+        setKids(err);
+        if (!f.name.trim()) return errBox(err, new ApiError('your_name_required'));
+        if (f.phone.replace(/\D/g, '').length < 9) return errBox(err, new ApiError('phone_required'));
+        send.disabled = true;
+        api('fiila_vitrine_order', { p_slug: slug, p: { items: Object.keys(cart).map(function (k) { return { product_id: k, qty: cart[k] }; }),
+          customer: { name: f.name.trim(), phone: f.phone.trim() }, note: f.note.trim() || null } }).then(function (r) {
+          go('#/f/' + r.invoice + '?nouvelle=1');
+        }, function (e) { send.disabled = false; errBox(err, e); });
+      } }, 'send', 'Envoyer la commande');
+      bar.hidden = true;
+      setKids(root,
+        h('button', { class: 'back', type: 'button', onclick: list }, '← Modifier la commande'),
+        h('h1', null, 'Votre commande'),
+        h('section', { class: 'card' },
+          Object.keys(cart).map(function (k) {
+            return h('div', { class: 'total-row' }, h('span', { class: 'wrapword' }, cart[k] + ' × ' + byId[k].name), h('span', null, fcfa(cart[k] * byId[k].price)));
+          }),
+          h('div', { class: 'total-row big' }, h('span', null, 'Total'), h('strong', { id: 'order-total' }, fcfa(total())))),
+        textField({ id: 'v-name', label: 'Votre nom', max: 60, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
+        textField({ id: 'v-phone', label: 'Votre numéro WhatsApp', type: 'tel', inputmode: 'tel', autocomplete: 'tel', onInput: function (v) { f.phone = v; } }),
+        textField({ id: 'v-note', label: 'Précision pour la boutique', optional: true, max: 200, placeholder: 'Ex. : taille M, couleur bleue', onInput: function (v) { f.note = v; } }),
+        h('p', { class: 'safe-line' }, icon('lock', 18), 'Votre nom et votre numéro vont uniquement à ' + shop.name + '.'),
+        err, send);
+      window.scrollTo(0, 0);
+    }
+    list();
+    var pg = page(brandBar('Boutique'), root, h('div', { style: 'height:80px' }), footer(true));
+    pg.appendChild(bar);
+    return pg;
+  }
+  // Photo chargée quand la carte arrive à l'écran (page légère sur réseau lent).
+  function lazyPhoto(box, load, alt) {
+    function go() {
+      load().then(function (src) {
+        if (!src) { box.classList.remove('loading-skel'); return; }
+        setKids(box, h('img', { src: src, alt: alt || '', decoding: 'async' })); box.classList.remove('loading-skel');
+      }, function () { box.classList.remove('loading-skel'); });
+    }
+    if (!('IntersectionObserver' in window)) { go(); return; }
+    var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); go(); } }, { rootMargin: '200px' });
+    setTimeout(function () { io.observe(box); }, 0);
+  }
+  // Réglages : ouvrir, fermer et présenter sa vitrine.
+  function vitrineSection(shop) {
+    var box = h('section', { class: 'card', id: 'vitrine-section' });
+    var state = { public: !!shop.public, slug: shop.slug, about: shop.about || '' };
+    var err = h('div', { role: 'alert' });
+    function save(p, okText) {
+      return sapi('fiila_shop_vitrine', { p: p }).then(function (r) { state.public = !!r.public; state.slug = r.slug; state.about = r.about || ''; toast(okText); draw(); }, function (e) { errBox(err, e); });
+    }
+    function draw() {
+      var url = state.slug ? vitrineUrl(state.slug) : null;
+      setKids(box, h('h2', null, 'Ma vitrine en ligne'),
+        h('p', { class: 'small muted' }, 'Vos articles visibles sur une page à partager. Vos clientes commandent sans compte et donnent leur adresse à la fin.'),
+        segField({ name: 'vitrine-open', id: 'vitrine-open', value: state.public ? 'on' : 'off', options: [['off', 'Fermée'], ['on', 'Ouverte']],
+          onChange: function (v) { save({ public: v === 'on' }, v === 'on' ? 'Vitrine ouverte.' : 'Vitrine fermée.'); } }),
+        state.public && url ? [
+          h('p', { class: 'sharelink', id: 'vitrine-url' }, url),
+          h('div', { class: 'duo' },
+            iconBtn('a', { class: 'btn mid', id: 'vitrine-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer'),
+            iconBtn('button', { class: 'btn ghost mid', type: 'button', onclick: function () { copy(url, 'Lien'); } }, 'link', 'Copier')),
+          iconRow('#/b/' + state.slug, 'eye', 'Voir ma vitrine', { id: 'vitrine-view' })] : null,
+        textField({ id: 'vitrine-about', label: 'Présentation', optional: true, max: 160, value: state.about, placeholder: 'Ex. : Robes wax et foulards, livrés à Dakar.',
+          onInput: function (v) { state.about = v; } }),
+        iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'vitrine-about-save', onclick: function () { save({ about: state.about }, 'Présentation enregistrée.'); } }, 'check', 'Enregistrer la présentation', 18),
+        err);
+    }
+    draw();
+    return box;
+  }
+
   /* ================================================================ ORIGINE ET PARRAINAGE
      Chaque lien Fii La reçu dit d'où vient la personne. On garde la première origine (30 jours) sur ce téléphone,
      et on l'envoie au serveur juste après une création (boutique, livreur, adresse, rendez-vous).
@@ -1126,9 +1272,10 @@
     else if (p[0] === 'l' && p[1]) { src = 'course'; token = p[1]; }
     else if (p[0] === 's' && p[1]) { src = 'watch'; token = p[1]; }
     else if (p[0] === 'livreur' && p[1] === 'invitation' && p[2]) { src = 'courier_invite'; token = p[2]; }
+    else if (p[0] === 'b' && p[1] && /^[a-z0-9-]{3,40}$/i.test(p[1])) { src = 'vitrine'; token = p[1].toLowerCase(); }
     var creating = p[0] === 'new' || p[0] === 'boutique' || p[0] === 'livreur' || p[0] === 'parrainer' || (p[0] === 'rdv' && p[1] === 'nouveau');
     if (creating && touchMem && !LS.get(TOUCH_LS, null)) LS.set(TOUCH_LS, touchMem);
-    if (!src || !/^[A-Za-z0-9_-]{6,100}$/.test(token)) return;
+    if (!src || !(src === 'vitrine' ? /^[a-z0-9-]{3,40}$/.test(token) : /^[A-Za-z0-9_-]{6,100}$/.test(token))) return;
     if (src === 'address' && owned.all().some(function (r) { return r.share === token; })) return; // sa propre fiche
     var cur = touchGet();
     if (cur && src !== 'link') return;
@@ -1261,7 +1408,8 @@
     var lines = [pr.name, fcfa(pr.price)];
     if (pr.description) lines.push(pr.description.length > 160 ? pr.description.slice(0, 157).trim() + '…' : pr.description);
     var n = shop && waNumber(shop.phone);
-    lines.push('', n ? 'Pour commander sur WhatsApp : https://wa.me/' + n : 'Pour commander, écrivez-nous en message privé.');
+    lines.push('', shop && shop.public && shop.slug ? 'Pour commander : ' + vitrineUrl(shop.slug, pr.id)
+      : n ? 'Pour commander sur WhatsApp : https://wa.me/' + n : 'Pour commander, écrivez-nous en message privé.');
     return lines.join('\n');
   }
   function dataUrlFile(dataUrl, name) {
@@ -1399,7 +1547,8 @@
       else if (p[0] === 'clients' && p[1]) view = viewCustomer(p[1]);
       else if (p[0] === 'commande' && p[1] === 'nouvelle') view = viewOrderNew(r.q);
       else if (p[0] === 'commande' && p[1]) view = viewOrder(p[1], r.q);
-      else if (p[0] === 'f' && p[1]) view = viewInvoice(p[1]);
+      else if (p[0] === 'f' && p[1]) view = viewInvoice(p[1], r.q);
+      else if (p[0] === 'b' && p[1]) view = viewVitrine(p[1].toLowerCase(), r.q);
       else if (p[0] === 'confidentialite') view = viewPrivacy();
       else view = page(backBtn(), stateCard('?', 'Page introuvable', 'Ce lien n’est pas valide.'));
     } catch (e) {
@@ -3124,6 +3273,7 @@
       textField({ id: 'shop-ninea', label: 'NINEA', optional: true, max: 30, value: f.ninea, onInput: function (v) { f.ninea = v; } }),
       ask ? ask.el : null,
       err, btn,
+      shop ? vitrineSection(shop) : null,
       shop ? courierSection(shop) : null,
       shop ? shopDeleteBox() : null,
       footer());
@@ -3287,6 +3437,9 @@
         options: [['open', 'En cours'], ['unpaid', 'À encaisser'], ['done', 'Terminées'], ['all', 'Toutes']],
         onChange: function (v) { vue = v; try { history.replaceState(null, '', location.pathname + location.search + '#/boutique?vue=' + v); } catch (e) { /* rien */ } setKids(listBox, loading()); load(); } }) : null,
       st.orders ? listBox : null,
+      st.products ? (shop.public && shop.slug
+        ? h('a', { class: 'invite-row', id: 'vitrine-link', href: '#/b/' + shop.slug }, icon('shop', 24), h('span', null, 'Ma vitrine en ligne'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))
+        : h('a', { class: 'invite-row', id: 'vitrine-open-link', href: '#/boutique/reglages' }, icon('shop', 24), h('span', null, 'Ouvrir ma vitrine en ligne'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))) : null,
       h('a', { class: 'invite-row', id: 'shop-referral', href: '#/parrainer?pour=boutique' }, icon('gift', 24), h('span', null, 'Parrainer une boutique'),
         h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
       footer()), 'orders');
@@ -3876,7 +4029,7 @@
   }
 
   /* ----- facture vue par le client (lien partagé) */
-  function viewInvoice(token) {
+  function viewInvoice(token, q) {
     return api('fiila_order_public', { p_token: token }).then(function (r) {
       if (r.state === 'cancelled') return page(stateCard('⦸', 'Commande annulée', 'La commande N° ' + r.ref + ' de ' + r.shop.name + ' a été annulée.'), footer());
       if (r.state !== 'ok') return page(stateCard('?', 'Commande introuvable', 'Vérifiez que le lien a été copié en entier.'), footer());
@@ -3887,6 +4040,14 @@
       var stateText = delivered ? 'Livrée' : o.delivery_state === 'on_the_way' ? 'En route' : o.delivery_state === 'arrived' ? 'Livreur arrivé'
         : o.address_state === 'pending' ? 'Adresse attendue' : 'En préparation';
       var act = [];
+      // Juste après une commande passée sur la vitrine : confirmation calme, puis l'étape suivante.
+      if (q && q.nouvelle === '1') {
+        var invUrl = invoiceUrl(token);
+        act.push(h('section', { class: 'card highlight no-print', id: 'order-sent' },
+          h('p', { class: 'saved-ok' }, icon('check', 18), 'Commande envoyée à ' + s.name + '.'),
+          h('p', { class: 'small muted' }, o.address_state === 'pending' ? 'Dernière étape : donnez votre adresse de livraison.' : 'La boutique a votre commande.'),
+          s.phone ? iconBtn('a', { class: 'btn ghost', id: 'notify-shop', href: waTo(s.phone, 'Bonjour, je viens de commander (N° ' + o.ref + ') : ' + invUrl), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Prévenir la boutique sur WhatsApp') : null));
+      }
       if (o.address_state === 'pending' && o.request_token && !delivered) {
         act.push(iconBtn('a', { class: 'btn big no-print', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'pin', 'Donner mon adresse de livraison'));
       }
@@ -3940,6 +4101,7 @@
           h('li', null, 'Origine et parrainage : quand vous créez une adresse, un rendez-vous, une boutique ou un espace livreur, Fii La note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
           h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro. Le numéro n’est jamais affiché ; il sert seulement à vous reconnaître quand quelqu’un le tape. Les personnes qui ouvrent votre lien voient votre prénom.'),
           h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus que vous ajoutez à votre adresse. Le micro n’est utilisé que lorsque vous appuyez sur « Enregistrer ». Toute personne qui a le lien, et le livreur d’une course, peuvent l’écouter. Il est supprimé avec la fiche, ou dès que vous le retirez.'),
+          h('li', null, 'Vitrine d’une boutique (si elle l’ouvre) : ses articles visibles par toute personne qui a le lien. Une commande passée sur la vitrine transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
           h('li', null, 'Publication d’un article : Fii La compte seulement qu’une publication a été faite, pas le réseau choisi.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),

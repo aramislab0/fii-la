@@ -62,6 +62,7 @@ Constaté dans le code au commit `9576bc8`.
 | **Origine et parrainage** : d'où vient une nouvelle boutique, un livreur, une adresse ou un rendez-vous (lien reçu, code, numéro tapé) ; fiche de parrainage (nom, numéro facultatif, jamais affiché) | Nouveaux utilisateurs ; parrains | Mesurer le bouche-à-oreille ; récompenses futures | Autant que la fiche, la boutique ou l'espace livreur concerné ; code supprimable par son titulaire | Le parrain voit qu'une arrivée a eu lieu (nom d'une boutique, prénom d'un livreur, rien pour un particulier) ; le fondateur voit des chiffres agrégés |
 | Publication d'un article (date seulement, pas le réseau choisi) | Commerçants | Mesure | Avec l'article | Le commerçant |
 | **Repère vocal** (facultatif) : enregistrement audio de 30 s au plus, lié à une adresse | Créateur de la fiche ; toute personne dont la voix est enregistrée | Guider le visiteur ou le livreur, notamment pour les personnes qui lisent peu | Jusqu'au retrait par le propriétaire ou la suppression de la fiche | Toute personne qui a le lien de la fiche ; le livreur de la course |
+| **Vitrine** (si la boutique l'ouvre) : articles publics ; commande en ligne (nom, numéro, articles, précision) | Commerçants ; clientes qui commandent | Vente en ligne | Comme les commandes (24 mois au plus) | La boutique concernée ; les articles sont visibles par toute personne qui a le lien |
 | Statistiques de croissance (agrégées) | Aucune personne identifiable | Pilotage | Sans limite | Comptes administrateurs (le fondateur) |
 
 **Points à signaler dans le complément**

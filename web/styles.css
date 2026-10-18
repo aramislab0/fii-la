@@ -501,7 +501,7 @@ footer.foot a:hover{text-decoration:underline}
 .pro-row:hover{background:var(--surface-2)}
 @media (prefers-reduced-motion: no-preference){
   #app>.wrap{animation:fiila-in .18s ease-out}
-  @keyframes fiila-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  @keyframes fiila-in{from{transform:translateY(6px)}to{transform:none}}
 }
 
 /* Actions sensibles : en bas, en texte, séparées (audit design D4). */
@@ -603,3 +603,24 @@ button.rnd:not(:disabled):active{transform:none}
 .vbar i{display:block;height:100%;width:0;background:var(--green);transition:width .2s linear}
 .tile.kpi{flex-direction:row;align-items:center;gap:10px}
 .tile.kpi>span:last-child{display:flex;flex-direction:column}
+
+/* ----- Vitrine publique (19/10/2026) */
+.vhead{display:flex;gap:14px;align-items:center}
+.vhead>div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.vavatar{width:60px;height:60px;border-radius:20px;background:var(--green);color:var(--on-green);font-size:26px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.vgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.vcard{background:var(--surface);border-radius:18px;overflow:hidden;box-shadow:var(--shadow-card);display:flex;flex-direction:column;min-width:0}
+.vcard.focus{outline:3px solid var(--lime);outline-offset:2px}
+.vimg{aspect-ratio:1/1;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.vimg img{width:100%;height:100%;object-fit:cover;display:block}
+.vbody{padding:10px 12px 12px;display:flex;flex-direction:column;gap:4px;flex:1}
+.vbody h3{font-size:14px;font-weight:600;line-height:1.3}
+.vprice{font-weight:700;font-size:15px}
+.vdesc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.qty{margin-top:auto;padding-top:6px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.qty .add-btn{width:100%}
+.qbtn{min-height:40px;width:40px;padding:0;border-radius:50%;font-size:20px;line-height:1}
+.qn{font-weight:700;font-size:16px;min-width:24px;text-align:center}
+.cartbar{position:fixed;left:0;right:0;bottom:0;z-index:900;display:flex;justify-content:center;padding:0 12px calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.cartbar>*{pointer-events:auto;width:100%;max-width:528px;box-shadow:var(--shadow-float)}
+@media (max-width:340px){.vgrid{grid-template-columns:1fr}}

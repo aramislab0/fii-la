@@ -40,6 +40,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Boutique ouverte, articles, notes | **En production (17/10 21:25)** : boutique sans compte (clé du téléphone), compte proposé à la création et après 3 actions, articles avec photo, commande depuis le catalogue, notes des acheteurs après livraison. Migration `20261017230000_fiila_shop_open_products` | `tests/accounts.sql.test.mjs` (26), `tests/shop.test.mjs` (24) |
 | Comptes et boutique (Rali) | **En production (17/10 21:35)** : migration appliquée, `verify-db` 8/8 (6 migrations, 40 fonctions, schéma fermé). Inscription ouverte mais « Confirm email » actif avec l'envoi d'e-mails intégré de Supabase : seules les adresses de l'équipe reçoivent l'e-mail → réglage fondateur §4 #12 avant tout vrai commerçant | `docs/ARCHITECTURE-RALI.md`, `tests/accounts.sql.test.mjs` (21), `tests/shop.test.mjs` (19) |
 | Croissance (phase 0) | **En production (17/10 23:30)** : origine de chaque arrivée, parrainage par lien `#/r/CODE`, code ou numéro, espaces « Parrainer » (boutique, livreur, particulier), bouton « Publier » sur les articles, statistiques `#/stats` (compte administrateur). Migration `20261018000000_fiila_referrals`, `verify-db` 10 migrations / 65 fonctions OK. Récompenses : non attribuées, à fixer par le fondateur | `docs/CROISSANCE.md` §9, `tests/referrals.sql.test.mjs` (15), `tests/referrals.test.mjs` (8) |
+| Vitrine publique | **Construite (19/10)** : `#/b/<slug>`, panier, commande sans compte, adresse donnée depuis la facture ; ouverture dans les réglages. Migration `20261019000000_fiila_vitrine` | `ARCHITECTURE-RALI.md` §11, `tests/vitrine.sql.test.mjs` (6), `tests/vitrine.test.mjs` (6) |
 | Interface v1.2 | **Calme et sûr + icônes** : trois formes, une grande action par écran, raccourcis ronds, pastilles d'état, barre d'onglets boutique, repère vocal. Détail `docs/PROPOSITION-UX-ICONES.md` | `docs/AUDIT-DESIGN-2026-10-18.md` |
 | Interface | **Design system v1.1 appliqué** (Light + Dark, sélecteur de thème, 6 cartes, contrastes AA). Aucune coordonnée affichée. Audit UI/UX fait et corrigé le 17/10 | `docs/design-system/README.md`, `web/styles.css` |
 
@@ -68,6 +69,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 17/10 23:01 | Suivi 3D mis en attente ; publication réseaux sociaux à prévoir dans le périmètre sans tout développer ; parrainage par numéro voulu, croissance organique d'abord, publicité plus tard ; stratégie à proposer avant exécution | Fondateur |
 | 17/10 23:10 | Croissance : cible tout le Sénégal (boutiques, particuliers, livreurs) ; phase 0 à construire en entier, bouton « Publier » compris ; récompenses fixées plus tard (l'argent n'est pas exclu) | Fondateur |
 | 18/10 21:18 | Design v1.2 + « icônes et hiérarchie » validés en entier ; repère vocal ajouté au périmètre | Fondateur |
+| 18/10 23:16 | Prochaine fonction : vitrine publique de la boutique (choisie parmi kit de lancement, alertes livreur, vitrine, suivi 3D) ; CDP pris en charge par le fondateur | Fondateur |
 
 ## 4. En attente / prochaines actions
 
