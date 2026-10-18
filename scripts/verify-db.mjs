@@ -24,7 +24,7 @@ const EXPECTED_FUNCTIONS = [
   // durcissement (20261017250000)
   'fiila_meeting_guest_remove',
   // origine et parrainage, publications, statistiques (20261018000000)
-  'fiila_admin_stats', 'fiila_attribute', 'fiila_post_log', 'fiila_referral_card_delete', 'fiila_referral_card_save', 'fiila_referral_me', 'fiila_referral_public',
+  'fiila_admin_stats', 'fiila_attribute', 'fiila_voice', 'fiila_voice_set', 'fiila_post_log', 'fiila_referral_card_delete', 'fiila_referral_card_save', 'fiila_referral_me', 'fiila_referral_public',
 ].sort();
 const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();

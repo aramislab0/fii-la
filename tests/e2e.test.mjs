@@ -113,12 +113,13 @@ let shareUrl, placeId, createBody;
 
 await t('accueil : une action principale (création), deux secondaires, puis mes adresses', async () => {
   await A.goto(URL0);
-  await A.getByText('Ton adresse, expliquée une seule fois.').waitFor();
-  for (const n of ['Créer mon adresse', 'Demander une adresse', 'Créer un rendez-vous']) await byText(A, n).waitFor();
+  await A.getByText('Votre adresse, en une photo.').waitFor();
+  for (const n of ['Créer mon adresse', 'Demander une adresse', 'Créer un rendez-vous', 'Ma boutique', 'Espace livreur']) await byText(A, n).waitFor();
   await A.getByRole('heading', { name: 'Mes adresses' }).waitFor();
-  const first = await A.locator('nav.home-actions a').first();
-  assert.equal(await first.textContent(), 'Créer mon adresse');
-  assert.match(await first.getAttribute('class'), /\bbig\b/);
+  // Une seule grande action, avant les raccourcis à pictogramme.
+  assert.equal(await A.locator('a.hero').count(), 1);
+  assert.equal(await A.locator('a.hero').getAttribute('href'), '#/new');
+  assert.equal(await A.locator('.tiles4 .ttile svg').count(), 4, 'chaque raccourci a son pictogramme');
   await shot(A, '01-accueil');
 });
 
@@ -214,7 +215,7 @@ await t('lien de partage sans clé propriétaire ; clé gardée localement', asy
 });
 
 await t('QR code : se décode exactement en lien de la fiche', async () => {
-  await A.locator('#more summary').click();
+  await A.locator('#share-qr').click();
   const img = A.locator('#qr-img');
   await img.waitFor();
   await A.waitForFunction(() => { const i = document.querySelector('#qr-img'); return i && i.complete && i.naturalWidth > 0; });
@@ -225,7 +226,7 @@ await t('QR code : se décode exactement en lien de la fiche', async () => {
 });
 
 await t('copie du lien (presse-papiers) et lien WhatsApp avec la vraie URL', async () => {
-  const wa = await A.getByRole('link', { name: 'Préparer un message WhatsApp' }).getAttribute('href');
+  const wa = await A.locator('#share-whatsapp').getAttribute('href');
   assert.ok(decodeURIComponent(wa).includes(shareUrl));
   await A.locator('#copy-link').click();
   if (ENGINE === 'chromium') {
@@ -275,11 +276,16 @@ await t('texte long : aucune largeur de page débordante (390 px)', async () => 
 });
 
 await t('itinéraires et coordonnées copiées = points enregistrés', async () => {
-  const links = await B.getByRole('link', { name: /Itinéraire/ }).evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+  const links = await B.locator('.route a[href^="comgooglemaps"]').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
   assert.equal(links.length, 2);
+  assert.equal(await B.locator('.route a').first().textContent(), 'Y aller');
   // iPhone : application Google Maps ouverte directement (schéma officiel), Plans en repli
   assert.deepEqual(links, ['comgooglemaps://?daddr=14.757905,-17.469880&directionsmode=driving', 'comgooglemaps://?daddr=14.758140,-17.470320&directionsmode=walking']);
-  assert.equal(await B.getByRole('link', { name: 'Ouvrir dans Plans' }).count(), 2);
+  assert.equal(await B.getByRole('link', { name: 'Ouvrir dans Plans' }).count(), 0, 'autres applis repliées');
+  await B.locator('#other-app').click();
+  assert.equal(await B.getByRole('link', { name: 'Ouvrir dans Plans' }).count(), 1);
+  assert.equal(await B.getByRole('link', { name: 'Plans : à pied jusqu’à l’entrée' }).count(), 1);
+  assert.equal(await B.getByRole('link', { name: 'Ouvrir dans Waze' }).count(), 1);
   assert.equal(await B.locator('.coords, .coords-more').count(), 0, 'aucune coordonnée affichée au destinataire');
   assert.equal(await B.getByText(/14\.75/).count(), 0, 'aucune coordonnée en clair');
 });
@@ -371,8 +377,8 @@ await t('Google Maps : lien sans point précis → consigne claire ; coordonnée
 await t('Android : itinéraire par lien Google Maps https (ouvre l’application), sans Plans', async () => {
   const p = await newPhone({ ctx: { userAgent: 'Mozilla/5.0 (Linux; Android 14; SM-A155F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36' } });
   await p.page.goto(shareUrl);
-  await p.page.getByRole('link', { name: /Itinéraire/ }).first().waitFor();
-  const links = await p.page.getByRole('link', { name: /Itinéraire/ }).evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+  await p.page.locator('.route a.btn').first().waitFor();
+  const links = await p.page.locator('.route a.btn[href*="google.com"]').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
   assert.ok(links.length >= 1 && links.every((l) => l.startsWith('https://www.google.com/maps/dir/?api=1&destination=')));
   assert.equal(await p.page.getByRole('link', { name: 'Ouvrir dans Plans' }).count(), 0);
   await p.ctx.close();
@@ -412,7 +418,7 @@ await t('demande : le commerçant crée la demande', async () => {
 await t('demande : le client voit qui demande, crée son adresse, prévisualise et envoie', async () => {
   await C.goto(requestUrl);
   await C.getByText('Boutique Ndèye vous demande votre adresse').waitFor();
-  await C.getByText(/Répondez seulement si vous attendez cette demande/).waitFor();
+  await C.locator('#request-safe').getByText(/Votre adresse ira uniquement à/).waitFor();
   await shot(C, '10-demande-client');
   await C.click('#new-address-for-request');
   await C.getByRole('button', { name: 'Utiliser ma position' }).click();

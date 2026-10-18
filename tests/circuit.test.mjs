@@ -117,6 +117,7 @@ await t('après enregistrement : partager est l’action principale, gestion acc
 
 await t('partage natif [SIMULÉ partage natif] : seule l’URL destinataire est transmise', async () => {
   const ev = waitTrack(O, 'share_initiated', 'native_meeting');
+  await O.locator('#share-more').click();
   await O.getByRole('button', { name: 'Partager…' }).click();
   await ev;
   const shared = await O.evaluate(() => window.__shared);
@@ -134,14 +135,15 @@ const V = visitor.page;
 await t('destinataire anonyme : itinéraire voiture vers l’arrêt, à pied vers le lieu (iPhone : appli Google Maps directe + Plans)', async () => {
   await V.goto(URL0 + '#/a/' + meetShare);
   await V.getByRole('heading', { name: 'Réunion de quartier (test)' }).waitFor();
-  const links = await V.getByRole('link', { name: /Itinéraire/ }).evaluateAll((as) => as.map((a) => [a.textContent, a.getAttribute('href')]));
+  const links = await V.locator('.route a[href^="comgooglemaps"]').evaluateAll((as) => as.map((a) => [a.textContent, a.getAttribute('href')]));
   assert.equal(links.length, 2);
   // iPhone : schéma officiel comgooglemaps:// (ouvre l'application avec la destination, sans détour par l'App Store)
   const car = new URL(links[0][1]), walk = new URL(links[1][1]);
   assert.equal(car.protocol, 'comgooglemaps:');
   assert.deepEqual([car.searchParams.get('daddr'), car.searchParams.get('directionsmode')], ['14.746500,-17.493000', 'driving']);
   assert.deepEqual([walk.searchParams.get('daddr'), walk.searchParams.get('directionsmode')], ['14.746100,-17.492500', 'walking']);
-  const plans = await V.getByRole('link', { name: 'Ouvrir dans Plans' }).evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+  await V.locator('#other-app').click();
+  const plans = await V.locator('#other-apps a[href^="https://maps.apple.com"]').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
   assert.deepEqual(plans, ['https://maps.apple.com/?daddr=14.746500,-17.493000&dirflg=d', 'https://maps.apple.com/?daddr=14.746100,-17.492500&dirflg=w']);
   assert.equal(await V.evaluate(() => localStorage.length), 0);
 });
@@ -170,7 +172,7 @@ await t('réouverture depuis « Mes rendez-vous » après rechargement, puis rep
   await reopen;
   await O.getByRole('heading', { name: 'Partager' }).waitFor();
   assert.equal(await O.locator('#saved-ok').count(), 0, 'confirmation affichée hors création');
-  const wa = await O.getByRole('link', { name: 'Préparer un message WhatsApp' }).getAttribute('href');
+  const wa = await O.locator('#share-whatsapp').getAttribute('href');
   assert.ok(decodeURIComponent(wa).includes(URL0 + '#/a/' + meetShare));
   if (ENGINE === 'chromium') {
     const cp = waitTrack(O, 'link_copied', 'meeting');
@@ -316,6 +318,7 @@ await t('demande : partage natif [SIMULÉ partage natif] et lien seul ; demande 
   await O.locator('#request-url').waitFor();
   const url = await O.locator('#request-url').textContent();
   const nat = waitTrack(O, 'share_initiated', 'native_request');
+  await O.locator('#share-more').click();
   await O.locator('#share-request').click();
   await nat;
   const shared = await O.evaluate(() => window.__shared.at(-1));
@@ -363,7 +366,7 @@ await t('clavier : « Créer un rendez-vous similaire » et le repli des coordon
   assert.notEqual(o, 'none');
   await V.goto(URL0 + '#/a/' + (await row(simId)).share_token);
   await V.getByRole('heading', { name: /novembre/ }).waitFor();
-  assert.ok(await reach(V, () => document.activeElement && /Itinéraire/.test(document.activeElement.textContent || '')), 'bouton Itinéraire non atteint au clavier');
+  assert.ok(await reach(V, () => document.activeElement && /Y aller/.test(document.activeElement.textContent || '')), 'bouton « Y aller » non atteint au clavier');
   const o2 = await V.evaluate(() => getComputedStyle(document.activeElement).outlineStyle);
   assert.notEqual(o2, 'none');
 });

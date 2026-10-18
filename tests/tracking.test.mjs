@@ -94,6 +94,8 @@ await t('livreur : voit la fiche (photo, repère, Google Maps, Waze) et démarre
   await C.goto(courierUrl);
   await C.getByRole('heading', { name: 'Maison du client (test)' }).waitFor();
   await C.getByText('Portail bleu').waitFor();
+  await C.getByRole('link', { name: 'Y aller' }).waitFor();
+  await C.locator('#other-app').click();
   assert.ok(await C.getByRole('link', { name: 'Ouvrir dans Waze' }).count() >= 1, 'Waze absent');
   const waze = await C.getByRole('link', { name: 'Ouvrir dans Waze' }).first().getAttribute('href');
   assert.equal(waze, 'https://waze.com/ul?ll=14.758140,-17.470320&navigate=yes');

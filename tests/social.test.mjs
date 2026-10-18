@@ -68,6 +68,8 @@ async function newPhone(opts = {}) {
 const shot = (page, name, full = true) => page.screenshot({ path: `${SHOTS}/social-${ENGINE}-${name}.png`, fullPage: full });
 const waitTrack = (page, ev, v) => { const p = page.waitForRequest((r) => r.url().endsWith('/rpc/fiila_track') && r.postData().includes(`"${ev}"`) && r.postData().includes(`"${v}"`), { timeout: 8000 }); p.catch(() => {}); return p; };
 function decodePng(buf) { const png = PNG.sync.read(buf); const c = jsQR(new Uint8ClampedArray(png.data), png.width, png.height); return c && c.data; }
+// Facebook, partage natif et (avec QR code) TikTok sont rangés sous « Autres ».
+async function reveal(page, sel) { await page.locator(sel).waitFor({ state: 'attached' }); if (!(await page.locator(sel).isVisible())) await page.locator('#share-more').click(); await page.locator(sel).waitFor(); }
 async function panelHrefs(page) { return page.locator('.share-panel a[href]').evaluateAll((as) => as.map((a) => a.href)); }
 
 const views = { address: '#/m/' + addr.id, meeting: '#/m/' + meet.id, request: '#/demande/' + req.id };
@@ -79,9 +81,12 @@ for (const kind of ['address', 'meeting', 'request']) {
   await t(`panneau ${kind} : actions présentes, avertissement de confidentialité, lien destinataire seul`, async () => {
     await O.goto(URL0 + views[kind]);
     await O.locator('.share-panel').waitFor();
-    for (const n of ['Préparer un message WhatsApp', 'Copier le lien', 'Telegram', 'Facebook : copier le lien', 'Instagram / Story', 'TikTok'])
+    for (const n of ['Envoyer sur WhatsApp', 'Copier', 'Telegram', 'Story', 'Autres'])
       await O.locator('.share-panel').getByText(n, { exact: true }).first().waitFor();
-    assert.equal(await O.locator('#privacy-note').textContent(), 'Toute personne qui a le lien voit la fiche.');
+    assert.equal(await O.locator('.share-panel .rnd svg').count() >= 5, true, 'chaque raccourci a son pictogramme');
+    await reveal(O, '#share-facebook-copy');
+    await O.locator('#share-tiktok').waitFor();
+    assert.equal(await O.locator('#privacy-note').textContent(), kind === 'request' ? 'Seule la personne qui a ce lien peut vous répondre.' : 'Seules les personnes qui ont le lien voient la fiche.');
     const url = await O.locator('.share-panel .sharelink').textContent();
     assert.equal(url, recipientUrl[kind]);
     const hrefs = await panelHrefs(O);
@@ -122,7 +127,7 @@ await t('Facebook avec identifiant d’application configuré : Share Dialog off
 
 await t('Facebook sans configuration : action de copie honnête, consigne affichée, aucune ouverture de Facebook', async () => {
   await O.goto(URL0 + views.request);
-  await O.locator('#share-facebook-copy').waitFor();
+  await reveal(O, '#share-facebook-copy');
   assert.equal(await O.locator('#fb-help').isVisible(), false, 'consigne affichée avant le clic');
   const popups = [];
   O.on('popup', (pp) => popups.push(pp));
@@ -137,7 +142,7 @@ await t('Facebook sans configuration : action de copie honnête, consigne affich
 await t('vue destinataire : aucun bouton de réseau social, l’itinéraire reste l’action principale', async () => {
   const p = await newPhone({ owned: false });
   await p.page.goto(recipientUrl.address);
-  await p.page.getByRole('link', { name: /Itinéraire/ }).first().waitFor();
+  await p.page.getByRole('link', { name: 'Y aller' }).first().waitFor();
   assert.equal(await p.page.locator('a[href*="t.me"], a[href*="facebook.com"], #share-instagram, #share-tiktok, .share-panel').count(), 0);
   await p.ctx.close();
 });
@@ -157,6 +162,7 @@ await t('partage natif [SIMULÉ partage natif] : réussi, annulé, refusé', asy
       if (window.__mode === 'deny') return Promise.reject(new DOMException('refusé', 'NotAllowedError')); return Promise.resolve(); };
   } });
   await p.page.goto(URL0 + views.meeting);
+  await reveal(p.page, '#share-native');
   await p.page.locator('#share-native').click();
   const d = await p.page.evaluate(() => window.__shared[0]);
   assert.equal(d.url, recipientUrl.meeting);
@@ -167,7 +173,7 @@ await t('partage natif [SIMULÉ partage natif] : réussi, annulé, refusé', asy
   assert.equal(await p.page.locator('#toast').isVisible(), false, 'message affiché après une annulation');
   await p.page.evaluate(() => { window.__mode = 'deny'; });
   await p.page.locator('#share-native').click();
-  await p.page.getByText('Partage indisponible ici. Utilisez « Copier le lien ».').waitFor();
+  await p.page.getByText('Partage indisponible ici. Utilisez « Copier ».').waitFor();
   await p.ctx.close();
 });
 
@@ -242,6 +248,7 @@ await t('photo cochée par le propriétaire : entière (non recadrée), sans tex
 });
 
 await t('TikTok : consigne du champ « Site web » (non garanti), formule neutre si le nom est masqué', async () => {
+  await reveal(O, '#share-tiktok');
   await O.locator('#share-tiktok').click();
   await O.getByText('Ni l’image ni la légende d’une vidéo TikTok ne rendent le lien cliquable', { exact: false }).waitFor();
   await O.getByText('TikTok ne le propose pas à tous les comptes', { exact: false }).waitFor();
@@ -354,6 +361,7 @@ await t('lien désactivé ou rendez-vous expiré [SIMULÉ temps] : plus de panne
 // ================================================================== 6. mesure
 await t('mesure : canal choisi, lien copié et image exportée distingués ; rien de privé', async () => {
   await O.goto(URL0 + views.request);
+  await reveal(O, '#share-facebook-copy');
   for (const id of ['share-telegram', 'share-facebook-copy']) {
     const [popup] = await Promise.all([O.waitForEvent('popup', { timeout: 4000 }).catch(() => null), O.locator('#' + id).click()]);
     if (popup) await popup.close().catch(() => {});

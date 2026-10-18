@@ -17,7 +17,9 @@
     "test:couriers": "node tests/couriers.test.mjs",
     "test:security": "node tests/security.sql.test.mjs",
     "test:referrals-sql": "node tests/referrals.sql.test.mjs",
-    "test:referrals": "node tests/referrals.test.mjs"
+    "test:referrals": "node tests/referrals.test.mjs",
+    "test:voice-sql": "node tests/voice.sql.test.mjs",
+    "test:voice": "node tests/voice.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",

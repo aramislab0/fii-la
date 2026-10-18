@@ -40,6 +40,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Boutique ouverte, articles, notes | **En production (17/10 21:25)** : boutique sans compte (clé du téléphone), compte proposé à la création et après 3 actions, articles avec photo, commande depuis le catalogue, notes des acheteurs après livraison. Migration `20261017230000_fiila_shop_open_products` | `tests/accounts.sql.test.mjs` (26), `tests/shop.test.mjs` (24) |
 | Comptes et boutique (Rali) | **En production (17/10 21:35)** : migration appliquée, `verify-db` 8/8 (6 migrations, 40 fonctions, schéma fermé). Inscription ouverte mais « Confirm email » actif avec l'envoi d'e-mails intégré de Supabase : seules les adresses de l'équipe reçoivent l'e-mail → réglage fondateur §4 #12 avant tout vrai commerçant | `docs/ARCHITECTURE-RALI.md`, `tests/accounts.sql.test.mjs` (21), `tests/shop.test.mjs` (19) |
 | Croissance (phase 0) | **En production (17/10 23:30)** : origine de chaque arrivée, parrainage par lien `#/r/CODE`, code ou numéro, espaces « Parrainer » (boutique, livreur, particulier), bouton « Publier » sur les articles, statistiques `#/stats` (compte administrateur). Migration `20261018000000_fiila_referrals`, `verify-db` 10 migrations / 65 fonctions OK. Récompenses : non attribuées, à fixer par le fondateur | `docs/CROISSANCE.md` §9, `tests/referrals.sql.test.mjs` (15), `tests/referrals.test.mjs` (8) |
+| Interface v1.2 | **Calme et sûr + icônes** : trois formes, une grande action par écran, raccourcis ronds, pastilles d'état, barre d'onglets boutique, repère vocal. Détail `docs/PROPOSITION-UX-ICONES.md` | `docs/AUDIT-DESIGN-2026-10-18.md` |
 | Interface | **Design system v1.1 appliqué** (Light + Dark, sélecteur de thème, 6 cartes, contrastes AA). Aucune coordonnée affichée. Audit UI/UX fait et corrigé le 17/10 | `docs/design-system/README.md`, `web/styles.css` |
 
 ## 3. Décisions en vigueur
@@ -66,6 +67,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 17/10 | Design system v1 (Light + Dark) = référence de la refonte d'interface ; application par le Builder sans toucher aux parcours ni aux textes ; ajout d'un sélecteur de thème Clair / Sombre / Automatique (seule addition au périmètre) | Fondateur |
 | 17/10 23:01 | Suivi 3D mis en attente ; publication réseaux sociaux à prévoir dans le périmètre sans tout développer ; parrainage par numéro voulu, croissance organique d'abord, publicité plus tard ; stratégie à proposer avant exécution | Fondateur |
 | 17/10 23:10 | Croissance : cible tout le Sénégal (boutiques, particuliers, livreurs) ; phase 0 à construire en entier, bouton « Publier » compris ; récompenses fixées plus tard (l'argent n'est pas exclu) | Fondateur |
+| 18/10 21:18 | Design v1.2 + « icônes et hiérarchie » validés en entier ; repère vocal ajouté au périmètre | Fondateur |
 
 ## 4. En attente / prochaines actions
 
@@ -95,8 +97,9 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 25 | ~~Valider la stratégie de croissance~~ phase 0 validée 17/10 23:10 et construite (`docs/CROISSANCE.md` §9) | Fondateur | — |
 | 27 | Fixer les récompenses du parrainage (boutiques, livreurs, particuliers ; argent possible) | Fondateur | Annonce du parrainage |
 | 29 | Supprimer 1 fiche « Maison du client (test) » et 1 demande « Boutique Ndèye » restées en production après l'arrêt d'une série de tests (23:32) : suppression SQL refusée à l'exécution, en attente d'accord du fondateur | Fondateur → Builder | Base propre |
-| 32 | Valider la proposition « icônes et hiérarchie » (`docs/PROPOSITION-UX-ICONES.md`, maquette `docs/screenshots/proposition-icones.png`) ; décider : repère vocal, wolof | Fondateur | Suite de la refonte |
-| 31 | Valider le lot 1 v1.2 + accueil + gestion (branche `design-v1.2`, captures `docs/screenshots/design-v1.2-*.png`) avant mise en production et extension aux autres écrans | Fondateur | Lots 2 à 5 |
+| 33 | Ajouter au dossier CDP le traitement « repère vocal » (enregistrement audio facultatif lié à une adresse) | Fondateur | Usage réel |
+| 32 | ~~Valider la proposition « icônes et hiérarchie »~~ validée 18/10 21:18 avec le repère vocal, et appliquée ; (`docs/PROPOSITION-UX-ICONES.md`, maquette `docs/screenshots/proposition-icones.png`) ; décider : repère vocal, wolof | Fondateur | Suite de la refonte |
+| 31 | ~~Valider le lot 1 v1.2~~ validé 18/10 21:13 (« tout fonctionne ») ; + accueil + gestion (branche `design-v1.2`, captures `docs/screenshots/design-v1.2-*.png`) avant mise en production et extension aux autres écrans | Fondateur | Lots 2 à 5 |
 | 30 | ~~Valider l'audit design~~ lancé 18/10 06:28 ; « calme et sûr » (`docs/AUDIT-DESIGN-2026-10-18.md`) : direction v1.2, deux règles v1.1 touchées (titres 800, tuiles non filtrées), plan en 5 lots ; premier pas proposé = lot 1 + accueil avec captures avant/après | Fondateur | Refonte v1.2 |
 | 28 | Créer son compte Fii La, puis le Builder le marque administrateur (SQL) pour ouvrir `#/stats` | Fondateur → Builder | Lecture des statistiques |
 | 26 | Ajouter au dossier CDP le traitement « parrainage » (lien parrain–filleul) si la phase 0 est validée | Fondateur | Usage réel du parrainage |

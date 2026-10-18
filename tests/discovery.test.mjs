@@ -106,7 +106,7 @@ async function discoverContrast(page) {
     return {
       title: [pick(box.querySelector('h2')), bg], body: [pick(box.querySelector('p')), bg], hint: [pick(box.querySelector('.hint')), bg],
       cta: [pick(cta), getComputedStyle(cta).backgroundColor],
-      ctaBg: getComputedStyle(cta).backgroundColor, navBg: getComputedStyle(document.querySelector('.leg a.btn')).backgroundColor,
+      ctaBg: getComputedStyle(cta).backgroundColor, navBg: getComputedStyle(document.querySelector('.route a.btn')).backgroundColor,
     };
   });
 }
@@ -119,7 +119,7 @@ await t('destinataire anonyme : fiche, photo et itinéraire visibles sans compte
   await R.goto(addrUrl);
   await R.getByRole('heading', { name: SENDER.label }).waitFor();
   assert.ok(await R.locator('img.door').evaluate((i) => i.complete && i.naturalWidth > 100), 'photo absente');
-  await R.getByRole('link', { name: /Itinéraire/ }).first().waitFor();
+  await R.getByRole('link', { name: 'Y aller' }).first().waitFor();
   assert.equal(await R.evaluate(() => localStorage.length), 0, 'stockage local utilisé sans action');
   assert.equal(await R.evaluate(() => window.__geoCalls), 0, 'position demandée');
   assert.equal(R.__dialogs, 0, 'boîte de dialogue affichée');
@@ -234,7 +234,7 @@ await t('environnement sans installation possible : aucune proposition, rien de 
 await t('mesure : partage WhatsApp ouvert et lien copié, distingués, sans contenu', async () => {
   await anon.ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(URL0).origin });
   const wa = waitTrack(R, 'share_initiated', 'whatsapp_address');
-  const [popup] = await Promise.all([R.waitForEvent('popup').catch(() => null), R.getByRole('link', { name: 'Préparer un message WhatsApp' }).click()]);
+  const [popup] = await Promise.all([R.waitForEvent('popup').catch(() => null), R.locator('#share-whatsapp').click()]);
   await wa;
   if (popup) await popup.close().catch(() => {});
   const cp = waitTrack(R, 'link_copied', 'address');

@@ -797,7 +797,7 @@
         else say('Position indisponible pour le moment. Placez le repère à la main sur la carte.', 'err');
       }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     }
-    var locBtn = h('button', { class: 'btn', type: 'button', onclick: locate }, 'Utiliser ma position');
+    var locBtn = iconBtn('button', { class: 'btn', type: 'button', onclick: locate }, 'nav', 'Utiliser ma position');
 
     loadLeaflet().then(function (L) {
       var start = center ? [center.lat, center.lng] : DAKAR_VIEW;
@@ -924,7 +924,7 @@
         h('span', { class: 'label' }, (opts.label || 'Photo de l’entrée') + ' ', h('span', { class: 'hint' }, opts.optional ? '(facultatif)' : '(conseillé)')),
         p ? h('img', { class: 'photo-prev', src: p, alt: 'Aperçu : ' + (opts.label || 'photo de l’entrée') }) : null,
         h('div', { class: 'row' },
-          h('button', { class: p || opts.optional ? 'btn ghost' : 'btn', type: 'button', onclick: function () { inp.click(); } }, p ? 'Remplacer la photo' : 'Prendre ou choisir une photo'),
+          h('button', { class: p || opts.optional ? 'btn ghost' : 'btn', type: 'button', onclick: function () { inp.click(); } }, icon('cam', 22), h('span', null, p ? 'Remplacer la photo' : 'Prendre ou choisir une photo')),
           p ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { opts.set(null); draw(); } }, 'Retirer') : null),
         opts.label ? null : h('p', { class: 'hint' }, 'La porte, pas la maison.'),
         inp, msg);
@@ -952,47 +952,155 @@
 
   /* ================================================================ fiche (vue destinataire) */
   // Aucune coordonnée affichée : l'itinéraire s'ouvre directement dans l'application de navigation.
-  function leg(n, title, p, mode, note) {
-    return h('section', { class: 'leg', 'aria-label': title },
-      h('div', { class: 'leg-h' }, n ? h('span', { class: 'leg-n', 'aria-hidden': 'true' }, n) : null, h('h3', null, title),
-        h('span', { class: 'leg-ico', 'aria-hidden': 'true' }, icon(mode === 'driving' && n ? 'car' : 'door', 22))),
-      note ? h('p', { class: 'note' }, note) : null,
-      dirButtons(p, mode, !!n));
-  }
-  function dirButtons(p, mode, opts2) {
-    var label = mode === 'walking' ? 'Itinéraire à pied' : opts2 ? 'Itinéraire en voiture' : 'Itinéraire';
-    var waze = h('a', { class: 'btn ghost small', href: wazeDir(p), target: '_blank', rel: 'noopener noreferrer' }, 'Ouvrir dans Waze');
-    if (!IS_IOS) return h('div', { class: 'stack tight' }, h('a', { class: 'btn', href: gmDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, label), mode === 'walking' ? null : waze);
-    // iPhone : ouverture directe de l'application Google Maps ; si rien ne s'ouvre, on propose Plans.
-    var note = h('p', { class: 'hint', hidden: true, role: 'status' }, 'Google Maps ne s’est pas ouvert ? Il n’est peut-être pas installé : utilisez Plans.');
+  // Lien d'itinéraire : Google Maps (application directe sur iPhone, avec repli proposé vers Plans).
+  function routeLink(p, mode, cls, name, label, note) {
+    if (!IS_IOS) return iconBtn('a', { class: cls, href: gmDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, name, label);
     function tried() {
-      var t = setTimeout(function () { if (document.visibilityState === 'visible') note.hidden = false; }, 1600);
+      var t = setTimeout(function () { if (document.visibilityState === 'visible' && note) note.hidden = false; }, 1600);
       var stop = function () { clearTimeout(t); document.removeEventListener('visibilitychange', stop); window.removeEventListener('pagehide', stop); };
       document.addEventListener('visibilitychange', stop); window.addEventListener('pagehide', stop);
     }
-    return h('div', { class: 'stack tight' },
-      h('a', { class: 'btn', href: iosGmDir(p, mode), onclick: tried }, label),
-      h('div', { class: 'row' }, h('a', { class: 'btn ghost small', href: appleDir(p, mode), target: '_blank', rel: 'noopener noreferrer' }, 'Ouvrir dans Plans'),
-        mode === 'walking' ? null : waze),
-      note);
+    return iconBtn('a', { class: cls, href: iosGmDir(p, mode), onclick: tried }, name, label);
   }
+  // Fiche (vue destinataire) : photo, nom, repère, étapes en pictogrammes, une grande action « Y aller ».
   function fiche(p, opts) {
     opts = opts || {};
     var hasStop = p.vehicle_ok === false && p.stop;
     var isMeeting = p.kind === 'meeting';
+    var place = isMeeting ? 'Lieu du rendez-vous' : 'Entrée';
+    var note = h('p', { class: 'hint', hidden: true, role: 'status' }, 'Google Maps ne s’est pas ouvert ? Il n’est peut-être pas installé : touchez « Autre appli ».');
+    var target = hasStop ? p.stop : p.entry;
+    var others = h('div', { class: 'stack tight', id: 'other-apps', hidden: true },
+      IS_IOS ? iconBtn('a', { class: 'btn ghost small', href: appleDir(target, 'driving'), target: '_blank', rel: 'noopener noreferrer' }, 'pin', 'Ouvrir dans Plans', 18) : null,
+      IS_IOS && hasStop ? iconBtn('a', { class: 'btn ghost small', href: appleDir(p.entry, 'walking'), target: '_blank', rel: 'noopener noreferrer' }, 'walk', 'Plans : à pied jusqu’à l’entrée', 18) : null,
+      iconBtn('a', { class: 'btn ghost small', href: wazeDir(target), target: '_blank', rel: 'noopener noreferrer' }, 'nav', 'Ouvrir dans Waze', 18));
+    var otherBtn = iconBtn('button', { class: 'btn ghost', type: 'button', id: 'other-app', 'aria-expanded': 'false', 'aria-controls': 'other-apps',
+      onclick: function (e) { others.hidden = !others.hidden; e.currentTarget.setAttribute('aria-expanded', others.hidden ? 'false' : 'true'); } }, 'pin', 'Autre appli');
+    function step(name, title, txt) {
+      return h('div', { class: 'spic' }, h('span', { class: 'spic-ic', 'aria-hidden': 'true' }, icon(name, 20)),
+        h('div', null, h('strong', null, title), txt ? h('p', { class: 'note' }, txt) : null));
+    }
     return h('article', { class: 'fiche' + (opts.wide && p.photo ? ' wide' : '') },
       p.photo ? h('img', { class: 'door', src: p.photo, alt: 'Photo de l’entrée' + (p.label ? ' : ' + p.label : ''), decoding: 'async' }) : null,
       h('div', { class: 'fiche-body' },
         h('div', { class: 'stack tight' },
           isMeeting ? h('p', { class: 'eyebrow' }, 'Rendez-vous') : (p.locality ? h('p', { class: 'eyebrow wrapword' }, p.locality) : null),
-          h('h1', { class: 'wrapword', style: 'font-size:26px' }, p.label || 'Sans nom'),
+          h('h1', { class: 'wrapword' }, p.label || 'Sans nom'),
           isMeeting && p.starts_at ? h('p', { class: 'muted' }, whenText(p.starts_at)) : null),
         p.instruction ? h('p', { class: 'instr' }, p.instruction) : null,
-        hasStop
-          ? [leg('1', 'Arrêt voiture', p.stop, 'driving', p.walk ? 'Ensuite, à pied : ' + p.walk : 'La voiture ne peut pas aller jusqu’à l’entrée.'),
-             leg('2', isMeeting ? 'Lieu du rendez-vous' : 'Entrée', p.entry, 'walking')]
-          : leg(null, isMeeting ? 'Lieu du rendez-vous' : 'Entrée', p.entry, 'driving'),
+        opts.voice || null,
+        h('div', { class: 'steps-pic' },
+          hasStop ? step('car', 'Arrêt voiture', p.walk ? 'Ensuite, à pied : ' + p.walk : 'La voiture ne peut pas aller jusqu’à l’entrée.') : null,
+          step(isMeeting ? 'pin' : 'door', place, null)),
+        h('div', { class: 'stack tight route' },
+          routeLink(target, 'driving', 'btn big', 'nav', 'Y aller', note),
+          hasStop ? routeLink(p.entry, 'walking', 'btn ghost', 'walk', (isMeeting ? 'À pied jusqu’au lieu' : 'À pied jusqu’à l’entrée'), null) : null,
+          otherBtn, others, note),
         opts.footer || null));
+  }
+
+
+
+  /* ================================================================ REPÈRE VOCAL
+     L'expéditeur enregistre au plus 30 secondes (dans sa langue). L'audio n'est chargé qu'au toucher « Écouter ». */
+  var VOICE_MAX = 30;
+  function voiceSupported() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder); }
+  function secsText(n) { n = Math.max(0, Math.round(n || 0)); return Math.floor(n / 60) + ':' + String(n % 60).padStart(2, '0'); }
+  function blobToB64(blob) {
+    return new Promise(function (ok, ko) { var fr = new FileReader(); fr.onload = function () { ok(String(fr.result).replace(/^data:[^,]+,/, '')); }; fr.onerror = ko; fr.readAsDataURL(blob); });
+  }
+  // state : { action: 'keep'|'set'|'clear', b64, url, secs, existing: { secs, token } }
+  function voiceRecorder(state, onChange) {
+    var box = h('div', { class: 'stack tight', id: 'voice-box' });
+    var rec = null, chunks = [], timer = null, started = 0, stream = null, audio = null;
+    function stopAll() { try { if (rec && rec.state !== 'inactive') rec.stop(); } catch (e) { /* rien */ } if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); clearInterval(timer); }
+    function draw() {
+      var has = state.action === 'set' || (state.action === 'keep' && state.existing);
+      if (has) {
+        var secs = state.action === 'set' ? state.secs : state.existing.secs;
+        var playBtn = h('button', { class: 'btn vbtn', type: 'button', id: 'voice-play', 'aria-label': 'Écouter' }, icon('play', 24));
+        playBtn.onclick = function () {
+          if (audio && !audio.paused) { audio.pause(); audio.currentTime = 0; setKids(playBtn, icon('play', 24)); return; }
+          var go = function (src) { audio = new Audio(src); audio.onended = function () { setKids(playBtn, icon('play', 24)); }; audio.play().then(null, function () {}); setKids(playBtn, icon('stop', 24)); };
+          if (state.action === 'set') go(state.url);
+          else api('fiila_voice', { p_token: state.existing.token, p_via: 'share' }).then(function (r) { if (r.state === 'ok') go(r.voice); }, function (e) { toast(errText(e)); });
+        };
+        setKids(box, h('div', { class: 'voice' }, playBtn,
+          h('div', { class: 'vtxt' }, h('strong', null, 'Repère vocal'), h('span', { class: 'muted' }, secsText(secs))),
+          iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'voice-redo', onclick: start }, 'mic', 'Refaire', 18),
+          h('button', { class: 'btn quiet danger-text', type: 'button', id: 'voice-remove', 'aria-label': 'Retirer le repère vocal', style: 'min-height:44px;padding:0 6px',
+            onclick: function () { state.action = state.existing ? 'clear' : 'keep'; state.existing = null; state.b64 = null; state.url = null; onChange(); draw(); } }, icon('trash', 20))));
+        return;
+      }
+      if (!voiceSupported()) { setKids(box); return; }
+      setKids(box, h('div', { class: 'voice' },
+        h('button', { class: 'btn vbtn', type: 'button', id: 'voice-record', 'aria-label': 'Enregistrer un message vocal', onclick: start }, icon('mic', 24)),
+        h('div', { class: 'vtxt' }, h('strong', null, 'Repère vocal'), h('span', { class: 'muted' }, 'Facultatif. 30 secondes, dans votre langue.'))));
+    }
+    function start() {
+      if (!voiceSupported()) return;
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+        stream = s; chunks = [];
+        var types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'];
+        var mime = types.filter(function (t) { return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t); })[0];
+        try { rec = new MediaRecorder(s, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 }); }
+        catch (e) { rec = new MediaRecorder(s); }
+        rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = function () {
+          clearInterval(timer);
+          if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+          var secs = Math.min(VOICE_MAX, (Date.now() - started) / 1000);
+          var blob = new Blob(chunks, { type: (rec.mimeType || mime || 'audio/webm').split(';')[0] });
+          if (secs < 1 || !blob.size) { toast('Enregistrement trop court.'); draw(); return; }
+          blobToB64(blob).then(function (b64) {
+            state.action = 'set'; state.b64 = b64; state.secs = Math.round(secs); state.url = URL.createObjectURL(blob);
+            onChange(); draw();
+          });
+        };
+        started = Date.now();
+        rec.start();
+        var bar = h('i'), clock = h('span', { class: 'muted', id: 'voice-clock' }, '0:00 / ' + secsText(VOICE_MAX));
+        setKids(box, h('div', { class: 'voice rec' },
+          h('button', { class: 'btn vbtn', type: 'button', id: 'voice-stop', 'aria-label': 'Arrêter', onclick: function () { try { rec.stop(); } catch (e) { /* rien */ } } }, icon('stop', 24)),
+          h('div', { class: 'vtxt' }, h('strong', null, 'Parlez maintenant…'), clock, h('div', { class: 'vbar' }, bar))));
+        timer = setInterval(function () {
+          var el = (Date.now() - started) / 1000;
+          clock.textContent = secsText(el) + ' / ' + secsText(VOICE_MAX);
+          bar.style.width = Math.min(100, el / VOICE_MAX * 100) + '%';
+          if (el >= VOICE_MAX) { try { rec.stop(); } catch (e) { /* rien */ } }
+        }, 250);
+      }, function () {
+        setKids(box, h('div', { class: 'voice' }, h('span', { class: 'vbtn btn ghost', 'aria-hidden': 'true' }, icon('mic', 24)),
+          h('div', { class: 'vtxt' }, h('strong', null, 'Micro non autorisé'), h('span', { class: 'muted' }, 'Autorisez le micro dans les réglages du navigateur, puis réessayez.'))));
+        setTimeout(draw, 5000);
+      });
+    }
+    draw();
+    box.stop = stopAll;
+    return box;
+  }
+  // Lecteur pour la personne qui reçoit : rien n'est chargé avant le toucher.
+  function voicePlayer(token, via, secs) {
+    var audio = null;
+    var btn = h('button', { class: 'btn vbtn', type: 'button', id: 'voice-listen', 'aria-label': 'Écouter le repère vocal' }, icon('play', 24));
+    var status = h('span', { class: 'muted' }, secsText(secs));
+    btn.onclick = function () {
+      if (audio && !audio.paused) { audio.pause(); audio.currentTime = 0; setKids(btn, icon('play', 24)); return; }
+      if (audio) { audio.play().then(null, function () {}); setKids(btn, icon('stop', 24)); return; }
+      status.textContent = 'Chargement…';
+      api('fiila_voice', { p_token: token, p_via: via }).then(function (r) {
+        if (r.state !== 'ok') { status.textContent = 'Indisponible.'; return; }
+        status.textContent = secsText(r.secs);
+        audio = new Audio(r.voice);
+        audio.onended = function () { setKids(btn, icon('play', 24)); };
+        audio.play().then(null, function () {});
+        setKids(btn, icon('stop', 24));
+      }, function (e) { status.textContent = errText(e); });
+    };
+    return h('div', { class: 'voice', id: 'voice-player' }, btn, h('div', { class: 'vtxt' }, h('strong', null, 'Écouter le repère'), status));
+  }
+  function voiceOwnerBox(pl) {
+    return h('section', { class: 'stack tight' }, voicePlayer(pl.share_token, 'share', pl.voice_secs));
   }
 
   /* ================================================================ ORIGINE ET PARRAINAGE
@@ -1069,8 +1177,8 @@
           ? 'Recevez l’adresse exacte de vos clients en une photo. Gratuit, sans compte.'
           : 'Créez votre adresse une fois, envoyez-la par un lien. Gratuit, sans compte.'),
         r.kind === 'shop' || r.kind === 'courier'
-          ? h('div', { class: 'row' }, h('a', { class: 'btn', href: '#/boutique', id: 'invite-shop' }, 'Créer ma boutique'),
-              h('a', { class: 'btn ghost', href: '#/livreur' }, 'Je suis livreur'))
+          ? h('div', { class: 'row' }, iconBtn('a', { class: 'btn', href: '#/boutique', id: 'invite-shop' }, 'shop', 'Créer ma boutique'),
+              iconBtn('a', { class: 'btn ghost', href: '#/livreur' }, 'moto', 'Je suis livreur'))
           : null);
       box.hidden = false;
     }, function () { /* hors ligne : pas de bandeau */ });
@@ -1124,8 +1232,8 @@
         h('p', { class: 'ref-code', id: 'ref-code' }, ref.code),
         h('p', { class: 'small muted wrapword', id: 'ref-link' }, referralUrl(ref.code)),
         h('div', { class: 'row' },
-          h('a', { class: 'btn', id: 'ref-whatsapp', href: waLink(msg), target: '_blank', rel: 'noopener' }, 'Envoyer sur WhatsApp'),
-          h('button', { class: 'btn ghost', type: 'button', id: 'ref-copy', onclick: function () { copy(referralUrl(ref.code), 'Lien'); } }, 'Copier le lien')),
+          iconBtn('a', { class: 'btn', id: 'ref-whatsapp', href: waLink(msg), target: '_blank', rel: 'noopener' }, 'chat', 'Envoyer sur WhatsApp'),
+          iconBtn('button', { class: 'btn ghost', type: 'button', id: 'ref-copy', onclick: function () { copy(referralUrl(ref.code), 'Lien'); } }, 'link', 'Copier le lien')),
         ref.has_phone ? h('p', { class: 'small muted' }, 'À l’inscription, on peut aussi taper votre numéro.') : null),
       h('div', { class: 'tiles', id: 'ref-stats' },
         h('div', { class: 'tile' }, h('strong', null, String(ref.joined || 0)), h('span', null, (ref.joined || 0) > 1 ? 'arrivées grâce à vous' : 'arrivée grâce à vous')),
@@ -1200,7 +1308,7 @@
     return h('section', { class: 'card', id: 'publish-box' },
       h('h2', null, fresh ? 'Article ajouté. Publiez-le' : 'Publier sur vos réseaux'),
       h('p', { class: 'small muted' }, 'La photo et la légende, prêtes pour Instagram, Facebook, TikTok ou votre statut WhatsApp.'),
-      h('button', { class: 'btn', type: 'button', id: 'product-publish', onclick: publish }, 'Publier'),
+      iconBtn('button', { class: 'btn', type: 'button', id: 'product-publish', onclick: publish }, 'share', 'Publier'),
       countEl, more);
   }
 
@@ -1333,14 +1441,29 @@
           h('span', { class: 'item-end' }, chip, h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))));
       }
       function chip(cls, text) { return h('span', { class: 'chip ' + cls }, icon(cls === 'ok' ? 'check' : cls === 'wait' ? 'clock' : 'ban', 12), text); }
+      // Adresse : vignette de la porte, état, et les deux gestes les plus fréquents (envoyer, copier).
+      function addrCard(x) {
+        if (x.missing) return item(x);
+        var rec = owned.find('place', x.id) || {};
+        var share = x.share_token || rec.share;
+        var url = share ? shareUrl(share) : null;
+        var active = !x.cached && x.status === 'active';
+        return h('div', { class: 'card addr-card' },
+          h('a', { class: 'addr-top', href: '#/m/' + x.id, onclick: function () { track('owned_reopened', 'address'); } },
+            rec.thumb ? h('img', { class: 'vthumb', src: rec.thumb, alt: '' }) : h('span', { class: 'vthumb', 'aria-hidden': 'true' }, icon('door', 24)),
+            h('div', null, h('div', { class: 't' }, x.label || 'Adresse'),
+              h('div', { class: 'small muted wrapword' }, [x.tag ? TAGS[x.tag] : null, x.locality].filter(Boolean).join(' · '))),
+            x.cached ? null : active ? chip('ok', 'Lien actif') : chip('off', 'Lien désactivé')),
+          active && url ? h('div', { class: 'duo' },
+            iconBtn('a', { class: 'btn mid', href: waLink((x.label || 'Mon adresse') + '. L’entrée, avec la photo : ' + url), target: '_blank', rel: 'noopener noreferrer',
+              onclick: function () { track('share_initiated', 'whatsapp_address'); } }, 'chat', 'Envoyer'),
+            iconBtn('button', { class: 'btn ghost mid', type: 'button', onclick: function () { copy(url, 'Lien', function () { track('link_copied', 'address'); }); } }, 'link', 'Copier')) : null);
+      }
       setKids(listBox, 
         offlineMsg ? h('p', { class: 'alert' }, offlineMsg) : null,
         h('section', { class: 'stack', id: 'mes-adresses', 'aria-labelledby': 'h-adr' },
           h('h2', { id: 'h-adr' }, 'Mes adresses'),
-          addrs.length ? h('div', { class: 'list' }, addrs.map(function (x) {
-            return item(x, '#/m/' + x.id, x.label || 'Adresse', [x.tag ? TAGS[x.tag] : null, x.locality].filter(Boolean).join(' · '),
-              x.cached ? null : x.status === 'active' ? chip('ok', 'Lien actif') : chip('off', 'Lien désactivé'));
-          })) : h('div', { class: 'card' },
+          addrs.length ? h('div', { class: 'list' }, addrs.map(addrCard)) : h('div', { class: 'card' },
             h('p', null, authed() ? 'Aucune adresse pour l’instant.' : 'Aucune adresse sur ce téléphone.'),
             authed() ? null : h('p', { class: 'small muted' }, 'Connectez-vous pour retrouver vos adresses sur tous vos téléphones.'))),
         reqs.length ? h('section', { class: 'stack', 'aria-labelledby': 'h-req' }, h('h2', { id: 'h-req' }, 'Mes demandes'),
@@ -1359,32 +1482,32 @@
     if (authed()) account.me().then(function (me) {
       if (!me) { setKids(who, 'Se connecter'); return; }
       setKids(who, avatarEl(me, 32), h('span', { class: 'who-name' }, me.display_name || 'Mon compte'));
-      if (me.shop && shopBtn) shopBtn.querySelector('.pro-name').textContent = me.shop.name;
+      if (me.shop && shopBtn) shopBtn.setAttribute('aria-label', 'Ma boutique : ' + me.shop.name);
     }, function () { /* hors ligne : on garde le lien */ });
-    var shopBtn = CFG.shop === false ? null : h('a', { class: 'pro-row', id: 'shop-link', href: '#/boutique' },
-      h('span', null, h('span', { class: 'pro-name' }, 'Ma boutique'), h('span', { class: 'sub' }, 'Commandes, factures, adresses de vos clients')),
-      h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)));
+    function tile4(href, name, label, attrs) {
+      return h('a', Object.assign({ class: 'ttile', href: href }, attrs || {}), h('span', { class: 'ttile-ic', 'aria-hidden': 'true' }, icon(name, 26)), h('span', { class: 'pro-name' }, label));
+    }
+    var shopBtn = CFG.shop === false ? null : tile4('#/boutique', 'shop', 'Boutique', { id: 'shop-link', 'aria-label': 'Ma boutique' });
     return page(
       h('header', { class: 'stack tight' },
         h('div', { class: 'brand-row' },
           h('div', { class: 'brand' }, h('span', { class: 'mark', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La'))),
           who),
-        h('p', { class: 'promise' }, 'Ton adresse, expliquée une seule fois.'),
-        h('p', { class: 'muted small' }, 'La porte exacte, une photo, un repère, et l’endroit où la voiture peut s’arrêter.')),
+        h('p', { class: 'promise' }, 'Votre adresse, en une photo.')),
       inviteBanner(),
-      // Une seule action principale ; deux secondaires ; les professionnels en lignes sous la liste (audit design D2).
-      h('nav', { class: 'home-actions', 'aria-label': 'Actions principales' },
-        h('a', { class: 'btn big full', href: '#/new' }, 'Créer mon adresse'),
-        h('a', { class: 'btn ghost', href: '#/demande/nouvelle' }, 'Demander une adresse'),
-        h('a', { class: 'btn ghost', href: '#/rdv/nouveau' }, 'Créer un rendez-vous')),
+      // Une grande action ; quatre raccourcis avec pictogramme ; puis les adresses (proposition validée le 18/10).
+      h('a', { class: 'hero', href: '#/new', id: 'create-address', 'aria-label': 'Créer mon adresse' },
+        h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon('cam', 32)),
+        h('span', null, h('b', null, 'Créer mon adresse'), h('small', null, 'Photo de la porte · repère · lien'))),
+      h('nav', { class: 'tiles4', 'aria-label': 'Autres actions' },
+        tile4('#/demande/nouvelle', 'ask', 'Demander', { 'aria-label': 'Demander une adresse' }),
+        tile4('#/rdv/nouveau', 'cal', 'Rendez-vous', { 'aria-label': 'Créer un rendez-vous' }),
+        CFG.shop === false ? null : shopBtn,
+        tile4('#/livreur', 'moto', 'Livreur', { id: 'courier-link', 'aria-label': 'Espace livreur' })),
       accountNudge(),
       listBox,
-      h('section', { class: 'stack tight', 'aria-labelledby': 'h-pro' },
-        h('h2', { id: 'h-pro', class: 'eyebrow' }, 'Pour les commerçants et livreurs'),
-        h('nav', { class: 'pro-list' },
-          shopBtn,
-          h('a', { class: 'pro-row', href: '#/livreur', id: 'courier-link' }, h('span', null, 'Espace livreur', h('span', { class: 'sub' }, 'Recevez vos courses avec l’entrée exacte')), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
-          h('a', { class: 'pro-row', id: 'invite-link', href: '#/parrainer' }, h('span', null, 'Inviter un proche', h('span', { class: 'sub' }, 'Votre lien et votre code de parrainage')), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))))),
+      h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer' }, icon('gift', 24), h('span', null, 'Inviter un proche'),
+        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
       footer());
   }
 
@@ -1401,7 +1524,8 @@
         var d = { label: pl.label || '', locality: pl.locality || '', entry: { lat: pl.entry.lat, lng: pl.entry.lng, acc: pl.entry_acc, src: 'saved' },
           vehicle_ok: pl.vehicle_ok, stop: pl.stop ? { lat: pl.stop.lat, lng: pl.stop.lng, src: 'saved' } : null,
           walk: pl.walk || '', instruction: pl.instruction || '', photo: pl.photo || null };
-        return addressWizard(d, { editId: editId, owner: rec.owner || null, originalPhoto: pl.photo || null });
+        return addressWizard(d, { editId: editId, owner: rec.owner || null, originalPhoto: pl.photo || null,
+          voice: pl.has_voice ? { secs: pl.voice_secs, token: pl.share_token } : null });
       }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger la fiche', errText(e), retryBtn())); });
     }
     var draft = LS.get(DRAFT_KEY, null) || blankAddress();
@@ -1418,6 +1542,9 @@
   function addressWizard(d, ctx) {
     // Origine : demandée seulement pour une adresse créée d'elle-même (pas en réponse à une demande, pas en modification).
     var refAsk = ctx.editId || ctx.reqToken || ctx.retour ? null : referralAsk('add-ref');
+    // Repère vocal : gardé hors brouillon (trop lourd), envoyé après l'enregistrement de la fiche.
+    var voice = { action: 'keep', existing: ctx.voice || null };
+    var voiceBox = null;
     var step = 1;
     var root = h('div', { class: 'wrap' });
     function saveDraft() {
@@ -1482,16 +1609,20 @@
         drawLoc(false);
         body = [h('h1', null, 'Comment reconnaître l’entrée ?'),
           photoField({ id: 'photo', get: function () { return d.photo; }, set: function (p) { d.photo = p; onChange(); } }),
+          (voiceBox = voiceRecorder(voice, function () {})),
           textField({ id: 'instruction', label: 'Repère', multiline: true, max: 280, value: d.instruction, placeholder: 'Ex. : porte verte après le manguier', onInput: function (v) { d.instruction = v; onChange(); } }),
           textField({ id: 'label', label: 'Nom du lieu', max: 60, value: d.label, placeholder: 'Ex. : Chez Awa', onInput: function (v) { d.label = v; onChange(); } }),
           locBox];
       } else {
         body = [h('h1', null, ctx.requester ? 'Ce que ' + ctx.requester + ' va recevoir' : 'Ce que verra la personne'),
-          fiche({ kind: 'address', label: d.label.trim(), locality: d.locality.trim(), instruction: d.instruction.trim(), entry: d.entry, vehicle_ok: d.vehicle_ok, stop: d.stop, walk: d.walk.trim(), photo: d.photo }),
+          fiche({ kind: 'address', label: d.label.trim(), locality: d.locality.trim(), instruction: d.instruction.trim(), entry: d.entry, vehicle_ok: d.vehicle_ok, stop: d.stop, walk: d.walk.trim(), photo: d.photo },
+            { voice: voice.action === 'set' || (voice.action === 'keep' && voice.existing) ? h('div', { class: 'voice' }, h('span', { class: 'btn vbtn', 'aria-hidden': 'true' }, icon('play', 24)),
+              h('div', { class: 'vtxt' }, h('strong', null, 'Écouter le repère'), h('span', { class: 'muted' }, secsText(voice.action === 'set' ? voice.secs : voice.existing.secs)))) : null }),
           h('p', { class: 'hint' }, 'Modifiable à tout moment.'),
           refAsk ? refAsk.el : null];
       }
       function onNext() {
+        if (voiceBox && voiceBox.stop && step === 3) voiceBox.stop();
         if (step === 1 && pickers.entry) pickers.entry.commit();
         if (step === 2 && pickers.stop) pickers.stop.commit();
         if (valid()) return;
@@ -1524,16 +1655,23 @@
       if (!ctx.editId || d.photo !== ctx.originalPhoto) p.photo = d.photo ? d.photo.replace(/^data:[^,]+,/, '') : null;
       return p;
     }
+    function sendVoice(id, owner) {
+      if (voice.action === 'set') return api('fiila_voice_set', { p_id: id, p_owner: owner, p_voice: voice.b64, p_secs: voice.secs }).then(null, function (e) { toast('Repère vocal non enregistré : ' + errText(e)); });
+      if (voice.action === 'clear') return api('fiila_voice_set', { p_id: id, p_owner: owner, p_voice: '', p_secs: 0 }).then(null, function () {});
+      return Promise.resolve();
+    }
     function publish() {
       if (ctx.editId) {
-        return api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner || null, p: payload() }).then(function (pl) {
+        return api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner || null, p: payload() }).then(function (pl) { return sendVoice(ctx.editId, ctx.owner || null).then(function () { return pl; }); }).then(function (pl) {
           owned.patch('place', ctx.editId, { label: pl.label });
+          if (d.photo !== ctx.originalPhoto) makeThumb(d.photo).then(function (t) { owned.patch('place', ctx.editId, { thumb: t || undefined }); });
           toast('Modifications enregistrées. Le lien reste le même.');
           go('#/m/' + ctx.editId);
         });
       }
-      return api('fiila_create_place', { p: payload() }).then(function (r) {
+      return api('fiila_create_place', { p: payload() }).then(function (r) { return sendVoice(r.id, r.owner_token).then(function () { return r; }); }).then(function (r) {
         var stored = owned.put({ type: 'place', kind: 'address', id: r.id, owner: r.owner_token, share: r.share_token, label: d.label.trim(), created: Date.now() });
+        if (stored && d.photo) makeThumb(d.photo).then(function (t) { if (t) owned.patch('place', r.id, { thumb: t }); });
         attribute('address', r.id, r.owner_token, refAsk ? refAsk.value() : '',
           ctx.reqToken ? { src: 'request', token: ctx.reqToken } : ctx.retour ? { src: 'address', token: ctx.retour } : null);
         LS.del(DRAFT_KEY);
@@ -1610,43 +1748,42 @@
     var key = owner ? keyUrl('place', pl.id, owner) : null;
 
     var variant = isMeeting ? 'meeting' : 'address';
+    function sumRow(name, label) { return h('summary', null, h('span', { class: 'irow-ic', 'aria-hidden': 'true' }, icon(name, 20)), h('span', { class: 'irow-t' }, label)); }
     return page(
       retour ? backBtn('Revenir à la fiche reçue', '#/a/' + retour) : backBtn(),
       h('div', { class: 'stack tight' },
         h('p', { class: 'eyebrow' }, isMeeting ? 'Mon rendez-vous' : 'Mon adresse'),
-        h('h1', { class: 'wrapword' }, pl.label),
-        isMeeting ? h('p', { class: 'muted' }, whenText(pl.starts_at)) : null,
+        h('div', { class: 'addr-top' },
+          pl.photo ? h('img', { class: 'vthumb', src: pl.photo, alt: '', style: 'width:64px;height:64px' }) : null,
+          h('div', null, h('h1', { class: 'wrapword' }, pl.label),
+            isMeeting ? h('p', { class: 'muted' }, whenText(pl.starts_at)) : null)),
         justSaved && active ? h('p', { class: 'saved-ok', role: 'status', id: 'saved-ok' }, icon('check', 18), 'Enregistré.') : null,
         h('div', { class: 'row', style: 'align-items:center' },
           h('span', { class: 'chip ' + (active ? 'ok' : 'off'), style: 'flex:0 0 auto' }, icon(active ? 'check' : expired ? 'hourglass' : 'ban', 12),
             expired ? 'Expiré' : pl.status === 'active' ? 'Lien actif' : 'Lien désactivé'),
           h('span', { class: 'small muted' }, isMeeting && !expired ? 'Visible jusqu’au ' + shortDate(pl.expires_at) : 'Modifiée le ' + shortDate(pl.updated_at)))),
-      active ? sharePanel({ kind: variant, url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null,
+      active ? sharePanel({ kind: variant, url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null, qr: qrBox,
         ids: { url: 'share-url', copy: 'copy-link', native: 'share-native' } }) : null,
+      pl.has_voice && active ? voiceOwnerBox(pl) : null,
       isMeeting && active ? guestsPanel(pl, owner) : null,
-      // Un seul bouton fort sur cet écran (partager) : le reste se range dans « Plus ».
-      active ? h('details', { class: 'more', id: 'more' }, h('summary', null, 'Plus'),
-        h('div', { class: 'stack', style: 'margin-top:12px' },
-          !isMeeting ? deliveryPanel({ id: pl.id, owner: owner }, 'place') : null,
-          !isMeeting ? tagPicker(pl, owner) : null,
-          h('section', { class: 'card', 'aria-label': 'QR code' },
-            h('p', { class: 'small' }, h('strong', null, 'QR code'), ' · à imprimer près de la porte.'),
-            qrBox))) : null,
       installSlot(),
       expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
-      isMeeting ? h('a', { class: expired ? 'btn' : 'btn ghost', id: 'similar', href: '#/rdv/nouveau' + qs({ depuis: pl.id }) }, 'Créer un rendez-vous similaire') : null,
-      // Navigation en lignes ; actions sensibles à part, en bas (audit design D1, D4).
-      h('nav', { class: 'pro-list' },
-        h('a', { class: 'pro-row', href: isMeeting ? '#/rdv/modifier/' + pl.id : '#/edit/' + pl.id }, h('span', null, 'Modifier'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
-        active ? h('a', { class: 'pro-row', href: url, target: '_blank', rel: 'noopener' }, h('span', null, 'Voir la fiche publique'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))) : null),
-      !key ? h('p', { class: 'hint' }, 'Fiche rattachée à votre compte : retrouvez-la sur tous vos téléphones en vous connectant.') :
-      h('details', null,
-        h('summary', null, 'Clé de gestion (pour un autre téléphone)'),
-        h('div', { class: 'stack', style: 'margin-top:10px' },
-          h('p', { class: 'small' }, 'Cette fiche est gérée depuis ce téléphone. Si vous le perdez ou effacez les données du navigateur, seule la clé de gestion permet encore de la modifier ou de la supprimer. Gardez-la pour vous : elle donne tous les droits sur la fiche.'),
-          h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(key, 'Clé de gestion'); } }, 'Copier la clé de gestion'),
-          h('a', { class: 'btn ghost small', href: waLink('Ma clé de gestion Fii La pour « ' + pl.label + ' » (ne pas partager) : ' + key), target: '_blank', rel: 'noopener noreferrer' }, 'M’envoyer la clé sur WhatsApp'),
-          h('p', { class: 'hint' }, 'Choisissez votre propre discussion WhatsApp, pas celle d’une autre personne.'))),
+      isMeeting ? iconBtn('a', { class: expired ? 'btn' : 'btn ghost', id: 'similar', href: '#/rdv/nouveau' + qs({ depuis: pl.id }) }, 'cal', 'Créer un rendez-vous similaire') : null,
+      // Lignes avec icône ; actions sensibles à part, en bas.
+      h('nav', { class: 'ilist' },
+        iconRow(isMeeting ? '#/rdv/modifier/' + pl.id : '#/edit/' + pl.id, 'edit', 'Modifier', { id: 'edit-link' }),
+        active ? iconRow(url, 'eye', 'Voir comme le destinataire', { target: '_blank', rel: 'noopener', id: 'public-link' }) : null,
+        active && !isMeeting ? h('details', { class: 'more', id: 'more' }, sumRow('moto', 'Livraison et étiquette'),
+          h('div', { class: 'stack', style: 'margin-top:12px' },
+            deliveryPanel({ id: pl.id, owner: owner }, 'place'),
+            tagPicker(pl, owner))) : null,
+        !key ? null : h('details', { id: 'key-box' }, sumRow('key', 'Clé de gestion'),
+          h('div', { class: 'stack', style: 'margin-top:10px' },
+            h('p', { class: 'small' }, 'Cette fiche est gérée depuis ce téléphone. Si vous le perdez ou effacez les données du navigateur, seule la clé de gestion permet encore de la modifier ou de la supprimer. Gardez-la pour vous : elle donne tous les droits sur la fiche.'),
+            iconBtn('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(key, 'Clé de gestion'); } }, 'link', 'Copier la clé de gestion', 18),
+            iconBtn('a', { class: 'btn ghost small', href: waLink('Ma clé de gestion Fii La pour « ' + pl.label + ' » (ne pas partager) : ' + key), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'M’envoyer la clé sur WhatsApp', 18),
+            h('p', { class: 'hint' }, 'Choisissez votre propre discussion WhatsApp, pas celle d’une autre personne.')))),
+      !key ? h('p', { class: 'hint' }, 'Fiche rattachée à votre compte : retrouvez-la sur tous vos téléphones en vous connectant.') : null,
       h('section', { class: 'sensitive', 'aria-labelledby': 'h-sensitive' },
         h('h2', { id: 'h-sensitive', class: 'eyebrow' }, 'Actions sensibles'),
         pl.status === 'active' && !expired
@@ -1680,7 +1817,39 @@
     car: 'M5 16h14M6 16l1.5-5h9L18 16M5 16v3h2v-2M19 16v3h-2v-2M8 13.5h.01M16 13.5h.01',
     door: 'M6 21V4h12v17M3 21h18M14.5 12.5h.01',
     chev: 'M9 6l6 6-6 6',
-    star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z'
+    star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z',
+    pin: 'M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21ZM9.5 9.5a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0',
+    ask: 'M4 5h16v11H9l-5 4V5ZM12 8.5v.01M12 11v2.5',
+    cal: 'M7 5h10a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3ZM8 3v4M16 3v4M4 10h16M9 15l2 2 4-4',
+    shop: 'M4 9 5.5 4h13L20 9M4 9h16v1.5a2.7 2.7 0 0 1-5.3 0 2.7 2.7 0 0 1-5.4 0 2.7 2.7 0 0 1-5.3 0V9ZM5.5 13v7h13v-7M10 20v-4h4v4',
+    moto: 'M2.5 16.5a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M15.5 16.5a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M8.5 16.5h5l3-6h-4M14 7h3l1.5 3.5M5.5 16.5 9 11h4',
+    gift: 'M6 9h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2ZM3 9h18M12 9v11M12 9S10.5 4 8 5s1 4 4 4ZM12 9s1.5-5 4-4-1 4-4 4Z',
+    chat: 'M4.5 19.5 5.6 16A8 8 0 1 1 8.4 18.6ZM9 10.5c.5 2 2 3.5 4.5 4.3l1.3-1.3 1.7.8',
+    qr: 'M5 4h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM15 4h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM5 14h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1ZM14 14h2v2M20 14v6h-6v-2M17 17h.01',
+    dots: 'M4.5 12a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0M10.5 12a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0M16.5 12a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0',
+    cam: 'M4 8h3l2-3h6l2 3h3v11H4V8ZM8.5 13a3.5 3.5 0 1 0 7.0 0a3.5 3.5 0 1 0 -7.0 0',
+    lock: 'M7.5 10h9a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 17.5v-5A2.5 2.5 0 0 1 7.5 10ZM8 10V7a4 4 0 0 1 8 0v3',
+    nav: 'm4 11 16-7-7 16-2-7-7-2Z',
+    walk: 'M11.2 4.5a1.8 1.8 0 1 0 3.6 0a1.8 1.8 0 1 0 -3.6 0M9 21l2.5-6 2.5 2v4M11.5 15l1-5-3 1.5-1.5 3M12.5 10l2.5 2.5 2.5.5',
+    phone: 'M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z',
+    edit: 'M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4',
+    eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12ZM9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0',
+    key: 'M4 15a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M11 12l8-8M16 7l2 2M14 9l2 2',
+    box: 'M4 8 12 4l8 4v8l-8 4-8-4V8ZM4 8l8 4 8-4M12 12v8',
+    users: 'M5.5 8a3.5 3.5 0 1 0 7.0 0a3.5 3.5 0 1 0 -7.0 0M3 20a6 6 0 0 1 12 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3 6',
+    user: 'M8 8a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M4 21a8 8 0 0 1 16 0',
+    plus: 'M12 5v14M5 12h14',
+    cash: 'M5.5 6h13A2.5 2.5 0 0 1 21 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 15.5v-7A2.5 2.5 0 0 1 5.5 6ZM9.5 12a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0',
+    mic: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3ZM5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21',
+    play: 'M8 5.5v13l11-6.5-11-6.5Z',
+    stop: 'M7 7h10v10H7z',
+    trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+    share: 'M15.5 5a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0M3.5 12a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0M15.5 19a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4',
+    print: 'M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v6H7z',
+    home: 'M4 11 12 4l8 7v9H4v-9ZM10 20v-5h4v5',
+    settings: 'M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M12 2.5v3M12 18.5v3M4.2 6.5l2.6 1.5M17.2 16l2.6 1.5M4.2 17.5l2.6-1.5M17.2 8l2.6-1.5',
+    back: 'M15 6l-6 6 6 6',
+    down: 'M6 9l6 6 6-6'
   };
   function icon(name, size) {
     var ns = 'http://www.w3.org/2000/svg';
@@ -1693,6 +1862,37 @@
     svg.appendChild(path);
     return svg;
   }
+  // Vignette de la porte gardée sur ce téléphone pour la liste « Mes adresses » (≈ 3 Ko, jamais envoyée).
+  function makeThumb(dataUrl) {
+    return new Promise(function (ok) {
+      if (!dataUrl) return ok(null);
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var S = 112, c = document.createElement('canvas'); c.width = S; c.height = S;
+          var r = Math.max(S / img.width, S / img.height), w = img.width * r, hh = img.height * r;
+          c.getContext('2d').drawImage(img, (S - w) / 2, (S - hh) / 2, w, hh);
+          ok(c.toDataURL('image/jpeg', 0.7));
+        } catch (e) { ok(null); }
+      };
+      img.onerror = function () { ok(null); };
+      img.src = dataUrl;
+    });
+  }
+  // Bouton avec icône et un mot (v1.2 : « une icône + un mot »).
+  function iconBtn(tag, attrs, name, label, size) { return h(tag, attrs, icon(name, size || 22), h('span', null, label)); }
+  // Raccourci rond : pictogramme dans un cercle, un mot dessous.
+  function roundBtn(tag, attrs, name, label) {
+    attrs = Object.assign({}, attrs); attrs['class'] = 'rnd' + (attrs['class'] ? ' ' + attrs['class'] : '');
+    return h(tag, attrs, h('span', { class: 'rnd-ic', 'aria-hidden': 'true' }, icon(name, 22)), h('span', { class: 'rnd-t' }, label));
+  }
+  // Ligne avec icône et chevron (navigation).
+  function iconRow(href, name, label, attrs) {
+    return h('a', Object.assign({ class: 'irow', href: href }, attrs || {}), h('span', { class: 'irow-ic', 'aria-hidden': 'true' }, icon(name, 20)),
+      h('span', { class: 'irow-t' }, label), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)));
+  }
+  // Pastille d'état : un pictogramme dans un cercle de couleur, compris sans lire.
+  function statePill(kind, name) { return h('span', { class: 'spill ' + kind, 'aria-hidden': 'true' }, icon(name, 20)); }
   function telegramLink(url, text) {
     return 'https://t.me/share/url?url=' + encodeURIComponent(url) + (text ? '&text=' + encodeURIComponent(text) : '');
   }
@@ -1703,7 +1903,8 @@
     return 'https://www.facebook.com/dialog/share?app_id=' + encodeURIComponent(facebookAppId()) + '&display=page&href=' +
       encodeURIComponent(url) + '&redirect_uri=' + encodeURIComponent(baseUrl());
   }
-  var PRIVACY_NOTICE = 'Toute personne qui a le lien voit la fiche.';
+  var PRIVACY_NOTICE = 'Seules les personnes qui ont le lien voient la fiche.';
+  var REQUEST_NOTICE = 'Seule la personne qui a ce lien peut vous répondre.';
 
   // o : { kind: 'address'|'meeting'|'request', url, msg, title, when, photo, ids: { url, copy, native } }
   function sharePanel(o) {
@@ -1712,52 +1913,62 @@
     var fbHelp = h('p', { class: 'hint', id: 'fb-help', hidden: true },
       'Fii La n’est pas relié à Facebook : le lien est seulement copié. Ouvrez Facebook, créez une publication ou un message, puis collez le lien. Facebook affichera un aperçu générique de Fii La.');
     var openChannel = null;
-    function channelBtn(ch, label) {
-      return h('button', { class: 'btn ghost small chan', type: 'button', id: 'share-' + ch, 'aria-expanded': 'false', 'aria-controls': 'visual-box',
+    // Instagram / TikTok : rond (raccourci) ou bouton à icône (dans « Autres »).
+    function channelBtn(ch, label, round) {
+      var attrs = { type: 'button', id: 'share-' + ch, 'aria-expanded': 'false', 'aria-controls': 'visual-box', 'data-chan': '1',
         onclick: function (e) {
           var btn = e.currentTarget;
           if (openChannel === ch) { visualBox.hidden = true; openChannel = null; btn.setAttribute('aria-expanded', 'false'); return; }
-          Array.prototype.forEach.call(panel.querySelectorAll('button.chan'), function (b) { b.setAttribute('aria-expanded', 'false'); });
+          Array.prototype.forEach.call(panel.querySelectorAll('[data-chan]'), function (b) { b.setAttribute('aria-expanded', 'false'); });
           btn.setAttribute('aria-expanded', 'true');
           openChannel = ch;
           track('share_initiated', ch + '_' + o.kind);
           setKids(visualBox, visualPanel(o, ch));
           visualBox.hidden = false;
-        } }, icon(ch), label);
+        } };
+      return round ? roundBtn('button', attrs, ch === 'instagram' ? 'cam' : 'tiktok', label)
+        : iconBtn('button', Object.assign({ class: 'btn ghost small chan' }, attrs), ch, label, 18);
+    }
+    var nativeShare = navigator.share ? iconBtn('button', { class: 'btn ghost small chan', type: 'button', id: o.ids.native || 'share-native', onclick: function () {
+      track('share_initiated', 'native_' + o.kind);
+      try {
+        navigator.share({ title: o.title || 'Fii La', text: text, url: o.url }).catch(function (e) {
+          if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier ».');
+        });
+      } catch (e) { toast('Partage indisponible ici. Utilisez « Copier ».'); }
+    } }, 'share', 'Partager…', 18) : null;
+    var facebook = facebookAppId()
+      ? iconBtn('a', { class: 'btn ghost small chan', id: 'share-facebook', href: facebookLink(o.url), target: '_blank', rel: 'noopener noreferrer',
+          onclick: function () { track('share_initiated', 'facebook_' + o.kind); } }, 'facebook', 'Facebook', 18)
+      : iconBtn('button', { class: 'btn ghost small chan', type: 'button', id: 'share-facebook-copy', 'aria-describedby': 'fb-help',
+          onclick: function () {
+            track('share_initiated', 'facebook_' + o.kind);
+            copy(o.url, 'Lien', function () { track('link_copied', o.kind); });
+            fbHelp.hidden = false;
+          } }, 'facebook', 'Facebook', 18);
+    var qrWrap = o.qr ? h('div', { class: 'stack tight', id: 'share-qr-box', hidden: true },
+      o.qr, h('p', { class: 'small muted' }, 'À imprimer près de la porte.')) : null;
+    var moreBox = h('div', { class: 'chan-grid', id: 'share-more-box', hidden: true },
+      o.qr ? channelBtn('tiktok', 'TikTok') : null, facebook, nativeShare);
+    function toggle(btn, box) {
+      var open = box.hidden; box.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
     var panel = h('section', { class: 'card share-panel', 'aria-labelledby': 'h-share' },
       h('h2', { id: 'h-share' }, o.kind === 'request' ? 'Envoyer la demande au client' : 'Partager'),
-      h('p', { class: 'sharelink', id: o.ids.url }, o.url),
-      h('p', { class: 'privacy-note', id: 'privacy-note' }, PRIVACY_NOTICE),
-      navigator.share ? h('button', { class: 'btn', type: 'button', id: o.ids.native || 'share-native', onclick: function () {
-        track('share_initiated', 'native_' + o.kind);
-        try {
-          navigator.share({ title: o.title || 'Fii La', text: text, url: o.url }).catch(function (e) {
-            if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier le lien ».');
-          });
-        } catch (e) { toast('Partage indisponible ici. Utilisez « Copier le lien ».'); }
-      } }, 'Partager…') : null,
-      h('a', { class: 'btn lime', href: waLink(o.msg), target: '_blank', rel: 'noopener noreferrer', id: 'share-whatsapp',
-        onclick: function () { track('share_initiated', 'whatsapp_' + o.kind); } }, 'Préparer un message WhatsApp'),
-      h('button', { class: 'btn ghost', type: 'button', id: o.ids.copy, onclick: function () { copy(o.url, 'Lien', function () { track('link_copied', o.kind); }); } }, 'Copier le lien'),
-      h('p', { class: 'label', style: 'margin-top:4px' }, 'Autres applications'),
-      h('div', { class: 'chan-grid' },
-        h('a', { class: 'btn ghost small chan', id: 'share-telegram', href: telegramLink(o.url, text), target: '_blank', rel: 'noopener noreferrer',
-          onclick: function () { track('share_initiated', 'telegram_' + o.kind); } }, icon('telegram'), 'Telegram'),
-        facebookAppId()
-          ? h('a', { class: 'btn ghost small chan', id: 'share-facebook', href: facebookLink(o.url), target: '_blank', rel: 'noopener noreferrer',
-              onclick: function () { track('share_initiated', 'facebook_' + o.kind); } }, icon('facebook'), 'Facebook')
-          : h('button', { class: 'btn ghost small chan', type: 'button', id: 'share-facebook-copy', 'aria-describedby': 'fb-help',
-              onclick: function () {
-                track('share_initiated', 'facebook_' + o.kind);
-                copy(o.url, 'Lien', function () { track('link_copied', o.kind); });
-                fbHelp.hidden = false;
-              } }, 'Facebook : copier le lien'),
-        channelBtn('instagram', 'Instagram / Story'),
-        channelBtn('tiktok', 'TikTok')),
-      fbHelp,
-      visualBox,
-      null);
+      iconBtn('a', { class: 'btn big', href: waLink(o.msg), target: '_blank', rel: 'noopener noreferrer', id: 'share-whatsapp',
+        onclick: function () { track('share_initiated', 'whatsapp_' + o.kind); } }, 'chat', 'Envoyer sur WhatsApp'),
+      h('div', { class: 'rnd-row' },
+        roundBtn('button', { type: 'button', id: o.ids.copy, onclick: function () { copy(o.url, 'Lien', function () { track('link_copied', o.kind); }); } }, 'link', 'Copier'),
+        roundBtn('a', { id: 'share-telegram', href: telegramLink(o.url, text), target: '_blank', rel: 'noopener noreferrer',
+          onclick: function () { track('share_initiated', 'telegram_' + o.kind); } }, 'telegram', 'Telegram'),
+        channelBtn('instagram', 'Story', true),
+        o.qr ? roundBtn('button', { type: 'button', id: 'share-qr', 'aria-expanded': 'false', 'aria-controls': 'share-qr-box',
+          onclick: function (e) { toggle(e.currentTarget, qrWrap); } }, 'qr', 'QR code') : channelBtn('tiktok', 'TikTok', true),
+        roundBtn('button', { type: 'button', id: 'share-more', 'aria-expanded': 'false', 'aria-controls': 'share-more-box',
+          onclick: function (e) { toggle(e.currentTarget, moreBox); } }, 'dots', 'Autres')),
+      moreBox, fbHelp, qrWrap, visualBox,
+      h('p', { class: 'safe-line', id: 'privacy-note' }, icon('lock', 18), o.kind === 'request' ? REQUEST_NOTICE : PRIVACY_NOTICE),
+      h('p', { class: 'sharelink', id: o.ids.url }, o.url));
     return panel;
   }
 
@@ -1829,7 +2040,7 @@
       h('div', { class: 'row' },
         h('button', { class: 'btn', type: 'button', id: 'visual-download', onclick: download }, 'Télécharger l’image'),
         canShareFiles ? h('button', { class: 'btn ghost', type: 'button', id: 'visual-share', onclick: shareFile }, 'Partager l’image…') : null),
-      h('button', { class: 'btn ghost', type: 'button', id: 'visual-copy', onclick: function () { copy(o.url, 'Lien', function () { track('link_copied', o.kind); }); } }, 'Copier le lien'),
+      iconBtn('button', { class: 'btn ghost', type: 'button', id: 'visual-copy', onclick: function () { copy(o.url, 'Lien', function () { track('link_copied', o.kind); }); } }, 'link', 'Copier le lien'),
       fallback,
       h('p', { class: 'hint' }, guide),
       h('p', { class: 'hint' }, 'Une image téléchargée ou publiée ne peut pas être rappelée, même si vous désactivez ou supprimez la fiche ensuite.'));
@@ -2161,7 +2372,7 @@
       if (r.state !== 'ok') return page(stateCard('⦸', 'Lien livreur indisponible', 'L’adresse a été désactivée ou le lien n’est pas valide.'), footer());
       var pg = page(courierKey() ? backBtn('Mes courses', '#/livreur') : null, h('p', { class: 'eyebrow' }, 'Livraison'),
         liveShare(token, r.place.entry, { kind: 'courier', title: 'Prêt à partir ?', startLabel: 'Démarrer la livraison', who: 'L’expéditeur et le client voient', initial: r.status }),
-        fiche(r.place, { wide: true }), footer(true));
+        fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(token, 'course', r.place.voice_secs) : null }), footer(true));
       pg.classList.add('wide');
       return pg;
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la livraison', errText(e), retryBtn())); });
@@ -2233,7 +2444,10 @@
         var joined = isMeet && LS.get('fiila.guest.' + token, null);
         // Rendez-vous : « Créer le vôtre » seulement après l'arrivée de l'invité, pas avant qu'il ait agi.
         var showDiscover = !mine && (!joined || joined.arrived);
-        var pg = page(brandBar(isMeet ? 'Rendez-vous' : 'Adresse'), fiche(r.place, { wide: true }), !mine && isMeet ? guestBlock(token, r.place) : null,
+        var pg = page(brandBar(isMeet ? 'Rendez-vous' : 'Adresse'),
+          fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(token, 'share', r.place.voice_secs) : null }),
+          h('p', { class: 'safe-line', id: 'recipient-safe' }, icon('lock', 18), 'Lien privé : seules les personnes qui l’ont reçu voient cette fiche.'),
+          !mine && isMeet ? guestBlock(token, r.place) : null,
           mine ? ownerBlock(mine) : showDiscover ? discoveryBlock(r.place.kind, token) : null,
           footer(true));
         pg.classList.add('wide');
@@ -2258,7 +2472,7 @@
   function ownerBlock(rec) {
     return h('section', { class: 'discover', id: 'owner-block', 'aria-labelledby': 'owner-title' },
       h('h2', { id: 'owner-title' }, 'C’est votre fiche'),
-      h('a', { class: 'btn ghost discover-cta', id: 'owner-manage', href: '#/m/' + rec.id }, 'Gérer et partager'));
+      iconBtn('a', { class: 'btn ghost discover-cta', id: 'owner-manage', href: '#/m/' + rec.id }, 'share', 'Gérer et partager'));
   }
 
   // Bloc de découverte, placé après les informations d'arrivée. Il ouvre le parcours de création
@@ -2272,7 +2486,7 @@
         ? 'Le lieu, l’heure et le chemin dans un seul lien.'
         : 'La porte, un repère, où se garer. Un lien à envoyer.'),
       h('a', { class: 'btn ghost discover-cta', id: 'discover-cta', href: (isMeeting ? '#/rdv/nouveau' : '#/new') + qs({ retour: token }),
-        onclick: function () { track('discovery_cta', variant); } }, isMeeting ? 'Créer un rendez-vous' : 'Créer mon adresse'),
+        onclick: function () { track('discovery_cta', variant); } }, icon(isMeeting ? 'cal' : 'cam', 22), h('span', null, isMeeting ? 'Créer un rendez-vous' : 'Créer mon adresse')),
       h('p', { class: 'hint' }, 'Gratuit. Sans compte.'));
     trackWhenVisible(block, 'discovery_shown', variant);
     return block;
@@ -2290,7 +2504,7 @@
   }
   function requestForm(f) {
     var err = h('div', { role: 'alert' });
-    var btn = h('button', { class: 'btn', type: 'button', disabled: !(f.requester_name.trim() && f.purpose.trim()), onclick: submit }, 'Créer la demande');
+    var btn = iconBtn('button', { class: 'btn', type: 'button', disabled: !(f.requester_name.trim() && f.purpose.trim()), onclick: submit }, 'send', 'Créer la demande');
     function chk() { btn.disabled = !(f.requester_name.trim() && f.purpose.trim()); }
     function submit() {
       btn.disabled = true; btn.textContent = 'Création…'; setKids(err);
@@ -2341,7 +2555,7 @@
       var keyBox = !key ? null : h('details', null, h('summary', null, 'Clé de gestion de la demande'),
         h('div', { class: 'stack', style: 'margin-top:10px' },
           h('p', { class: 'small' }, 'Permet de consulter la réponse depuis un autre téléphone. Ne la partagez pas.'),
-          h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(key, 'Clé de gestion'); } }, 'Copier la clé de gestion')));
+          iconBtn('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(key, 'Clé de gestion'); } }, 'link', 'Copier la clé de gestion')));
       var stateBlock;
       if (q.state === 'fulfilled') {
         stateBlock = [h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Adresse reçue le ' + shortDate(q.fulfilled_at)),
@@ -2378,7 +2592,7 @@
       h('section', { class: 'card state', id: 'sent' },
         h('div', { class: 'big', 'aria-hidden': 'true' }, icon('check', 26)),
         h('h2', null, name + ' a votre adresse.'),
-        backInvoice ? h('a', { class: 'btn', id: 'back-invoice', href: '#/f/' + backInvoice }, 'Revenir à ma commande') : null),
+        backInvoice ? iconBtn('a', { class: 'btn', id: 'back-invoice', href: '#/f/' + backInvoice }, 'back', 'Revenir à ma commande') : null),
       url ? h('section', { class: 'card', id: 'share-close' },
         h('h2', null, 'Votre adresse est prête'),
         h('p', { class: 'small muted' }, 'Envoyez-la à vos proches : ils vous trouveront sans appeler.'),
@@ -2401,7 +2615,7 @@
       var head = h('section', { class: 'card' },
         h('h1', { class: 'wrapword', style: 'font-size:24px' }, r.requester_name + ' vous demande votre adresse'),
         h('p', { class: 'wrapword' }, (r.shop ? r.purpose.replace(/^Livraison de la commande/, 'Pour la commande') : 'Pour : ' + r.purpose) + (showRef ? ' · ' + r.order_ref : '')),
-        fromInvoice ? null : h('p', { class: 'small muted' }, 'Répondez seulement si vous attendez cette demande.'));
+        h('p', { class: 'safe-line', id: 'request-safe' }, icon('lock', 18), 'Votre adresse ira uniquement à ' + r.requester_name + '. Vous pourrez la retirer à tout moment.'));
       var listBox = h('div', { class: 'stack' }, loading('Recherche de vos adresses sur ce téléphone…'));
       var prev = h('div', { class: 'stack' });
       var err = h('div', { role: 'alert' });
@@ -2425,7 +2639,7 @@
               send.disabled = false; send.textContent = 'Réessayer l’envoi';
               setKids(err, h('p', { class: 'alert' }, errText(e)));
             });
-          } }, 'Envoyer à ' + r.requester_name);
+          } }, icon('send', 22), h('span', null, 'Envoyer à ' + r.requester_name));
           setKids(prev, send, err, h('details', null, h('summary', null, 'Voir ce qui sera envoyé'), h('div', { style: 'margin-top:12px' }, fiche(pl))));
         }, function (e) { setKids(prev, h('p', { class: 'alert' }, errText(e))); });
       }
@@ -2447,7 +2661,7 @@
 
       return page(brandBar('Demande d’adresse'), head,
         listBox,
-        h('a', { class: mine.length ? 'btn ghost' : 'btn', id: 'new-address-for-request', href: '#/new' + qs({ d: token, f: backInvoice || undefined }) }, mine.length ? 'Créer une autre adresse' : 'Créer mon adresse'),
+        h('a', { class: mine.length ? 'btn ghost' : 'btn', id: 'new-address-for-request', href: '#/new' + qs({ d: token, f: backInvoice || undefined }) }, icon(mine.length ? 'plus' : 'cam', 22), h('span', null, mine.length ? 'Créer une autre adresse' : 'Créer mon adresse')),
         prev,
         r.shop ? h('p', { class: 'hint' }, 'La boutique pourra la réutiliser. Vous pouvez l’arrêter.') : null,
         footer(true));
@@ -2866,7 +3080,7 @@
         h('h2', null, 'Profil'),
         textField({ id: 'me-name', label: 'Nom affiché', max: 60, value: f.display_name, autocomplete: 'name', onInput: function (v) { f.display_name = v; } }),
         textField({ id: 'me-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', autocomplete: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
-        h('button', { class: 'btn', type: 'button', id: 'me-save', onclick: function () { save(null); } }, 'Enregistrer')),
+        iconBtn('button', { class: 'btn', type: 'button', id: 'me-save', onclick: function () { save(null); } }, 'check', 'Enregistrer')),
       h('nav', { class: 'list', 'aria-label': 'Raccourcis' },
         h('a', { class: 'item', href: '#/' }, h('div', null, h('div', { class: 't' }, 'Mes adresses'), h('div', { class: 'small muted' }, 'Maison, bureau, boutique…')), h('span', { class: 'chev' }, icon('chev', 18))),
         h('a', { class: 'item', href: '#/boutique', id: 'go-shop' }, h('div', null, h('div', { class: 't' }, me.shop ? me.shop.name : 'Ma boutique'),
@@ -2901,7 +3115,7 @@
         ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, shop ? 'Enregistrer' : 'Créer ma boutique');
-    return page(backBtn(shop ? 'Ma boutique' : 'Accueil', shop ? '#/boutique' : '#/'),
+    var pg = page(backBtn(shop ? 'Ma boutique' : 'Accueil', shop ? '#/boutique' : '#/'),
       h('div', { class: 'stack tight' },
         h('h1', null, shop ? 'Réglages de la boutique' : 'Créer ma boutique'),
         shop ? null : h('p', { class: 'muted' }, 'Ces informations apparaissent sur vos factures.')),
@@ -2913,6 +3127,7 @@
       shop ? courierSection(shop) : null,
       shop ? shopDeleteBox() : null,
       footer());
+    return shop ? shopTabs(pg, 'settings') : pg;
   }
 
   // Livreur attitré : invitation par WhatsApp, acceptation par le livreur, envoi automatique des courses.
@@ -2964,8 +3179,8 @@
           track('courier_invited', 'whatsapp');
           // un seul bouton à la fois : l'invitation prête remplace « Inviter »
           b.hidden = true;
-          setKids(sendBox, h('a', { class: 'btn lime', id: 'courier-invite-send', href: wa, target: '_blank', rel: 'noopener noreferrer' }, 'Envoyer sur WhatsApp'),
-            h('button', { class: 'btn ghost small', type: 'button', style: 'align-self:flex-start', onclick: function () { copy(link, 'Lien'); } }, 'Copier le lien'));
+          setKids(sendBox, iconBtn('a', { class: 'btn lime', id: 'courier-invite-send', href: wa, target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer sur WhatsApp'),
+            iconBtn('button', { class: 'btn ghost small', type: 'button', style: 'align-self:flex-start', onclick: function () { copy(link, 'Lien'); } }, 'link', 'Copier le lien'));
         }, function (e) { b.disabled = false; errBox(err, e); });
       } }, 'Inviter sur WhatsApp'),
       sendBox,
@@ -3003,16 +3218,41 @@
     if (o.delivery_state === 'arrived') return ['ok', 'Livreur arrivé'];
     return ['wait', 'À livrer'];
   }
+  // Pastille d'état d'une commande (pictogramme compris sans lire) : [classe, icône].
+  function stageIcon(o) {
+    if (o.status === 'cancelled') return ['off', 'ban'];
+    var paid = o.pay_state === 'paid';
+    if (o.delivery_state === 'delivered') return paid ? ['ok', 'check'] : ['wait', 'cash'];
+    if (o.address_state === 'pending') return ['wait', 'pin'];
+    if (o.address_state !== 'received') return ['off', 'pin'];
+    if (o.delivery_state === 'on_the_way') return ['go', 'moto'];
+    if (o.delivery_state === 'arrived') return ['ok', 'door'];
+    return ['go', 'box'];
+  }
+  // Barre d'onglets de la boutique (pages principales).
+  function shopTabs(pg, active) {
+    function tab(key, href, name, label) {
+      return h('a', { class: 'tab', href: href, id: 'tab-' + key, 'aria-current': active === key ? 'page' : null },
+        h('span', { class: 'p', 'aria-hidden': 'true' }, icon(name, 22)), label);
+    }
+    pg.classList.add('has-tabs');
+    pg.appendChild(h('div', { class: 'tabbar' }, h('nav', { 'aria-label': 'Boutique' },
+      tab('orders', '#/boutique', 'box', 'Commandes'), tab('products', '#/boutique/articles', 'shop', 'Articles'),
+      tab('customers', '#/clients', 'users', 'Clients'), tab('settings', '#/boutique/reglages', 'settings', 'Réglages'))));
+    return pg;
+  }
   function stageChip(o) {
     var st = orderStage(o);
     return h('span', { class: 'chip ' + st[0] }, icon(st[0] === 'ok' ? 'check' : st[0] === 'wait' ? 'clock' : 'ban', 12), st[1]);
   }
   function orderItem(o) {
-    return h('a', { class: 'item', href: '#/commande/' + o.id },
+    var si = stageIcon(o), st = orderStage(o);
+    return h('a', { class: 'order-row', href: '#/commande/' + o.id },
+      statePill(si[0], si[1]),
       h('div', null,
         h('div', { class: 't' }, 'N° ' + o.ref + ' · ' + o.customer_name),
-        h('div', { class: 'small muted' }, fcfa(o.total) + (o.pay_state === 'partial' ? ' · acompte ' + fcfa(o.paid) : o.pay_state === 'paid' && o.total > 0 ? ' · payée' : '') + ' · ' + shortDate(o.created_at))),
-      h('span', { class: 'item-end' }, stageChip(o), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))));
+        h('div', { class: 'small muted' }, st[1] + (o.pay_state === 'partial' ? ' · acompte ' + fcfa(o.paid) : '') + ' · ' + shortDate(o.created_at))),
+      h('span', { class: 'amt' }, fcfa(o.total)));
   }
   function shopDashboard(r, q) {
     var shop = r.shop, st = r.stats || {};
@@ -3025,34 +3265,31 @@
       }, function (e) { errBox(listBox, e); });
     }
     if (st.orders) load();
-    function tile(n, label, href) {
-      return h('a', { class: 'tile', href: href }, h('strong', null, String(n || 0)), h('span', null, label));
+    function tile(n, label, href, name, kind) {
+      return h('a', { class: 'tile kpi', href: href }, statePill(kind, name), h('span', null, h('strong', null, String(n || 0)), h('span', null, label)));
     }
-    return page(backBtn(),
+    return shopTabs(page(backBtn(),
       h('div', { class: 'stack tight' },
         h('p', { class: 'eyebrow' }, 'Ma boutique'),
-        h('div', { class: 'brand-row' }, h('h1', { class: 'wrapword', id: 'shop-title' }, shop.name),
-          h('a', { class: 'btn ghost small', href: '#/boutique/reglages' }, 'Réglages'))),
+        h('h1', { class: 'wrapword', id: 'shop-title' }, shop.name)),
       // Boutique neuve : une seule première étape, pas de tableau de bord vide.
       !st.orders && !st.products ? h('section', { class: 'card', id: 'first-product' },
         h('h2', null, 'Ajoutez votre premier article'),
         h('p', { class: 'small muted' }, 'Une photo, un prix. Il sera prêt pour vos commandes.'),
-        h('a', { class: 'btn', href: '#/boutique/article/nouveau' }, 'Ajouter un article')) : null,
-      h('a', { class: !st.orders && !st.products ? 'btn ghost full' : 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'Nouvelle commande'),
+        iconBtn('a', { class: 'btn', href: '#/boutique/article/nouveau' }, 'cam', 'Ajouter un article')) : null,
+      iconBtn('a', { class: !st.orders && !st.products ? 'btn ghost full' : 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'plus', 'Nouvelle commande'),
       // Compte proposé quand la boutique tourne (3 commandes), pas dès sa création.
       shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard(),
       st.orders ? h('div', { class: 'tiles' },
-        tile(st.open, 'en cours', '#/boutique?vue=open'),
-        tile(st.unpaid, 'à encaisser', '#/boutique?vue=unpaid'),
-        tile(st.products, st.products === 1 ? 'article' : 'articles', '#/boutique/articles'),
-        tile(st.customers, st.customers === 1 ? 'client' : 'clients', '#/clients')) :
-        st.products ? h('a', { class: 'btn link', href: '#/boutique/articles', style: 'align-self:flex-start' }, 'Mes articles (' + st.products + ')') : null,
+        tile(st.open, 'en cours', '#/boutique?vue=open', 'clock', 'wait'),
+        tile(st.unpaid, 'à encaisser', '#/boutique?vue=unpaid', 'cash', 'go')) : null,
       st.orders ? segField({ name: 'vue', id: 'orders-filter', value: vue,
         options: [['open', 'En cours'], ['unpaid', 'À encaisser'], ['done', 'Terminées'], ['all', 'Toutes']],
         onChange: function (v) { vue = v; try { history.replaceState(null, '', location.pathname + location.search + '#/boutique?vue=' + v); } catch (e) { /* rien */ } setKids(listBox, loading()); load(); } }) : null,
       st.orders ? listBox : null,
-      h('a', { class: 'btn link', id: 'shop-referral', href: '#/parrainer?pour=boutique', style: 'align-self:flex-start' }, 'Parrainer une boutique'),
-      footer());
+      h('a', { class: 'invite-row', id: 'shop-referral', href: '#/parrainer?pour=boutique' }, icon('gift', 24), h('span', null, 'Parrainer une boutique'),
+        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
+      footer()), 'orders');
   }
 
   /* ----- clients */
@@ -3075,7 +3312,7 @@
     load();
     var search = h('input', { type: 'search', id: 'customer-search', placeholder: 'Nom ou téléphone', value: term, 'aria-label': 'Rechercher un client',
       oninput: function (e) { term = e.target.value; clearTimeout(timer); timer = setTimeout(load, 250); } });
-    return page(backBtn('Ma boutique', '#/boutique'), h('h1', null, 'Clients'), search, listBox, footer());
+    return shopTabs(page(backBtn('Ma boutique', '#/boutique'), h('h1', null, 'Clients'), search, listBox, footer()), 'customers');
   }
 
   function viewCustomer(id) {
@@ -3134,7 +3371,7 @@
     var itemsBox = h('div', { class: 'stack', id: 'items' });
     var totalEl = h('strong', { id: 'order-total' });
     var err = h('div', { role: 'alert' });
-    var btn = h('button', { class: 'btn', type: 'button', id: 'order-create', onclick: submit }, 'Créer la commande');
+    var btn = iconBtn('button', { class: 'btn', type: 'button', id: 'order-create', onclick: submit }, 'check', 'Créer la commande');
     function keep() { LS.set(ORDER_DRAFT, d); }
     function num(v) { var n = parseInt(String(v).replace(/[\s  .]/g, ''), 10); return isFinite(n) ? n : NaN; }
     function total() {
@@ -3276,10 +3513,10 @@
     var send = closed && o.status === 'cancelled' ? null : h('section', { class: 'card', id: 'send-client' },
       h('h2', null, 'Envoyer au client'),
       h('a', { class: 'btn lime', id: 'send-invoice', href: waTo(o.customer_phone, msgClient), target: '_blank', rel: 'noopener noreferrer',
-        onclick: function () { track('share_initiated', 'whatsapp'); } }, o.address_state === 'pending' ? 'Envoyer la commande et demander l’adresse' : 'Envoyer la facture'),
+        onclick: function () { track('share_initiated', 'whatsapp'); } }, icon('chat', 22), h('span', null, o.address_state === 'pending' ? 'Envoyer la commande et demander l’adresse' : 'Envoyer la facture')),
       h('div', { class: 'row' },
-        h('button', { class: 'btn ghost small', type: 'button', id: 'copy-invoice', onclick: function () { copy(link, 'Lien'); } }, 'Copier le lien'),
-        h('a', { class: 'btn ghost small', href: '#/f/' + o.share_token, id: 'open-invoice' }, 'Voir la facture')));
+        iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'copy-invoice', onclick: function () { copy(link, 'Lien'); } }, 'link', 'Copier le lien'),
+        iconBtn('a', { class: 'btn ghost small', href: '#/f/' + o.share_token, id: 'open-invoice' }, 'eye', 'Voir la facture')));
 
     // 3. Livraison
     var deliv = null;
@@ -3306,7 +3543,7 @@
         attBlock = h('button', { class: 'btn big', type: 'button', id: 'dispatch-att', onclick: function (ev) {
           ev.currentTarget.disabled = true;
           call('fiila_order_dispatch', null, 'Course envoyée à ' + att.name + '.').catch(function () {});
-        } }, 'Envoyer à ' + att.name);
+        } }, icon('moto', 22), h('span', null, 'Envoyer à ' + att.name));
         startBtn.textContent = 'Autre livreur (lien)'; startBtn.className = 'btn ghost small';
       }
       deliv = h('section', { class: 'card', id: 'order-delivery' }, h('h2', null, 'Livraison'),
@@ -3357,7 +3594,7 @@
     var zone = h('div', { class: 'stack' });
     var endActions = o.status === 'cancelled'
       ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { call('fiila_order_set_status', { p_status: 'open' }, 'Commande rouverte.').catch(function () {}); } }, 'Rouvrir la commande')
-      : o.status === 'open' ? h('button', { class: 'btn danger', type: 'button', id: 'cancel-order', onclick: function () {
+      : o.status === 'open' ? h('button', { class: 'btn quiet danger-text', type: 'button', id: 'cancel-order', onclick: function () {
         setKids(zone, h('div', { class: 'confirm' },
           h('p', null, h('strong', null, 'Annuler la commande N° ' + o.ref + ' ?')),
           h('p', { class: 'small' }, 'Le lien envoyé au client affichera « commande annulée ». Le suivi du livreur s’arrête.'),
@@ -3420,8 +3657,8 @@
   function ratingEl(r, n) { return h('span', { class: 'rating' }, icon('star', 14), ratingText(r, n)); }
   function viewProducts() {
     return sapi('fiila_products', { p_all: true }).then(function (rows) {
-      return page(backBtn('Ma boutique', '#/boutique'),
-        h('div', { class: 'brand-row' }, h('h1', null, 'Mes articles'), h('a', { class: 'btn small', id: 'product-new', href: '#/boutique/article/nouveau' }, 'Ajouter')),
+      return shopTabs(page(backBtn('Ma boutique', '#/boutique'),
+        h('div', { class: 'brand-row' }, h('h1', null, 'Mes articles'), iconBtn('a', { class: 'btn small', id: 'product-new', href: '#/boutique/article/nouveau' }, 'plus', 'Ajouter', 18)),
         rows.length ? h('div', { class: 'list', id: 'products' }, rows.map(function (pr) {
           return h('a', { class: 'item product-item', href: '#/boutique/article/' + pr.id },
             pr.photo ? h('img', { class: 'thumb', src: pr.photo, alt: '' }) : h('span', { class: 'thumb empty', 'aria-hidden': 'true' }),
@@ -3429,7 +3666,7 @@
               h('div', { class: 'small muted' }, fcfa(pr.price), pr.reviews ? [' · ', ratingEl(pr.rating, pr.reviews)] : null)),
             h('span', { class: 'item-end' }, pr.active ? null : h('span', { class: 'chip neutral' }, 'Masqué'), h('span', { class: 'chev' }, icon('chev', 18))));
         })) : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Ajoutez vos articles avec leur photo et leur prix : vous les choisirez en un geste dans vos commandes.')),
-        footer());
+        footer()), 'products');
     }, failPage('Impossible de charger les articles', 'boutique/articles'));
   }
   function viewProductForm(id, q) {
@@ -3559,8 +3796,8 @@
           h('p', { class: 'wrapword' }, k.customer + ' · ' + k.dest + (k.locality ? ', ' + k.locality : '')),
           due ? h('p', { class: 'small' }, 'À encaisser : ', h('strong', null, fcfa(due))) : h('p', { class: 'small muted' }, 'Déjà payée'),
           h('div', { class: 'row' },
-            h('a', { class: 'btn', href: '#/l/' + k.token }, 'Ouvrir la course'),
-            k.customer_phone ? h('a', { class: 'btn ghost', href: 'tel:' + k.customer_phone.replace(/\s/g, '') }, 'Appeler le client') : null),
+            iconBtn('a', { class: 'btn', href: '#/l/' + k.token }, 'nav', 'Ouvrir la course'),
+            k.customer_phone ? iconBtn('a', { class: 'btn ghost', href: 'tel:' + k.customer_phone.replace(/\s/g, '') }, 'phone', 'Appeler le client') : null),
           h('button', { class: 'btn ghost small', type: 'button', style: 'align-self:flex-start', onclick: function (ev) {
             ev.currentTarget.disabled = true;
             api('fiila_courier_done', { p_key: courierKey(), p_send: k.token }).then(function () { track('courier_done', 'courier'); toast('Livraison confirmée.'); load(); },
@@ -3614,7 +3851,7 @@
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Invitation'),
           h('h1', { class: 'wrapword' }, r.shop + ' vous propose d’être son livreur attitré'),
           h('p', { class: 'muted' }, 'Ses courses arrivent ici, avec la photo de l’entrée.')),
-        courierKey() ? h('button', { class: 'btn big', type: 'button', id: 'courier-accept', onclick: function (ev) { ev.currentTarget.disabled = true; accept(); } }, 'Accepter') :
+        courierKey() ? iconBtn('button', { class: 'btn big', type: 'button', id: 'courier-accept', onclick: function (ev) { ev.currentTarget.disabled = true; accept(); } }, 'check', 'Accepter') :
           courierForm({ name: r.name, phone: r.phone }, function () { accept(); }),
         err, footer());
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher l’invitation', errText(e), retryBtn())); });
@@ -3651,7 +3888,7 @@
         : o.address_state === 'pending' ? 'Adresse attendue' : 'En préparation';
       var act = [];
       if (o.address_state === 'pending' && o.request_token && !delivered) {
-        act.push(h('a', { class: 'btn big no-print', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'Donner mon adresse de livraison'));
+        act.push(iconBtn('a', { class: 'btn big no-print', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'pin', 'Donner mon adresse de livraison'));
       }
       if (o.watch_token) act.push(h('div', { class: 'no-print' }, deliveryWatch(o.watch_token, o.courier && o.courier.name)));
       // « Votre avis » : articles et livraison dans un seul bloc, une fois la commande livrée.
@@ -3677,7 +3914,7 @@
           o.paid ? h('div', { class: 'total-row' }, h('span', null, 'Déjà payé'), h('span', null, fcfa(o.paid))) : null,
           h('div', { class: 'total-row big' }, h('span', null, remaining ? 'Reste à payer' : 'Statut'), h('strong', { id: 'inv-remaining' }, remaining ? fcfa(remaining) : 'Payée')),
           o.note ? h('p', { class: 'small muted wrapword' }, o.note) : null),
-        h('button', { class: 'btn ghost no-print', type: 'button', id: 'print', onclick: function () { window.print(); } }, 'Télécharger ou imprimer'),
+        iconBtn('button', { class: 'btn ghost no-print', type: 'button', id: 'print', onclick: function () { window.print(); } }, 'print', 'Télécharger ou imprimer'),
         delivered && !shopKey() ? h('a', { class: 'btn link no-print', id: 'sell-too', href: '#/boutique', style: 'align-self:center' }, 'Vous vendez aussi sur WhatsApp ? Créez votre boutique') : null,
         footer(true));
       return pg;
@@ -3702,6 +3939,7 @@
           h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom. Le commerçant voit la moyenne de ses articles.'),
           h('li', null, 'Origine et parrainage : quand vous créez une adresse, un rendez-vous, une boutique ou un espace livreur, Fii La note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
           h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro. Le numéro n’est jamais affiché ; il sert seulement à vous reconnaître quand quelqu’un le tape. Les personnes qui ouvrent votre lien voient votre prénom.'),
+          h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus que vous ajoutez à votre adresse. Le micro n’est utilisé que lorsque vous appuyez sur « Enregistrer ». Toute personne qui a le lien, et le livreur d’une course, peuvent l’écouter. Il est supprimé avec la fiche, ou dès que vous le retirez.'),
           h('li', null, 'Publication d’un article : Fii La compte seulement qu’une publication a été faite, pas le réseau choisi.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),
