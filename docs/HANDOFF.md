@@ -95,7 +95,8 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 25 | ~~Valider la stratégie de croissance~~ phase 0 validée 17/10 23:10 et construite (`docs/CROISSANCE.md` §9) | Fondateur | — |
 | 27 | Fixer les récompenses du parrainage (boutiques, livreurs, particuliers ; argent possible) | Fondateur | Annonce du parrainage |
 | 29 | Supprimer 1 fiche « Maison du client (test) » et 1 demande « Boutique Ndèye » restées en production après l'arrêt d'une série de tests (23:32) : suppression SQL refusée à l'exécution, en attente d'accord du fondateur | Fondateur → Builder | Base propre |
-| 30 | Valider l'audit design « calme et sûr » (`docs/AUDIT-DESIGN-2026-10-18.md`) : direction v1.2, deux règles v1.1 touchées (titres 800, tuiles non filtrées), plan en 5 lots ; premier pas proposé = lot 1 + accueil avec captures avant/après | Fondateur | Refonte v1.2 |
+| 31 | Valider le lot 1 v1.2 + accueil + gestion (branche `design-v1.2`, captures `docs/screenshots/design-v1.2-*.png`) avant mise en production et extension aux autres écrans | Fondateur | Lots 2 à 5 |
+| 30 | ~~Valider l'audit design~~ lancé 18/10 06:28 ; « calme et sûr » (`docs/AUDIT-DESIGN-2026-10-18.md`) : direction v1.2, deux règles v1.1 touchées (titres 800, tuiles non filtrées), plan en 5 lots ; premier pas proposé = lot 1 + accueil avec captures avant/après | Fondateur | Refonte v1.2 |
 | 28 | Créer son compte Fii La, puis le Builder le marque administrateur (SQL) pour ouvrir `#/stats` | Fondateur → Builder | Lecture des statistiques |
 | 26 | Ajouter au dossier CDP le traitement « parrainage » (lien parrain–filleul) si la phase 0 est validée | Fondateur | Usage réel du parrainage |
 | 16 | Revue VP de l'intégration Rali (parcours commerçant et client, `docs/screenshots/boutique/`) | VP | — |
@@ -138,6 +139,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 18/10 06:45 | Design v1.2 lot 1 (fondations : 3 formes, pilules, cartes sans bord, lignes de liste, titres 700, citron retiré des boutons, désactivé neutre, sauge pour la confidentialité, sombre adouci, pied allégé) + accueil réorganisé + gestion (actions sensibles en bas). Sur branche `design-v1.2`, **pas en production**. Tests locaux verts (E2E 38, circuit 20, découverte 23, social 23, suivi 12, boutique 26, livreurs 8, parrainage 8) | branche `design-v1.2`, `docs/screenshots/design-v1.2-*.png` |
 | 18/10 04:05 | Audit design (beauté, couleurs, formes, sécurité ressentie, calme) à partir des captures à jour : 13 constats, direction « calme et sûr », plan en 5 lots. Rien de modifié | `docs/AUDIT-DESIGN-2026-10-18.md` |
 | 17/10 23:40 | Croissance phase 0 livrée : migration `20261018000000_fiila_referrals` appliquée et vérifiée (10 migrations, 65 fonctions) ; local : SQL 95/95 (dont parrainage 15), E2E 38, circuit 20, découverte 23, social 23, suivi 12, boutique 26, livreurs 8, parrainage 8 ; production : E2E 38/38 Chromium et WebKit ; WebKit local : parrainage 8/8, boutique 26/26. Test E2E « correction manuelle » rendu robuste (attente de la carte) | `8267406`, `e7f1a4f` |
 | 17/10 23:15 | Proposition de stratégie de croissance et de parrainage rédigée ; périmètre publication réseaux sociaux et suivi 3D en attente consignés | `docs/CROISSANCE.md`, `ARCHITECTURE-RALI.md` §8-9 |

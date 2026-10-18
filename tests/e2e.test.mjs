@@ -111,10 +111,14 @@ globalThis.__shotOnFail = async (n) => {
 };
 let shareUrl, placeId, createBody;
 
-await t('accueil : 4 actions, création en premier', async () => {
+await t('accueil : une action principale (création), deux secondaires, puis mes adresses', async () => {
   await A.goto(URL0);
   await A.getByText('Ton adresse, expliquée une seule fois.').waitFor();
-  for (const n of ['Créer mon adresse', 'Mes adresses', 'Demander une adresse', 'Créer un rendez-vous']) await byText(A, n).waitFor();
+  for (const n of ['Créer mon adresse', 'Demander une adresse', 'Créer un rendez-vous']) await byText(A, n).waitFor();
+  await A.getByRole('heading', { name: 'Mes adresses' }).waitFor();
+  const first = await A.locator('nav.home-actions a').first();
+  assert.equal(await first.textContent(), 'Créer mon adresse');
+  assert.match(await first.getAttribute('class'), /\bbig\b/);
   await shot(A, '01-accueil');
 });
 

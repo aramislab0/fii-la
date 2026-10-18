@@ -3,6 +3,7 @@
    (repère de carte en SVG, point central de la carte, champ du toast : la carte et le toast restent lisibles quel que soit le thème). */
 @font-face{font-family:"Montserrat";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/montserrat-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Montserrat";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/montserrat-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Montserrat";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/montserrat-latin-700-normal.woff2) format("woff2")}
 @font-face{font-family:"Montserrat";font-style:normal;font-weight:800;font-display:swap;src:url(fonts/montserrat-latin-800-normal.woff2) format("woff2")}
 
 :root{
@@ -389,3 +390,126 @@ a.plain{color:inherit;text-decoration:none}
 .ref-ask summary{font-weight:500;color:var(--muted)}
 pre.caption{white-space:pre-wrap;font:inherit;font-size:14px;background:var(--surface-2);border-radius:12px;padding:12px;margin:0}
 div.tile:hover{border-color:var(--line)}
+
+/* =====================================================================
+   v1.2 « calme et sûr » — lot 1 (fondations), 18/10/2026. Audit : docs/AUDIT-DESIGN-2026-10-18.md
+   Trois formes : bouton pilule (agir), carte sans bord (lire), ligne de liste (naviguer, déplier).
+   Une seule action principale verte par écran ; le citron devient marque et petits signaux.
+   ===================================================================== */
+:root{
+  --safe:#E8EFE4; --on-safe:#17201B;
+  --shadow-card:0 1px 2px rgba(23,32,27,.04),0 10px 28px -16px rgba(23,32,27,.18);
+  --shadow-float:0 6px 24px -8px rgba(23,32,27,.35);
+  --control-line:#B9BBB2;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --surface:#172019; --surface-2:#1E2923; --surface-3:#28342D; --line:#25302A;
+    --green:#2A7350; --green-press:#245F43; --safe:#1B2A21; --on-safe:#EDF1EC;
+    --shadow-float:0 6px 24px -8px rgba(0,0,0,.6); --control-line:#3E4B43;
+  }
+}
+:root[data-theme="dark"]{
+  --surface:#172019; --surface-2:#1E2923; --surface-3:#28342D; --line:#25302A;
+  --green:#2A7350; --green-press:#245F43; --safe:#1B2A21; --on-safe:#EDF1EC;
+  --shadow-float:0 6px 24px -8px rgba(0,0,0,.6); --control-line:#3E4B43;
+}
+
+/* Typographie : plus douce. 800 reste réservé au logo. */
+h1{font-size:26px;font-weight:700;line-height:1.2;letter-spacing:-.015em}
+h2{font-size:20px;font-weight:700;line-height:1.25;letter-spacing:-.01em}
+.fiche-body h1{font-size:24px}
+.leg-h h3,.discover h2,.live-big,.tile strong,.inv tfoot td,.ref-code,.leg-n,.avatar{font-weight:700}
+.eyebrow{font-size:13px;letter-spacing:0;text-transform:none;font-weight:600}
+.eyebrow.step{font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.promise{font-size:19px;font-weight:600;line-height:1.35}
+
+/* 1. Bouton = action (pilule). */
+button,.btn{border-radius:999px}
+.btn.big{border-radius:999px}
+.btn.small{border-radius:999px}
+.leg .btn,.leg .btn.small{border-radius:999px}
+.btn.ghost{background:transparent;border:1px solid var(--control-line);color:var(--ink)}
+.btn.ghost:hover{background:var(--surface);border-color:var(--green)}
+.btn.ghost:active{background:var(--surface-2)}
+.btn.lime,.btn.lime:hover{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.btn.lime:active{background:var(--green-press);border-color:var(--green-press)}
+.btn.link{border-radius:6px}
+.btn.danger{border-width:1px}
+.chan{border-radius:999px}
+/* Désactivé : gris neutre, jamais un vert délavé. */
+button:disabled,.btn:disabled,.btn[aria-disabled="true"],.btn.lime:disabled,
+button:disabled:hover,.btn:disabled:hover{background:var(--surface-3);border-color:var(--surface-3);color:var(--muted);transform:none;box-shadow:none}
+@media (prefers-reduced-motion: no-preference){
+  button:not(:disabled):active,.btn:not(:disabled):active{transform:scale(.97)}
+}
+
+/* 2. Carte = contenu (sans bord, ombre douce). */
+.card,.fiche{border:0}
+.card.highlight,.card.nudge,.card.invite{border:0;box-shadow:inset 3px 0 0 var(--green),var(--shadow-card)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .card,:root:not([data-theme="light"]) .fiche{background:var(--surface)} }
+.map-box,.photo-prev,.visual-preview{border-color:transparent}
+
+/* Éléments de liste : surfaces posées, sans contour. */
+.item{border:0;box-shadow:var(--shadow-card)}
+.item:hover{border:0;background:var(--surface-2)}
+.item:active{background:var(--surface-3);border:0}
+
+/* 3. Ligne de liste = naviguer ou déplier (plus de boîte qui ressemble à un bouton). */
+details{background:transparent;border:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0;padding:2px 0}
+details+details{border-top:0}
+details summary{list-style:none;justify-content:space-between;gap:12px}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"";width:9px;height:9px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translate(-2px,-2px);flex:none;margin-right:6px}
+details[open]>summary::after{transform:rotate(-135deg) translate(-2px,-2px)}
+details[open]{padding-bottom:14px}
+.card details{margin-inline:0}
+
+/* Chiffres : cliquables = surface posée ; simples = texte, sans boîte. */
+.tile{border:0}
+a.tile{box-shadow:var(--shadow-card)}
+a.tile:hover{border:0;background:var(--surface-2)}
+div.tile{background:transparent;box-shadow:none;padding:4px 0;min-height:0}
+
+/* Couleurs : rôles tenus. Attente = neutre ; notes = vert ; confidentialité = sauge. */
+.chip.wait{color:var(--muted)}
+.star.on,.rating .ico{color:var(--ok)}
+.notice,.privacy-note{background:var(--safe);color:var(--on-safe)}
+
+/* Message éphémère : flottant, petit, au-dessus de la zone de sécurité. */
+.toast{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+.toast>div{max-width:420px;width:auto;border-radius:16px;box-shadow:var(--shadow-float);padding:12px 18px}
+
+/* Pied de page allégé : une ligne de liens, thème en petit. */
+footer.foot{gap:12px;border-top:0;padding-top:12px}
+.foot-links{gap:6px 14px}
+footer.foot a{text-decoration:none}
+footer.foot a:hover{text-decoration:underline}
+.theme-switch{display:flex;align-items:center;gap:10px}
+.theme-switch legend{float:left;margin:0 4px 0 0;font-weight:500}
+.theme-switch .segs{flex:1;max-width:280px;background:transparent;border:1px solid var(--line)}
+.theme-switch label{min-height:36px;font-weight:500}
+.theme-switch label:has(input:checked){box-shadow:none;border-color:var(--line);background:var(--surface)}
+
+/* Accueil : action principale, deux secondaires, puis les professionnels en lignes. */
+.home-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.home-actions .full{grid-column:1/-1}
+.pro-list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.pro-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:4px 2px;border-bottom:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:600}
+.pro-row .sub{display:block;font-size:13px;font-weight:400;color:var(--muted)}
+.pro-row .chev{color:var(--muted);display:flex}
+.pro-row:hover{background:var(--surface-2)}
+@media (prefers-reduced-motion: no-preference){
+  #app>.wrap{animation:fiila-in .18s ease-out}
+  @keyframes fiila-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+}
+
+/* Actions sensibles : en bas, en texte, séparées (audit design D4). */
+.sensitive{display:flex;flex-direction:column;gap:2px;padding-top:8px}
+.sensitive .eyebrow{margin-bottom:4px}
+.btn.quiet{background:none;border:0;color:var(--ink);justify-content:flex-start;padding:0 2px;min-height:48px;font-weight:600;border-radius:8px}
+.btn.quiet:hover{background:none;text-decoration:underline}
+.btn.quiet.danger-text{color:var(--danger)}
+.btn.chan{border-radius:16px}
+.promise{font-size:18px}
+.discover .btn.ghost.discover-cta{background:var(--surface);border-color:var(--line)}

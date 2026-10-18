@@ -1359,9 +1359,11 @@
     if (authed()) account.me().then(function (me) {
       if (!me) { setKids(who, 'Se connecter'); return; }
       setKids(who, avatarEl(me, 32), h('span', { class: 'who-name' }, me.display_name || 'Mon compte'));
-      if (me.shop && shopBtn) shopBtn.textContent = me.shop.name;
+      if (me.shop && shopBtn) shopBtn.querySelector('.pro-name').textContent = me.shop.name;
     }, function () { /* hors ligne : on garde le lien */ });
-    var shopBtn = CFG.shop === false ? null : h('a', { class: 'btn ghost full', id: 'shop-link', href: '#/boutique' }, 'Ma boutique');
+    var shopBtn = CFG.shop === false ? null : h('a', { class: 'pro-row', id: 'shop-link', href: '#/boutique' },
+      h('span', null, h('span', { class: 'pro-name' }, 'Ma boutique'), h('span', { class: 'sub' }, 'Commandes, factures, adresses de vos clients')),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)));
     return page(
       h('header', { class: 'stack tight' },
         h('div', { class: 'brand-row' },
@@ -1370,15 +1372,19 @@
         h('p', { class: 'promise' }, 'Ton adresse, expliquée une seule fois.'),
         h('p', { class: 'muted small' }, 'La porte exacte, une photo, un repère, et l’endroit où la voiture peut s’arrêter.')),
       inviteBanner(),
-      h('nav', { class: 'actions', 'aria-label': 'Actions principales' },
+      // Une seule action principale ; deux secondaires ; les professionnels en lignes sous la liste (audit design D2).
+      h('nav', { class: 'home-actions', 'aria-label': 'Actions principales' },
         h('a', { class: 'btn big full', href: '#/new' }, 'Créer mon adresse'),
-        h('a', { class: 'btn ghost', href: '#/', onclick: function (e) { e.preventDefault(); var el = document.getElementById('mes-adresses'); if (el) el.scrollIntoView(); } }, 'Mes adresses'),
         h('a', { class: 'btn ghost', href: '#/demande/nouvelle' }, 'Demander une adresse'),
-        h('a', { class: 'btn ghost full', href: '#/rdv/nouveau' }, 'Créer un rendez-vous'),
-        shopBtn),
+        h('a', { class: 'btn ghost', href: '#/rdv/nouveau' }, 'Créer un rendez-vous')),
       accountNudge(),
       listBox,
-      h('a', { class: 'btn link', id: 'invite-link', href: '#/parrainer', style: 'align-self:flex-start' }, 'Inviter un proche'),
+      h('section', { class: 'stack tight', 'aria-labelledby': 'h-pro' },
+        h('h2', { id: 'h-pro', class: 'eyebrow' }, 'Pour les commerçants et livreurs'),
+        h('nav', { class: 'pro-list' },
+          shopBtn,
+          h('a', { class: 'pro-row', href: '#/livreur', id: 'courier-link' }, h('span', null, 'Espace livreur', h('span', { class: 'sub' }, 'Recevez vos courses avec l’entrée exacte')), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
+          h('a', { class: 'pro-row', id: 'invite-link', href: '#/parrainer' }, h('span', null, 'Inviter un proche', h('span', { class: 'sub' }, 'Votre lien et votre code de parrainage')), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))))),
       footer());
   }
 
@@ -1502,7 +1508,7 @@
           : ctx.retour ? backBtn('Revenir à la fiche reçue', '#/a/' + ctx.retour)
           : backBtn(ctx.reqToken ? 'Retour à la demande' : ctx.editId ? 'Retour à la fiche' : 'Accueil', ctx.reqToken ? '#/d/' + ctx.reqToken + qs({ f: ctx.f }) : ctx.editId ? '#/m/' + ctx.editId : '#/'),
         h('div', { class: 'stack tight' },
-          h('p', { class: 'eyebrow' }, (ctx.editId ? 'Modifier · ' : '') + 'Étape ' + step + ' sur 4'),
+          h('p', { class: 'eyebrow step' }, (ctx.editId ? 'Modifier · ' : '') + 'Étape ' + step + ' sur 4'),
           h('div', { class: 'steps', 'aria-hidden': 'true' }, [1, 2, 3, 4].map(function (i) { return h('i', { class: i <= step ? 'on' : '' }); }))),
         h('div', { class: 'stack' }, body), err, h('div', { class: 'stack' }, next, why),
         ctx.retour && step > 1 ? h('a', { class: 'btn link', href: '#/a/' + ctx.retour, style: 'align-self:flex-start' }, 'Revenir à la fiche reçue (le brouillon est gardé)') : null);
@@ -1629,17 +1635,10 @@
       installSlot(),
       expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
       isMeeting ? h('a', { class: expired ? 'btn' : 'btn ghost', id: 'similar', href: '#/rdv/nouveau' + qs({ depuis: pl.id }) }, 'Créer un rendez-vous similaire') : null,
-      h('div', { class: 'row' },
-        active ? h('a', { class: 'btn ghost', href: url, target: '_blank', rel: 'noopener' }, 'Voir la fiche publique') : null,
-        h('a', { class: 'btn ghost', href: isMeeting ? '#/rdv/modifier/' + pl.id : '#/edit/' + pl.id }, 'Modifier')),
-      h('div', { class: 'row' },
-        pl.status === 'active' && !expired
-          ? h('button', { class: 'btn ghost', type: 'button', id: 'revoke', onclick: function () { act('fiila_revoke_place', 'Lien désactivé. Il n’affiche plus rien.', function () { render(); }); } }, 'Désactiver le lien')
-          : !expired ? h('button', { class: 'btn ghost', type: 'button', id: 'new-link', onclick: function () { act('fiila_new_link', 'Nouveau lien créé. L’ancien reste inactif.', function () { render(); }); } }, 'Créer un nouveau lien') : null,
-        h('button', { class: 'btn danger', type: 'button', id: 'delete', onclick: askDelete }, 'Supprimer')),
-      pl.status !== 'active' && !expired ? h('p', { class: 'hint' }, 'Le lien désactivé n’affiche plus aucune information. Un nouveau lien le remplacera définitivement.') : null,
-      zone,
-      !isMeeting && !active ? tagPicker(pl, owner) : null,
+      // Navigation en lignes ; actions sensibles à part, en bas (audit design D1, D4).
+      h('nav', { class: 'pro-list' },
+        h('a', { class: 'pro-row', href: isMeeting ? '#/rdv/modifier/' + pl.id : '#/edit/' + pl.id }, h('span', null, 'Modifier'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
+        active ? h('a', { class: 'pro-row', href: url, target: '_blank', rel: 'noopener' }, h('span', null, 'Voir la fiche publique'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))) : null),
       !key ? h('p', { class: 'hint' }, 'Fiche rattachée à votre compte : retrouvez-la sur tous vos téléphones en vous connectant.') :
       h('details', null,
         h('summary', null, 'Clé de gestion (pour un autre téléphone)'),
@@ -1648,6 +1647,15 @@
           h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(key, 'Clé de gestion'); } }, 'Copier la clé de gestion'),
           h('a', { class: 'btn ghost small', href: waLink('Ma clé de gestion Fii La pour « ' + pl.label + ' » (ne pas partager) : ' + key), target: '_blank', rel: 'noopener noreferrer' }, 'M’envoyer la clé sur WhatsApp'),
           h('p', { class: 'hint' }, 'Choisissez votre propre discussion WhatsApp, pas celle d’une autre personne.'))),
+      h('section', { class: 'sensitive', 'aria-labelledby': 'h-sensitive' },
+        h('h2', { id: 'h-sensitive', class: 'eyebrow' }, 'Actions sensibles'),
+        pl.status === 'active' && !expired
+          ? h('button', { class: 'btn quiet', type: 'button', id: 'revoke', onclick: function () { act('fiila_revoke_place', 'Lien désactivé. Il n’affiche plus rien.', function () { render(); }); } }, 'Désactiver le lien')
+          : !expired ? h('button', { class: 'btn quiet', type: 'button', id: 'new-link', onclick: function () { act('fiila_new_link', 'Nouveau lien créé. L’ancien reste inactif.', function () { render(); }); } }, 'Créer un nouveau lien') : null,
+        h('button', { class: 'btn quiet danger-text', type: 'button', id: 'delete', onclick: askDelete }, 'Supprimer'),
+        pl.status !== 'active' && !expired ? h('p', { class: 'hint' }, 'Le lien désactivé n’affiche plus aucune information. Un nouveau lien le remplacera définitivement.') : null,
+        zone),
+      !isMeeting && !active ? tagPicker(pl, owner) : null,
       footer());
   }
 

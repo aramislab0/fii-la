@@ -1,7 +1,7 @@
 {
   "moteur": "chromium",
   "version": "141.0.7390.37",
-  "date": "2026-10-17T23:26:52.924Z",
+  "date": "2026-10-18T06:35:47.731Z",
   "reussis": 23,
   "total": 23,
   "contrastes_bloc_decouverte": {
@@ -15,7 +15,7 @@
       "title": 13.14,
       "body": 13.14,
       "hint": 6.68,
-      "cta": 15.07
+      "cta": 14.63
     }
   },
   "installabilite": {
