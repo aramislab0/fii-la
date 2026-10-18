@@ -146,6 +146,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 18/10 23:27 | Vitrine en production : migration `20261019000000_fiila_vitrine` appliquée, `verify-db` 12 migrations / 71 fonctions OK ; E2E déployé 38/38 Chromium et WebKit ; WebKit local vitrine 6/6, parrainage 8/8, boutique 26/26 ; données réelles du fondateur intactes | `c2e4849` |
 | 18/10 23:20 | Accord fondateur (« je valide tout ») : complément CDP rédigé (§2 bis) ; compte du fondateur marqué administrateur (SQL, `is_admin = true`) ; suppression des 2 restes de test refusée à l'exécution par la fenêtre de confirmation, à relancer | `docs/CONFORMITE-CDP.md` |
 | 18/10 21:46 | Production vérifiée : E2E déployé 38/38 Chromium et 38/38 WebKit ; WebKit local parrainage 8/8, boutique 26/26. Base : données réelles du fondateur (fiches, 1 boutique, 1 livreur, 1 compte) intactes ; restent 1 fiche et 1 demande de test du 17/10 en attente d'accord de suppression | journaux Mac `e2e-c.log`, `e2e-w.log`, `ref-w.log`, `shop-w.log` |
 | 18/10 21:40 | Interface v1.2 (calme et sûr + icônes) et repère vocal mis en production : migration `20261018100000_fiila_voice` appliquée, `verify-db` 11 migrations / 67 fonctions OK ; branche `design-v1.2` fusionnée dans `main`. Tests locaux : SQL 101, E2E 38, circuit 20, découverte 23, social 23, suivi 12, boutique 26, livreurs 8, parrainage 8, vocal 5 | `5aef262` |
