@@ -95,6 +95,23 @@ await t('parrainage : une boutique ouverte depuis la vitrine d’une autre est c
   assert.equal(me.recent[0].label, 'Nouvelle [TEST]');
 });
 
+await t('modèles et personnalisation : thème, couleur, couverture ; valeurs inventées refusées', async () => {
+  const r0 = await ok('fiila_shop_vitrine', { p_key: SK, p: null });
+  assert.equal(r0.theme, 'galerie'); assert.equal(r0.accent, 'foret');
+  const r = await ok('fiila_shop_vitrine', { p_key: SK, p: { theme: 'magazine', accent: 'prune', cover: photo } });
+  assert.equal(r.theme, 'magazine'); assert.equal(r.accent, 'prune'); assert.match(r.cover, /^data:image\/png;base64,/);
+  const v = await ok('fiila_vitrine', { p_slug: SLUG });
+  assert.equal(v.shop.theme, 'magazine'); assert.equal(v.shop.accent, 'prune'); assert.equal(v.shop.has_cover, true);
+  assert.ok(!JSON.stringify(v).includes('base64'), 'couverture chargée à part');
+  assert.match((await ok('fiila_vitrine_photo', { p_slug: SLUG, p_id: 'cover' })).photo, /^data:image\/png/);
+  await ko('fiila_shop_vitrine', { p_key: SK, p: { theme: '<script>' } }, 'invalid_theme');
+  await ko('fiila_shop_vitrine', { p_key: SK, p: { accent: '#ff0000' } }, 'invalid_theme');
+  await ko('fiila_shop_vitrine', { p_key: SK, p: { cover: Buffer.from('pas une image'.repeat(20)).toString('base64') } }, 'photo_invalid');
+  const r2 = await ok('fiila_shop_vitrine', { p_key: SK, p: { cover: '' } });
+  assert.equal(r2.cover, undefined);
+  assert.equal((await ok('fiila_vitrine', { p_slug: SLUG })).shop.has_cover, undefined);
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL vitrine réussis`);
 process.exit(passed === results.length ? 0 : 1);

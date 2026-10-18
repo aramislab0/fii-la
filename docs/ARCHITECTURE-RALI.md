@@ -154,3 +154,9 @@ Proposition faite le 17/10, non validée. Rien n'est construit.
 - Client : `#/b/<slug>` (panier en mémoire, rien d'écrit sur le téléphone), `#/b/<slug>?a=<article>` (article mis en avant, utilisé par la légende « Publier »), confirmation sur la facture (`?nouvelle=1`) avec « Prévenir la boutique sur WhatsApp ». Réglages : « Ma vitrine en ligne ».
 - Parrainage : une boutique ouverte après la visite d'une vitrine est comptée pour cette vitrine (source `vitrine`).
 - Restent pour la marketplace (V3) : catégories, recherche, modération, mise en avant.
+
+### 11 bis. Modèles et personnalisation de la vitrine (19/10/2026)
+- Trois modèles : **Galerie** (deux vignettes par ligne, par défaut), **Catalogue** (liste compacte, photo à gauche), **Magazine** (une grande photo 4:5 par article).
+- Couleur d'accent dans une palette fermée de 6 (Forêt, Nuit, Indigo, Prune, Bordeaux, Terre) : texte blanc lisible sur chacune ; aucune couleur libre (pas de saisie hexadécimale).
+- Photo de couverture (mêmes contrôles que les photos d'articles : format vérifié, métadonnées refusées, 400 Ko au plus), chargée à part.
+- Migration `20261019100000_fiila_vitrine_themes` : `shops.theme`, `shops.accent`, `shops.cover`.

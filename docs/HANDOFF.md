@@ -70,6 +70,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 17/10 23:10 | Croissance : cible tout le Sénégal (boutiques, particuliers, livreurs) ; phase 0 à construire en entier, bouton « Publier » compris ; récompenses fixées plus tard (l'argent n'est pas exclu) | Fondateur |
 | 18/10 21:18 | Design v1.2 + « icônes et hiérarchie » validés en entier ; repère vocal ajouté au périmètre | Fondateur |
 | 18/10 23:16 | Prochaine fonction : vitrine publique de la boutique (choisie parmi kit de lancement, alertes livreur, vitrine, suivi 3D) ; CDP pris en charge par le fondateur | Fondateur |
+| 18/10 23:31 | Vitrine : 3 modèles au choix et personnalisation simple (« comme Shopify ») | Fondateur |
 
 ## 4. En attente / prochaines actions
 

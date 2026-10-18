@@ -624,3 +624,50 @@ button.rnd:not(:disabled):active{transform:none}
 .cartbar{position:fixed;left:0;right:0;bottom:0;z-index:900;display:flex;justify-content:center;padding:0 12px calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none}
 .cartbar>*{pointer-events:auto;width:100%;max-width:528px;box-shadow:var(--shadow-float)}
 @media (max-width:340px){.vgrid{grid-template-columns:1fr}}
+
+/* ----- Vitrine : modèles et couleur (19/10/2026) */
+.vt{--accent:#1E4A34}
+.vt .btn:not(.ghost):not(.link):not(.quiet),.vt .qbtn{background:var(--accent);border-color:var(--accent);color:#fff}
+.vt .btn:not(.ghost):not(.link):not(.quiet):hover{filter:brightness(.92)}
+.vt .vavatar{background:var(--accent)}
+.vt .vcard.focus{outline-color:var(--accent)}
+.vcover{height:180px;border-radius:22px;overflow:hidden;background:var(--surface-2)}
+.vcover img{width:100%;height:100%;object-fit:cover;display:block}
+/* Catalogue : liste compacte */
+.vt-catalogue .vgrid{grid-template-columns:1fr;gap:10px}
+.vt-catalogue .vcard{flex-direction:row;align-items:stretch}
+.vt-catalogue .vimg{width:104px;flex:none;aspect-ratio:auto;min-height:104px}
+.vt-catalogue .vbody{padding:10px 12px}
+.vt-catalogue .qty .add-btn{width:auto;align-self:flex-end}
+.vt-catalogue .qty{justify-content:flex-end}
+/* Magazine : une grande photo par article */
+.vt-magazine .vgrid{grid-template-columns:1fr;gap:18px}
+.vt-magazine .vimg{aspect-ratio:4/5}
+.vt-magazine .vbody{padding:14px 16px 16px;gap:6px}
+.vt-magazine .vbody h3{font-size:18px}
+.vt-magazine .vprice{font-size:17px}
+.vt-magazine .vdesc{-webkit-line-clamp:3}
+.vt-magazine .vhead{flex-direction:column;align-items:flex-start;text-align:left}
+/* Choix du modèle et de la couleur (réglages) */
+.vt-pick,.vt-colors{border:0;margin:0;padding:0;min-width:0}
+.vt-pick legend,.vt-colors legend{font-weight:600;font-size:14px;padding:0;margin-bottom:8px}
+.vt-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.vt-pick legend{grid-column:1/-1}
+.vt-opt{display:flex;flex-direction:column;gap:4px;padding:8px;border:1.5px solid var(--line);border-radius:16px;cursor:pointer;background:var(--surface);position:relative;min-width:0}
+.vt-opt.on,.vt-opt:has(input:checked){border:2px solid var(--green)}
+.vt-opt input,.swatch input{position:absolute;opacity:0;width:1px;height:1px}
+.vt-opt:has(input:focus-visible),.swatch:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:2px}
+.vt-name{font-weight:700;font-size:13px}
+.vt-opt .small{font-size:11px;line-height:1.3}
+.vt-mini{display:grid;gap:3px;height:64px;padding:5px;border-radius:10px;background:var(--surface-2)}
+.vt-mini i{display:block;border-radius:4px;background:var(--accent);opacity:.75}
+.vt-mini-galerie{grid-template-columns:1fr 1fr}
+.vt-mini-catalogue{grid-template-columns:1fr}
+.vt-mini-catalogue i{opacity:.45;border-left:14px solid var(--accent)}
+.vt-mini-magazine{grid-template-columns:1fr;grid-template-rows:3fr 1fr 0 0}
+.vt-mini-magazine i:nth-child(n+3){display:none}
+.vt-colors{display:flex;flex-wrap:wrap;gap:10px}
+.vt-colors legend{width:100%}
+.swatch{width:44px;height:44px;border-radius:50%;padding:3px;border:2px solid transparent;cursor:pointer;position:relative}
+.swatch span{display:block;width:100%;height:100%;border-radius:50%}
+.swatch.on,.swatch:has(input:checked){border-color:var(--ink)}

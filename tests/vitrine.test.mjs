@@ -104,6 +104,29 @@ await t('publication d’un article : la légende renvoie vers la vitrine', asyn
   await S.locator('#post-caption').getByText(/Pour commander : .*#\/b\/boutique-awa-test\?a=/).waitFor();
 });
 
+await t('personnalisation : modèle Magazine, couleur Prune, couverture ; la vitrine change aussitôt', async () => {
+  await S.goto(URL0 + '#/boutique/reglages');
+  await S.locator('#vitrine-theme').getByText('Magazine').click();
+  await S.getByText('Modèle « Magazine » appliqué.').waitFor();
+  await S.getByRole('radio', { name: 'Prune' }).check({ force: true });
+  await S.getByText('Couleur « Prune » appliquée.').waitFor();
+  await S.setInputFiles('#vitrine-cover', 'tests/fixtures/door-with-exif.jpg');
+  await S.getByText('Couverture enregistrée.').waitFor();
+  await shot(S, '05-personnalisation');
+  const C = await newPhone();
+  await C.goto(URLV);
+  await C.locator('.vt.vt-magazine').waitFor();
+  await C.locator('#vitrine-cover img').waitFor();
+  const bg = await C.locator(`[data-add="${P1.id}"]`).evaluate((b) => getComputedStyle(b).backgroundColor);
+  assert.equal(bg, 'rgb(91, 42, 134)', 'couleur d’accent appliquée aux boutons');
+  await shot(C, '06-magazine');
+  await S.locator('#vitrine-theme').getByText('Catalogue').click();
+  await S.getByText('Modèle « Catalogue » appliqué.').waitFor();
+  await C.goto(URL0 + '#/'); await C.goto(URLV);
+  await C.locator('.vt.vt-catalogue').waitFor();
+  await shot(C, '07-catalogue');
+});
+
 await t('vitrine fermée : message clair, plus de commande possible', async () => {
   await S.goto(URL0 + '#/boutique/reglages');
   await S.locator('#vitrine-section').getByText('Fermée').click();

@@ -1112,6 +1112,11 @@
   /* ================================================================ VITRINE PUBLIQUE DE LA BOUTIQUE
      #/b/<slug> : articles visibles, panier en mémoire (rien n'est écrit sur le téléphone), commande en ligne.
      La commande crée la demande d'adresse : la personne donne son adresse depuis la facture. */
+  // Modèles et couleurs de vitrine (palette fermée : texte blanc lisible sur chaque couleur).
+  var VT_THEMES = [['galerie', 'Galerie', 'Grandes vignettes, deux par ligne'], ['catalogue', 'Catalogue', 'Liste compacte, beaucoup d’articles'],
+    ['magazine', 'Magazine', 'Une grande photo par article']];
+  var VT_ACCENTS = { foret: ['Forêt', '#1E4A34'], nuit: ['Nuit', '#1F2A37'], indigo: ['Indigo', '#2F3E9E'], prune: ['Prune', '#5B2A86'],
+    bordeaux: ['Bordeaux', '#7A1F3D'], terre: ['Terre', '#8A4B1F'] };
   function vitrineUrl(slug, productId) { return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : ''); }
   function viewVitrine(slug, q) {
     if (!/^[a-z0-9-]{3,40}$/.test(slug)) return page(brandBar('Boutique'), stateCard('?', 'Vitrine introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
@@ -1204,7 +1209,12 @@
       window.scrollTo(0, 0);
     }
     list();
-    var pg = page(brandBar('Boutique'), root, h('div', { style: 'height:80px' }), footer(true));
+    var theme = ['galerie', 'catalogue', 'magazine'].indexOf(shop.theme) >= 0 ? shop.theme : 'galerie';
+    var cover = shop.has_cover ? h('div', { class: 'vcover loading-skel', id: 'vitrine-cover' }) : null;
+    if (cover) lazyPhoto(cover, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: 'cover' }).then(function (x) { return x.photo; }); }, '');
+    var pg = page(brandBar('Boutique'), cover, root, h('div', { style: 'height:80px' }), footer(true));
+    pg.classList.add('vt', 'vt-' + theme);
+    pg.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.foret)[1]);
     pg.appendChild(bar);
     return pg;
   }
@@ -1223,10 +1233,14 @@
   // Réglages : ouvrir, fermer et présenter sa vitrine.
   function vitrineSection(shop) {
     var box = h('section', { class: 'card', id: 'vitrine-section' });
-    var state = { public: !!shop.public, slug: shop.slug, about: shop.about || '' };
+    var state = { public: !!shop.public, slug: shop.slug, about: shop.about || '', theme: shop.theme || 'galerie', accent: shop.accent || 'foret', cover: null };
+    sapi('fiila_shop_vitrine', { p: null }).then(function (r) { state.cover = r.cover || null; state.theme = r.theme || state.theme; state.accent = r.accent || state.accent; draw(); }, function () {});
     var err = h('div', { role: 'alert' });
     function save(p, okText) {
-      return sapi('fiila_shop_vitrine', { p: p }).then(function (r) { state.public = !!r.public; state.slug = r.slug; state.about = r.about || ''; toast(okText); draw(); }, function (e) { errBox(err, e); });
+      return sapi('fiila_shop_vitrine', { p: p }).then(function (r) {
+        state.public = !!r.public; state.slug = r.slug; state.about = r.about || ''; state.theme = r.theme || 'galerie'; state.accent = r.accent || 'foret'; state.cover = r.cover || null;
+        toast(okText); draw();
+      }, function (e) { errBox(err, e); });
     }
     function draw() {
       var url = state.slug ? vitrineUrl(state.slug) : null;
@@ -1240,6 +1254,24 @@
             iconBtn('a', { class: 'btn mid', id: 'vitrine-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer'),
             iconBtn('button', { class: 'btn ghost mid', type: 'button', onclick: function () { copy(url, 'Lien'); } }, 'link', 'Copier')),
           iconRow('#/b/' + state.slug, 'eye', 'Voir ma vitrine', { id: 'vitrine-view' })] : null,
+        h('fieldset', { class: 'vt-pick', id: 'vitrine-theme' }, h('legend', null, 'Modèle'),
+          VT_THEMES.map(function (t) {
+            return h('label', { class: 'vt-opt' + (state.theme === t[0] ? ' on' : '') },
+              h('input', { type: 'radio', name: 'vt-theme', value: t[0], checked: state.theme === t[0] || null,
+                onchange: function () { save({ theme: t[0] }, 'Modèle « ' + t[1] + ' » appliqué.'); } }),
+              h('span', { class: 'vt-mini vt-mini-' + t[0], 'aria-hidden': 'true', style: '--accent:' + VT_ACCENTS[state.accent][1] }, h('i'), h('i'), h('i'), h('i')),
+              h('span', { class: 'vt-name' }, t[1]), h('span', { class: 'small muted' }, t[2]));
+          })),
+        h('fieldset', { class: 'vt-colors', id: 'vitrine-accent' }, h('legend', null, 'Couleur'),
+          Object.keys(VT_ACCENTS).map(function (k) {
+            return h('label', { class: 'swatch' + (state.accent === k ? ' on' : ''), title: VT_ACCENTS[k][0] },
+              h('input', { type: 'radio', name: 'vt-accent', value: k, 'aria-label': VT_ACCENTS[k][0], checked: state.accent === k || null,
+                onchange: function () { save({ accent: k }, 'Couleur « ' + VT_ACCENTS[k][0] + ' » appliquée.'); } }),
+              h('span', { style: 'background:' + VT_ACCENTS[k][1] }));
+          })),
+        photoField({ id: 'vitrine-cover', optional: true, label: 'Photo de couverture', maxSide: 1280,
+          get: function () { return state.cover; },
+          set: function (v) { state.cover = v; save({ cover: v ? v.replace(/^data:[^,]+,/, '') : '' }, v ? 'Couverture enregistrée.' : 'Couverture retirée.'); } }),
         textField({ id: 'vitrine-about', label: 'Présentation', optional: true, max: 160, value: state.about, placeholder: 'Ex. : Robes wax et foulards, livrés à Dakar.',
           onInput: function (v) { state.about = v; } }),
         iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'vitrine-about-save', onclick: function () { save({ about: state.about }, 'Présentation enregistrée.'); } }, 'check', 'Enregistrer la présentation', 18),
