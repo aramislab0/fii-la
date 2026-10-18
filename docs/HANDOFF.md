@@ -143,6 +143,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 18/10 22:10 | Interface v1.2 (calme et sûr + icônes) et repère vocal mis en production : migration `20261018100000_fiila_voice` appliquée, `verify-db` 11 migrations / 67 fonctions OK ; branche `design-v1.2` fusionnée dans `main`. Tests locaux : SQL 101, E2E 38, circuit 20, découverte 23, social 23, suivi 12, boutique 26, livreurs 8, parrainage 8, vocal 5 | `5aef262` |
 | 18/10 21:30 | Retour fondateur : lot 1 fonctionne ; demande moins de boutons, hiérarchie, icônes (lecteurs peu à l'aise). Analyse et maquette 4 écrans proposées, rien appliqué | `docs/PROPOSITION-UX-ICONES.md` |
 | 18/10 06:45 | Design v1.2 lot 1 (fondations : 3 formes, pilules, cartes sans bord, lignes de liste, titres 700, citron retiré des boutons, désactivé neutre, sauge pour la confidentialité, sombre adouci, pied allégé) + accueil réorganisé + gestion (actions sensibles en bas). Sur branche `design-v1.2`, **pas en production**. Tests locaux verts (E2E 38, circuit 20, découverte 23, social 23, suivi 12, boutique 26, livreurs 8, parrainage 8) | branche `design-v1.2`, `docs/screenshots/design-v1.2-*.png` |
 | 18/10 04:05 | Audit design (beauté, couleurs, formes, sécurité ressentie, calme) à partir des captures à jour : 13 constats, direction « calme et sûr », plan en 5 lots. Rien de modifié | `docs/AUDIT-DESIGN-2026-10-18.md` |
