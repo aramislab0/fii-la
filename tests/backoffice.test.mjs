@@ -82,6 +82,7 @@ await t('portail : connexion de l’équipe ; un compte hors équipe est refusé
   // Double authentification obligatoire : activation à la première connexion (QR code ou clé), refus d'un code faux.
   await D.locator('#bo-mfa').getByText('Activer la double authentification').waitFor();
   await D.locator('#bo-mfa-qr').waitFor();
+  assert.ok(await D.locator('#bo-mfa-qr').evaluate((img) => img.complete && img.naturalWidth > 0), 'le QR code s’affiche (format réel de Supabase)');
   await shot(D, '00-double-authentification');
   await D.fill('#bo-mfa-code', '000000');
   await D.click('#bo-mfa-ok');

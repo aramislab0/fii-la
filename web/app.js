@@ -5582,6 +5582,14 @@
   }
   /* Double authentification de l'équipe : à la première connexion, activation (QR code ou clé à saisir dans l'application,
      puis premier code) ; ensuite, le code à chaque connexion. */
+  // QR code renvoyé par Supabase : du SVG brut dans une URL « data: » (les « # » des couleurs la coupent). On le réencode.
+  function mfaQrSrc(q) {
+    var m = /^data:image\/svg\+xml;(?:charset=)?utf-8,([\s\S]*)$/i.exec(q || '');
+    if (!m) return q || '';
+    var raw = m[1];
+    if (/^%3C/i.test(raw)) { try { raw = decodeURIComponent(raw); } catch (e) { /* tel quel */ } }
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(raw);
+  }
   function boMfa(me) {
     function card() { return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-mfa' },
       h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
@@ -5617,7 +5625,8 @@
             h('p', { class: 'small muted' }, 'Obligatoire pour l’équipe : un mot de passe volé ne suffit plus pour entrer.'),
             h('ol', { class: 'bo-steps' },
               h('li', null, 'Installez une application d’authentification : Google Authenticator, Microsoft Authenticator, ou « Mots de passe » sur iPhone.'),
-              h('li', null, 'Scannez ce QR code avec l’application.', h('img', { src: en.totp.qr_code, alt: 'QR code de la double authentification', class: 'bo-qr', id: 'bo-mfa-qr', width: 180, height: 180 }),
+              h('li', null, 'Scannez ce QR code avec l’application.', h('img', { src: mfaQrSrc(en.totp.qr_code), alt: 'QR code de la double authentification', class: 'bo-qr', id: 'bo-mfa-qr', width: 180, height: 180 }),
+                en.totp.uri ? h('a', { class: 'btn ghost small', href: en.totp.uri, id: 'bo-mfa-open', style: 'align-self:flex-start' }, 'Sur ce téléphone : ajouter à l’application') : null,
                 h('span', { class: 'small muted' }, 'Ou saisissez cette clé à la main : '), h('code', { id: 'bo-mfa-secret', class: 'wrapword' }, secret.replace(/(.{4})/g, '$1 ').trim())),
               h('li', null, 'Saisissez le code à 6 chiffres affiché par l’application.')),
             codeForm(en.id, 'Activer', 'Double authentification activée.'),
