@@ -1588,11 +1588,62 @@
     }
     Promise.resolve(view).then(function (node) {
       if (seq !== renderSeq) return;
+      ensureWayBack(node, r);
       setKids(app, node);
       window.scrollTo(0, 0);
     });
   }
-  window.addEventListener('hashchange', render);
+  /* ----- navigation : chaque écran a une sortie
+     On garde en mémoire les écrans vus dans cette session (jamais sur le téléphone). Un écran sans bouton retour
+     en reçoit un : retour à l'écran précédent de l'application s'il existe, sinon à l'écran « parent » logique. */
+  var NAV = [];
+  var lastHash = location.hash || '#/';
+  window.addEventListener('hashchange', function () {
+    var cur = location.hash || '#/';
+    if (NAV.length && NAV[NAV.length - 1] === cur) NAV.pop(); // retour arrière
+    else if (lastHash !== cur) NAV.push(lastHash);
+    if (NAV.length > 50) NAV.shift();
+    lastHash = cur;
+    render();
+  });
+  function parentOf(parts, q) {
+    var a = parts[0], b = parts[1];
+    if (!a) return null;
+    if (a === 'boutique' && b === 'article') return ['#/boutique/articles', 'Mes articles'];
+    if (a === 'boutique' && b) return ['#/boutique', 'Ma boutique'];
+    if (a === 'clients' && b) return ['#/clients', 'Clients'];
+    if (a === 'clients' || a === 'commande') return ['#/boutique', 'Ma boutique'];
+    if (a === 'edit' && b) return ['#/m/' + b, 'Retour à la fiche'];
+    if (a === 'livreur' && b) return ['#/livreur', 'Espace livreur'];
+    if (a === 'parrainer' && q && q.pour === 'boutique') return ['#/boutique', 'Ma boutique'];
+    if (a === 'parrainer' && q && q.pour === 'livreur') return ['#/livreur', 'Espace livreur'];
+    return ['#/', 'Accueil'];
+  }
+  function showView(node) { ensureWayBack(node, parseHash()); setKids(app, node); }
+  function ensureWayBack(node, r) {
+    if (!node || !node.querySelector || !r.parts.length) return;
+    var prev = NAV.length ? NAV[NAV.length - 1] : null;
+    var bar = node.querySelector('.brand-bar');
+    // Pages reçues par lien : le logo ramène à l'accueil ; une flèche apparaît si l'on vient d'un autre écran de l'application.
+    if (bar) {
+      var mark = bar.querySelector('.mark');
+      if (mark && mark.tagName !== 'A') {
+        var link = h('a', { class: 'mark small brand-home', href: '#/', 'aria-label': 'Fii La, accueil' }, 'Fii', h('span', null, 'La'));
+        mark.replaceWith(link);
+      }
+      if (prev && !bar.querySelector('.bar-back')) {
+        bar.insertBefore(h('button', { class: 'bar-back', type: 'button', 'aria-label': 'Retour', onclick: function () { history.back(); } }, icon('back', 22)), bar.firstChild);
+      }
+      return;
+    }
+    if (node.querySelector('.back')) return;
+    var par = parentOf(r.parts, r.q);
+    var btn = backBtn(par[1], par[0]);
+    btn.classList.add('auto-back');
+    if (prev) btn.onclick = function (e) { e.preventDefault(); history.back(); };
+    if (prev) btn.textContent = '← Retour';
+    node.insertBefore(btn, node.firstChild);
+  }
 
   /* ================================================================ ACCUEIL */
   function viewHome() {
@@ -1862,7 +1913,7 @@
         else toast('Adresse enregistrée.');
         if (ctx.reqToken && ctx.requester) {
           return api('fiila_fulfill_request', { p_token: ctx.reqToken, p_place_id: r.id, p_place_owner: r.owner_token }).then(function () {
-            setKids(app, sentView(ctx.requester, r.share_token, r.id, ctx.f)); window.scrollTo(0, 0);
+            showView(sentView(ctx.requester, r.share_token, r.id, ctx.f)); window.scrollTo(0, 0);
           }, function () { go('#/d/' + ctx.reqToken + qs({ sel: r.id, f: ctx.f })); });
         }
         if (ctx.reqToken) go('#/d/' + ctx.reqToken + qs({ sel: r.id, f: ctx.f }));
@@ -2533,8 +2584,8 @@
       var courierUrl = baseUrl() + '#/l/' + d.courier, watchUrl = baseUrl() + '#/s/' + d.watch;
       setKids(box,
         h('section', { class: 'card' }, h('h2', null, 'Livraison'),
-          h('a', { class: 'btn lime', id: 'send-courier', target: '_blank', rel: 'noopener noreferrer',
-            href: waLink('Livraison : l’adresse exacte avec la photo de l’entrée. Ouvrez le lien et touchez « Démarrer la livraison » : ' + courierUrl) }, 'Envoyer au livreur (WhatsApp)'),
+          iconBtn('a', { class: 'btn', id: 'send-courier', target: '_blank', rel: 'noopener noreferrer',
+            href: waLink('Livraison : l’adresse exacte avec la photo de l’entrée. Ouvrez le lien et touchez « Démarrer la livraison » : ' + courierUrl) }, 'moto', 'Envoyer au livreur (WhatsApp)'),
           type === 'request' ? h('a', { class: 'btn ghost', id: 'send-watch', target: '_blank', rel: 'noopener noreferrer',
             href: waLink('Suivez votre livraison en direct : ' + watchUrl) }, 'Envoyer le suivi au client (WhatsApp)') : null,
           h('div', { class: 'row' },
@@ -2770,6 +2821,7 @@
     LS.set('fiila.sent', sent);
     var url = shareToken ? shareUrl(shareToken) : null;
     return page(
+      brandBar('Adresse envoyée'),
       h('section', { class: 'card state', id: 'sent' },
         h('div', { class: 'big', 'aria-hidden': 'true' }, icon('check', 26)),
         h('h2', null, name + ' a votre adresse.'),
@@ -2777,8 +2829,8 @@
       url ? h('section', { class: 'card', id: 'share-close' },
         h('h2', null, 'Votre adresse est prête'),
         h('p', { class: 'small muted' }, 'Envoyez-la à vos proches : ils vous trouveront sans appeler.'),
-        h('a', { class: 'btn lime', id: 'share-relatives', href: waLink('Mon adresse, avec la photo de l’entrée : ' + url), target: '_blank', rel: 'noopener noreferrer',
-          onclick: function () { track('share_initiated', 'whatsapp_address'); } }, 'Envoyer sur WhatsApp'),
+        iconBtn('a', { class: 'btn', id: 'share-relatives', href: waLink('Mon adresse, avec la photo de l’entrée : ' + url), target: '_blank', rel: 'noopener noreferrer',
+          onclick: function () { track('share_initiated', 'whatsapp_address'); } }, 'chat', 'Envoyer sur WhatsApp'),
         h('a', { class: 'btn link', href: '#/m/' + placeId, style: 'align-self:flex-start' }, 'Voir mon adresse')) : null,
       !authed() && sent >= 2 ? nudgeCard('sent-nudge', 'Gardez vos adresses', 'Retrouvez-les même si vous changez de téléphone.',
         '#/compte' + qs({ mode: 'inscription', source: 'nudge' }), function () { LS.set('fiila.nudge.until', Date.now() + 14 * 864e5); }) : null,
@@ -2814,7 +2866,7 @@
           var send = h('button', { class: 'btn', type: 'button', id: 'send-address', onclick: function () {
             send.disabled = true; send.textContent = 'Envoi…'; setKids(err);
             api('fiila_fulfill_request', { p_token: token, p_place_id: sel, p_place_owner: rec.owner || null }).then(function () {
-              setKids(app, sentView(r.requester_name, pl.share_token || (owned.find('place', sel) || {}).share, sel, backInvoice));
+              showView(sentView(r.requester_name, pl.share_token || (owned.find('place', sel) || {}).share, sel, backInvoice));
               window.scrollTo(0, 0);
             }, function (e) {
               send.disabled = false; send.textContent = 'Réessayer l’envoi';
@@ -3007,7 +3059,7 @@
       h('button', { class: 'btn', type: 'button', onclick: function () {
         var m = /#\/k\/([^\s]+)/.exec(val) || /^([pr]\.[^\s]+)$/.exec(val.trim());
         if (!m) { setKids(err, h('p', { class: 'alert' }, 'Clé non reconnue. Collez-la en entier.')); return; }
-        restore(m[1]).then(function (node) { setKids(app, node); });
+        restore(m[1]).then(function (node) { showView(node); });
       } }, 'Restaurer'),
       footer());
   }
@@ -3360,7 +3412,7 @@
           track('courier_invited', 'whatsapp');
           // un seul bouton à la fois : l'invitation prête remplace « Inviter »
           b.hidden = true;
-          setKids(sendBox, iconBtn('a', { class: 'btn lime', id: 'courier-invite-send', href: wa, target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer sur WhatsApp'),
+          setKids(sendBox, iconBtn('a', { class: 'btn', id: 'courier-invite-send', href: wa, target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer sur WhatsApp'),
             iconBtn('button', { class: 'btn ghost small', type: 'button', style: 'align-self:flex-start', onclick: function () { copy(link, 'Lien'); } }, 'link', 'Copier le lien'));
         }, function (e) { b.disabled = false; errBox(err, e); });
       } }, 'Inviter sur WhatsApp'),
@@ -3671,7 +3723,7 @@
     var link = invoiceUrl(o.share_token);
     var closed = o.status !== 'open';
     var shopName = shop.name || 'votre boutique';
-    function refresh(next) { if (next) o = next; setKids(app, orderView(o, shop, {})); }
+    function refresh(next) { if (next) o = next; showView(orderView(o, shop, {})); }
     function call(fn, args, okText) {
       return sapi(fn, Object.assign({ p_id: o.id }, args || {})).then(function () {
         return sapi('fiila_order_get', { p_id: o.id });
@@ -3696,7 +3748,7 @@
     // 2. Envoyer au client
     var send = closed && o.status === 'cancelled' ? null : h('section', { class: 'card', id: 'send-client' },
       h('h2', null, 'Envoyer au client'),
-      h('a', { class: 'btn lime', id: 'send-invoice', href: waTo(o.customer_phone, msgClient), target: '_blank', rel: 'noopener noreferrer',
+      h('a', { class: 'btn', id: 'send-invoice', href: waTo(o.customer_phone, msgClient), target: '_blank', rel: 'noopener noreferrer',
         onclick: function () { track('share_initiated', 'whatsapp'); } }, icon('chat', 22), h('span', null, o.address_state === 'pending' ? 'Envoyer la commande et demander l’adresse' : 'Envoyer la facture')),
       h('div', { class: 'row' },
         iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'copy-invoice', onclick: function () { copy(link, 'Lien'); } }, 'link', 'Copier le lien'),
@@ -3732,8 +3784,8 @@
       }
       deliv = h('section', { class: 'card', id: 'order-delivery' }, h('h2', null, 'Livraison'),
         attBlock,
-        cour && !o.courier ? h('a', { class: 'btn lime', id: 'send-courier', target: '_blank', rel: 'noopener noreferrer',
-          href: waLink('Livraison N° ' + o.ref + ' pour ' + o.customer_name + ' : adresse exacte et photo de l’entrée. Ouvrez le lien et touchez « Démarrer la livraison » : ' + courierUrl) }, 'Envoyer le lien au livreur (WhatsApp)') : null,
+        cour && !o.courier ? iconBtn('a', { class: 'btn', id: 'send-courier', target: '_blank', rel: 'noopener noreferrer',
+          href: waLink('Livraison N° ' + o.ref + ' pour ' + o.customer_name + ' : adresse exacte et photo de l’entrée. Ouvrez le lien et touchez « Démarrer la livraison » : ' + courierUrl) }, 'moto', 'Envoyer le lien au livreur (WhatsApp)') : null,
         cour && !o.courier ? h('button', { class: 'btn ghost small', type: 'button', id: 'copy-courier', onclick: function () { copy(courierUrl, 'Lien livreur'); } }, 'Copier le lien livreur') : null,
         startBtn, dErr,
         o.watch_token ? deliveryWatch(o.watch_token) : null,

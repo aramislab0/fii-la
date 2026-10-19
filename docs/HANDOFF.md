@@ -148,6 +148,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 03:50 | Navigation (en cours, branche `navigation`) : retour automatique sur tout écran sans sortie, logo cliquable vers l'accueil, flèche dans l'en-tête des pages reçues ouvertes depuis l'application ; boutons citron restants passés en vert avec icône ; nouvelle suite `tests/navigation.test.mjs` 47/47 | ce commit |
 | 18/10 23:55 | NINEA retiré (champ, facture, page confidentialité) ; tests boutique 26/26, vitrine 7/7, livreurs 8/8 | ce commit |
 | 18/10 23:39 | Modèles de vitrine en production : migration `20261019100000_fiila_vitrine_themes` appliquée, `verify-db` 13 migrations / 71 fonctions OK ; E2E déployé 38/38 Chromium et WebKit ; WebKit local vitrine 7/7, parrainage 8/8, boutique 26/26 | `8901e75` |
 | 18/10 23:27 | Vitrine en production : migration `20261019000000_fiila_vitrine` appliquée, `verify-db` 12 migrations / 71 fonctions OK ; E2E déployé 38/38 Chromium et WebKit ; WebKit local vitrine 6/6, parrainage 8/8, boutique 26/26 ; données réelles du fondateur intactes | `c2e4849` |
