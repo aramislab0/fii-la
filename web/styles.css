@@ -534,7 +534,7 @@ footer.foot a:hover{text-decoration:underline}
 .ttile:active .ttile-ic{background:var(--surface-2)}
 @media (max-width:340px){.ttile-ic{width:52px;height:52px}}
 /* Raccourcis ronds */
-.rnd-row{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.rnd-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
 .rnd{display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;min-height:0;padding:4px 0;color:var(--ink);font:inherit;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;border-radius:12px;line-height:1.15;text-align:center}
 .rnd:hover{background:none}
 .rnd-ic{width:52px;height:52px;border-radius:50%;background:var(--surface-2);color:var(--green);display:flex;align-items:center;justify-content:center}
@@ -999,3 +999,6 @@ input[type=number]{font:inherit;font-size:16px;padding:12px 14px;border-radius:1
 .opt,.car-dot,.post-more,.qbtn{position:relative}
 .opt::after,.post-more::after,.qbtn::after{content:'';position:absolute;inset:-5px -2px}
 .car-dot::after{content:'';position:absolute;inset:-8px}
+/* Rangée d'actions rondes : jamais plus large que l'écran, même avec des polices de remplacement plus larges (audit 19/10). */
+.rnd-t{max-width:100%;overflow-wrap:anywhere}
+@media (max-width:350px){.rnd-ic{width:46px;height:46px}.rnd{font-size:11.5px}}

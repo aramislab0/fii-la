@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 let pw;
 try { pw = require('playwright'); } catch { pw = require('/opt/npm-tools/node_modules/playwright'); }
 const { chromium, devices } = pw;
-const sharp = (() => { try { return require('sharp'); } catch { return require('/opt/npm-tools/node_modules/sharp'); } })();
+const { PNG } = require('pngjs'); // dépendance du dépôt (sharp n'est pas installé sur GitHub)
 
 const SHOTS = 'docs/screenshots';
 mkdirSync(SHOTS, { recursive: true });
@@ -29,7 +29,9 @@ async function t(name, fn) {
 
 // ------------------------------------------------------------------ fiches de l'expéditeur (synthétiques)
 const SENDER = { label: 'Atelier EXPEDITEUR-7731', locality: 'QUARTIER-EXPEDITEUR', instruction: 'REPERE-EXPEDITEUR porte grise', lat: 14.711111, lng: -17.422222 };
-const senderPhoto = (await sharp({ create: { width: 640, height: 480, channels: 3, background: '#7a5c3c' } }).jpeg({ quality: 70 }).toBuffer()).toString('base64');
+const senderPhoto = (() => { const png = new PNG({ width: 640, height: 480 });
+  for (let i = 0; i < png.data.length; i += 4) { png.data[i] = 0x7a; png.data[i + 1] = 0x5c; png.data[i + 2] = 0x3c; png.data[i + 3] = 255; }
+  return PNG.sync.write(png).toString('base64'); })();
 const seed = async (p) => {
   const r = await rpc(local.db, 'fiila_create_place', { p }, { ip: '192.0.2.50' });
   assert.equal(r.status, 200, JSON.stringify(r.body));

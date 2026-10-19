@@ -81,7 +81,7 @@ await t('inscription : charte obligatoire, puis formation en 6 fiches et test r�
   for (let q = 0; q < 10; q++) await A.locator(`#q${q} input[value="${GOOD[q]}"]`).check();
   await shot(A, '03-test');
   await A.click('#amb-quiz-send');
-  await A.getByText('Test réussi : 10/10').waitFor();
+  await A.getByRole('heading', { name: /Test réussi : 10\/10/ }).waitFor();
 });
 
 await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async () => {
