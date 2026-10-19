@@ -5582,13 +5582,18 @@
   }
   /* Double authentification de l'équipe : à la première connexion, activation (QR code ou clé à saisir dans l'application,
      puis premier code) ; ensuite, le code à chaque connexion. */
-  // QR code renvoyé par Supabase : du SVG brut dans une URL « data: » (les « # » des couleurs la coupent). On le réencode.
+  // QR code renvoyé par l'API Supabase : du SVG brut (« <?xml…><svg… », sans préfixe « data: » ; c'est supabase-js qui en ajoute un).
+  // On accepte les deux formes et on réencode toujours le SVG (les « # » des couleurs couperaient une URL « data: »).
   function mfaQrSrc(q) {
-    var m = /^data:image\/svg\+xml;(?:charset=)?utf-8,([\s\S]*)$/i.exec(q || '');
-    if (!m) return q || '';
-    var raw = m[1];
-    if (/^%3C/i.test(raw)) { try { raw = decodeURIComponent(raw); } catch (e) { /* tel quel */ } }
-    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(raw);
+    var raw = String(q || '');
+    if (/^data:/i.test(raw)) {
+      var c = raw.indexOf(',');
+      raw = raw.slice(c + 1);
+      if (/^\s*%3C/i.test(raw)) { try { raw = decodeURIComponent(raw); } catch (e) { /* tel quel */ } }
+    }
+    var i = raw.search(/<svg[\s>]/i);
+    if (i < 0) return '';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(raw.slice(i));
   }
   function boMfa(me) {
     function card() { return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-mfa' },
