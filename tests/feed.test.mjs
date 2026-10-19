@@ -116,6 +116,9 @@ await t('page « Boutiques » : les 4 vitrines ouvertes, places gratuites restan
   const A = await newPhone();
   await A.goto(URL0 + '#/');
   await A.locator('#home-feed-all').click();
+  await A.locator('#feed-tabs').waitFor();
+  assert.match(A.url(), /#\/boutiques$/);
+  await A.locator('#feed-shops').click();
   await A.locator('#feed-list .fcard').first().waitFor();
   assert.equal(await A.locator('#feed-list .fcard').count(), 4);
   assert.match(await A.locator('#feed-join').textContent(), /Encore 21 places gratuites/);
@@ -124,7 +127,7 @@ await t('page « Boutiques » : les 4 vitrines ouvertes, places gratuites restan
   assert.match(A.url(), /#\/b\/awa-couture-test/);
   await A.locator('.back, .bar-back').first().click();
   await A.locator('#feed-list').waitFor();
-  assert.match(A.url(), /#\/boutiques$/);
+  assert.match(A.url(), /#\/boutiques\/liste$/);
   await shot(A, '02-boutiques');
 });
 
@@ -161,12 +164,14 @@ await t('mode démo : boutiques fictives visibles et marquées, filtre par caté
   const { readFileSync } = await import('node:fs');
   await local.db.exec(readFileSync('scripts/demo-seed.sql', 'utf8'));
   const A = await newPhone();
-  await A.goto(URL0 + '#/boutiques');
+  await A.goto(URL0 + '#/boutiques/liste');
   await A.locator('#feed-list .fcard').first().waitFor();
   const n0 = await A.locator('#feed-list .fcard').count();
   assert.equal(await A.locator('.demo-tag').count(), 0, 'aucune boutique fictive sans le mode démo');
   await A.goto(URL0 + '#/demo');
   await A.locator('#demo-banner').waitFor();
+  await A.locator('#posts .post .demo-tag').first().waitFor();
+  await A.goto(URL0 + '#/boutiques/liste');
   await A.locator('#feed-list .demo-tag').first().waitFor();
   assert.equal(await A.locator('#feed-list .fcard').count(), n0 + 14);
   await A.locator('#feed-cats').getByRole('button', { name: 'Chaussures' }).click();
@@ -176,7 +181,7 @@ await t('mode démo : boutiques fictives visibles et marquées, filtre par caté
   await A.locator('#feed-list .fcard').first().click();
   await A.locator('#vitrine-demo').waitFor();
   await A.goto(URL0 + '#/demo?off=1');
-  await A.goto(URL0 + '#/boutiques');
+  await A.goto(URL0 + '#/boutiques/liste');
   await A.locator('#feed-list .fcard').first().waitFor();
   assert.equal(await A.locator('.demo-tag').count(), 0);
   await local.db.exec(readFileSync('scripts/demo-clear.sql', 'utf8'));

@@ -65,6 +65,7 @@ Constaté dans le code au commit `9576bc8`.
 | **Vitrine** (si la boutique l'ouvre) : articles publics ; commande en ligne (nom, numéro, articles, précision) | Commerçants ; clientes qui commandent | Vente en ligne | Comme les commandes (24 mois au plus) | La boutique concernée ; les articles sont visibles par toute personne qui a le lien |
 | **Ambassadeurs (19/10)** : nom, téléphone, quartier, numéro de versement Wave ou Orange Money, résultat au test, boutiques accompagnées, gains et versements | Ambassadeurs (indépendants) ; commerçants accompagnés | Programme d'acquisition rémunéré à la mission ; prévention de la fraude | Durée du programme, puis selon les obligations comptables (à confirmer avec le comptable) | L'équipe Fii La ; le commerçant voit le prénom de son ambassadeur ; l'ambassadeur voit le nom de la boutique et des indicateurs, jamais les clientes |
 | **Vide-dressing enfants (19/10)** : nom, téléphone, quartier de la vendeuse ; photo et description de l'article (genre, âge, taille, état, prix) ; commandes | Vendeuses ; acheteuses | Vente de seconde main tenue par Fii La (intermédiaire), enlèvement et livraison, reversement | Comme les commandes (24 mois au plus) ; article retiré ou vendu : photo gardée avec la commande | L'équipe Fii La ; l'acheteuse voit seulement l'article |
+| **Fil social (19/10)** : j'aime et enregistrements (empreinte d'un identifiant aléatoire de l'appareil, ou compte) ; commentaires (texte, compte, prénom affiché) ; signalements | Visiteurs ; membres qui commentent | Réactions et avis publics sur les articles des boutiques, classements (best-sellers sur commandes livrées, coups de cœur) | Tant que l'article existe ; commentaires supprimés avec le compte ; l'auteur, la boutique et l'administrateur peuvent supprimer | Public : le prénom et le commentaire ; jamais le nom complet, l'e-mail ni le numéro |
 | Statistiques de croissance (agrégées) | Aucune personne identifiable | Pilotage | Sans limite | Comptes administrateurs (le fondateur) |
 
 **Points à signaler dans le complément**
@@ -73,6 +74,7 @@ Constaté dans le code au commit `9576bc8`.
 - **Responsables des données clients.** Le commerçant est responsable des données de ses propres clients ; Fii La les héberge pour lui.
 - **Ambassadeurs.** Fii La paie des personnes à la mission : vérifier le statut (indépendant), la retenue éventuelle et la durée de conservation des justificatifs avec un comptable.
 - **Vide-dressing.** Fii La devient intermédiaire de vente entre particuliers. Les photos d'articles ne doivent montrer aucun enfant reconnaissable (contrôlé à la validation).
+- **Fil social.** Les commentaires sont des contenus publics : ni lien ni numéro de téléphone acceptés (pas de démarchage ni de vente hors plateforme), masquage automatique après 3 signalements, suppression par l'auteur, la boutique ou l'administrateur. Les j'aime anonymes ne contiennent aucune donnée personnelle (empreinte d'un identifiant aléatoire).
 - **Prestataires.** Inchangés : Supabase (Paris), GitHub Pages, OpenStreetMap.
 
 ## 3. Lecture des dispositions

@@ -1,0 +1,42 @@
+name: Vérifier une branche (sans mise en ligne)
+
+# Toute branche autre que main : base de test locale, suites SQL, puis les écrans clés sur Chrome et Safari (WebKit).
+# Rien n'est mis en ligne et aucun secret n'est utilisé.
+
+on:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Suites SQL
+        run: |
+          fail=0
+          for f in tests/*.sql.test.mjs; do node "$f" | tail -1 || fail=1; done
+          exit $fail
+      - name: Écrans clés — Safari (WebKit)
+        if: always()
+        run: |
+          fail=0
+          for s in engage feed products vitrine videdressing navigation shop; do
+            ENGINE=webkit node tests/$s.test.mjs | tail -1 || fail=1
+          done
+          exit $fail
+      - name: Captures en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preuves-${{ github.sha }}
+          path: docs/screenshots/
+          retention-days: 7

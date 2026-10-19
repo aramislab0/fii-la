@@ -285,7 +285,12 @@
     already_used: 'Cette invitation a déjà été acceptée.',
     no_courier: 'Aucun livreur attitré disponible.',
     reauth_required: 'Saisissez à nouveau votre mot de passe.',
-    not_allowed: 'Action non autorisée.'
+    not_allowed: 'Action non autorisée.',
+    comment_contact: 'Pas de lien ni de numéro dans un commentaire : la commande se fait sur Fii La.',
+    comment_too_long: 'Commentaire trop long (300 caractères au plus).',
+    comment_empty: 'Écrivez votre commentaire.',
+    name_required: 'Ajoutez votre prénom dans votre compte pour commenter.',
+    device_required: 'Action impossible sur ce navigateur. Réessayez.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
   ApiError.prototype = Object.create(Error.prototype);
@@ -1566,14 +1571,194 @@
       if (!list.length) return;
       setKids(box,
         h('div', { class: 'feed-head' }, h('h2', { id: (o.id || 'feed-block') + '-h' }, o.title || 'Boutiques à découvrir'),
-          list.length > limit ? h('a', { class: 'btn link', href: '#/boutiques', id: (o.id || 'feed-block') + '-all' }, 'Tout voir (' + list.length + ')') : null),
+          list.length > limit ? h('a', { class: 'btn link', href: '#/boutiques', id: (o.id || 'feed-block') + '-all' }, 'Voir le fil') : null),
         o.sub ? h('p', { class: 'small muted' }, o.sub) : null,
         carousel(list.slice(0, limit).map(feedCard)));
       box.hidden = false;
     }, function () { /* hors ligne : le bloc reste caché */ });
     return box;
   }
-  function viewFeed() {
+  /* ----- Fil façon Instagram (fondateur, 19/10 09:34) : une publication par article avec photo des boutiques du fil.
+     J'aime et Enregistrer sans compte (identifiant aléatoire du téléphone, créé au premier geste seulement) ;
+     commenter avec un compte. Onglets : Pour vous, Meilleures ventes (commandes livrées), Coups de cœur. */
+  var DEVICE_LS = 'fiila.device';
+  function deviceId(create) {
+    var d = LS.get(DEVICE_LS, null);
+    if (d || !create) return d;
+    var b = new Uint8Array(18); (window.crypto || window.msCrypto).getRandomValues(b);
+    d = btoa(String.fromCharCode.apply(null, b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    LS.set(DEVICE_LS, d);
+    return d;
+  }
+  var FEED_TABS = [['pour-vous', 'Pour vous'], ['ventes', 'Best-sellers'], ['coeur', 'Coups de cœur']];
+  function countText(n, one, many) { return n === 1 ? '1 ' + one : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ' + many; }
+  function postCard(p) {
+    var st = { liked: !!p.liked, saved: !!p.saved, likes: p.likes || 0, saves: p.saves || 0, comments: p.comments || 0 };
+    var acc = (VT_ACCENTS[p.shop.accent] || VT_ACCENTS.foret)[1];
+    var shopHref = '#/b/' + p.shop.slug, buyHref = shopHref + qs({ a: p.id });
+    var img = h('div', { class: 'post-img loading-skel' });
+    lazyPhoto(img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, p.name);
+    var burst = h('span', { class: 'post-burst', 'aria-hidden': 'true' }, icon('heart', 72));
+    var likeBtn = h('button', { class: 'post-act', type: 'button', id: 'like-' + p.id, onclick: function () { react('like', !st.liked); } });
+    var saveBtn = h('button', { class: 'post-act', type: 'button', id: 'save-' + p.id, onclick: function () { react('save', !st.saved); } });
+    var likesLine = h('p', { class: 'post-likes' });
+    var cLink = h('button', { class: 'post-more', type: 'button', id: 'comments-' + p.id, onclick: function () { openComments(p, st, draw); } });
+    function draw() {
+      likeBtn.className = 'post-act' + (st.liked ? ' on' : ''); likeBtn.setAttribute('aria-pressed', st.liked ? 'true' : 'false');
+      likeBtn.setAttribute('aria-label', st.liked ? 'Je n’aime plus' : 'J’aime'); setKids(likeBtn, icon('heart', 26));
+      saveBtn.className = 'post-act' + (st.saved ? ' on' : ''); saveBtn.setAttribute('aria-pressed', st.saved ? 'true' : 'false');
+      saveBtn.setAttribute('aria-label', st.saved ? 'Retirer des enregistrés' : 'Enregistrer'); setKids(saveBtn, icon('bookmark', 26));
+      likesLine.textContent = [st.likes ? countText(st.likes, 'j’aime', 'j’aime') : '', st.saves ? countText(st.saves, 'enregistrement', 'enregistrements') : ''].filter(Boolean).join(' · ');
+      likesLine.hidden = !st.likes && !st.saves;
+      cLink.textContent = st.comments ? (st.comments === 1 ? 'Voir le commentaire' : 'Voir les ' + st.comments + ' commentaires') : 'Ajouter un commentaire';
+    }
+    function react(kind, on) {
+      var key = kind === 'like' ? 'liked' : 'saved', cnt = kind === 'like' ? 'likes' : 'saves';
+      var before = { v: st[key], n: st[cnt] };
+      st[key] = on; st[cnt] = Math.max(0, st[cnt] + (on ? 1 : -1)); draw();
+      if (kind === 'save') toast(on ? 'Enregistré. Retrouvez-le dans vos enregistrés.' : 'Retiré des enregistrés.');
+      api('fiila_react', { p_product: p.id, p_kind: kind, p_on: on, p_device: deviceId(true), p_demo: demoMode() }).then(function (r) {
+        st.likes = r.likes; st.saves = r.saves; st.comments = r.comments; st.liked = !!r.liked; st.saved = !!r.saved; draw();
+      }, function (e) { st[key] = before.v; st[cnt] = before.n; draw(); toast(errText(e)); });
+    }
+    // Double toucher sur la photo : j'aime (comme Instagram), avec un cœur qui apparaît puis s'efface.
+    var lastTap = 0;
+    img.addEventListener('click', function () {
+      var now = Date.now();
+      if (now - lastTap < 350) { burst.classList.remove('go'); void burst.offsetWidth; burst.classList.add('go'); if (!st.liked) react('like', true); lastTap = 0; }
+      else lastTap = now;
+    });
+    function share() {
+      var url = baseUrl() + buyHref;
+      if (navigator.share) navigator.share({ title: p.name, text: p.name + ' · ' + fcfa(p.price) + ' chez ' + p.shop.name, url: url }).catch(function () {});
+      else copy(url, 'Lien');
+    }
+    draw();
+    var badges = [p.best ? h('span', { class: 'post-badge best' }, icon('star', 14), ' Meilleure vente' + (p.sold ? ' · ' + countText(p.sold, 'vendu', 'vendus') : '')) : null,
+      p.heart ? h('span', { class: 'post-badge heart' }, icon('heart', 14), ' Coup de cœur') : null].filter(Boolean);
+    return h('article', { class: 'post', id: 'post-' + p.id, style: '--accent:' + acc },
+      h('a', { class: 'post-head', href: shopHref },
+        h('span', { class: 'post-av', 'aria-hidden': 'true' }, (p.shop.name || '?').trim().charAt(0).toUpperCase()),
+        h('span', { class: 'post-who' }, h('b', { class: 'wrapword' }, p.shop.name), p.shop.type ? h('span', { class: 'small muted' }, typeLabel(p.shop.type)) : null),
+        p.shop.demo || p.shop.platform ? h('span', { class: 'demo-tag' + (p.shop.platform ? ' fl-tag' : '') }, p.shop.demo ? 'Démo' : 'Par Fii La') : null),
+      h('div', { class: 'post-media' }, img, burst),
+      h('div', { class: 'post-bar' }, likeBtn,
+        h('button', { class: 'post-act', type: 'button', 'aria-label': 'Commenter', onclick: function () { openComments(p, st, draw); } }, icon('bubble', 25)),
+        h('button', { class: 'post-act', type: 'button', 'aria-label': 'Partager', onclick: share }, icon('share', 26)),
+        h('span', { class: 'grow' }), h('a', { class: 'post-buy', href: buyHref, id: 'buy-' + p.id }, 'Commander'), saveBtn),
+      h('div', { class: 'post-body' }, likesLine,
+        h('p', { class: 'post-cap' }, h('b', { class: 'wrapword' }, p.name), h('span', { class: 'post-price' }, fcfa(p.price))),
+        badges.length ? h('p', { class: 'post-badges' }, badges) : null,
+        cLink));
+  }
+  // Commentaires : feuille du bas. Lire sans compte ; écrire avec un compte ; la boutique et l'auteur suppriment ; tout le monde signale.
+  function openComments(p, st, redraw) {
+    var list = h('div', { class: 'stack tight cm-list', id: 'cm-list', 'aria-live': 'polite' }, h('p', { class: 'muted small' }, 'Chargement…'));
+    var foot = h('div', { class: 'stack tight' });
+    var back = h('div', { class: 'sheet-back', id: 'comments-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cm-h', onclick: function (e) { if (e.target === back) close(); } },
+      h('div', { class: 'sheet cm-sheet' }, h('div', { class: 'cm-top' }, h('h2', { id: 'cm-h' }, 'Commentaires'),
+        h('button', { class: 'btn quiet', type: 'button', 'aria-label': 'Fermer', onclick: close }, '×')), list, foot));
+    function close() { back.remove(); redraw(); }
+    function load() {
+      return api('fiila_comments', { p_product: p.id, p_key: shopKey(), p_device: deviceId(false), p_demo: demoMode() }).then(function (r) {
+        if (r.state !== 'ok') { setKids(list, h('p', { class: 'muted' }, 'Cette publication n’est plus disponible.')); setKids(foot); return; }
+        st.comments = r.comments.length;
+        setKids(list, r.comments.length ? r.comments.map(function (c) {
+          var acts = h('span', { class: 'cm-acts' },
+            c.can_delete ? h('button', { class: 'btn link small', type: 'button', onclick: function () {
+              api('fiila_comment_delete', { p_id: c.id, p_key: shopKey() }).then(function (x) { st.comments = x.comments; toast('Commentaire supprimé.'); load(); }, function (e) { toast(errText(e)); });
+            } }, 'Supprimer') : null,
+            !c.mine && !c.reported ? h('button', { class: 'btn link small muted', type: 'button', 'aria-label': 'Signaler ce commentaire', onclick: function () {
+              api('fiila_comment_report', { p_id: c.id, p_device: deviceId(true) }).then(function () { toast('Merci. Le commentaire sera vérifié.'); load(); }, function (e) { toast(errText(e)); });
+            } }, 'Signaler') : null);
+          return h('div', { class: 'cm' }, h('p', null, h('b', null, c.author), ' ', h('span', { class: 'wrapword' }, c.body)),
+            h('p', { class: 'small muted cm-meta' }, agoLong(c.at), acts));
+        }) : h('p', { class: 'muted', id: 'cm-empty' }, 'Aucun commentaire pour le moment. Soyez la première personne à donner votre avis.'));
+        if (!r.can_comment) {
+          setKids(foot, iconBtn('a', { class: 'btn ghost', href: '#/compte' + qs({ retour: 'boutiques' }), id: 'cm-login' }, 'user', 'Se connecter pour commenter'));
+          return;
+        }
+        var err = h('div', { role: 'alert' });
+        var input = h('textarea', { id: 'cm-input', rows: 2, maxlength: 300, placeholder: 'Votre commentaire…', 'aria-label': 'Votre commentaire' });
+        var send = h('button', { class: 'btn', type: 'button', id: 'cm-send', onclick: function () {
+          send.disabled = true; setKids(err);
+          api('fiila_comment_add', { p_product: p.id, p_body: input.value, p_demo: demoMode() }).then(function (x) {
+            st.comments = x.comments; input.value = ''; send.disabled = false; load();
+          }, function (e) { send.disabled = false; errBox(err, e); });
+        } }, 'Publier');
+        setKids(foot, err, h('div', { class: 'cm-form' }, input, send),
+          h('p', { class: 'small muted' }, 'Votre prénom est affiché. Pas de lien ni de numéro.'));
+      }, function (e) { setKids(list, h('p', { class: 'muted' }, errText(e))); });
+    }
+    document.body.append(back);
+    onMedia(close);
+    load();
+  }
+  function agoLong(iso) {
+    var s = (Date.now() - Date.parse(iso)) / 1000;
+    if (!isFinite(s) || s < 60) return 'à l’instant';
+    if (s < 3600) return Math.round(s / 60) + ' min';
+    if (s < 86400) return Math.round(s / 3600) + ' h';
+    if (s < 86400 * 7) return Math.round(s / 86400) + ' j';
+    return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  }
+  function viewFeed(q) {
+    var tab = FEED_TABS.some(function (t) { return t[0] === (q && q.tab); }) ? q.tab : 'pour-vous';
+    var listBox = h('div', { class: 'posts', id: 'posts', 'aria-live': 'polite' }, loading());
+    var moreBox = h('div');
+    var tabs = h('div', { class: 'feed-tabs', role: 'tablist', 'aria-label': 'Fil', id: 'feed-tabs' }, FEED_TABS.map(function (t) {
+      return h('a', { class: 'ftab' + (t[0] === tab ? ' on' : ''), role: 'tab', 'aria-selected': t[0] === tab ? 'true' : 'false',
+        href: '#/boutiques' + (t[0] === 'pour-vous' ? '' : qs({ tab: t[0] })), id: 'tab-' + t[0] }, t[1]);
+    }));
+    var empty = { 'pour-vous': 'Les premières publications arrivent bientôt.',
+      ventes: 'Pas encore de meilleure vente : le classement se fait sur les commandes livrées des 30 derniers jours.',
+      coeur: 'Pas encore de coup de cœur : touchez ♥ ou Enregistrer sur les articles que vous aimez.' };
+    var pageNo = 0;
+    function fetchPage() {
+      return api('fiila_posts', { p_tab: tab, p_device: deviceId(false), p_demo: demoMode(), p_page: pageNo });
+    }
+    fetchPage().then(function (r) {
+      var posts = r.posts || [];
+      setKids(listBox, posts.length ? posts.map(postCard) : h('div', { class: 'card', id: 'posts-empty' }, h('p', { class: 'muted' }, empty[tab])));
+      function more(n) {
+        setKids(moreBox, n === 30 ? h('button', { class: 'btn ghost', type: 'button', id: 'posts-more', onclick: function () {
+          pageNo++; setKids(moreBox, loading());
+          fetchPage().then(function (x) { (x.posts || []).forEach(function (p) { listBox.appendChild(postCard(p)); }); more((x.posts || []).length); },
+            function (e) { setKids(moreBox, h('p', { class: 'muted' }, errText(e))); });
+        } }, 'Voir plus') : null);
+      }
+      more(posts.length);
+    }, function (e) { setKids(listBox, stateCard('!', 'Impossible de charger le fil', errText(e), retryBtn())); });
+    var join = h('div');
+    loadFeed().then(function (d) {
+      var mine = shopKey(), n = ((d && d.shops) || []).length;
+      setKids(join,
+        n ? h('a', { class: 'btn link', href: '#/boutiques/liste', id: 'feed-shops' }, 'Toutes les boutiques (' + n + ')') : null,
+        d && d.free_left > 0 ? h('section', { class: 'card', id: 'feed-join' },
+          h('h2', null, mine ? 'Votre boutique ici' : 'Vous vendez ?'),
+          h('p', { class: 'small muted' }, (d.free_left === 1 ? 'Encore 1 place gratuite' : 'Encore ' + d.free_left + ' places gratuites') +
+            ' pour les 25 premières boutiques. Ouvrez votre vitrine avec au moins un article.'),
+          iconBtn('a', { class: 'btn', href: mine ? '#/boutique/reglages' : '#/boutique', id: 'feed-join-btn' }, 'shop', mine ? 'Ouvrir ma vitrine' : 'Créer ma boutique')) : null);
+    }, function () {});
+    return page(backBtn(), demoBanner(),
+      h('header', { class: 'feed-top' }, h('h1', null, 'Fil Fii La'),
+        h('a', { class: 'btn quiet icon-only', href: '#/enregistres', id: 'saved-link', 'aria-label': 'Mes enregistrés' }, icon('bookmark', 24))),
+      tabs, listBox, moreBox, join, footer(true));
+  }
+  function viewSaved() {
+    return api('fiila_saved', { p_device: deviceId(false) }).then(function (list) {
+      return page(backBtn('Fil', '#/boutiques'), h('h1', null, 'Mes enregistrés'),
+        list.length ? h('div', { class: 'saved-grid', id: 'saved-grid' }, list.map(function (p) {
+          var img = h('span', { class: 'saved-img loading-skel' });
+          lazyPhoto(img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, '');
+          return h('a', { class: 'saved-tile', href: '#/b/' + p.shop.slug + qs({ a: p.id }), 'aria-label': p.name + ', ' + fcfa(p.price) + ', ' + p.shop.name },
+            img, h('span', { class: 'saved-cap' }, h('b', { class: 'wrapword' }, p.name), h('span', null, fcfa(p.price))));
+        })) : h('div', { class: 'card', id: 'saved-empty' }, h('p', { class: 'muted' }, 'Touchez l’icône Enregistrer sous une publication pour la retrouver ici.'),
+          h('a', { class: 'btn', href: '#/boutiques' }, 'Voir le fil')),
+        footer(true));
+    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger vos enregistrés', errText(e), retryBtn()), footer()); });
+  }
+  function viewShops() {
     return loadFeed().then(function (d) {
       var list = (d && d.shops) || [];
       var mine = shopKey();
@@ -2008,7 +2193,9 @@
       else if (p[0] === 'cle') view = viewRestore(null);
       else if (p[0] === 'compte') view = viewAccount(r.q);
       else if (p[0] === 'boutique' && !p[1]) view = viewShop(r.q);
-      else if (p[0] === 'boutiques' && !p[1]) view = viewFeed();
+      else if (p[0] === 'boutiques' && !p[1]) view = viewFeed(r.q);
+      else if (p[0] === 'boutiques' && p[1] === 'liste') view = viewShops();
+      else if (p[0] === 'enregistres' && !p[1]) view = viewSaved();
       else if (p[0] === 'demo' && !p[1]) view = viewDemo(r.q);
       else if (p[0] === 'ambassadeur' && !p[1]) view = viewAmbassador();
       else if (p[0] === 'vide-dressing' && !p[1]) view = viewVideDressing();
@@ -2064,6 +2251,7 @@
   function parentOf(parts, q) {
     var a = parts[0], b = parts[1];
     if (!a) return null;
+    if (a === 'enregistres' || (a === 'boutiques' && b)) return ['#/boutiques', 'Fil'];
     if (a === 'boutique' && b === 'article') return ['#/boutique/articles', 'Mes articles'];
     if (a === 'boutique' && b) return ['#/boutique', 'Ma boutique'];
     if (a === 'clients' && b) return ['#/clients', 'Clients'];
@@ -2529,6 +2717,10 @@
     car: 'M5 16h14M6 16l1.5-5h9L18 16M5 16v3h2v-2M19 16v3h-2v-2M8 13.5h.01M16 13.5h.01',
     door: 'M6 21V4h12v17M3 21h18M14.5 12.5h.01',
     chev: 'M9 6l6 6-6 6',
+    bubble: 'M20 11.5a8 8 0 0 1-11.6 7.1L4 19.8l1.3-4.1A8 8 0 1 1 20 11.5Z',
+    heart: 'M12 20s-7.5-4.6-7.5-10.2A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.4C19.5 15.4 12 20 12 20Z',
+    bookmark: 'M7 3.8h10a1 1 0 0 1 1 1V20l-6-4.2L6 20V4.8a1 1 0 0 1 1-1Z',
+    flag: 'M5.5 21V4.5m0 0h11.5l-2.2 4 2.2 4H5.5',
     star: 'M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z',
     pin: 'M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21ZM9.5 9.5a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0',
     ask: 'M4 5h16v11H9l-5 4V5ZM12 8.5v.01M12 11v2.5',
@@ -4468,6 +4660,16 @@
         textField({ id: 'product-stock', label: 'Stock', optional: true, inputmode: 'numeric', value: f.stock, placeholder: 'Laisser vide si vous ne comptez pas', onInput: function (v) { f.stock = v; } }),
         h('p', { class: 'hint' }, 'Vos clientes choisissent leur taille et leur couleur en commandant. Avec un stock, l’article passe « Épuisé » à zéro.')));
   }
+  // Une ligne discrète : ce que le fil dit de l'article (j'aime, commentaires, enregistrements, ventes livrées sur 30 jours).
+  function productStats(id) {
+    var line = h('p', { class: 'small muted', id: 'product-stats', hidden: true });
+    sapi('fiila_product_stats', { p_id: id }).then(function (r) {
+      var parts = [r.likes ? countText(r.likes, 'j’aime', 'j’aime') : '', r.comments ? countText(r.comments, 'commentaire', 'commentaires') : '',
+        r.saves ? countText(r.saves, 'enregistrement', 'enregistrements') : '', r.sold ? countText(r.sold, 'vendu', 'vendus') + ' (30 j)' : ''].filter(Boolean);
+      if (parts.length) { line.textContent = 'Dans le fil : ' + parts.join(' · '); line.hidden = false; }
+    }, function () {});
+    return line;
+  }
   function productForm(pr, shop, fresh) {
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
     f.category = pr && pr.category || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');
@@ -4497,6 +4699,7 @@
     return page(backBtn('Mes articles', '#/boutique/articles'),
       pr && pr.active ? publishBox(pr, shop, fresh) : null,
       h('h1', null, pr ? 'Modifier l’article' : 'Nouvel article'),
+      pr ? productStats(pr.id) : null,
       photoBox,
       textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; } }),
       textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; } }),

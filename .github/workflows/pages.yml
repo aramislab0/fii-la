@@ -30,14 +30,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - name: Secret présent ?
         id: s
         env: { PW: '${{ secrets.SUPABASE_DB_PASSWORD }}' }
         run: |
-          if [ -n "$PW" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else
-            echo "::warning::SUPABASE_DB_PASSWORD absent : migrations sautées (à faire depuis le Mac)."; echo "ok=0" >> "$GITHUB_OUTPUT"; fi
+          if [ -n "$PW" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "ok=0" >> "$GITHUB_OUTPUT"
+          # Garde-fou : une nouvelle migration sans le secret bloque la mise en ligne (le site appellerait des fonctions absentes).
+          if git diff --name-only "${{ github.event.before }}" "$GITHUB_SHA" -- supabase/migrations 2>/dev/null | grep -q .; then
+            echo "::error::Nouvelle migration mais SUPABASE_DB_PASSWORD absent : mise en ligne bloquée. Enregistrer le secret (action #41) puis relancer."; exit 1
+          fi
+          echo "::warning::SUPABASE_DB_PASSWORD absent : migrations sautées (aucune nouvelle migration dans cet envoi)." 
       - if: steps.s.outputs.ok == '1'
         run: npm ci --ignore-scripts
       - name: Appliquer les migrations (chacune une seule fois, en transaction)
@@ -106,7 +112,7 @@ jobs:
         if: always()
         run: |
           fail=0
-          for s in referrals shop vitrine products videdressing navigation feed ambassadors; do
+          for s in referrals shop vitrine products videdressing navigation feed ambassadors engage; do
             ENGINE=webkit node tests/$s.test.mjs || fail=1
           done
           exit $fail
