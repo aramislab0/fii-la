@@ -184,6 +184,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 22:30 | Code par e-mail (f07338f, run 39329682791) et écran replié (5ea2cf4, run 39330408029) en production, tout vert | GitHub Actions |
 | 19/10 21:55 | Fondateur : ne pas toucher Supabase pour l'instant (SMS et modèles d'e-mail plus tard). Écran « Vérifiez vos e-mails » : le lien reste la voie principale (« ouvrez-le dans ce même navigateur »), le code est dans une section repliée ; shop 26/26 | ce commit |
 | 19/10 22:00 | Bug signalé par le fondateur (« je n'arrive plus à me connecter ») : journaux Auth 20:07 → mot de passe refusé ×3, puis lien « mot de passe oublié » ouvert dans Safari alors que la demande venait de l'icône de l'écran d'accueil (stockage séparé sur iPhone) → secret PKCE absent, lien refusé. Correctif : code à 6 chiffres reçu par e-mail, saisi dans l'application (`/verify` type recovery / email), écran « Ce lien ne s'ouvre pas ici » expliqué ; test shop 26/26. Action #47 (modèles d'e-mail) | journaux Auth, ce commit |
 | 19/10 21:45 | Équipe de la boutique et code SMS en production (runs 39318434682 et 39321685790, tout vert, migrations appliquées). Envoi réel des SMS : attend les réglages du fondateur (#46) | GitHub Actions |
