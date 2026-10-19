@@ -69,11 +69,13 @@ const PUBLIC_ROUTES = ['#/a/' + addr.share_token, '#/a/' + meet.share_token, '#/
 async function check(page, hash) {
   await page.goto(URL0 + '#/'); await page.locator('.hero').waitFor();
   await page.goto(URL0 + hash);
-  await page.waitForFunction(() => { const w = document.querySelector('#app > .wrap'); return w && !w.querySelector(':scope > .loading') && w.textContent.trim().length > 20; });
+  // Écran de l'application (.wrap) ou du back-office (cadre ou portail).
+  await page.waitForFunction(() => { const w = document.querySelector('#app > .wrap, #app > .bo-shell, #app > .bo-portal'); return w && !w.querySelector(':scope > .loading') && w.textContent.trim().length > 20; });
   await page.waitForTimeout(250);
   const info = await page.evaluate(() => {
-    const w = document.querySelector('#app > .wrap');
-    const back = w.querySelector('.back, .bar-back');
+    const w = document.querySelector('#app > .wrap, #app > .bo-shell, #app > .bo-portal');
+    // Back-office : la sortie est « Voir le site » / « Retour au site » (ou le retour d'une fiche).
+    const back = w.querySelector('.back, .bar-back') || w.querySelector('.bo-side a[href="#/"], .bo-portal a[href="#/"]');
     const logo = w.querySelector('.brand-bar a.brand-home');
     return { auto: !!w.querySelector('.auto-back'), back: back ? (back.getAttribute('href') || 'history') : null, logo: !!logo, text: w.innerText,
       over: document.documentElement.scrollWidth - document.documentElement.clientWidth, hash: location.hash };

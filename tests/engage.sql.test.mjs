@@ -165,7 +165,8 @@ await t('« pour vous » : 3 articles au plus par boutique en tête, puis le res
 
 await t('modération : file réservée à l’admin (masqués et signalés), rétablir efface les signalements, supprimer', async () => {
   const id = await createUser(db, 'admin.fil@example.invalid');
-  await db.query(`insert into fiila.profiles (user_id, display_name, is_admin) values ($1, 'Admin Test', true)`, [id]);
+  await db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Admin Test')`, [id]);
+  await db.query(`insert into fiila.staff (user_id, role) values ($1, 'moderation')`, [id]);
   const ADM = { uid: id };
   await ko('fiila_admin_comments', {}, 'not_allowed', U2);
   await ko('fiila_admin_comments', {}, 'auth_required');

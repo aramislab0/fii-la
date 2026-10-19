@@ -19,6 +19,7 @@ const one = async (sql, a) => (await db.query(sql, a)).rows[0];
 const user = async (email, admin = false) => {
   const id = (await one(`insert into auth.users (id, email) values (gen_random_uuid(), $1) returning id`, [email])).id;
   await db.query(`insert into fiila.profiles (user_id, display_name, is_admin) values ($1, $2, $3)`, [id, email.split('@')[0], admin]);
+  if (admin) await db.query(`insert into fiila.staff (user_id, role) values ($1, 'super_admin')`, [id]);
   return { uid: id };
 };
 const GOOD = [1, 1, 0, 1, 0, 1, 1, 1, 1, 0];

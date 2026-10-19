@@ -32,7 +32,8 @@ await t('fil : le type de la boutique est fourni (pour le filtre)', async () => 
 await t('statistiques par type : réservées au fondateur', async () => {
   await ko('fiila_admin_shop_types', {}, 'auth_required|not_allowed');
   const uid = (await db.query(`insert into auth.users (id, email) values (gen_random_uuid(), 'admin@example.test') returning id`)).rows[0].id;
-  await db.query(`insert into fiila.profiles (user_id, display_name, is_admin) values ($1, 'Admin', true)`, [uid]);
+  await db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Admin')`, [uid]);
+  await db.query(`insert into fiila.staff (user_id, role) values ($1, 'super_admin')`, [uid]);
   assert.deepEqual(await ok('fiila_admin_shop_types', {}, { uid }), { esthetique: 1 });
 });
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');

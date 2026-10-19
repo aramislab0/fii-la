@@ -150,7 +150,7 @@ await t('statistiques : refusées sans compte administrateur, agrégées pour le
   const uid = (await one(`insert into auth.users (id, email) values (gen_random_uuid(), 'fondateur@example.test') returning id`)).id;
   await db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Fondateur')`, [uid]);
   await ko('fiila_admin_stats', {}, 'not_allowed', { uid });
-  await db.query(`update fiila.profiles set is_admin = true where user_id = $1`, [uid]);
+  await db.query(`insert into fiila.staff (user_id, role) values ($1, 'super_admin')`, [uid]);
   const s = await ok('fiila_admin_stats', {}, { uid });
   assert.ok(s.totals.shops >= 4); assert.ok(s.totals.referred >= 6); assert.equal(s.totals.posts, 2);
   assert.ok(s.sources.code >= 1 && s.sources.phone >= 1 && s.sources.request === 1 && s.sources.direct >= 1);

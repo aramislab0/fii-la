@@ -71,7 +71,7 @@ await t('vendeuse : compte, photo du vêtement seul (case obligatoire), fille 2-
 
 await t('Fii La : vérifie et publie ; la vitrine « Vide-dressing Fii La » se filtre par genre et âge', async () => {
   await signup(F, 'Fondateur', 'fondateur.vd@example.invalid');
-  await local.db.query(`update fiila.profiles set is_admin = true where display_name = 'Fondateur'`);
+  await local.db.query(`insert into fiila.staff (user_id, role) select user_id, 'super_admin' from fiila.profiles where display_name = 'Fondateur'`);
   await F.goto(URL0 + '#/admin/vide-dressing');
   await F.locator('#vd-queue').getByText('Robe fleurie (test)').waitFor();
   await F.locator('#vd-queue').getByRole('button', { name: 'Publier' }).click();

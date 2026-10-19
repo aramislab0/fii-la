@@ -192,7 +192,7 @@ await t('livreur : inscription avec le code tapé, puis son propre espace « Par
 await t('statistiques : refusées sans compte autorisé ; le fondateur voit origines et meilleurs parrains', async () => {
   const G = await newPhone();
   await G.goto(URL0 + '#/stats');
-  await G.getByText('Accès réservé').waitFor();
+  await G.locator('#bo-login').waitFor();
   await G.goto(URL0 + '#/compte');
   await G.getByRole('tab', { name: 'Créer un compte' }).click();
   await G.fill('#acc-name', 'Fondateur Test');
@@ -202,10 +202,10 @@ await t('statistiques : refusées sans compte autorisé ; le fondateur voit orig
   await G.waitForFunction(() => { try { return !!localStorage.getItem('fiila.session') || document.querySelector('#account-link, .who'); } catch (e) { return false; } });
   await G.waitForTimeout(500);
   await G.goto(URL0 + '#/stats');
-  await G.getByText('Ce compte n’a pas accès aux statistiques.').waitFor();
+  await G.locator('#bo-denied').getByText('Accès non autorisé').waitFor();
   const uid = (await q1(`select id from auth.users where email = 'fondateur.test@example.test'`))[0].id;
   await local.db.query(`insert into fiila.profiles (user_id) values ($1) on conflict (user_id) do nothing`, [uid]);
-  await local.db.query(`update fiila.profiles set is_admin = true where user_id = $1`, [uid]);
+  await local.db.query(`insert into fiila.staff (user_id, role) values ($1, 'super_admin')`, [uid]);
   await G.goto(URL0 + '#/');
   await G.goto(URL0 + '#/stats');
   await G.locator('#stats-totals').waitFor();

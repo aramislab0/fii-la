@@ -86,7 +86,7 @@ await t('inscription : charte obligatoire, puis formation en 6 fiches et test r�
 
 await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async () => {
   await signup(F, 'Fondateur', 'fondateur.amb@example.invalid');
-  await local.db.query(`update fiila.profiles set is_admin = true where user_id = (select id from auth.users where email = 'fondateur.amb@example.invalid')`);
+  await local.db.query(`insert into fiila.staff (user_id, role) select id, 'super_admin' from auth.users where email = 'fondateur.amb@example.invalid'`);
   await F.goto(URL0 + '#/admin/ambassadeurs');
   await F.locator('#adm-review').getByText('Moussa Diop').waitFor();
   await F.locator('#adm-review').getByRole('button', { name: 'Valider' }).click();

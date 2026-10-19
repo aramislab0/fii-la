@@ -173,9 +173,10 @@ await t('modération : le fondateur voit le commentaire masqué (3 signalements)
   for (const d of ['aaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccc']) await ok('fiila_comment_report', { p_id: c.body.id, p_device: d });
   const F = await newPhone();
   await signup(F, 'Fondateur Test', 'fondateur.fil@example.invalid');
-  await local.db.query(`update fiila.profiles set is_admin = true where user_id = (select id from auth.users where email = 'fondateur.fil@example.invalid')`);
-  await F.goto(URL0 + '#/stats');
-  await F.locator('#stats-comments').click();
+  await local.db.query(`insert into fiila.staff (user_id, role) select id, 'super_admin' from auth.users where email = 'fondateur.fil@example.invalid'`);
+  await F.goto(URL0 + '#/bo');
+  await F.click('#bo-menu');
+  await F.click('#bo-nav-moderation');
   const card = F.locator('#mod-' + c.body.id);
   await card.getByText('Masqué · 3 signalements').waitFor();
   await shot(F, '06-moderation', true);

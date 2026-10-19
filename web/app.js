@@ -290,7 +290,18 @@
     comment_too_long: 'Commentaire trop long (300 caractères au plus).',
     comment_empty: 'Écrivez votre commentaire.',
     name_required: 'Ajoutez votre prénom dans votre compte pour commenter.',
-    device_required: 'Action impossible sur ce navigateur. Réessayez.'
+    device_required: 'Action impossible sur ce navigateur. Réessayez.',
+    invalid_value: 'Valeur hors des limites autorisées.',
+    invalid_setting: 'Réglage inconnu.',
+    reason_required: 'Indiquez un motif.',
+    shop_suspended: 'Votre boutique est suspendue par l’équipe Fii La. Contactez-nous pour la réactiver.',
+    invite_invalid: 'Invitation expirée, annulée ou déjà utilisée.',
+    invite_email_mismatch: 'Cette invitation a été créée pour une autre adresse e-mail.',
+    already_staff: 'Cette personne fait déjà partie de l’équipe.',
+    not_self: 'Vous ne pouvez pas modifier votre propre rôle.',
+    last_super_admin: 'Il faut garder au moins un super admin.',
+    invalid_role: 'Rôle non valide.',
+    email_invalid: 'Adresse e-mail non valide.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
   ApiError.prototype = Object.create(Error.prototype);
@@ -2123,10 +2134,6 @@
       function tile(n, label) { return h('div', { class: 'tile' }, h('strong', null, String(n || 0)), h('span', null, label)); }
       var src = Object.keys(s.sources || {}).sort(function (a, b) { return s.sources[b] - s.sources[a]; });
       return page(backBtn(),
-        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fondateur'), h('h1', null, 'Croissance')),
-        iconRow('#/admin/ambassadeurs', 'users', 'Ambassadeurs : inscriptions et versements', { id: 'stats-amb' }),
-        iconRow('#/admin/vide-dressing', 'box', 'Vide-dressing : articles à vérifier, commandes', { id: 'stats-vd' }),
-        iconRow('#/admin/commentaires', 'flag', 'Commentaires signalés', { id: 'stats-comments' }),
         h('div', { class: 'tiles', id: 'stats-totals' },
           tile(T.shops, 'boutiques'), tile(T.couriers, 'livreurs'), tile(T.addresses, 'adresses actives'), tile(T.meetings, 'événements actifs'),
           tile(T.orders, 'commandes'), tile(T.delivered, 'livrées'), tile(T.referred, 'arrivées parrainées'), tile(T.posts, 'publications')),
@@ -2178,7 +2185,9 @@
       if (!p.length) view = viewHome();
       else if (p[0] === 'r' && p[1]) { try { history.replaceState(null, '', location.pathname + location.search + '#/'); } catch (e) { /* rien */ } checkTouchCode(); view = viewHome(); }
       else if (p[0] === 'parrainer') view = viewReferral(r.q);
-      else if (p[0] === 'stats') view = viewStats();
+      else if (p[0] === 'bo') view = viewBo(p, r.q);
+      // Anciennes adresses d'administration : elles mènent au back-office.
+      else if (p[0] === 'stats' || (p[0] === 'admin' && p[1])) { var boTo = '#/bo/' + (p[0] === 'stats' ? 'croissance' : p[1]); try { history.replaceState(null, '', location.pathname + location.search + boTo); } catch (e) { /* rien */ } view = viewBo(['bo', p[0] === 'stats' ? 'croissance' : p[1]], r.q); }
       else if (p[0] === 'a' && p[1]) view = viewRecipient(p[1]);
       else if (p[0] === 'new') view = viewAddressForm(null, r.q);
       else if (p[0] === 'edit' && p[1]) view = viewAddressForm(p[1], r.q);
@@ -2201,9 +2210,6 @@
       else if (p[0] === 'ambassadeur' && !p[1]) view = viewAmbassador();
       else if (p[0] === 'vide-dressing' && !p[1]) view = viewVideDressing();
       else if (p[0] === 'vide-dressing' && p[1] === 'vendre') view = viewVdSell(r.q);
-      else if (p[0] === 'admin' && p[1] === 'vide-dressing') view = viewAdminVd();
-      else if (p[0] === 'admin' && p[1] === 'commentaires') view = viewAdminComments();
-      else if (p[0] === 'admin' && p[1] === 'ambassadeurs') view = viewAdminAmbassadors();
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
@@ -2267,6 +2273,7 @@
   function showView(node) { stopMedia(); ensureWayBack(node, parseHash()); setKids(app, node); }
   function ensureWayBack(node, r) {
     if (!node || !node.querySelector || !r.parts.length) return;
+    if (node.classList && (node.classList.contains('bo-shell') || node.classList.contains('bo-portal'))) return; // le back-office a sa propre navigation
     var prev = NAV.length ? NAV[NAV.length - 1] : null;
     var bar = node.querySelector('.brand-bar');
     // Pages reçues par lien : le logo ramène à l'accueil ; une flèche apparaît si l'on vient d'un autre écran de l'application.
@@ -3819,7 +3826,7 @@
   }
   function waTo(phone, text) { var n = waNumber(phone); return n ? 'https://wa.me/' + n + '?text=' + encodeURIComponent(text) : waLink(text); }
   function invoiceUrl(token) { return baseUrl() + '#/f/' + token; }
-  function safeRetour(v) { return v && /^[a-z0-9\/-]{1,40}$/i.test(v) ? '#/' + v.replace(/^\/+/, '') : '#/'; }
+  function safeRetour(v) { return v && /^[a-z0-9\/_-]{1,90}$/i.test(v) && !/\/\//.test(v) ? '#/' + v.replace(/^\/+/, '') : '#/'; }
   function segField(o) {
     // o : { legend, name, options: [[value, label]], value, onChange, id }
     return h('fieldset', { class: 'segfield', id: o.id || null }, o.legend ? h('legend', null, o.legend) : null,
@@ -3871,7 +3878,7 @@
   }
 
   function authForm(q) {
-    var mode = q.mode === 'inscription' ? 'signup' : 'login';
+    var mode = q.mode === 'inscription' ? 'signup' : q.mode === 'oubli' ? 'forgot' : 'login';
     var f = { email: '', password: '', name: '' };
     var retour = safeRetour(q.retour);
     var root = h('div', { class: 'wrap' });
@@ -3951,6 +3958,14 @@
         } }, 'Pas maintenant')));
     return card;
   }
+  // Lien vers le back-office, seulement pour les membres de l'équipe.
+  function boEntry() {
+    var box = h('div');
+    api('fiila_bo_me', {}).then(function (m) {
+      if (m.staff) setKids(box, iconRow('#/bo', 'key', 'Back-office · ' + (BO_ROLES[m.role] || m.role), { id: 'bo-entry' }));
+    }, function () {});
+    return box;
+  }
   function profileView(me, q) {
     var f = { display_name: me.display_name || '', phone: me.phone || '' };
     var msg = h('div', { role: 'status' });
@@ -4022,6 +4037,7 @@
       claimCard(me, q),
       q.mdp === '1' ? h('div', { class: 'notice' }, 'Choisissez maintenant votre nouveau mot de passe.') : null,
       h('section', { class: 'card' }, avatarBox, msg),
+      boEntry(),
       h('section', { class: 'card' },
         h('h2', null, 'Profil'),
         textField({ id: 'me-name', label: 'Nom affiché', max: 60, value: f.display_name, autocomplete: 'name', onInput: function (v) { f.display_name = v; } }),
@@ -5270,6 +5286,547 @@
         vdRules(), err, send, footer());
     }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger', errText(e), retryBtn()), footer()); });
   }
+  /* ================================================================ BACK-OFFICE (#/bo)
+     Portail unique de l'équipe Fii La (fondateur, 19/10 10:41). Chaque membre a son propre compte et un rôle ;
+     la base décide de chaque droit (fiila.staff_can) : l'interface ne fait que masquer ce qui n'est pas permis.
+     Ordinateur : barre latérale ; téléphone : barre du haut et menu. Règle « simple et intuitif » : une action principale
+     et une seule rangée de filtres par écran. */
+  var BO = { me: null, at: 0 };
+  var BO_ROLES = { super_admin: 'Super admin', operations: 'Opérations', moderation: 'Modération', support: 'Support', finance: 'Finances' };
+  var BO_ROLE_HELP = {
+    super_admin: 'Tout, y compris l’équipe, les réglages et le journal.',
+    operations: 'Boutiques, commandes, comptes, fil, modération, vide-dressing, ambassadeurs, finances.',
+    moderation: 'Modération des commentaires, vide-dressing, suspension des boutiques.',
+    support: 'Lecture des boutiques, commandes et comptes pour aider les utilisateurs.',
+    finance: 'Commandes, finances et versements des ambassadeurs.' };
+  // [chemin, icône, libellé, droit, file d'attente du tableau de bord]
+  var BO_NAV = [
+    ['', 'home', 'Tableau de bord', 'dashboard'],
+    ['boutiques', 'shop', 'Boutiques', 'shops', 'suspended'],
+    ['commandes', 'box', 'Commandes', 'orders'],
+    ['comptes', 'user', 'Comptes', 'accounts'],
+    ['moderation', 'flag', 'Modération', 'moderation', 'comments'],
+    ['vide-dressing', 'users', 'Vide-dressing', 'vide_dressing', 'vide_dressing'],
+    ['ambassadeurs', 'gift', 'Ambassadeurs', 'ambassadors', 'ambassadors'],
+    ['fil', 'heart', 'Fil (25 places)', 'feed'],
+    ['finances', 'cash', 'Finances', 'finance'],
+    ['croissance', 'star', 'Croissance', 'dashboard'],
+    ['equipe', 'key', 'Équipe', 'team'],
+    ['journal', 'clock', 'Journal', 'audit'],
+    ['reglages', 'settings', 'Réglages', 'settings']];
+  function boCan(perm) { return !!(BO.me && BO.me.perms && BO.me.perms.indexOf(perm) >= 0); }
+  function boMe(force) {
+    if (!force && BO.me && Date.now() - BO.at < 60000) return Promise.resolve(BO.me);
+    return api('fiila_bo_me', {}).then(function (m) { BO.me = m; BO.at = Date.now(); return m; });
+  }
+  function boDate(iso, time) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + (time ? ' · ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '');
+  }
+  function boBadge(kind, text) { return h('span', { class: 'bo-badge ' + kind }, text); }
+  function boNum(n) { return String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+  // Tableau : lignes de cellules ; sur téléphone, chaque ligne devient une carte (libellé à gauche, valeur à droite).
+  function boTable(cols, rows, o) {
+    o = o || {};
+    if (!rows.length) return h('div', { class: 'bo-empty', id: o.emptyId || null }, o.empty || 'Rien à afficher.');
+    return h('table', { class: 'bo-table', id: o.id || null },
+      h('thead', null, h('tr', null, cols.map(function (c) { return h('th', { scope: 'col', class: c.cls || null }, c.label); }))),
+      h('tbody', null, rows.map(function (r) {
+        var tr = h('tr', { class: o.href ? 'link' : null }, cols.map(function (c, i) {
+          var v = c.get(r);
+          return h('td', { 'data-label': c.label, class: c.cls || null }, i === 0 && o.href ? h('a', { href: o.href(r) }, v) : v);
+        }));
+        if (o.href) tr.addEventListener('click', function (e) { if (e.target.closest('a,button,select,input')) return; go(o.href(r)); });
+        return tr;
+      })));
+  }
+  function boChips(list, value, onPick, id) {
+    return h('div', { class: 'opt-row scroll bo-chips', role: 'group', id: id || null }, list.map(function (c) {
+      return h('button', { class: 'opt' + (value === c[0] ? ' on' : ''), type: 'button', 'aria-pressed': value === c[0] ? 'true' : 'false', onclick: function () { onPick(c[0]); } }, c[1]);
+    }));
+  }
+  function boSearch(value, placeholder, onSearch) {
+    var input = h('input', { type: 'search', class: 'bo-search', value: value || '', placeholder: placeholder, 'aria-label': placeholder, id: 'bo-search' });
+    var t = null;
+    input.addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { onSearch(input.value.trim()); }, 300); });
+    return input;
+  }
+  // Geste sensible refusé faute de connexion récente : on redemande le mot de passe, puis on rejoue.
+  function boSensitive(fn) {
+    return fn().then(null, function (e) {
+      if (!e || e.code !== 'reauth_required') throw e;
+      return new Promise(function (resolve, reject) {
+        var pw = h('input', { type: 'password', id: 'bo-reauth-pw', autocomplete: 'current-password', 'aria-label': 'Mot de passe' });
+        var err = h('div', { role: 'alert' });
+        var back = h('div', { class: 'sheet-back', id: 'bo-reauth', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bo-reauth-h' },
+          h('form', { class: 'sheet', onsubmit: function (ev) {
+            ev.preventDefault(); setKids(err);
+            account.signIn(BO.me.email, pw.value).then(function () { back.remove(); return fn(); }).then(resolve, function (x) { if (x && x.code === 'reauth_required') return; errBox(err, x); });
+          } }, h('h2', { id: 'bo-reauth-h' }, 'Confirmez votre mot de passe'),
+            h('p', { class: 'small muted' }, 'Ce geste touche à l’équipe ou aux réglages : il demande une connexion de moins de 15 minutes.'),
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Mot de passe'), pw), err,
+            h('button', { class: 'btn', type: 'submit', id: 'bo-reauth-ok' }, 'Confirmer'),
+            h('button', { class: 'btn ghost', type: 'button', onclick: function () { back.remove(); reject(e); } }, 'Annuler')));
+        document.body.append(back); pw.focus();
+      });
+    });
+  }
+  function boAct(fn, okText, after) {
+    return boSensitive(fn).then(function (r) { if (okText) toast(okText); if (after) after(r); else render(); return r; }, function (e) { if (e && e.code !== 'reauth_required') toast(errText(e)); });
+  }
+  // Récupère le contenu d'un écran d'administration existant (sans son bouton retour ni son pied de page) pour l'afficher dans le cadre.
+  function boEmbed(viewFn) {
+    return Promise.resolve(viewFn()).then(function (pg) {
+      var box = h('div', { class: 'bo-embed stack' });
+      Array.prototype.slice.call(pg.childNodes).forEach(function (n) {
+        if (n.nodeType === 1 && (n.classList.contains('back') || n.tagName === 'FOOTER' || n.tagName === 'H1')) return;
+        box.appendChild(n);
+      });
+      return box;
+    });
+  }
+  function boShell(sec, title, body, o) {
+    o = o || {};
+    var me = BO.me, q = (BO.overview && BO.overview.queues) || {};
+    var nav = h('nav', { class: 'bo-nav', 'aria-label': 'Back-office' }, BO_NAV.filter(function (n) { return boCan(n[3]); }).map(function (n) {
+      var count = n[4] ? q[n[4]] : 0;
+      return h('a', { href: '#/bo' + (n[0] ? '/' + n[0] : ''), class: 'bo-link' + (sec === n[0] ? ' on' : ''), 'aria-current': sec === n[0] ? 'page' : null, id: 'bo-nav-' + (n[0] || 'accueil') },
+        icon(n[1], 20), h('span', null, n[2]), count ? h('span', { class: 'bo-count', 'aria-label': count + ' à traiter' }, String(count)) : null);
+    }));
+    var shell = h('div', { class: 'bo-shell' });
+    var side = h('aside', { class: 'bo-side', id: 'bo-side' },
+      h('div', { class: 'bo-brand' }, h('span', { class: 'mark small' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+      nav,
+      h('div', { class: 'bo-user' },
+        h('div', null, h('b', { class: 'wrapword' }, (me.name || me.email || '').split(' ')[0] || 'Membre'), h('span', { class: 'small muted' }, BO_ROLES[me.role] || me.role)),
+        h('a', { class: 'btn link small', href: '#/' }, 'Voir le site'),
+        h('button', { class: 'btn link small', type: 'button', id: 'bo-logout', onclick: function () { account.signOut().then(function () { BO.me = null; go('#/bo'); }); } }, 'Se déconnecter')));
+    var top = h('header', { class: 'bo-top' },
+      h('button', { class: 'bo-menu-btn', type: 'button', id: 'bo-menu', 'aria-label': 'Menu', 'aria-expanded': 'false', 'aria-controls': 'bo-side', onclick: function () {
+        var open = !shell.classList.contains('menu-open'); shell.classList.toggle('menu-open', open); this.setAttribute('aria-expanded', open ? 'true' : 'false');
+      } }, h('span', { class: 'bo-burger', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'))),
+      h('span', { class: 'mark small' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office'));
+    var scrim = h('div', { class: 'bo-scrim', onclick: function () { shell.classList.remove('menu-open'); } });
+    var main = h('main', { class: 'bo-main', id: 'bo-main' },
+      o.back ? h('a', { class: 'btn back', href: o.back[0] }, '← ' + o.back[1]) : null,
+      h('div', { class: 'bo-head' }, h('div', { class: 'stack tight' }, o.eyebrow ? h('p', { class: 'eyebrow' }, o.eyebrow) : null, h('h1', { class: 'wrapword' }, title)), o.action || null),
+      body);
+    add(shell, [top, side, scrim, main]);
+    return shell;
+  }
+  function viewBo(parts, q) {
+    var sec = parts[1] || '';
+    if (sec === 'invitation') return viewBoInvite(parts[2]);
+    if (!authed()) return boLogin();
+    return boMe(true).then(function (me) {
+      if (!me.staff) return boDenied(me);
+      var nav = BO_NAV.filter(function (n) { return n[0] === sec; })[0];
+      if (!nav) return boShell('', 'Introuvable', stateCard('?', 'Page introuvable', 'Cette page n’existe pas dans le back-office.'));
+      if (!boCan(nav[3])) return boShell(sec, nav[2], stateCard('⦸', 'Accès non autorisé', 'Votre rôle (' + (BO_ROLES[me.role] || me.role) + ') ne donne pas accès à cette page.'));
+      var pre = BO.overview && Date.now() - BO.overview.at < 60000 ? Promise.resolve() : api('fiila_bo_overview', {}).then(function (o) { o.at = Date.now(); BO.overview = o; }, function () {});
+      return pre.then(function () {
+        var id = parts[2];
+        switch (sec) {
+          case '': return boDashboard();
+          case 'boutiques': return id ? boShop(id) : boShops(q);
+          case 'commandes': return id ? boOrder(id) : boOrders(q);
+          case 'comptes': return id ? boAccount(id) : boAccounts(q);
+          case 'moderation': return boEmbed(viewAdminComments).then(function (b) { return boShell(sec, 'Modération', b); });
+          case 'vide-dressing': return boEmbed(viewAdminVd).then(function (b) { return boShell(sec, 'Vide-dressing', b); });
+          case 'ambassadeurs': return boEmbed(viewAdminAmbassadors).then(function (b) { return boShell(sec, 'Ambassadeurs', b); });
+          case 'croissance': return boEmbed(viewStats).then(function (b) { return boShell(sec, 'Croissance', b); });
+          case 'fil': return boFeed();
+          case 'finances': return boFinance();
+          case 'equipe': return boTeam();
+          case 'journal': return boAudit(q);
+          case 'reglages': return boSettings();
+        }
+      });
+    }, function (e) { return page(stateCard('!', 'Back-office indisponible', errText(e), retryBtn())); });
+  }
+  // Portail de connexion de l'équipe.
+  function boLogin() {
+    var f = { email: '', password: '' };
+    var err = h('div', { role: 'alert' });
+    var btn = h('button', { class: 'btn', type: 'submit', id: 'bo-login-btn' }, 'Se connecter');
+    return h('div', { class: 'bo-portal' }, h('form', { class: 'bo-login card stack', id: 'bo-login', onsubmit: function (e) {
+        e.preventDefault(); setKids(err); btn.disabled = true;
+        account.signIn(f.email.trim(), f.password).then(function () { btn.disabled = false; render(); }, function (x) { btn.disabled = false; errBox(err, x); });
+      } },
+      h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+      h('h1', null, 'Connexion de l’équipe'),
+      h('p', { class: 'small muted' }, 'Accès réservé à l’équipe Fii La. Chaque membre se connecte avec son propre compte.'),
+      h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Adresse e-mail'), h('input', { type: 'email', id: 'bo-email', autocomplete: 'username', required: true, oninput: function (e) { f.email = e.target.value; } })),
+      h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Mot de passe'), h('input', { type: 'password', id: 'bo-pass', autocomplete: 'current-password', required: true, oninput: function (e) { f.password = e.target.value; } })),
+      err, btn,
+      h('div', { class: 'row', style: 'justify-content:space-between' },
+        h('a', { class: 'btn link small', href: '#/compte' + qs({ mode: 'oubli', retour: 'bo' }) }, 'Mot de passe oublié ?'),
+        h('a', { class: 'btn link small', href: '#/', id: 'bo-portal-home' }, 'Retour au site'))));
+  }
+  function boDenied(me) {
+    return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-denied' },
+      h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+      h('h1', null, 'Accès non autorisé'),
+      h('p', { class: 'muted' }, 'Ce compte ne fait pas partie de l’équipe Fii La. Pour rejoindre l’équipe, ouvrez le lien d’invitation reçu.'),
+      h('a', { class: 'btn', href: '#/' }, 'Retour au site'),
+      h('button', { class: 'btn ghost', type: 'button', onclick: function () { account.signOut().then(function () { BO.me = null; render(); }); } }, 'Changer de compte')));
+  }
+  function viewBoInvite(token) {
+    return api('fiila_bo_invite_get', { p_token: token || '' }).then(function (r) {
+      var box = function () { return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-invite' },
+        h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+        Array.prototype.slice.call(arguments))); };
+      if (r.state !== 'ok') return box(h('h1', null, r.state === 'used' ? 'Invitation déjà utilisée' : 'Invitation expirée ou non valide'),
+        h('p', { class: 'muted' }, r.state === 'used' ? 'Connectez-vous au back-office avec votre compte.' : 'Demandez une nouvelle invitation à la personne qui vous l’a envoyée.'),
+        h('a', { class: 'btn', href: '#/bo' }, 'Aller au back-office'));
+      var back = 'bo/invitation/' + token;
+      var err = h('div', { role: 'alert' });
+      return box(h('h1', null, 'Rejoindre l’équipe Fii La'),
+        h('p', null, 'Rôle : ', h('b', null, BO_ROLES[r.role] || r.role), '. ', h('span', { class: 'muted' }, BO_ROLE_HELP[r.role] || '')),
+        h('p', { class: 'small muted' }, 'Invitation nominative pour ' + r.email + '. Utilisez le compte qui porte cette adresse.'),
+        authed() ? [err, h('button', { class: 'btn', type: 'button', id: 'bo-invite-accept', onclick: function () {
+            api('fiila_bo_invite_accept', { p_token: token }).then(function () { toast('Bienvenue dans l’équipe.'); BO.me = null; go('#/bo'); }, function (e) {
+              if (e.code === 'invite_email_mismatch') setKids(err, h('p', { class: 'msg' }, 'Ce lien a été créé pour une autre adresse e-mail. Déconnectez-vous puis connectez-vous avec le bon compte.'));
+              else errBox(err, e);
+            });
+          } }, 'Rejoindre l’équipe')]
+          : [h('a', { class: 'btn', href: '#/compte' + qs({ mode: 'inscription', retour: back }), id: 'bo-invite-signup' }, 'Créer mon compte'),
+             h('a', { class: 'btn ghost', href: '#/compte' + qs({ retour: back }), id: 'bo-invite-login' }, 'J’ai déjà un compte')]);
+    }, function (e) { return page(stateCard('!', 'Invitation indisponible', errText(e), retryBtn())); });
+  }
+
+  // ----- Tableau de bord
+  function boDashboard() {
+    var o = BO.overview || { kpis: {}, queues: {}, days: [] }, k = o.kpis;
+    function kpi(id, n, label, sub) { return h('div', { class: 'bo-kpi', id: 'kpi-' + id }, h('strong', null, n), h('span', null, label), sub ? h('small', { class: 'muted' }, sub) : null); }
+    var QUEUE = [['comments', 'Commentaires signalés', '#/bo/moderation'], ['vide_dressing', 'Articles de vide-dressing à vérifier', '#/bo/vide-dressing'],
+      ['ambassadors', 'Ambassadeurs à valider', '#/bo/ambassadeurs'], ['rewards', 'Gains d’ambassadeurs à verser', '#/bo/ambassadeurs'], ['suspended', 'Boutiques suspendues', '#/bo/boutiques?f=suspended']];
+    var queues = QUEUE.filter(function (x) { return o.queues[x[0]] != null; });
+    var max = Math.max.apply(null, [1].concat(o.days.map(function (d) { return d.orders; })));
+    var chart = h('div', { class: 'bo-bars', role: 'img', 'aria-label': 'Commandes par jour sur 14 jours : ' + o.days.map(function (d) { return d.orders; }).join(', ') },
+      o.days.map(function (d) {
+        var dt = new Date(d.day + 'T12:00:00Z');
+        return h('div', { class: 'bo-bar', title: dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' : ' + d.orders + ' commande(s), ' + d.shops + ' boutique(s), ' + d.accounts + ' compte(s)' },
+          h('i', { style: 'height:' + Math.round(d.orders / max * 100) + '%' }), h('span', null, dt.getDate()));
+      }));
+    return boShell('', 'Tableau de bord', [
+      h('section', { class: 'bo-kpis', id: 'bo-kpis' },
+        kpi('shops', boNum(k.shops_open) + ' / ' + boNum(k.shops), 'boutiques ouvertes', '+' + (k.shops_7d || 0) + ' en 7 jours'),
+        kpi('orders', boNum(k.orders_30d), 'commandes (30 j)', boNum(k.delivered_30d) + ' livrées'),
+        kpi('gmv', fcfa(k.gmv_30d || 0), 'volume livré (30 j)'),
+        kpi('accounts', boNum(k.accounts), 'comptes', '+' + (k.accounts_7d || 0) + ' en 7 jours'),
+        kpi('addresses', boNum(k.addresses), 'adresses actives', boNum(k.meetings) + ' événements'),
+        kpi('couriers', boNum(k.couriers), 'livreurs', boNum(k.ambassadors) + ' ambassadeurs actifs'),
+        kpi('feed', boNum(k.feed_left), 'places gratuites restantes', 'sur 25 dans le fil')),
+      h('div', { class: 'bo-grid2' },
+        h('section', { class: 'card stack tight', id: 'bo-queues' }, h('h2', null, 'À traiter'),
+          queues.length ? queues.map(function (x) {
+            var n = o.queues[x[0]];
+            return h('a', { class: 'bo-queue' + (n ? '' : ' zero'), href: x[2] }, h('span', null, x[1]), h('b', null, String(n)), icon('chev', 16));
+          }) : h('p', { class: 'muted small' }, 'Rien pour votre rôle.')),
+        h('section', { class: 'card stack tight' }, h('h2', null, 'Commandes par jour (14 jours)'), chart,
+          h('p', { class: 'small muted' }, 'Hors boutiques de démonstration. Survolez une barre pour le détail du jour.')))]);
+  }
+
+  // ----- Boutiques
+  var BO_SHOP_FILTERS = [['', 'Toutes'], ['open', 'Ouvertes'], ['closed', 'Fermées'], ['suspended', 'Suspendues'], ['feed', 'Dans le fil'], ['demo', 'Démo']];
+  function boShopState(s) {
+    if (s.suspended || s.suspended_at) return boBadge('danger', 'Suspendue');
+    if (s.platform) return boBadge('info', 'Fii La');
+    if (s.demo) return boBadge('muted', 'Démo');
+    return s.public ? boBadge('ok', 'Ouverte') : boBadge('muted', 'Fermée');
+  }
+  function boList(sec, title, fn, args, key, cols, href, filters, q, placeholder) {
+    var st = { q: (q && q.q) || '', f: (q && q.f) || '', page: 0 };
+    var box = h('div', { class: 'stack', id: 'bo-list' }, loading());
+    var more = h('div');
+    var rows = [];
+    function load(reset) {
+      if (reset) { st.page = 0; rows = []; setKids(box, loading()); }
+      var a = Object.assign({}, args(st), { p_page: st.page });
+      api(fn, a).then(function (r) {
+        rows = rows.concat(r[key]);
+        setKids(box, boTable(cols, rows, { href: href, id: 'bo-table', emptyId: 'bo-empty', empty: st.q || st.f ? 'Aucun résultat pour cette recherche.' : 'Rien pour le moment.' }));
+        setKids(more, r[key].length === 50 ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { st.page++; load(false); } }, 'Voir plus') : null);
+        try { history.replaceState(null, '', location.pathname + location.search + '#/bo/' + sec + qs({ q: st.q || undefined, f: st.f || undefined })); } catch (e) { /* rien */ }
+      }, function (e) { errBox(box, e); });
+    }
+    var chips = filters ? h('div') : null;
+    function drawChips() { if (chips) setKids(chips, boChips(filters, st.f, function (v) { st.f = v; drawChips(); load(true); }, 'bo-filters')); }
+    drawChips(); load(true);
+    return boShell(sec, title, [h('div', { class: 'bo-tools' }, boSearch(st.q, placeholder, function (v) { st.q = v; load(true); }), chips), box, more]);
+  }
+  function boShops(q) {
+    return boList('boutiques', 'Boutiques', 'fiila_bo_shops', function (st) { return { p_q: st.q || null, p_filter: st.f || null }; }, 'shops', [
+      { label: 'Boutique', get: function (s) { return s.name; } },
+      { label: 'Type', get: function (s) { return typeLabel(s.type) || '—'; }, cls: 'hide-s' },
+      { label: 'État', get: boShopState },
+      { label: 'Fil', get: function (s) { return s.rank ? 'Place ' + s.rank : '—'; } },
+      { label: 'Articles', get: function (s) { return String(s.products); }, cls: 'num' },
+      { label: 'Commandes', get: function (s) { return String(s.orders); }, cls: 'num' },
+      { label: 'Créée', get: function (s) { return boDate(s.created_at); } }],
+      function (s) { return '#/bo/boutiques/' + s.id; }, BO_SHOP_FILTERS, q, 'Nom, lien ou téléphone');
+  }
+  function boShop(id) {
+    return api('fiila_bo_shop', { p_id: id }).then(function (s) {
+      var st = s.stats;
+      function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
+      var reason = h('input', { type: 'text', id: 'bo-suspend-reason', maxlength: 300, placeholder: 'Motif (visible dans le journal)' });
+      var actions = boCan('shops_write') && !s.platform ? h('section', { class: 'card stack tight', id: 'bo-shop-actions' }, h('h2', null, 'Actions'),
+        s.suspended_at ? [h('p', { class: 'small' }, 'Suspendue le ' + boDate(s.suspended_at, true) + ' : ' + (s.suspended_reason || '')),
+            h('button', { class: 'btn', type: 'button', id: 'bo-unsuspend', onclick: function () { boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'unsuspend' }); }, 'Boutique réactivée. Elle peut rouvrir sa vitrine.'); } }, 'Réactiver la boutique')]
+          : [h('p', { class: 'small muted' }, 'La suspension ferme la vitrine et la retire du fil. La boutique ne peut pas la rouvrir elle-même.'),
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif de suspension'), reason),
+            h('button', { class: 'btn danger', type: 'button', id: 'bo-suspend', onclick: function () {
+              if (!reason.value.trim()) { toast('Indiquez un motif.'); reason.focus(); return; }
+              boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'suspend', p_value: reason.value }); }, 'Boutique suspendue.');
+            } }, 'Suspendre la boutique')],
+        boCan('feed') && s.rank ? h('div', { class: 'row' },
+          h('button', { class: 'btn ghost small', type: 'button', id: 'bo-feed-toggle', onclick: function () { boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: s.feed ? 'feed_off' : 'feed_on' }); }, s.feed ? 'Retirée du fil.' : 'Remise dans le fil.'); } }, s.feed ? 'Retirer du fil' : 'Remettre dans le fil'),
+          h('button', { class: 'btn quiet danger-text', type: 'button', id: 'bo-free-place', onclick: function () {
+            if (!window.confirm || window.confirm('Libérer la place n° ' + s.rank + ' ? Elle ira à la plus ancienne boutique en attente.')) boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'free_place' }); }, 'Place libérée.');
+          } }, 'Libérer la place n° ' + s.rank)) : null) : null;
+      var typeSel = boCan('shops_write') ? h('select', { id: 'bo-shop-type', 'aria-label': 'Type de commerce', onchange: function (e) {
+          boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'set_type', p_value: e.target.value || null }); }, 'Type enregistré.', function () {});
+        } }, h('option', { value: '' }, '—'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: s.type === t[0] || null }, t[1]); })) : (typeLabel(s.type) || '—');
+      return boShell('boutiques', s.name, [
+        h('p', null, boShopState(s), ' ', s.rank ? boBadge('info', 'Fil · place ' + s.rank + (s.feed ? '' : ' (masquée)')) : null),
+        h('div', { class: 'bo-kpis small' },
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.products)), h('span', null, 'articles')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.orders)), h('span', null, 'commandes'), h('small', { class: 'muted' }, boNum(st.delivered) + ' livrées')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, fcfa(st.gmv)), h('span', null, 'volume livré')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.customers)), h('span', null, 'clients')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.likes) + ' ♥'), h('span', null, boNum(st.comments) + ' commentaires'))),
+        h('div', { class: 'bo-grid2' },
+          h('section', { class: 'card stack tight', id: 'bo-shop-info' }, h('h2', null, 'Informations'),
+            row('Vitrine', s.slug ? h('a', { href: '#/b/' + s.slug }, '/b/' + s.slug) : '—'),
+            row('Téléphone', s.phone || '—'),
+            row('Type', typeSel),
+            row('Accès', s.access === 'account' ? 'Compte' : 'Clé du téléphone (sans compte)'),
+            s.owner ? row('Propriétaire', h('a', { href: '#/bo/comptes/' + s.owner.id }, s.owner.email)) : null,
+            s.ambassador ? row('Ambassadeur', s.ambassador) : null,
+            row('Créée', boDate(s.created_at, true)),
+            s.about ? row('Présentation', s.about) : null),
+          actions),
+        s.recent_orders ? h('section', { class: 'stack tight' }, h('h2', null, 'Dernières commandes'),
+          boTable([{ label: 'N°', get: function (o) { return String(o.number).padStart(4, '0'); } }, { label: 'Total', get: function (o) { return fcfa(o.total); }, cls: 'num' },
+            { label: 'Statut', get: boOrderState }, { label: 'Date', get: function (o) { return boDate(o.created_at, true); } }], s.recent_orders || [],
+            { href: function (o) { return '#/bo/commandes/' + o.id; }, empty: 'Aucune commande.' })) : null,
+        s.log ? h('section', { class: 'stack tight', id: 'bo-shop-log' }, h('h2', null, 'Historique de l’équipe'),
+          s.log.map(function (l) { return h('p', { class: 'small' }, h('span', { class: 'muted' }, boDate(l.at, true) + ' · ' + boActor(l.actor) + ' · '), boActionLabel(l.action, l.detail)); })) : null
+      ], { back: ['#/bo/boutiques', 'Boutiques'] });
+    }, function (e) { return boShell('boutiques', 'Boutique', stateCard('!', 'Boutique introuvable', errText(e)), { back: ['#/bo/boutiques', 'Boutiques'] }); });
+  }
+
+  // ----- Commandes
+  function boOrderState(o) { return o.status === 'delivered' ? boBadge('ok', 'Livrée') : o.status === 'cancelled' ? boBadge('muted', 'Annulée') : boBadge('warn', 'En cours'); }
+  function boOrders(q) {
+    return boList('commandes', 'Commandes', 'fiila_bo_orders', function (st) { return { p_q: st.q || null, p_status: st.f || null }; }, 'orders', [
+      { label: 'N°', get: function (o) { return String(o.number).padStart(4, '0'); } },
+      { label: 'Boutique', get: function (o) { return o.shop + (o.demo ? ' (démo)' : ''); } },
+      { label: 'Client', get: function (o) { return o.customer; } },
+      { label: 'Total', get: function (o) { return fcfa(o.total); }, cls: 'num' },
+      { label: 'Statut', get: boOrderState },
+      { label: 'Date', get: function (o) { return boDate(o.created_at, true); } }],
+      function (o) { return '#/bo/commandes/' + o.id; }, [['', 'Toutes'], ['open', 'En cours'], ['delivered', 'Livrées'], ['cancelled', 'Annulées']], q, 'Boutique, client, numéro ou téléphone');
+  }
+  function boOrder(id) {
+    return api('fiila_bo_order', { p_id: id }).then(function (o) {
+      function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
+      return boShell('commandes', 'Commande n° ' + String(o.number).padStart(4, '0'), [
+        h('p', null, boOrderState(o)),
+        h('div', { class: 'bo-grid2' },
+          h('section', { class: 'card stack tight', id: 'bo-order-info' }, h('h2', null, 'Commande'),
+            row('Boutique', h('a', { href: '#/bo/boutiques/' + o.shop.id }, o.shop.name)),
+            row('Client', o.customer), row('Téléphone', o.phone || '—'),
+            row('Adresse', o.address === 'received' ? 'Reçue' : o.address === 'pending' ? 'Demandée, pas encore donnée' : 'Aucune'),
+            row('Créée', boDate(o.created_at, true)),
+            o.delivered_at ? row('Livrée', boDate(o.delivered_at, true)) : null,
+            o.cancelled_at ? row('Annulée', boDate(o.cancelled_at, true)) : null,
+            o.note ? row('Note', o.note) : null,
+            h('a', { class: 'btn ghost small', href: '#/f/' + o.invoice, style: 'align-self:flex-start' }, 'Voir la facture')),
+          h('section', { class: 'card stack tight', id: 'bo-order-items' }, h('h2', null, 'Articles'),
+            (o.items || []).map(function (it) { return row((it.qty || 1) + ' × ' + (it.label || ''), fcfa((it.price || 0) * (it.qty || 1))); }),
+            row(h('b', null, 'Total'), h('b', null, fcfa(o.total))),
+            row('Encaissé', fcfa(o.paid)),
+            (o.payments || []).map(function (p) { return h('p', { class: 'small muted' }, boDate(p.at, true) + ' · ' + fcfa(p.amount) + ' · ' + (({ cash: 'Espèces', wave: 'Wave', orange_money: 'Orange Money', card: 'Carte', other: 'Autre' })[p.method] || p.method)); })))
+      ], { back: ['#/bo/commandes', 'Commandes'] });
+    }, function (e) { return boShell('commandes', 'Commande', stateCard('!', 'Commande introuvable', errText(e)), { back: ['#/bo/commandes', 'Commandes'] }); });
+  }
+
+  // ----- Comptes
+  function boAccounts(q) {
+    return boList('comptes', 'Comptes', 'fiila_bo_accounts', function (st) { return { p_q: st.q || null }; }, 'accounts', [
+      { label: 'Nom', get: function (a) { return a.name || '—'; } },
+      { label: 'E-mail', get: function (a) { return a.email; } },
+      { label: 'Boutique', get: function (a) { return a.shop || '—'; }, cls: 'hide-s' },
+      { label: 'Rôle', get: function (a) { return a.role ? boBadge('info', BO_ROLES[a.role]) : a.ambassador ? boBadge('muted', 'Ambassadeur') : '—'; } },
+      { label: 'Créé', get: function (a) { return boDate(a.created_at); } }],
+      function (a) { return '#/bo/comptes/' + a.id; }, null, q, 'Nom ou e-mail');
+  }
+  function boAccount(id) {
+    return api('fiila_bo_account', { p_id: id }).then(function (a) {
+      function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
+      var AMB = { training: 'En formation', review: 'À valider', active: 'Actif', suspended: 'Suspendu', excluded: 'Exclu' };
+      return boShell('comptes', a.name || a.email, [
+        h('section', { class: 'card stack tight', id: 'bo-account-info' },
+          row('E-mail', a.email), row('Téléphone', a.phone || '—'), row('Créé', boDate(a.created_at, true)),
+          row('Équipe', a.role ? BO_ROLES[a.role] : '—'),
+          row('Boutique', a.shop ? h('a', { href: '#/bo/boutiques/' + a.shop.id }, a.shop.name) : '—'),
+          row('Ambassadeur', a.ambassador ? (AMB[a.ambassador.status] || a.ambassador.status) + ' · code ' + a.ambassador.code : '—'),
+          row('Adresses', boNum(a.counts.addresses)), row('Événements', boNum(a.counts.meetings)),
+          row('Commentaires', boNum(a.counts.comments)), row('Articles de vide-dressing', boNum(a.counts.vide_dressing))),
+        a.role && boCan('team') ? h('a', { class: 'btn ghost', href: '#/bo/equipe' }, 'Gérer son rôle dans l’équipe') : null
+      ], { back: ['#/bo/comptes', 'Comptes'] });
+    }, function (e) { return boShell('comptes', 'Compte', stateCard('!', 'Compte introuvable', errText(e)), { back: ['#/bo/comptes', 'Comptes'] }); });
+  }
+
+  // ----- Fil
+  function boFeed() {
+    return api('fiila_bo_feed', {}).then(function (d) {
+      return boShell('fil', 'Fil (25 places gratuites)', [
+        h('p', { class: 'small muted' }, d.places.length + ' places attribuées sur 25 · ' + d.waiting.length + ' boutique(s) en attente d’une place.'),
+        boTable([
+          { label: 'Place', get: function (p) { return 'n° ' + p.rank; } },
+          { label: 'Boutique', get: function (p) { return p.name; } },
+          { label: 'État', get: function (p) { return p.suspended ? boBadge('danger', 'Suspendue') : !p.public ? boBadge('muted', 'Vitrine fermée') : !p.feed ? boBadge('warn', 'Masquée du fil') : boBadge('ok', 'Visible'); } },
+          { label: 'Publications', get: function (p) { return String(p.products); }, cls: 'num' }],
+          d.places, { href: function (p) { return '#/bo/boutiques/' + p.id; }, id: 'bo-feed', empty: 'Aucune place attribuée.' }),
+        d.waiting.length ? h('section', { class: 'stack tight' }, h('h2', null, 'En attente'),
+          boTable([{ label: 'Boutique', get: function (w) { return w.name; } }, { label: 'Depuis', get: function (w) { return boDate(w.since); } }], d.waiting,
+            { href: function (w) { return '#/bo/boutiques/' + w.id; } })) : null]);
+    });
+  }
+
+  // ----- Finances
+  function boFinance() {
+    return api('fiila_bo_finance', {}).then(function (f) {
+      var rate = f.vd_commission || 0;
+      return boShell('finances', 'Finances', [
+        h('div', { class: 'bo-kpis' },
+          h('div', { class: 'bo-kpi' }, h('strong', null, fcfa(f.rewards.validated)), h('span', null, 'gains ambassadeurs à verser'), h('small', { class: 'muted' }, fcfa(f.rewards.pending) + ' en attente (30 jours)')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, fcfa(f.rewards.paid)), h('span', null, 'gains déjà versés')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, String(f.vd_to_pay)), h('span', null, 'ventes de vide-dressing à reverser'), h('small', { class: 'muted' }, 'commission ' + rate + ' %'))),
+        h('section', { class: 'stack tight' }, h('h2', null, 'Par mois (6 derniers mois)'),
+          boTable([
+            { label: 'Mois', get: function (m) { return new Date(m.month + 'T12:00:00Z').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }); } },
+            { label: 'Commandes', get: function (m) { return boNum(m.orders); }, cls: 'num' },
+            { label: 'Livrées', get: function (m) { return boNum(m.delivered); }, cls: 'num' },
+            { label: 'Volume livré', get: function (m) { return fcfa(m.gmv); }, cls: 'num' },
+            { label: 'Commission vide-dressing', get: function (m) { return fcfa(Math.round(m.vd_gmv * rate / 100)); }, cls: 'num' }], f.months, { id: 'bo-months' }),
+          h('p', { class: 'small muted' }, 'Le volume est celui des commandes livrées, hors boutiques de démonstration. Fii La n’encaisse pas encore les paiements en ligne : la commission de vide-dressing est retenue au reversement.'))]);
+    });
+  }
+
+  // ----- Équipe
+  function boTeam() {
+    return api('fiila_bo_team', {}).then(function (t) {
+      var form = h('div');
+      function openInvite() {
+        var f = { email: '', role: 'support' };
+        var err = h('div', { role: 'alert' }), out = h('div');
+        var roleSel = h('select', { id: 'bo-inv-role', onchange: function (e) { f.role = e.target.value; help.textContent = BO_ROLE_HELP[f.role]; } },
+          Object.keys(BO_ROLES).map(function (r) { return h('option', { value: r, selected: r === f.role || null }, BO_ROLES[r]); }));
+        var help = h('p', { class: 'small muted' }, BO_ROLE_HELP[f.role]);
+        setKids(form, h('section', { class: 'card stack tight', id: 'bo-invite-form' }, h('h2', null, 'Inviter un membre'),
+          h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Adresse e-mail de la personne'), h('input', { type: 'email', id: 'bo-inv-email', oninput: function (e) { f.email = e.target.value; } })),
+          h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Rôle'), roleSel), help, err,
+          h('button', { class: 'btn', type: 'button', id: 'bo-inv-send', onclick: function () {
+            setKids(err);
+            boSensitive(function () { return api('fiila_bo_invite', { p_email: f.email, p_role: f.role }); }).then(function (r) {
+              var link = baseUrl() + '#/bo/invitation/' + r.token;
+              setKids(out, h('div', { class: 'msg stack tight', id: 'bo-inv-link' },
+                h('p', null, h('b', null, 'Invitation créée. '), 'Envoyez ce lien à la personne : il fonctionne une seule fois, pendant 7 jours, avec son adresse e-mail.'),
+                h('code', { class: 'wrapword' }, link),
+                h('div', { class: 'row' }, h('button', { class: 'btn small', type: 'button', onclick: function () { copy(link, 'Lien'); } }, 'Copier le lien'),
+                  h('a', { class: 'btn ghost small', href: 'https://wa.me/?text=' + encodeURIComponent('Invitation au back-office Fii La (' + BO_ROLES[f.role] + ') : ' + link), target: '_blank', rel: 'noopener' }, 'WhatsApp'))));
+            }, function (e) { if (e && e.code !== 'reauth_required') errBox(err, e); });
+          } }, 'Créer le lien d’invitation'), out));
+      }
+      var members = boTable([
+        { label: 'Membre', get: function (m) { return (m.name || '—') + (m.me ? ' (vous)' : ''); } },
+        { label: 'E-mail', get: function (m) { return m.email; } },
+        { label: 'Rôle', get: function (m) {
+          if (m.me) return BO_ROLES[m.role];
+          return h('select', { 'aria-label': 'Rôle de ' + (m.name || m.email), class: 'bo-role', 'data-user': m.user_id, onchange: function (e) {
+            var v = e.target.value;
+            boAct(function () { return api('fiila_bo_staff_set', { p_user: m.user_id, p_role: v }); }, 'Rôle modifié.');
+          } }, Object.keys(BO_ROLES).map(function (r) { return h('option', { value: r, selected: r === m.role || null }, BO_ROLES[r]); }));
+        } },
+        { label: 'Dernière activité', get: function (m) { return m.last_seen_at ? boDate(m.last_seen_at, true) : 'Jamais'; } },
+        { label: '', get: function (m) { return m.me ? '' : h('button', { class: 'btn quiet danger-text small', type: 'button', 'data-remove': m.user_id, onclick: function () {
+          if (!window.confirm || window.confirm('Retirer ' + (m.name || m.email) + ' de l’équipe ? Son compte reste, sans accès au back-office.')) boAct(function () { return api('fiila_bo_staff_set', { p_user: m.user_id, p_role: null }); }, 'Membre retiré.');
+        } }, 'Retirer'); } }], t.members, { id: 'bo-members' });
+      var invites = t.invites.length ? h('section', { class: 'stack tight', id: 'bo-invites' }, h('h2', null, 'Invitations en attente'),
+        boTable([{ label: 'E-mail', get: function (i) { return i.email; } }, { label: 'Rôle', get: function (i) { return BO_ROLES[i.role]; } },
+          { label: 'Expire', get: function (i) { return boDate(i.expires_at, true); } },
+          { label: '', get: function (i) { return h('button', { class: 'btn quiet danger-text small', type: 'button', onclick: function () { boAct(function () { return api('fiila_bo_invite_revoke', { p_id: i.id }); }, 'Invitation annulée.'); } }, 'Annuler'); } }], t.invites)) : null;
+      return boShell('equipe', 'Équipe', [
+        h('p', { class: 'small muted' }, 'Chaque membre se connecte avec son propre compte sur le portail du back-office. Personne ne partage de mot de passe.'),
+        form, members, invites,
+        h('details', { class: 'card', id: 'bo-roles-help' }, h('summary', null, 'Ce que permet chaque rôle'),
+          h('div', { class: 'stack tight', style: 'margin-top:8px' }, Object.keys(BO_ROLES).map(function (r) { return h('p', { class: 'small' }, h('b', null, BO_ROLES[r] + ' : '), BO_ROLE_HELP[r]); })))
+      ], { action: iconBtn('button', { class: 'btn', type: 'button', id: 'bo-invite-open', onclick: function () { openInvite(); var i = document.getElementById('bo-inv-email'); if (i) i.focus(); } }, 'plus', 'Inviter') });
+    });
+  }
+  // ----- Journal
+  var BO_ACTIONS = { shop_suspend: 'a suspendu la boutique', shop_unsuspend: 'a réactivé la boutique', shop_feed_off: 'a retiré la boutique du fil',
+    shop_feed_on: 'a remis la boutique dans le fil', shop_free_place: 'a libéré la place du fil', shop_set_type: 'a changé le type de la boutique',
+    team_invite: 'a invité', team_invite_revoke: 'a annulé l’invitation de', team_join: 'a rejoint l’équipe', team_role: 'a changé le rôle de',
+    team_remove: 'a retiré de l’équipe', setting: 'a modifié le réglage', comment_delete: 'a supprimé un commentaire', comment_hide: 'a masqué un commentaire',
+    comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
+    vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’ambassadeur versé',
+    reward_cancelled: 'a annulé un gain d’ambassadeur', reward_validated: 'a validé un gain d’ambassadeur', ambassador_active: 'a activé un ambassadeur',
+    ambassador_suspended: 'a suspendu un ambassadeur', ambassador_excluded: 'a exclu un ambassadeur', ambassador_training: 'a renvoyé un ambassadeur en formation' };
+  var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain ambassadeur, niveau 1', 'FCFA'], amb_reward_2: ['Gain ambassadeur, niveau 2', 'FCFA'],
+    amb_reward_3: ['Gain ambassadeur, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par ambassadeur et par mois', ''] };
+  // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
+  function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
+  function boActionLabel(a, d) {
+    d = d || {};
+    var who = d.name || d.email || d.title || d.shop || (d.body ? '« ' + d.body + ' »' : '') || '';
+    var txt = (BO_ACTIONS[a] || a) + (who ? ' ' + who : '');
+    if (a === 'team_role' && d.to) txt += ' (' + (BO_ROLES[d.from] || d.from) + ' → ' + (BO_ROLES[d.to] || d.to) + ')';
+    if (a === 'team_invite' && d.role) txt += ' (' + (BO_ROLES[d.role] || d.role) + ')';
+    if (a === 'shop_suspend' && d.value) txt += ' : ' + d.value;
+    if (a === 'shop_set_type' && d.value) txt += ' : ' + (typeLabel(d.value) || d.value);
+    return txt;
+  }
+  function boAudit(q) {
+    var pageNo = 0, box = h('div', { class: 'stack', id: 'bo-audit' }, loading()), more = h('div'), rows = [];
+    function load() {
+      api('fiila_bo_audit', { p_page: pageNo }).then(function (r) {
+        rows = rows.concat(r);
+        setKids(box, boTable([
+          { label: 'Date', get: function (l) { return boDate(l.at, true); } },
+          { label: 'Membre', get: function (l) { return boActor(l.actor); } },
+          { label: 'Action', get: function (l) { return l.action === 'setting' ? 'a modifié « ' + ((BO_SETTINGS[l.target_id] || [l.target_id])[0]) + ' » : ' + l.detail.from + ' → ' + l.detail.to : boActionLabel(l.action, l.detail); } }],
+          rows, { empty: 'Aucune action pour le moment.' }));
+        setKids(more, r.length === 50 ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { pageNo++; load(); } }, 'Voir plus') : null);
+      }, function (e) { errBox(box, e); });
+    }
+    load();
+    return boShell('journal', 'Journal', [h('p', { class: 'small muted' }, 'Toutes les actions de l’équipe : qui, quoi, quand. Rien ne peut y être modifié ni effacé depuis le back-office.'), box, more]);
+  }
+
+  // ----- Réglages
+  function boSettings() {
+    return api('fiila_bo_settings', {}).then(function (s) {
+      return boShell('reglages', 'Réglages de la plateforme', [
+        h('p', { class: 'small muted' }, 'Chaque modification est appliquée aussitôt, tracée dans le journal, et demande une connexion récente.'),
+        h('div', { class: 'stack', id: 'bo-settings' }, Object.keys(BO_SETTINGS).map(function (k) {
+          var input = h('input', { type: 'number', inputmode: 'numeric', id: 'bo-set-' + k, value: s[k] != null ? s[k] : '', min: 0 });
+          return h('div', { class: 'card bo-setting' },
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, BO_SETTINGS[k][0] + (BO_SETTINGS[k][1] ? ' (' + BO_SETTINGS[k][1] + ')' : '')), input),
+            h('button', { class: 'btn ghost small', type: 'button', id: 'bo-save-' + k, onclick: function () {
+              boAct(function () { return api('fiila_bo_setting_set', { p_key: k, p_value: parseInt(input.value, 10) }); }, 'Réglage enregistré.');
+            } }, 'Enregistrer'));
+        })),
+        h('p', { class: 'small muted' }, 'Le nombre de places gratuites du fil (25) et le prix après ces places restent à décider : ils seront ajoutés ici.')]);
+    });
+  }
+
   // Modération des commentaires du fil : masqués (3 signalements) d'abord, puis signalés. Rétablir ou supprimer.
   function viewAdminComments() {
     if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.'), footer());

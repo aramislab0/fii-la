@@ -119,7 +119,7 @@ jobs:
         if: always()
         run: |
           fail=0
-          for s in referrals shop vitrine products videdressing navigation feed ambassadors engage; do
+          for s in referrals shop vitrine products videdressing navigation feed ambassadors engage backoffice; do
             ENGINE=webkit node tests/$s.test.mjs || fail=1
           done
           exit $fail
