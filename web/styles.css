@@ -726,3 +726,14 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .ev-type .ev-ic{color:var(--green);display:flex}
 .ev-type.on{border-color:var(--green);background:var(--soft)}
 .home-hint{margin-top:-8px}
+
+/* ---- Attributs d'articles (19/10) : choix de taille, de couleur, filtres de la vitrine. */
+.opt-row{display:flex;flex-wrap:wrap;gap:6px}
+.opt-row.scroll{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px}
+.opt-row.scroll::-webkit-scrollbar{display:none}
+.opt{flex:none;min-height:36px;min-width:40px;padding:0 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.opt.on{border-color:var(--green);background:var(--green);color:#fff}
+.vpick .btn{align-self:flex-start}
+.more-details summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
+.vpick .opt{min-height:32px;min-width:34px;padding:0 9px;font-size:13px}
+.vpick .opt-row{gap:5px}

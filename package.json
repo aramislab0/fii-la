@@ -25,7 +25,9 @@
     "test:navigation": "node tests/navigation.test.mjs",
     "test:bugfixes-sql": "node tests/bugfixes.sql.test.mjs",
     "test:feed-sql": "node tests/feed.sql.test.mjs",
-    "test:feed": "node tests/feed.test.mjs"
+    "test:feed": "node tests/feed.test.mjs",
+    "test:products-sql": "node tests/products.sql.test.mjs",
+    "test:products": "node tests/products.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",

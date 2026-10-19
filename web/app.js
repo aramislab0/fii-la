@@ -210,6 +210,11 @@
     invalid_kind: 'Type de fiche non valide.',
     invalid_payload: 'Données non valides.',
     invalid_theme: 'Modèle ou couleur non reconnu. Choisissez dans la liste.',
+    invalid_category: 'Catégorie non reconnue. Choisissez dans la liste.',
+    invalid_stock: 'Stock : indiquez un nombre (0 ou plus), ou laissez vide.',
+    size_required: 'Choisissez votre taille ou pointure.',
+    color_required: 'Choisissez une couleur.',
+    out_of_stock: 'Un article n’est plus disponible en quantité suffisante. Modifiez la commande.',
     invalid_phone: 'Numéro non reconnu. Exemple : 77 123 45 67.',
     invalid_event: 'Action non reconnue.',
     not_a_meeting: 'Ce lien n’est pas un événement.',
@@ -1159,27 +1164,62 @@
     }, function (e) { return page(brandBar('Boutique'), stateCard('!', 'Impossible d’afficher la vitrine', errText(e), retryBtn()), footer(true)); });
   }
   function vitrinePage(slug, shop, products, q) {
-    var cart = {}; // id → quantité
+    var cart = {}; // ligne (article, taille, couleur) → { id, size, color, qty }
     var byId = {}; products.forEach(function (p) { byId[p.id] = p; });
+    var filter = { cat: '', size: '' };
+    function lineKey(id, size, color) { return id + '|' + (size || '') + '|' + (color || ''); }
+    function qtyOf(id) { return Object.keys(cart).reduce(function (n, k) { return n + (cart[k].id === id ? cart[k].qty : 0); }, 0); }
+    function lineLabel(l) { var v = [l.size, l.color].filter(Boolean).join(' · '); return byId[l.id].name + (v ? ' (' + v + ')' : ''); }
     var bar = h('div', { class: 'cartbar', hidden: true });
     var root = h('div', { class: 'stack' });
-    function count() { return Object.keys(cart).reduce(function (n, k) { return n + cart[k]; }, 0); }
-    function total() { return Object.keys(cart).reduce(function (n, k) { return n + cart[k] * byId[k].price; }, 0); }
+    function count() { return Object.keys(cart).reduce(function (n, k) { return n + cart[k].qty; }, 0); }
+    function total() { return Object.keys(cart).reduce(function (n, k) { return n + cart[k].qty * byId[cart[k].id].price; }, 0); }
     function refreshBar() {
       var n = count();
       bar.hidden = !n;
       setKids(bar, iconBtn('button', { class: 'btn big', type: 'button', id: 'cart-go', onclick: checkout }, 'box',
         'Commander · ' + n + ' article' + (n > 1 ? 's' : '') + ' · ' + fcfa(total())));
     }
+    function maxQty(p) { return p.stock != null ? Math.min(99, p.stock) : 99; }
     function stepper(p) {
       var box = h('div', { class: 'qty' });
+      var k = lineKey(p.id);
       function draw() {
-        var n = cart[p.id] || 0;
+        var n = cart[k] ? cart[k].qty : 0;
         setKids(box, n ? [
-          h('button', { class: 'qbtn', type: 'button', 'aria-label': 'Retirer un ' + p.name, onclick: function () { if (--cart[p.id] <= 0) delete cart[p.id]; draw(); refreshBar(); } }, '−'),
+          h('button', { class: 'qbtn', type: 'button', 'aria-label': 'Retirer un ' + p.name, onclick: function () { if (--cart[k].qty <= 0) delete cart[k]; draw(); refreshBar(); } }, '−'),
           h('span', { class: 'qn', 'aria-live': 'polite' }, String(n)),
-          h('button', { class: 'qbtn', type: 'button', 'aria-label': 'Ajouter un ' + p.name, onclick: function () { if (cart[p.id] < 99) cart[p.id]++; draw(); refreshBar(); } }, '+')]
-          : iconBtn('button', { class: 'btn small add-btn', type: 'button', 'data-add': p.id, onclick: function () { cart[p.id] = 1; draw(); refreshBar(); } }, 'plus', 'Ajouter', 18));
+          h('button', { class: 'qbtn', type: 'button', 'aria-label': 'Ajouter un ' + p.name, onclick: function () { if (qtyOf(p.id) < maxQty(p)) cart[k].qty++; draw(); refreshBar(); } }, '+')]
+          : iconBtn('button', { class: 'btn small add-btn', type: 'button', 'data-add': p.id, onclick: function () { cart[k] = { id: p.id, qty: 1 }; draw(); refreshBar(); } }, 'plus', 'Ajouter', 18));
+      }
+      draw();
+      return box;
+    }
+    // Article avec tailles ou couleurs : on choisit, puis « Ajouter » ; chaque choix fait sa ligne de commande.
+    function variantPicker(p) {
+      var pick = { size: p.sizes && p.sizes.length === 1 ? p.sizes[0] : (filter.size && p.sizes && p.sizes.indexOf(filter.size) >= 0 ? filter.size : ''), color: p.colors && p.colors.length === 1 ? p.colors[0] : '' };
+      var box = h('div', { class: 'stack tight vpick' });
+      var note = h('p', { class: 'small muted', 'aria-live': 'polite' });
+      function chips(list, key, label) {
+        return h('div', { class: 'opt-row', role: 'group', 'aria-label': label }, list.map(function (v) {
+          return h('button', { class: 'opt' + (pick[key] === v ? ' on' : ''), type: 'button', 'aria-pressed': pick[key] === v ? 'true' : 'false', onclick: function () { pick[key] = v; draw(); } }, v);
+        }));
+      }
+      function draw() {
+        var inCart = qtyOf(p.id);
+        setKids(box,
+          p.sizes ? chips(p.sizes, 'size', 'Taille ou pointure') : null,
+          p.colors ? chips(p.colors, 'color', 'Couleur') : null,
+          iconBtn('button', { class: 'btn small add-btn', type: 'button', 'data-add': p.id, onclick: function () {
+            if (p.sizes && !pick.size) { note.textContent = 'Choisissez votre taille ou pointure.'; return; }
+            if (p.colors && !pick.color) { note.textContent = 'Choisissez une couleur.'; return; }
+            if (inCart >= maxQty(p)) { note.textContent = 'Plus de stock disponible.'; return; }
+            var k = lineKey(p.id, pick.size, pick.color);
+            if (cart[k]) cart[k].qty++; else cart[k] = { id: p.id, size: pick.size || null, color: pick.color || null, qty: 1 };
+            note.textContent = ''; draw(); refreshBar();
+          } }, 'plus', 'Ajouter', 18),
+          inCart ? h('p', { class: 'small', style: 'color:var(--green);font-weight:600' }, icon('check', 14), ' Dans la commande : ' + inCart) : null,
+          note);
       }
       draw();
       return box;
@@ -1196,7 +1236,32 @@
           h('p', { class: 'vprice' }, fcfa(p.price)),
           p.reviews ? ratingEl(p.rating, p.reviews) : null,
           p.description ? h('p', { class: 'small muted vdesc' }, p.description) : null,
-          stepper(p)));
+          p.stock === 0 ? h('span', { class: 'chip off', style: 'align-self:flex-start' }, 'Épuisé')
+            : p.sizes || p.colors ? variantPicker(p) : stepper(p),
+          p.stock > 0 && p.stock <= 3 ? h('p', { class: 'small muted' }, 'Plus que ' + p.stock + ' en stock') : null));
+    }
+    // Filtres : catégories (s'il y en a au moins deux) et « ma taille / pointure ».
+    var grid = h('div', { class: 'vgrid', id: 'vitrine-products' });
+    var filters = h('div', { class: 'stack tight', id: 'vitrine-filters' });
+    function shown() {
+      return products.filter(function (p) { return (!filter.cat || p.category === filter.cat) && (!filter.size || (p.sizes && p.sizes.indexOf(filter.size) >= 0)); });
+    }
+    function drawGrid() {
+      var l = shown();
+      setKids(grid, l.length ? l.map(card) : h('p', { class: 'muted', style: 'grid-column:1/-1' }, 'Aucun article pour ce choix.'));
+    }
+    function drawFilters() {
+      var cats = []; products.forEach(function (p) { if (p.category && cats.indexOf(p.category) < 0) cats.push(p.category); });
+      var sizes = []; products.forEach(function (p) { (p.sizes || []).forEach(function (z) { if (sizes.indexOf(z) < 0) sizes.push(z); }); });
+      function chip(on, label, fn, id) { return h('button', { class: 'opt' + (on ? ' on' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false', id: id || null, onclick: fn }, label); }
+      setKids(filters,
+        cats.length >= 2 ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Catégorie', id: 'filter-cat' },
+          chip(!filter.cat, 'Tout', function () { filter.cat = ''; drawFilters(); drawGrid(); }),
+          cats.map(function (c) { return chip(filter.cat === c, catLabel(c) || c, function () { filter.cat = c; drawFilters(); drawGrid(); }); })) : null,
+        sizes.length ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Ma taille ou pointure', id: 'filter-size' },
+          h('span', { class: 'small muted', style: 'align-self:center;white-space:nowrap' }, 'Ma taille :'),
+          chip(!filter.size, 'Toutes', function () { filter.size = ''; drawFilters(); drawGrid(); }),
+          sizes.map(function (z) { return chip(filter.size === z, z, function () { filter.size = z; drawFilters(); drawGrid(); }); })) : null);
     }
     function list() {
       setKids(root,
@@ -1206,9 +1271,9 @@
             shop.reviews ? ratingEl(shop.rating, shop.reviews) : null,
             shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null)),
         q.a && !byId[q.a] ? h('p', { class: 'msg', id: 'vitrine-gone' }, 'Cet article n’est plus proposé. Voici les autres articles de la boutique.') : null,
-        products.length ? h('div', { class: 'vgrid', id: 'vitrine-products' }, products.map(card))
-          : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun article pour le moment.')),
+        products.length ? [filters, grid] : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun article pour le moment.')),
         h('p', { class: 'safe-line' }, icon('lock', 18), 'Commande sans compte. Vous donnez votre adresse à la dernière étape.'));
+      if (products.length) { drawFilters(); drawGrid(); }
       refreshBar();
       if (q.a && byId[q.a]) setTimeout(function () { var el = document.getElementById('p-' + q.a); if (el) el.scrollIntoView({ block: 'center' }); }, 60);
     }
@@ -1220,7 +1285,7 @@
         if (!f.name.trim()) return errBox(err, new ApiError('your_name_required'));
         if (f.phone.replace(/\D/g, '').length < 9) return errBox(err, new ApiError('phone_required'));
         send.disabled = true;
-        api('fiila_vitrine_order', { p_slug: slug, p: { items: Object.keys(cart).map(function (k) { return { product_id: k, qty: cart[k] }; }),
+        api('fiila_vitrine_order', { p_slug: slug, p: { items: Object.keys(cart).map(function (k) { var l = cart[k]; return { product_id: l.id, qty: l.qty, size: l.size || undefined, color: l.color || undefined }; }),
           customer: { name: f.name.trim(), phone: f.phone.trim() }, note: f.note.trim() || null } }).then(function (r) {
           go('#/f/' + r.invoice + '?nouvelle=1');
         }, function (e) { send.disabled = false; errBox(err, e); });
@@ -1231,7 +1296,8 @@
         h('h1', null, 'Votre commande'),
         h('section', { class: 'card' },
           Object.keys(cart).map(function (k) {
-            return h('div', { class: 'total-row' }, h('span', { class: 'wrapword' }, cart[k] + ' × ' + byId[k].name), h('span', null, fcfa(cart[k] * byId[k].price)));
+            var l = cart[k];
+            return h('div', { class: 'total-row' }, h('span', { class: 'wrapword' }, l.qty + ' × ' + lineLabel(l)), h('span', null, fcfa(l.qty * byId[l.id].price)));
           }),
           h('div', { class: 'total-row big' }, h('span', null, 'Total'), h('strong', { id: 'order-total' }, fcfa(total())))),
         textField({ id: 'v-name', label: 'Votre nom', max: 60, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
@@ -4174,8 +4240,34 @@
       return pr ? productForm(pr, rr[1].shop, q && q.publier === '1') : page(backBtn('Mes articles', '#/boutique/articles'), stateCard('?', 'Article introuvable', ''), footer());
     }, failPage('Impossible de charger l’article', 'boutique/articles'));
   }
+  var CATEGORIES = [['mode', 'Vêtements'], ['chaussures', 'Chaussures'], ['beaute', 'Beauté'], ['alimentation', 'Alimentation'], ['maison', 'Maison'],
+    ['electronique', 'Électronique'], ['accessoires', 'Accessoires'], ['enfants', 'Enfants'], ['autre', 'Autre']];
+  function catLabel(k) { var c = CATEGORIES.filter(function (x) { return x[0] === k; })[0]; return c ? c[1] : ''; }
+  function splitTags(t) {
+    var seen = {}; return String(t || '').split(/[,;\n]+/).map(function (x) { return x.trim(); }).filter(function (x) { if (!x || seen[x]) return false; seen[x] = 1; return true; });
+  }
+  // Détails de l'article (facultatifs) : catégorie, tailles ou pointures, couleurs, stock. Ouverts s'ils sont déjà remplis.
+  function productDetails(f) {
+    var sizesBox = textField({ id: 'product-sizes', label: 'Tailles ou pointures', optional: true, max: 120, value: f.sizes, placeholder: 'Ex. : S, M, L ou 40, 41, 42', onInput: function (v) { f.sizes = v; } });
+    function preset(label, val) {
+      return h('button', { class: 'btn ghost small', type: 'button', onclick: function () { f.sizes = val; var i = document.getElementById('product-sizes'); if (i) i.value = val; } }, label);
+    }
+    var sel = h('select', { id: 'product-cat', onchange: function (e) { f.category = e.target.value; } },
+      h('option', { value: '' }, 'Choisir…'), CATEGORIES.map(function (c) { return h('option', { value: c[0], selected: f.category === c[0] || null }, c[1]); }));
+    return h('details', { class: 'more-details', id: 'product-details', open: f.category || f.sizes || f.colors || f.stock ? true : null },
+      h('summary', null, 'Catégorie, tailles, couleurs, stock'),
+      h('div', { class: 'stack', style: 'margin-top:12px' },
+        h('div', { class: 'field' }, h('label', { for: 'product-cat' }, 'Catégorie'), sel),
+        sizesBox,
+        h('div', { class: 'row' }, preset('Tailles S à XL', 'S, M, L, XL'), preset('Pointures 38 à 45', '38, 39, 40, 41, 42, 43, 44, 45')),
+        textField({ id: 'product-colors', label: 'Couleurs', optional: true, max: 160, value: f.colors, placeholder: 'Ex. : Rouge, Bleu nuit', onInput: function (v) { f.colors = v; } }),
+        textField({ id: 'product-stock', label: 'Stock', optional: true, inputmode: 'numeric', value: f.stock, placeholder: 'Laisser vide si vous ne comptez pas', onInput: function (v) { f.stock = v; } }),
+        h('p', { class: 'hint' }, 'Vos clientes choisissent leur taille et leur couleur en commandant. Avec un stock, l’article passe « Épuisé » à zéro.')));
+  }
   function productForm(pr, shop, fresh) {
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
+    f.category = pr && pr.category || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');
+    f.stock = pr && pr.stock != null ? String(pr.stock) : '';
     var original = f.photo;
     var err = h('div', { role: 'alert' });
     var zone = h('div', { class: 'stack' });
@@ -4185,7 +4277,10 @@
       var price = parseInt(String(f.price).replace(/\D/g, ''), 10);
       if (!f.name.trim()) return errBox(err, new ApiError('item_label_required'));
       if (!(price >= 0)) return errBox(err, new ApiError('invalid_price'));
-      var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active };
+      var stock = f.stock.trim() === '' ? null : parseInt(f.stock.replace(/\D/g, ''), 10);
+      if (stock !== null && !(stock >= 0)) return errBox(err, new ApiError('invalid_stock'));
+      var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active,
+        category: f.category || null, sizes: splitTags(f.sizes), colors: splitTags(f.colors), stock: stock };
       if (f.photo !== original) p.photo = f.photo ? f.photo.replace(/^data:[^,]+,/, '') : '';
       btn.disabled = true;
       sapi('fiila_product_save', { p: p }).then(function (res) {
@@ -4202,6 +4297,7 @@
       textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; } }),
       textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; } }),
       textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, onInput: function (v) { f.description = v; } }),
+      productDetails(f),
       pr ? segField({ name: 'product-active', id: 'product-active', value: f.active ? 'on' : 'off', options: [['on', 'Visible'], ['off', 'Masqué']], onChange: function (v) { f.active = v === 'on'; } }) : null,
       err, btn,
       pr ? h('button', { class: 'btn danger', type: 'button', id: 'product-delete', onclick: function () {
