@@ -160,3 +160,31 @@ Proposition faite le 17/10, non validée. Rien n'est construit.
 - Couleur d'accent dans une palette fermée de 6 (Forêt, Nuit, Indigo, Prune, Bordeaux, Terre) : texte blanc lisible sur chacune ; aucune couleur libre (pas de saisie hexadécimale).
 - Photo de couverture (mêmes contrôles que les photos d'articles : format vérifié, métadonnées refusées, 400 Ko au plus), chargée à part.
 - Migration `20261019100000_fiila_vitrine_themes` : `shops.theme`, `shops.accent`, `shops.cover`.
+
+## 12. Fil des boutiques (19/10/2026)
+
+Décision du fondateur (19/10 04:24) : mettre en avant gratuitement les 25 premières boutiques ; tous les utilisateurs voient le fil à la page principale et une fois leurs tâches terminées.
+
+**Règles**
+- **Attribution des places**
+  - Une place est attribuée quand la boutique ouvre sa vitrine, dans l'ordre d'arrivée (rang 1 à 25). Les boutiques déjà ouvertes ont été classées par date de création.
+  - La place est gardée si la boutique ferme sa vitrine ou sort du fil.
+  - Une boutique supprimée libère sa place, qui revient à la plus ancienne boutique ouverte en attente.
+- **Conditions d'affichage :** vitrine ouverte, au moins un article actif, choix « Apparaître » (activé par défaut, modifiable dans Réglages → Ma vitrine → Fil Fii La).
+- **Ordre du fil :** il change chaque jour, pour que chaque boutique passe en tête à son tour.
+- **Données montrées :** celles que la vitrine montre déjà (nom, présentation, 3 derniers articles avec leur prix, note). Une seule image par boutique : la couverture, sinon le dernier article avec photo. L'image est chargée au défilement, ce qui limite la consommation de données mobiles. Aucune donnée de client n'y figure.
+
+**Où le fil apparaît**
+- Accueil : bloc « Boutiques à découvrir » sous « Mes adresses », 3 boutiques en défilement horizontal, avec « Tout voir ».
+- Page `#/boutiques` : toutes les boutiques du fil, et le nombre de places gratuites restantes pour les commerçants.
+- Fin de tâche, toujours après le service rendu :
+  - adresse envoyée à une boutique ;
+  - facture d'une commande livrée, ou dont l'adresse est reçue ;
+  - arrivée confirmée (invité ou livreur).
+
+**À décider (action #35 du HANDOFF)** : l'offre après les 25 places gratuites (place payante, durée, prix).
+
+Migration `20261019300000_fiila_feed` :
+- colonnes `shops.feed`, `shops.featured_rank` et `shops.featured_at` ;
+- déclencheurs d'attribution et de libération des places ;
+- fonctions publiques `fiila_feed()` et `fiila_shop_feed(p_key, p_on)`.

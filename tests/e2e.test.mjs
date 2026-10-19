@@ -612,7 +612,7 @@ await t('page destinataire sur réseau lent (3G simulée) : poids et temps mesur
   writeFileSync(`${SHOTS}/../perf-${ENGINE}.json`, JSON.stringify(perf, null, 2));
   console.log('   perf', perf);
   assert.equal(perf.leaflet_charge, false, 'Leaflet chargé inutilement');
-  assert.ok(perf.total_ko < 400, 'page trop lourde');
+  assert.ok(perf.total_ko < 250, 'page trop lourde (poids compressé, comme en production)');
   await p.ctx.close();
 });
 

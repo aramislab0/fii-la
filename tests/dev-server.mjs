@@ -1,6 +1,7 @@
 // Serveur local : sert web/ et simule l'API PostgREST de Supabase sur un Postgres PGlite.
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { gzipSync } from 'node:zlib';
 import { join, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
@@ -168,7 +169,13 @@ export async function startServer(port = 0) {
     if (path.endsWith('/')) path += 'index.html';
     try {
       const data = await readFile(join(webRoot, path));
-      res.writeHead(200, { 'Content-Type': TYPES[extname(path)] || 'application/octet-stream' });
+      const type = TYPES[extname(path)] || 'application/octet-stream';
+      // Comme GitHub Pages : textes compressés en gzip si le navigateur l'accepte (mesure de poids réaliste).
+      if (/^(text\/|application\/(javascript|json)|image\/svg)/.test(type) && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {
+        res.writeHead(200, { 'Content-Type': type, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' });
+        return res.end(gzipSync(data));
+      }
+      res.writeHead(200, { 'Content-Type': type });
       res.end(data);
     } catch { res.writeHead(404); res.end('not found'); }
   });

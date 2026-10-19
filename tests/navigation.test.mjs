@@ -60,7 +60,7 @@ async function phone(withOwner) {
 const OWNER_ROUTES = ['#/new', '#/edit/' + addr.id, '#/m/' + addr.id, '#/m/' + meet.id, '#/demande/nouvelle', '#/demande/' + req.id,
   '#/rdv/nouveau', '#/rdv/modifier/' + meet.id, '#/cle', '#/compte', '#/boutique', '#/boutique/reglages', '#/boutique/articles',
   '#/boutique/article/nouveau', '#/boutique/article/' + prod.id, '#/clients', '#/clients/' + custId, '#/commande/nouvelle', '#/commande/' + order.id,
-  '#/livreur', '#/livreur/invitation/' + invite.token, '#/parrainer', '#/parrainer?pour=boutique', '#/parrainer?pour=livreur', '#/stats', '#/confidentialite',
+  '#/livreur', '#/livreur/invitation/' + invite.token, '#/parrainer', '#/parrainer?pour=boutique', '#/parrainer?pour=livreur', '#/stats', '#/confidentialite', '#/boutiques',
   '#/m/00000000-0000-0000-0000-000000000000', '#/page-inconnue'];
 const PUBLIC_ROUTES = ['#/a/' + addr.share_token, '#/a/' + meet.share_token, '#/d/' + req.share_token, '#/f/' + order.share_token,
   '#/l/' + deliv.courier_token, '#/s/' + deliv.watch_token, '#/b/' + vit.slug, '#/a/' + BAD, '#/d/' + BAD, '#/f/' + BAD, '#/l/' + BAD, '#/s/' + BAD,

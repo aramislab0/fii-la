@@ -123,7 +123,7 @@ await t('« Continuer » pendant l’enregistrement : le vocal est gardé ; lien
   await local.db.query(`update fiila.places set status = 'revoked' where id = $1`, [id]);
   await A.goto(URL0 + '#/');
   await A.goto(URL0 + '#/m/' + id);
-  await A.getByText('Lien désactivé').waitFor();
+  await A.getByText('Lien désactivé', { exact: true }).waitFor();
   await A.locator('#voice-listen').click();
   await A.waitForFunction(() => !/Chargement|Indisponible/.test(document.querySelector('#voice-player').textContent));
   await local.db.query('delete from fiila.places where id = $1', [id]);

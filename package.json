@@ -23,7 +23,9 @@
     "test:vitrine-sql": "node tests/vitrine.sql.test.mjs",
     "test:vitrine": "node tests/vitrine.test.mjs",
     "test:navigation": "node tests/navigation.test.mjs",
-    "test:bugfixes-sql": "node tests/bugfixes.sql.test.mjs"
+    "test:bugfixes-sql": "node tests/bugfixes.sql.test.mjs",
+    "test:feed-sql": "node tests/feed.sql.test.mjs",
+    "test:feed": "node tests/feed.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",

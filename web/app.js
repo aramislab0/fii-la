@@ -1263,6 +1263,64 @@
     var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); go(); } }, { rootMargin: '200px' });
     setTimeout(function () { io.observe(box); }, 0);
   }
+  /* ----- fil des boutiques : les 25 premières boutiques ouvertes, mises en avant gratuitement (fondateur, 19/10).
+     Une image par boutique (couverture, sinon dernier article), chargée au défilement : peu de données mobiles. */
+  var FEED_CACHE = null;
+  function loadFeed() {
+    if (FEED_CACHE && Date.now() - FEED_CACHE.at < 120000) return Promise.resolve(FEED_CACHE.data);
+    return api('fiila_feed', {}).then(function (d) { FEED_CACHE = { at: Date.now(), data: d }; return d; });
+  }
+  function feedCard(s) {
+    var img = h('span', { class: 'fimg loading-skel', 'aria-hidden': 'true' }, icon('shop', 28));
+    if (s.has_cover || s.photo_id) lazyPhoto(img, function () {
+      return api('fiila_vitrine_photo', { p_slug: s.slug, p_id: s.has_cover ? 'cover' : s.photo_id }).then(function (r) { return r.photo || null; });
+    }, '');
+    else img.classList.remove('loading-skel');
+    var acc = (VT_ACCENTS[s.accent] || VT_ACCENTS.foret)[1];
+    return h('a', { class: 'fcard', href: '#/b/' + s.slug, style: '--accent:' + acc, 'aria-label': 'Voir la boutique ' + s.name },
+      img,
+      h('span', { class: 'fbody' },
+        h('span', { class: 'fname wrapword' }, s.name),
+        s.reviews ? ratingEl(s.rating, s.reviews) : null,
+        s.about ? h('span', { class: 'small muted wrapword fabout' }, s.about) : null,
+        h('span', { class: 'fitems' }, (s.products || []).map(function (p) {
+          return h('span', { class: 'fitem' }, h('span', { class: 'wrapword' }, p.name), h('b', null, fcfa(p.price)));
+        })),
+        h('span', { class: 'fgo' }, s.count > 1 ? s.count + ' articles' : '1 article', icon('chev', 16))));
+  }
+  // Bloc du fil : sur l'accueil (3 boutiques) et à la fin d'une tâche (2 boutiques). Absent s'il n'y a encore aucune boutique.
+  function feedSection(limit, o) {
+    o = o || {};
+    var box = h('section', { class: 'stack feed-block', id: o.id || 'feed-block', hidden: true, 'aria-labelledby': (o.id || 'feed-block') + '-h' });
+    loadFeed().then(function (d) {
+      var list = (d && d.shops) || [];
+      if (!list.length) return;
+      setKids(box,
+        h('div', { class: 'feed-head' }, h('h2', { id: (o.id || 'feed-block') + '-h' }, o.title || 'Boutiques à découvrir'),
+          list.length > limit ? h('a', { class: 'btn link', href: '#/boutiques', id: (o.id || 'feed-block') + '-all' }, 'Tout voir (' + list.length + ')') : null),
+        o.sub ? h('p', { class: 'small muted' }, o.sub) : null,
+        h('div', { class: 'feed-list' }, list.slice(0, limit).map(feedCard)));
+      box.hidden = false;
+    }, function () { /* hors ligne : le bloc reste caché */ });
+    return box;
+  }
+  function viewFeed() {
+    return loadFeed().then(function (d) {
+      var list = (d && d.shops) || [];
+      var mine = shopKey();
+      return page(backBtn(),
+        h('header', { class: 'stack tight' }, h('h1', null, 'Boutiques Fii La'),
+          h('p', { class: 'muted' }, 'Commandez sans compte. Vous donnez votre adresse à la fin, la boutique livre à la bonne porte.')),
+        list.length ? h('div', { class: 'feed-list', id: 'feed-list' }, list.map(feedCard))
+          : h('div', { class: 'card' }, h('p', null, 'Les premières boutiques arrivent bientôt.')),
+        d && d.free_left > 0 ? h('section', { class: 'card', id: 'feed-join' },
+          h('h2', null, mine ? 'Votre boutique ici' : 'Vous vendez ?'),
+          h('p', { class: 'small muted' }, (d.free_left === 1 ? 'Encore 1 place gratuite' : 'Encore ' + d.free_left + ' places gratuites') +
+            ' pour les 25 premières boutiques. Ouvrez votre vitrine avec au moins un article.'),
+          iconBtn('a', { class: 'btn', href: mine ? '#/boutique/reglages' : '#/boutique', id: 'feed-join-btn' }, 'shop', mine ? 'Ouvrir ma vitrine' : 'Créer ma boutique')) : null,
+        footer(true));
+    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger les boutiques', errText(e), retryBtn()), footer()); });
+  }
   // Réglages : ouvrir, fermer et présenter sa vitrine.
   function vitrineSection(shop) {
     var box = h('section', { class: 'card', id: 'vitrine-section' });
@@ -1276,12 +1334,34 @@
       if (changed) draw();
     }, function () {});
     var err = h('div', { role: 'alert' });
+    // Fil Fii La : place gratuite (25 premières boutiques) et choix d'y apparaître.
+    var feedBox = h('div', { class: 'stack tight', id: 'feed-settings' }), feedState = null;
+    function loadFeedState() { sapi('fiila_shop_feed', { p_on: null }).then(function (r) { feedState = r; drawFeed(); }, function () {}); }
+    function drawFeed() {
+      var f = feedState;
+      if (!f) { setKids(feedBox); return; }
+      var line = !f.public ? (f.rank ? 'Votre place gratuite n° ' + f.rank + ' est gardée. Rouvrez la vitrine pour réapparaître dans le fil.'
+          : f.free_left > 0 ? 'Ouvrez votre vitrine : les 25 premières boutiques sont mises en avant gratuitement dans le fil Fii La (encore ' + f.free_left + ').'
+          : 'Les 25 places gratuites du fil Fii La sont prises.')
+        : f.rank ? (f.feed ? 'Place gratuite n° ' + f.rank + ' sur 25 : votre boutique apparaît dans le fil Fii La.' : 'Place gratuite n° ' + f.rank + ' gardée, mais vous n’apparaissez pas dans le fil.')
+        : 'Les 25 places gratuites du fil Fii La sont prises.';
+      setKids(feedBox, h('h3', null, 'Fil Fii La'),
+        h('p', { class: 'small muted', id: 'feed-status' }, line),
+        f.rank ? segField({ name: 'feed-on', id: 'feed-on', value: f.feed ? 'on' : 'off', options: [['on', 'Apparaître'], ['off', 'Ne pas apparaître']],
+          onChange: function (v) {
+            sapi('fiila_shop_feed', { p_on: v === 'on' }).then(function (r) { feedState = r; FEED_CACHE = null; toast(v === 'on' ? 'Votre boutique apparaît dans le fil.' : 'Votre boutique n’apparaît plus dans le fil.'); drawFeed(); },
+              function (e) { drawFeed(); errBox(err, e); });
+          } }) : null,
+        f.public && f.rank && f.feed ? iconRow('#/boutiques', 'eye', 'Voir le fil', { id: 'feed-view' }) : null);
+    }
+    loadFeedState();
     function save(p, okText) {
       setKids(err);
       return sapi('fiila_shop_vitrine', { p: p }).then(function (r) {
         state.public = !!r.public; state.slug = r.slug; state.theme = r.theme || 'galerie'; state.accent = r.accent || 'foret'; state.cover = r.cover || null;
         if ('about' in p) state.about = r.about || ''; // un texte tapé mais pas encore enregistré est gardé
         saved.cover = state.cover;
+        if ('public' in p) { FEED_CACHE = null; loadFeedState(); }
         toast(okText); draw();
       }, function (e) {
         // Rien n'a changé sur le serveur : les choix reviennent à l'état enregistré.
@@ -1322,7 +1402,7 @@
         textField({ id: 'vitrine-about', label: 'Présentation', optional: true, max: 160, value: state.about, placeholder: 'Ex. : Robes wax et foulards, livrés à Dakar.',
           onInput: function (v) { state.about = v; } }),
         iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'vitrine-about-save', onclick: function () { save({ about: state.about }, 'Présentation enregistrée.'); } }, 'check', 'Enregistrer la présentation', 18),
-        err);
+        feedBox, err);
     }
     draw();
     return box;
@@ -1638,6 +1718,7 @@
       else if (p[0] === 'cle') view = viewRestore(null);
       else if (p[0] === 'compte') view = viewAccount(r.q);
       else if (p[0] === 'boutique' && !p[1]) view = viewShop(r.q);
+      else if (p[0] === 'boutiques' && !p[1]) view = viewFeed();
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
@@ -1816,6 +1897,7 @@
         tile4('#/livreur', 'moto', 'Livreur', { id: 'courier-link', 'aria-label': 'Espace livreur' })),
       accountNudge(),
       listBox,
+      feedSection(3, { id: 'home-feed' }),
       h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer' }, icon('gift', 24), h('span', null, 'Inviter un proche'),
         h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
       footer());
@@ -2581,7 +2663,8 @@
         setKids(box, h('p', { class: 'live-big' }, icon('check', 22), 'Arrivée confirmée'),
           // Fin de parcours : le bon moment pour proposer la suite (rétention).
           o.kind === 'guest' ? h('a', { class: 'btn ghost', id: 'guest-create', href: '#/rdv/nouveau' }, 'Créer votre rendez-vous')
-            : h('a', { class: 'btn ghost', id: 'courier-more', href: '#/livreur' }, courierKey() ? 'Mes courses' : 'Recevoir les courses de vos boutiques'));
+            : h('a', { class: 'btn ghost', id: 'courier-more', href: '#/livreur' }, courierKey() ? 'Mes courses' : 'Recevoir les courses de vos boutiques'),
+          feedSection(2, { id: 'done-feed' }));
       } else {
         setKids(box,
           h('p', { class: 'live-big' }, h('span', { class: 'live-dot', 'aria-hidden': 'true' }), st === 'starting' ? 'Recherche de votre position…' : 'Position partagée'),
@@ -2936,6 +3019,7 @@
         iconBtn('a', { class: 'btn', id: 'share-relatives', href: waLink('Mon adresse, avec la photo de l’entrée : ' + url), target: '_blank', rel: 'noopener noreferrer',
           onclick: function () { track('share_initiated', 'whatsapp_address'); } }, 'chat', 'Envoyer sur WhatsApp'),
         h('a', { class: 'btn link', href: '#/m/' + placeId, style: 'align-self:flex-start' }, 'Voir mon adresse')) : null,
+      feedSection(2, { id: 'done-feed', title: 'Boutiques à découvrir', sub: 'Commandez sans compte, livré à la bonne porte.' }),
       !authed() && sent >= 2 ? nudgeCard('sent-nudge', 'Gardez vos adresses', 'Retrouvez-les même si vous changez de téléphone.',
         '#/compte' + qs({ mode: 'inscription', source: 'nudge' }), function () { LS.set('fiila.nudge.until', Date.now() + 14 * 864e5); }) : null,
       footer(true));
@@ -4264,6 +4348,7 @@
           o.note ? h('p', { class: 'small muted wrapword' }, o.note) : null),
         iconBtn('button', { class: 'btn ghost no-print', type: 'button', id: 'print', onclick: function () { window.print(); } }, 'print', 'Télécharger ou imprimer'),
         delivered && !shopKey() ? h('a', { class: 'btn link no-print', id: 'sell-too', href: '#/boutique', style: 'align-self:center' }, 'Vous vendez aussi sur WhatsApp ? Créez votre boutique') : null,
+        delivered || (o.address_state === 'received' && q && q.nouvelle !== '1') ? h('div', { class: 'no-print' }, feedSection(2, { id: 'done-feed', title: 'D’autres boutiques' })) : null,
         footer(true));
       return pg;
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la commande', errText(e), retryBtn())); });
@@ -4289,6 +4374,7 @@
           h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro. Le numéro n’est jamais affiché ; il sert seulement à vous reconnaître quand quelqu’un le tape. Les personnes qui ouvrent votre lien voient votre prénom.'),
           h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus que vous ajoutez à votre adresse. Le micro n’est utilisé que lorsque vous appuyez sur « Enregistrer ». Toute personne qui a le lien, et le livreur d’une course, peuvent l’écouter. Il est supprimé avec la fiche, ou dès que vous le retirez.'),
           h('li', null, 'Vitrine d’une boutique (si elle l’ouvre) : ses articles visibles par toute personne qui a le lien. Une commande passée sur la vitrine transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
+          h('li', null, 'Fil des boutiques : les 25 premières boutiques qui ouvrent leur vitrine y apparaissent gratuitement (nom, présentation, articles, prix, note). La boutique peut en sortir à tout moment dans ses réglages. Aucune donnée de client n’y figure.'),
           h('li', null, 'Publication d’un article : Fii La compte seulement qu’une publication a été faite, pas le réseau choisi.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),
