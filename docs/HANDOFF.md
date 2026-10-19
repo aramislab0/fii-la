@@ -160,6 +160,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 06:31 (Mac) | En-tête et « Installer l'app » en production : Pages déployé ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 50/50, fil 7/7 | `3e59bd3` |
 | 19/10 06:40 | En-tête de l'accueil validé (photo ronde, « Bonjour, Prénom ») ; bouton « Installer l'app » sur l'accueil (fenêtre d'installation Android, 3 étapes en images sur iPhone, consigne « ouvrir dans Chrome/Safari » depuis WhatsApp ou Facebook, masquable 30 jours) ; tests navigation 50/50, boutique 26/26 | ce commit |
 | 19/10 06:16 (Mac) | Les 2 restes de test supprimés en production sur demande explicite du fondateur (« Supprime les 2 test ») : la fenêtre de confirmation du connecteur s'annulant d'elle-même, suppression faite depuis le Mac, limitée aux deux identifiants ; 5 fiches du fondateur restantes | — |
 | 19/10 06:06 (Mac) | Mode démo en production : migration `20261019500000_fiila_demo` appliquée, `verify-db` 17 migrations / 74 fonctions OK ; 13 boutiques de démonstration chargées (aucune place gratuite prise ; fil réel : 1 boutique, fil démo : 14) ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 49/49, fil 7/7, attributs 3/3 | `097eba6` |
