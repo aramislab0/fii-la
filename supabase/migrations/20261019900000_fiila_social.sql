@@ -243,12 +243,23 @@ begin
   return fiila.post_stats(p_id);
 end $$;
 
+-- Version de la base (dernière migration appliquée) : permet à la mise en ligne de vérifier, sans secret,
+-- que le site ne sera pas publié avant la base dont il a besoin. Aucune donnée personnelle.
+create or replace function public.fiila_schema_version() returns text
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  return (select max(version) from supabase_migrations.schema_migrations);
+exception when others then
+  return null;
+end $$;
+
 revoke all on all functions in schema fiila from public;
 do $$
 declare role_name text; fn text;
   fns text[] := array['public.fiila_posts(text, text, boolean, integer)', 'public.fiila_react(uuid, text, boolean, text, boolean)',
     'public.fiila_saved(text)', 'public.fiila_comments(uuid, text, text, boolean)', 'public.fiila_comment_add(uuid, text, boolean)',
-    'public.fiila_comment_delete(uuid, text)', 'public.fiila_comment_report(uuid, text)', 'public.fiila_product_stats(text, uuid)'];
+    'public.fiila_comment_delete(uuid, text)', 'public.fiila_comment_report(uuid, text)', 'public.fiila_product_stats(text, uuid)',
+    'public.fiila_schema_version()'];
 begin
   foreach fn in array fns loop
     execute format('revoke execute on function %s from public', fn);

@@ -30,20 +30,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
-      - name: Secret présent ?
+      - name: Secret présent ? Sinon, la base en ligne doit déjà être à jour
         id: s
-        env: { PW: '${{ secrets.SUPABASE_DB_PASSWORD }}' }
+        env:
+          PW: '${{ secrets.SUPABASE_DB_PASSWORD }}'
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           if [ -n "$PW" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; exit 0; fi
           echo "ok=0" >> "$GITHUB_OUTPUT"
-          # Garde-fou : une nouvelle migration sans le secret bloque la mise en ligne (le site appellerait des fonctions absentes).
-          if git diff --name-only "${{ github.event.before }}" "$GITHUB_SHA" -- supabase/migrations 2>/dev/null | grep -q .; then
-            echo "::error::Nouvelle migration mais SUPABASE_DB_PASSWORD absent : mise en ligne bloquée. Enregistrer le secret (action #41) puis relancer."; exit 1
+          # Garde-fou : sans le secret, on ne publie que si la base en ligne a déjà la dernière migration du dépôt
+          # (sinon le site appellerait des fonctions absentes).
+          latest=$(ls supabase/migrations/*.sql | sed 's#.*/##' | cut -c1-14 | sort | tail -1)
+          got=$(curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/fiila_schema_version" -H "apikey: $SUPABASE_KEY" \
+                -H "Authorization: Bearer $SUPABASE_KEY" -H 'Content-Type: application/json' -d '{}' 2>/dev/null | tr -d '"' || true)
+          if [ "$got" != "$latest" ]; then
+            echo "::error::Base en ligne en retard (version ${got:-inconnue}, attendue $latest) et SUPABASE_DB_PASSWORD absent : mise en ligne bloquée. Enregistrer le secret (action #41) puis relancer."
+            exit 1
           fi
-          echo "::warning::SUPABASE_DB_PASSWORD absent : migrations sautées (aucune nouvelle migration dans cet envoi)." 
+          echo "::warning::SUPABASE_DB_PASSWORD absent, mais la base est déjà à jour ($latest) : mise en ligne autorisée."
       - if: steps.s.outputs.ok == '1'
         run: npm ci --ignore-scripts
       - name: Appliquer les migrations (chacune une seule fois, en transaction)
