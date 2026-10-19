@@ -41,6 +41,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Comptes et boutique (Rali) | **En production (17/10 21:35)** : migration appliquée, `verify-db` 8/8 (6 migrations, 40 fonctions, schéma fermé). Inscription ouverte mais « Confirm email » actif avec l'envoi d'e-mails intégré de Supabase : seules les adresses de l'équipe reçoivent l'e-mail → réglage fondateur §4 #12 avant tout vrai commerçant | `docs/ARCHITECTURE-RALI.md`, `tests/accounts.sql.test.mjs` (21), `tests/shop.test.mjs` (19) |
 | Croissance (phase 0) | **En production (17/10 23:30)** : origine de chaque arrivée, parrainage par lien `#/r/CODE`, code ou numéro, espaces « Parrainer » (boutique, livreur, particulier), bouton « Publier » sur les articles, statistiques `#/stats` (compte administrateur). Migration `20261018000000_fiila_referrals`, `verify-db` 10 migrations / 65 fonctions OK. Récompenses : non attribuées, à fixer par le fondateur | `docs/CROISSANCE.md` §9, `tests/referrals.sql.test.mjs` (15), `tests/referrals.test.mjs` (8) |
 | Vitrine publique | **Construite (19/10)** : `#/b/<slug>`, panier, commande sans compte, adresse donnée depuis la facture ; ouverture dans les réglages. Migration `20261019000000_fiila_vitrine` | `ARCHITECTURE-RALI.md` §11, `tests/vitrine.sql.test.mjs` (6), `tests/vitrine.test.mjs` (6) |
+| Navigation et correctifs (19/10) | Chaque écran a une sortie (retour automatique, logo vers l'accueil, flèche dans l'en-tête des pages reçues ouvertes depuis l'application) ; 20 bugs de la revue du 19/10 traités ou atténués, migration `20261019200000_fiila_bugfixes` | `tests/navigation.test.mjs`, `tests/bugfixes.sql.test.mjs`, `docs/REVUE-BUGS-2026-10-19.md` |
 | Interface v1.2 | **Calme et sûr + icônes** : trois formes, une grande action par écran, raccourcis ronds, pastilles d'état, barre d'onglets boutique, repère vocal. Détail `docs/PROPOSITION-UX-ICONES.md` | `docs/AUDIT-DESIGN-2026-10-18.md` |
 | Interface | **Design system v1.1 appliqué** (Light + Dark, sélecteur de thème, 6 cartes, contrastes AA). Aucune coordonnée affichée. Audit UI/UX fait et corrigé le 17/10 | `docs/design-system/README.md`, `web/styles.css` |
 
@@ -72,6 +73,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 18/10 23:16 | Prochaine fonction : vitrine publique de la boutique (choisie parmi kit de lancement, alertes livreur, vitrine, suivi 3D) ; CDP pris en charge par le fondateur | Fondateur |
 | 18/10 23:31 | Vitrine : 3 modèles au choix et personnalisation simple (« comme Shopify ») | Fondateur |
 | 18/10 23:50 | NINEA retiré de l'application (réglages de la boutique, facture, confidentialité) ; la colonne reste en base, vidée à chaque enregistrement de la boutique | Fondateur |
+| 19/10 04:30 | Commande de vitrine : le numéro tapé n'est pas vérifié, donc l'adresse reçue pour elle n'est jamais copiée sur un client connu de la boutique. Parrainage par numéro : la boutique, le livreur ou le compte qui porte le numéro passe avant une fiche anonyme ; un compte qui supprime son code n'est plus réinscrit d'office | Builder (sécurité ; à confirmer par le fondateur) |
 
 ## 4. En attente / prochaines actions
 
@@ -101,6 +103,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 25 | ~~Valider la stratégie de croissance~~ phase 0 validée 17/10 23:10 et construite (`docs/CROISSANCE.md` §9) | Fondateur | — |
 | 27 | Fixer les récompenses du parrainage (boutiques, livreurs, particuliers ; argent possible) | Fondateur | Annonce du parrainage |
 | 29 | Supprimer 1 fiche « Maison du client (test) » et 1 demande « Boutique Ndèye » restées en production après l'arrêt d'une série de tests (23:32) : suppression SQL refusée à l'exécution, en attente d'accord du fondateur | Fondateur → Builder | Base propre |
+| 34 | Avant toute récompense en argent : vérifier le numéro par SMS (sans cela, n'importe qui peut taper le numéro d'un autre, même en créant une boutique) ; tester sur iPhone l'écoute du repère vocal au premier toucher | Fondateur (décision), Builder | Récompenses du parrainage |
 | 33 | Déposer le complément CDP préparé dans `docs/CONFORMITE-CDP.md` §2 bis (comptes, boutique, livreurs, parrainage, repère vocal) — le texte est prêt ; ~~rédaction~~ faite 18/10 | Fondateur | Usage réel |
 | 33b | (remplacé par 33) Ajouter au dossier CDP le traitement « repère vocal » (enregistrement audio facultatif lié à une adresse) | Fondateur | Usage réel |
 | 32 | ~~Valider la proposition « icônes et hiérarchie »~~ validée 18/10 21:18 avec le repère vocal, et appliquée ; (`docs/PROPOSITION-UX-ICONES.md`, maquette `docs/screenshots/proposition-icones.png`) ; décider : repère vocal, wolof | Fondateur | Suite de la refonte |
@@ -148,6 +151,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 04:40 | Revue de bugs (20 points, `docs/REVUE-BUGS-2026-10-19.md`) : migration `20261019200000_fiila_bugfixes` (vitrine, commandes, parrainage, repère vocal privé) et correctifs client (micro et son coupés en changeant d'écran, échec du vocal affiché, double suivi GPS, codes d'erreur, icône « send », réglages vitrine) ; tests locaux tous verts dont correctifs SQL 6/6, vocal 7/7, navigation 47/47 | ce commit |
 | 19/10 03:50 | Navigation (en cours, branche `navigation`) : retour automatique sur tout écran sans sortie, logo cliquable vers l'accueil, flèche dans l'en-tête des pages reçues ouvertes depuis l'application ; boutons citron restants passés en vert avec icône ; nouvelle suite `tests/navigation.test.mjs` 47/47 | ce commit |
 | 18/10 23:55 | NINEA retiré (champ, facture, page confidentialité) ; tests boutique 26/26, vitrine 7/7, livreurs 8/8 | ce commit |
 | 18/10 23:39 | Modèles de vitrine en production : migration `20261019100000_fiila_vitrine_themes` appliquée, `verify-db` 13 migrations / 71 fonctions OK ; E2E déployé 38/38 Chromium et WebKit ; WebKit local vitrine 7/7, parrainage 8/8, boutique 26/26 | `8901e75` |

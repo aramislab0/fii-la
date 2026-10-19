@@ -90,6 +90,45 @@ await t('livreur : écoute avec le lien de sa course', async () => {
   assert.equal(L.__voiceCalls, 1);
 });
 
+await t('demande d’adresse : le demandeur écoute le repère de l’adresse reçue', async () => {
+  const owner = await A.evaluate(() => JSON.parse(localStorage.getItem('fiila.owned'))[0].owner);
+  const R = (await rpc(local.db, 'fiila_create_request', { p: { requester_name: 'Boutique Test', purpose: 'Livraison [TEST]' } })).body;
+  await rpc(local.db, 'fiila_fulfill_request', { p_token: R.share_token, p_place_id: placeId, p_place_owner: owner });
+  await A.evaluate((r) => { const l = JSON.parse(localStorage.getItem('fiila.owned')); l.push({ type: 'request', id: r.id, owner: r.owner_token, share: r.share_token, label: 'Livraison [TEST]', created: Date.now() }); localStorage.setItem('fiila.owned', JSON.stringify(l)); }, R);
+  await A.goto(URL0 + '#/demande/' + R.id);
+  const before = A.__voiceCalls;
+  await A.locator('#voice-listen').click();
+  await A.waitForFunction(() => !/Chargement|Indisponible/.test(document.querySelector('#voice-player').textContent));
+  assert.equal(A.__voiceCalls, before, 'accès privé (fiila_voice_private), pas le lien public');
+});
+
+await t('« Continuer » pendant l’enregistrement : le vocal est gardé ; lien coupé : le propriétaire l’écoute encore', async () => {
+  await A.goto(URL0 + '#/new');
+  await A.getByRole('button', { name: 'Utiliser ma position' }).click();
+  await A.getByText('Position précise.').first().waitFor();
+  await A.locator('#wizard-next').click();
+  await A.getByLabel('Oui').check();
+  await A.locator('#wizard-next').click();
+  await A.locator('#label').fill('Chez Awa (test)');
+  await A.locator('#instruction').fill('Porte bleue [TEST]');
+  await A.locator('#voice-record').click();
+  await A.getByText('Parlez maintenant…').waitFor();
+  await A.waitForTimeout(2200);
+  await A.locator('#wizard-next').click();
+  await A.getByText('Écouter le repère').waitFor();
+  await A.locator('#wizard-next').click();
+  await A.getByRole('heading', { name: 'Partager' }).waitFor();
+  const id = A.url().match(/#\/m\/([0-9a-f-]{36})/)[1];
+  assert.ok((await local.db.query('select voice is not null v from fiila.places where id = $1', [id])).rows[0].v, 'vocal enregistré');
+  await local.db.query(`update fiila.places set status = 'revoked' where id = $1`, [id]);
+  await A.goto(URL0 + '#/');
+  await A.goto(URL0 + '#/m/' + id);
+  await A.getByText('Lien désactivé').waitFor();
+  await A.locator('#voice-listen').click();
+  await A.waitForFunction(() => !/Chargement|Indisponible/.test(document.querySelector('#voice-player').textContent));
+  await local.db.query('delete from fiila.places where id = $1', [id]);
+});
+
 await t('modification : retrait du repère vocal ; il disparaît chez le destinataire', async () => {
   await A.goto(URL0 + '#/edit/' + placeId);
   await A.locator('#wizard-next').click();

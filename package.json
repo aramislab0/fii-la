@@ -22,7 +22,8 @@
     "test:voice": "node tests/voice.test.mjs",
     "test:vitrine-sql": "node tests/vitrine.sql.test.mjs",
     "test:vitrine": "node tests/vitrine.test.mjs",
-    "test:navigation": "node tests/navigation.test.mjs"
+    "test:navigation": "node tests/navigation.test.mjs",
+    "test:bugfixes-sql": "node tests/bugfixes.sql.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",

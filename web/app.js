@@ -209,6 +209,10 @@
     not_an_address: 'Choisissez une adresse, pas un rendez-vous.',
     invalid_kind: 'Type de fiche non valide.',
     invalid_payload: 'Données non valides.',
+    invalid_theme: 'Modèle ou couleur non reconnu. Choisissez dans la liste.',
+    invalid_phone: 'Numéro non reconnu. Exemple : 77 123 45 67.',
+    invalid_event: 'Action non reconnue.',
+    not_a_meeting: 'Ce lien n’est pas un rendez-vous.',
     // comptes
     auth_required: 'Connectez-vous pour continuer.',
     session_expired: 'Votre session a expiré. Reconnectez-vous.',
@@ -1014,11 +1018,20 @@
   function blobToB64(blob) {
     return new Promise(function (ok, ko) { var fr = new FileReader(); fr.onload = function () { ok(String(fr.result).replace(/^data:[^,]+,/, '')); }; fr.onerror = ko; fr.readAsDataURL(blob); });
   }
-  // state : { action: 'keep'|'set'|'clear', b64, url, secs, existing: { secs, token } }
+  // state : { action: 'keep'|'set'|'clear', b64, url, secs, existing: { secs, load } }
   function voiceRecorder(state, onChange) {
     var box = h('div', { class: 'stack tight', id: 'voice-box' });
-    var rec = null, chunks = [], timer = null, started = 0, stream = null, audio = null;
-    function stopAll() { try { if (rec && rec.state !== 'inactive') rec.stop(); } catch (e) { /* rien */ } if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); clearInterval(timer); }
+    var rec = null, chunks = [], timer = null, started = 0, stream = null, audio = null, asking = false, waiters = [];
+    function release() { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; clearInterval(timer); }
+    function settle() { var w = waiters; waiters = []; w.forEach(function (f) { f(); }); }
+    // Arrête l'enregistrement en cours ; la promesse se résout quand le son est prêt (ou tout de suite s'il n'y a rien).
+    function finish() {
+      if (audio && !audio.paused) audio.pause();
+      if (!rec || rec.state === 'inactive') { release(); return Promise.resolve(); }
+      return new Promise(function (resolve) { waiters.push(resolve); try { rec.stop(); } catch (e) { release(); settle(); } });
+    }
+    // Changement d'écran : on coupe le micro et le son, sans garder l'enregistrement interrompu.
+    function abandon() { if (rec) { rec.onstop = function () { release(); settle(); }; } finish(); }
     function draw() {
       var has = state.action === 'set' || (state.action === 'keep' && state.existing);
       if (has) {
@@ -1026,15 +1039,16 @@
         var playBtn = h('button', { class: 'btn vbtn', type: 'button', id: 'voice-play', 'aria-label': 'Écouter' }, icon('play', 24));
         playBtn.onclick = function () {
           if (audio && !audio.paused) { audio.pause(); audio.currentTime = 0; setKids(playBtn, icon('play', 24)); return; }
-          var go = function (src) { audio = new Audio(src); audio.onended = function () { setKids(playBtn, icon('play', 24)); }; audio.play().then(null, function () {}); setKids(playBtn, icon('stop', 24)); };
+          if (audio) { playAudio(audio, playBtn, null, secs); return; }
+          var go = function (src) { audio = new Audio(src); playAudio(audio, playBtn, null, secs); };
           if (state.action === 'set') go(state.url);
-          else api('fiila_voice', { p_token: state.existing.token, p_via: 'share' }).then(function (r) { if (r.state === 'ok') go(r.voice); }, function (e) { toast(errText(e)); });
+          else if (state.existing.load) state.existing.load().then(function (r) { if (r.state === 'ok') go(r.voice); else toast('Repère vocal indisponible.'); }, function (e) { toast(errText(e)); });
         };
         setKids(box, h('div', { class: 'voice' }, playBtn,
           h('div', { class: 'vtxt' }, h('strong', null, 'Repère vocal'), h('span', { class: 'muted' }, secsText(secs))),
           iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'voice-redo', onclick: start }, 'mic', 'Refaire', 18),
           h('button', { class: 'btn quiet danger-text', type: 'button', id: 'voice-remove', 'aria-label': 'Retirer le repère vocal', style: 'min-height:44px;padding:0 6px',
-            onclick: function () { state.action = state.existing ? 'clear' : 'keep'; state.existing = null; state.b64 = null; state.url = null; onChange(); draw(); } }, icon('trash', 20))));
+            onclick: function () { if (audio) audio.pause(); audio = null; state.action = state.existing ? 'clear' : 'keep'; state.existing = null; state.b64 = null; state.url = null; onChange(); draw(); } }, icon('trash', 20))));
         return;
       }
       if (!voiceSupported()) { setKids(box); return; }
@@ -1043,24 +1057,27 @@
         h('div', { class: 'vtxt' }, h('strong', null, 'Repère vocal'), h('span', { class: 'muted' }, 'Facultatif. 30 secondes, dans votre langue.'))));
     }
     function start() {
-      if (!voiceSupported()) return;
+      if (!voiceSupported() || asking || (rec && rec.state === 'recording')) return;
+      if (audio) { audio.pause(); audio = null; }
+      asking = true;
       navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+        asking = false;
         stream = s; chunks = [];
+        onMedia(abandon);
         var types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'];
         var mime = types.filter(function (t) { return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t); })[0];
         try { rec = new MediaRecorder(s, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 }); }
         catch (e) { rec = new MediaRecorder(s); }
         rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
         rec.onstop = function () {
-          clearInterval(timer);
-          if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+          release();
           var secs = Math.min(VOICE_MAX, (Date.now() - started) / 1000);
           var blob = new Blob(chunks, { type: (rec.mimeType || mime || 'audio/webm').split(';')[0] });
-          if (secs < 1 || !blob.size) { toast('Enregistrement trop court.'); draw(); return; }
+          if (secs < 1 || !blob.size) { toast('Enregistrement trop court.'); draw(); settle(); return; }
           blobToB64(blob).then(function (b64) {
             state.action = 'set'; state.b64 = b64; state.secs = Math.round(secs); state.url = URL.createObjectURL(blob);
-            onChange(); draw();
-          });
+            onChange(); draw(); settle();
+          }, function () { draw(); settle(); });
         };
         started = Date.now();
         rec.start();
@@ -1075,37 +1092,52 @@
           if (el >= VOICE_MAX) { try { rec.stop(); } catch (e) { /* rien */ } }
         }, 250);
       }, function () {
+        asking = false;
         setKids(box, h('div', { class: 'voice' }, h('span', { class: 'vbtn btn ghost', 'aria-hidden': 'true' }, icon('mic', 24)),
           h('div', { class: 'vtxt' }, h('strong', null, 'Micro non autorisé'), h('span', { class: 'muted' }, 'Autorisez le micro dans les réglages du navigateur, puis réessayez.'))));
         setTimeout(draw, 5000);
       });
     }
     draw();
-    box.stop = stopAll;
+    box.stop = finish;
     return box;
   }
-  // Lecteur pour la personne qui reçoit : rien n'est chargé avant le toucher.
-  function voicePlayer(token, via, secs) {
-    var audio = null;
+  // Sources du repère vocal : lien reçu (fiche ou course) ou accès privé (propriétaire, demandeur, boutique).
+  function voiceFrom(token, via) { return function () { return api('fiila_voice', { p_token: token, p_via: via }); }; }
+  function voicePrivate(kind, id, key) { return function () { return api('fiila_voice_private', { p_kind: kind, p_id: id, p_key: key || null }); }; }
+  // Joue un son ; si le téléphone refuse (iPhone : le son est arrivé après le toucher), on demande un second toucher.
+  function playAudio(audio, btn, status, secs) {
+    onMedia(function () { audio.pause(); });
+    audio.onended = function () { setKids(btn, icon('play', 24)); };
+    setKids(btn, icon('stop', 24));
+    var pr = audio.play();
+    if (pr && pr.then) pr.then(function () { if (status) status.textContent = secsText(secs); }, function () {
+      setKids(btn, icon('play', 24));
+      if (status) status.textContent = 'Touchez encore pour écouter.';
+    });
+  }
+  // Lecteur : rien n'est chargé avant le toucher.
+  function voicePlayer(load, secs) {
+    var audio = null, loading = false;
     var btn = h('button', { class: 'btn vbtn', type: 'button', id: 'voice-listen', 'aria-label': 'Écouter le repère vocal' }, icon('play', 24));
     var status = h('span', { class: 'muted' }, secsText(secs));
     btn.onclick = function () {
       if (audio && !audio.paused) { audio.pause(); audio.currentTime = 0; setKids(btn, icon('play', 24)); return; }
-      if (audio) { audio.play().then(null, function () {}); setKids(btn, icon('stop', 24)); return; }
-      status.textContent = 'Chargement…';
-      api('fiila_voice', { p_token: token, p_via: via }).then(function (r) {
-        if (r.state !== 'ok') { status.textContent = 'Indisponible.'; return; }
-        status.textContent = secsText(r.secs);
+      if (audio) { playAudio(audio, btn, status, secs); return; }
+      if (loading) return;
+      loading = true; status.textContent = 'Chargement…';
+      load().then(function (r) {
+        loading = false;
+        if (!r || r.state !== 'ok') { status.textContent = 'Indisponible.'; return; }
+        secs = r.secs || secs;
         audio = new Audio(r.voice);
-        audio.onended = function () { setKids(btn, icon('play', 24)); };
-        audio.play().then(null, function () {});
-        setKids(btn, icon('stop', 24));
-      }, function (e) { status.textContent = errText(e); });
+        playAudio(audio, btn, status, secs);
+      }, function (e) { loading = false; status.textContent = errText(e); });
     };
     return h('div', { class: 'voice', id: 'voice-player' }, btn, h('div', { class: 'vtxt' }, h('strong', null, 'Écouter le repère'), status));
   }
-  function voiceOwnerBox(pl) {
-    return h('section', { class: 'stack tight' }, voicePlayer(pl.share_token, 'share', pl.voice_secs));
+  function voiceOwnerBox(pl, owner) {
+    return h('section', { class: 'stack tight' }, voicePlayer(voicePrivate('place', pl.id, owner), pl.voice_secs));
   }
 
 
@@ -1173,6 +1205,7 @@
           h('div', null, h('h1', { class: 'wrapword' }, shop.name),
             shop.reviews ? ratingEl(shop.rating, shop.reviews) : null,
             shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null)),
+        q.a && !byId[q.a] ? h('p', { class: 'msg', id: 'vitrine-gone' }, 'Cet article n’est plus proposé. Voici les autres articles de la boutique.') : null,
         products.length ? h('div', { class: 'vgrid', id: 'vitrine-products' }, products.map(card))
           : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun article pour le moment.')),
         h('p', { class: 'safe-line' }, icon('lock', 18), 'Commande sans compte. Vous donnez votre adresse à la dernière étape.'));
@@ -1234,13 +1267,27 @@
   function vitrineSection(shop) {
     var box = h('section', { class: 'card', id: 'vitrine-section' });
     var state = { public: !!shop.public, slug: shop.slug, about: shop.about || '', theme: shop.theme || 'galerie', accent: shop.accent || 'foret', cover: null };
-    sapi('fiila_shop_vitrine', { p: null }).then(function (r) { state.cover = r.cover || null; state.theme = r.theme || state.theme; state.accent = r.accent || state.accent; draw(); }, function () {});
+    var saved = { cover: null };
+    // La couverture n'arrive qu'ici : on ne redessine que si elle change (une saisie en cours n'est pas effacée).
+    sapi('fiila_shop_vitrine', { p: null }).then(function (r) {
+      var changed = (r.cover || null) !== state.cover || (r.theme && r.theme !== state.theme) || (r.accent && r.accent !== state.accent);
+      state.cover = r.cover || null; state.theme = r.theme || state.theme; state.accent = r.accent || state.accent;
+      saved.cover = state.cover;
+      if (changed) draw();
+    }, function () {});
     var err = h('div', { role: 'alert' });
     function save(p, okText) {
+      setKids(err);
       return sapi('fiila_shop_vitrine', { p: p }).then(function (r) {
-        state.public = !!r.public; state.slug = r.slug; state.about = r.about || ''; state.theme = r.theme || 'galerie'; state.accent = r.accent || 'foret'; state.cover = r.cover || null;
+        state.public = !!r.public; state.slug = r.slug; state.theme = r.theme || 'galerie'; state.accent = r.accent || 'foret'; state.cover = r.cover || null;
+        if ('about' in p) state.about = r.about || ''; // un texte tapé mais pas encore enregistré est gardé
+        saved.cover = state.cover;
         toast(okText); draw();
-      }, function (e) { errBox(err, e); });
+      }, function (e) {
+        // Rien n'a changé sur le serveur : les choix reviennent à l'état enregistré.
+        if ('cover' in p) state.cover = saved.cover;
+        draw(); errBox(err, e);
+      });
     }
     function draw() {
       var url = state.slug ? vitrineUrl(state.slug) : null;
@@ -1295,6 +1342,22 @@
     if (t && t.at > Date.now() - TOUCH_DAYS * 864e5) return t;
     return touchMem;
   }
+  // Ses propres codes (boutique, livreur, particulier) : ouvrir son lien ne compte jamais comme une invitation.
+  var MYCODES_LS = 'fiila.mycodes';
+  function myCodes() { var l = LS.get(MYCODES_LS, []); return Array.isArray(l) ? l : []; }
+  function rememberMyCode(code) {
+    var l = myCodes().filter(function (c) { return c !== code; }); l.unshift(code); LS.set(MYCODES_LS, l.slice(0, 5));
+    var cur = touchGet(); if (cur && cur.src === 'link' && cur.token === code) forgetTouch();
+  }
+  function forgetTouch() { touchMem = null; LS.del(TOUCH_LS); }
+  function checkTouchCode() {
+    var t = touchGet();
+    if (!t || t.src !== 'link') return;
+    api('fiila_referral_public', { p_code: t.token }).then(function (r) {
+      var c = touchGet();
+      if (r.state !== 'ok' && c && c.token === t.token) forgetTouch();
+    }, function () { /* hors ligne : on garde */ });
+  }
   function noteTouch(p) {
     var src = null, token = null;
     if (p[0] === 'r' && p[1]) { src = 'link'; token = p[1].toUpperCase(); }
@@ -1309,6 +1372,7 @@
     if (creating && touchMem && !LS.get(TOUCH_LS, null)) LS.set(TOUCH_LS, touchMem);
     if (!src || !(src === 'vitrine' ? /^[a-z0-9-]{3,40}$/.test(token) : /^[A-Za-z0-9_-]{6,100}$/.test(token))) return;
     if (src === 'address' && owned.all().some(function (r) { return r.share === token; })) return; // sa propre fiche
+    if (src === 'link' && myCodes().indexOf(token) >= 0) return; // son propre code
     var cur = touchGet();
     if (cur && src !== 'link') return;
     if (cur && cur.src === 'link' && cur.token === token) return;
@@ -1350,6 +1414,8 @@
     if (!t || t.src !== 'link' || owned.all().length || shopKey() || courierKey()) return null;
     var box = h('section', { class: 'card invite', id: 'invite-banner', hidden: true });
     api('fiila_referral_public', { p_code: t.token }).then(function (r) {
+      // Code inconnu ou supprimé : on l'oublie, pour ne bloquer ni une autre origine ni la question « recommandé ? ».
+      if (r.state === 'unknown' || r.state === 'invalid') { var c = touchGet(); if (c && c.token === t.token) forgetTouch(); return; }
       if (r.state !== 'ok' || !r.name) return;
       setKids(box, h('p', null, h('strong', null, r.name), ' vous invite sur Fii La.'),
         h('p', { class: 'small muted' }, r.kind === 'shop' || r.kind === 'courier'
@@ -1370,6 +1436,7 @@
     var key = forWho === 'shop' ? shopKey() : forWho === 'courier' ? courierKey() : ((LS.get(REF_LS, null) || {}).key || null);
     var back = forWho === 'shop' ? backBtn('Ma boutique', '#/boutique') : forWho === 'courier' ? backBtn('Espace livreur', '#/livreur') : backBtn();
     return api('fiila_referral_me', { p_for: forWho, p_key: key }).then(function (r) {
+      if (r.referrer && r.referrer.code) rememberMyCode(r.referrer.code);
       return r.referrer ? referralPage(forWho, r.referrer, back) : referralCardForm(back);
     }, function (e) {
       if (e.code === 'shop_required') { go('#/boutique'); return loading(); }
@@ -1495,7 +1562,7 @@
   /* ----- statistiques de croissance (compte administrateur seulement) */
   var SOURCE_LABEL = { code: 'Code tapé', phone: 'Numéro tapé', link: 'Lien de parrainage', request: 'Demande d’adresse', invoice: 'Facture',
     address: 'Adresse reçue', meeting: 'Rendez-vous reçu', course: 'Course livreur', watch: 'Suivi de livraison', courier_invite: 'Invitation livreur',
-    post: 'Publication', direct: 'Direct' };
+    post: 'Publication', vitrine: 'Vitrine de boutique', direct: 'Direct' };
   function viewStats() {
     if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.', h('a', { class: 'btn', href: '#/compte' + qs({ retour: 'stats' }) }, 'Se connecter')), footer());
     return api('fiila_admin_stats', {}).then(function (s) {
@@ -1547,12 +1614,13 @@
   function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
   function render() {
     var seq = ++renderSeq;
+    stopMedia();
     staleToast();
     var r = parseHash(), p = r.parts, view;
     noteTouch(p);
     try {
       if (!p.length) view = viewHome();
-      else if (p[0] === 'r' && p[1]) { try { history.replaceState(null, '', location.pathname + location.search + '#/'); } catch (e) { /* rien */ } view = viewHome(); }
+      else if (p[0] === 'r' && p[1]) { try { history.replaceState(null, '', location.pathname + location.search + '#/'); } catch (e) { /* rien */ } checkTouchCode(); view = viewHome(); }
       else if (p[0] === 'parrainer') view = viewReferral(r.q);
       else if (p[0] === 'stats') view = viewStats();
       else if (p[0] === 'a' && p[1]) view = viewRecipient(p[1]);
@@ -1591,8 +1659,18 @@
       ensureWayBack(node, r);
       setKids(app, node);
       window.scrollTo(0, 0);
+    }, function (e) {
+      if (seq !== renderSeq) return;
+      var node = page(backBtn(), stateCard('!', 'Chargement impossible', errText(e)),
+        h('button', { class: 'btn', type: 'button', onclick: render }, 'Réessayer'));
+      ensureWayBack(node, r);
+      setKids(app, node);
     });
   }
+  // Micro et sons en cours : arrêtés à chaque changement d'écran (jamais de micro ouvert sur un autre écran).
+  var MEDIA = [];
+  function onMedia(stop) { MEDIA.push(stop); }
+  function stopMedia() { var l = MEDIA || []; MEDIA = []; l.forEach(function (f) { try { f(); } catch (e) { /* rien */ } }); }
   /* ----- navigation : chaque écran a une sortie
      On garde en mémoire les écrans vus dans cette session (jamais sur le téléphone). Un écran sans bouton retour
      en reçoit un : retour à l'écran précédent de l'application s'il existe, sinon à l'écran « parent » logique. */
@@ -1619,7 +1697,7 @@
     if (a === 'parrainer' && q && q.pour === 'livreur') return ['#/livreur', 'Espace livreur'];
     return ['#/', 'Accueil'];
   }
-  function showView(node) { ensureWayBack(node, parseHash()); setKids(app, node); }
+  function showView(node) { stopMedia(); ensureWayBack(node, parseHash()); setKids(app, node); }
   function ensureWayBack(node, r) {
     if (!node || !node.querySelector || !r.parts.length) return;
     var prev = NAV.length ? NAV[NAV.length - 1] : null;
@@ -1757,7 +1835,7 @@
           vehicle_ok: pl.vehicle_ok, stop: pl.stop ? { lat: pl.stop.lat, lng: pl.stop.lng, src: 'saved' } : null,
           walk: pl.walk || '', instruction: pl.instruction || '', photo: pl.photo || null };
         return addressWizard(d, { editId: editId, owner: rec.owner || null, originalPhoto: pl.photo || null,
-          voice: pl.has_voice ? { secs: pl.voice_secs, token: pl.share_token } : null });
+          voice: pl.has_voice ? { secs: pl.voice_secs, load: voicePrivate('place', editId, rec.owner || null) } : null });
       }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger la fiche', errText(e), retryBtn())); });
     }
     var draft = LS.get(DRAFT_KEY, null) || blankAddress();
@@ -1854,7 +1932,12 @@
           refAsk ? refAsk.el : null];
       }
       function onNext() {
-        if (voiceBox && voiceBox.stop && step === 3) voiceBox.stop();
+        // Étape du repère : on attend que l'enregistrement en cours soit prêt avant d'afficher l'aperçu.
+        if (voiceBox && voiceBox.stop && step === 3 && !onNext.waiting) {
+          onNext.waiting = true; next.disabled = true;
+          voiceBox.stop().then(function () { next.disabled = false; onNext(); onNext.waiting = false; });
+          return;
+        }
         if (step === 1 && pickers.entry) pickers.entry.commit();
         if (step === 2 && pickers.stop) pickers.stop.commit();
         if (valid()) return;
@@ -1867,7 +1950,9 @@
       }
       refresh();
       setKids(root, 
-        step > 1 ? h('button', { class: 'back', type: 'button', onclick: function () { step--; draw(); } }, '← Étape précédente')
+        step > 1 ? h('button', { class: 'back', type: 'button', onclick: function () {
+          (step === 3 && voiceBox && voiceBox.stop ? voiceBox.stop() : Promise.resolve()).then(function () { step--; draw(); });
+        } }, '← Étape précédente')
           : ctx.retour ? backBtn('Revenir à la fiche reçue', '#/a/' + ctx.retour)
           : backBtn(ctx.reqToken ? 'Retour à la demande' : ctx.editId ? 'Retour à la fiche' : 'Accueil', ctx.reqToken ? '#/d/' + ctx.reqToken + qs({ f: ctx.f }) : ctx.editId ? '#/m/' + ctx.editId : '#/'),
         h('div', { class: 'stack tight' },
@@ -1887,9 +1972,13 @@
       if (!ctx.editId || d.photo !== ctx.originalPhoto) p.photo = d.photo ? d.photo.replace(/^data:[^,]+,/, '') : null;
       return p;
     }
+    // Résout avec un message d'échec (affiché après « Adresse enregistrée »), ou null.
+    var voiceFail = null;
     function sendVoice(id, owner) {
-      if (voice.action === 'set') return api('fiila_voice_set', { p_id: id, p_owner: owner, p_voice: voice.b64, p_secs: voice.secs }).then(null, function (e) { toast('Repère vocal non enregistré : ' + errText(e)); });
-      if (voice.action === 'clear') return api('fiila_voice_set', { p_id: id, p_owner: owner, p_voice: '', p_secs: 0 }).then(null, function () {});
+      voiceFail = null;
+      var fail = function (e) { voiceFail = 'Adresse enregistrée, mais le repère vocal ne l’est pas : ' + errText(e) + ' Réessayez depuis « Modifier ».'; };
+      if (voice.action === 'set') return api('fiila_voice_set', { p_id: id, p_owner: owner, p_voice: voice.b64, p_secs: voice.secs }).then(null, fail);
+      if (voice.action === 'clear') return api('fiila_voice_set', { p_id: id, p_owner: owner, p_voice: '', p_secs: 0 }).then(null, fail);
       return Promise.resolve();
     }
     function publish() {
@@ -1897,7 +1986,7 @@
         return api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner || null, p: payload() }).then(function (pl) { return sendVoice(ctx.editId, ctx.owner || null).then(function () { return pl; }); }).then(function (pl) {
           owned.patch('place', ctx.editId, { label: pl.label });
           if (d.photo !== ctx.originalPhoto) makeThumb(d.photo).then(function (t) { owned.patch('place', ctx.editId, { thumb: t || undefined }); });
-          toast('Modifications enregistrées. Le lien reste le même.');
+          toast(voiceFail || 'Modifications enregistrées. Le lien reste le même.');
           go('#/m/' + ctx.editId);
         });
       }
@@ -1910,7 +1999,7 @@
         LS.set('fiila.saved', true);
         track('fiche_created', ctx.reqToken ? 'address_request' : ctx.retour ? 'address_discovery' : 'address_direct');
         if (!stored) toast('Fiche enregistrée, mais ce téléphone n’a pas pu garder la clé de gestion. Copiez-la sur la page suivante.');
-        else toast('Adresse enregistrée.');
+        else toast(voiceFail || 'Adresse enregistrée.');
         if (ctx.reqToken && ctx.requester) {
           return api('fiila_fulfill_request', { p_token: ctx.reqToken, p_place_id: r.id, p_place_owner: r.owner_token }).then(function () {
             showView(sentView(ctx.requester, r.share_token, r.id, ctx.f)); window.scrollTo(0, 0);
@@ -1996,7 +2085,7 @@
           h('span', { class: 'small muted' }, isMeeting && !expired ? 'Visible jusqu’au ' + shortDate(pl.expires_at) : 'Modifiée le ' + shortDate(pl.updated_at)))),
       active ? sharePanel({ kind: variant, url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null, qr: qrBox,
         ids: { url: 'share-url', copy: 'copy-link', native: 'share-native' } }) : null,
-      pl.has_voice && active ? voiceOwnerBox(pl) : null,
+      pl.has_voice ? voiceOwnerBox(pl, owner) : null,
       isMeeting && active ? guestsPanel(pl, owner) : null,
       installSlot(),
       expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
@@ -2076,6 +2165,7 @@
     play: 'M8 5.5v13l11-6.5-11-6.5Z',
     stop: 'M7 7h10v10H7z',
     trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+    send: 'M4 12 20 4l-4 16-4.5-6.5ZM11.5 13.5 20 4',
     share: 'M15.5 5a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0M3.5 12a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0M15.5 19a2.5 2.5 0 1 0 5.0 0a2.5 2.5 0 1 0 -5.0 0M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4',
     print: 'M7 9V4h10v5M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v6H7z',
     home: 'M4 11 12 4l8 7v9H4v-9ZM10 20v-5h4v5',
@@ -2354,7 +2444,16 @@
       var tl = wrap(title, CW, photo ? 2 : 3);
       tl.forEach(function (l) { y += 96; text(l, M, y, C.ink); });
       meta.titleLines = tl;
-      if (o.kind === 'meeting' && opts.showWhen && o.when) { y += 18; font(600, 40); wrap(o.when, CW, 2).forEach(function (l) { y += 56; text(l, M, y, C.muted); }); }
+      if (o.kind === 'meeting' && opts.showWhen && o.when) {
+        // « (heure de Dakar) » jamais coupé en deux lignes : la date d'abord, le fuseau sur sa propre ligne si besoin.
+        y += 18; font(600, 40);
+        var tz = ' (heure de Dakar)', day = o.when.replace(tz, ''), wl = wrap(day, CW, 2);
+        if (day !== o.when) {
+          var lastL = wl[wl.length - 1] + tz;
+          if (g.measureText(lastL).width <= CW) wl[wl.length - 1] = lastL; else wl.push(tz.trim());
+        }
+        wl.forEach(function (l) { y += 56; text(l, M, y, C.muted); });
+      }
       // Invitation
       y += 40; font(600, 44);
       var inv = o.kind === 'meeting' ? 'Ouvre la fiche : le lieu exact, l’heure et comment arriver.'
@@ -2443,6 +2542,7 @@
     }
     sh.start = function () {
       if (!('geolocation' in navigator)) { emit('error', 'unavailable'); return; }
+      halt(); // jamais deux suivis en même temps (« Reprendre » après une erreur)
       emit('starting'); keepAwake(); lastSent = 0; last = null;
       watchId = navigator.geolocation.watchPosition(function (p) {
         var c = p.coords, now = Date.now(), here = { lat: c.latitude, lng: c.longitude };
@@ -2450,7 +2550,11 @@
         var moved = last ? distM({ lat: last.latitude, lng: last.longitude }, here) : Infinity;
         if (lastSent && now - lastSent < 20000 && moved < 40) return;
         last = c; lastSent = now;
-        send('live', c).then(function () { emit('live', { at: new Date().toISOString() }); }, function (e) { emit('error', e.code); });
+        send('live', c).then(function () { emit('live', { at: new Date().toISOString() }); }, function (e) {
+          // Coupure réseau passagère : le suivi continue, la prochaine position réessaie.
+          if (e.code === 'network' || e.code === 'timeout') { lastSent = 0; return; }
+          halt(); emit('error', e.code);
+        });
       }, function (err) { halt(); emit('error', err.code === 1 ? 'denied' : 'unavailable'); },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 });
     };
@@ -2604,7 +2708,7 @@
       if (r.state !== 'ok') return page(stateCard('⦸', 'Lien livreur indisponible', 'L’adresse a été désactivée ou le lien n’est pas valide.'), footer());
       var pg = page(courierKey() ? backBtn('Mes courses', '#/livreur') : null, h('p', { class: 'eyebrow' }, 'Livraison'),
         liveShare(token, r.place.entry, { kind: 'courier', title: 'Prêt à partir ?', startLabel: 'Démarrer la livraison', who: 'L’expéditeur et le client voient', initial: r.status }),
-        fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(token, 'course', r.place.voice_secs) : null }), footer(true));
+        fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(voiceFrom(token, 'course'), r.place.voice_secs) : null }), footer(true));
       pg.classList.add('wide');
       return pg;
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la livraison', errText(e), retryBtn())); });
@@ -2677,7 +2781,7 @@
         // Rendez-vous : « Créer le vôtre » seulement après l'arrivée de l'invité, pas avant qu'il ait agi.
         var showDiscover = !mine && (!joined || joined.arrived);
         var pg = page(brandBar(isMeet ? 'Rendez-vous' : 'Adresse'),
-          fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(token, 'share', r.place.voice_secs) : null }),
+          fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(voiceFrom(token, 'share'), r.place.voice_secs) : null }),
           h('p', { class: 'safe-line', id: 'recipient-safe' }, icon('lock', 18), 'Lien privé : seules les personnes qui l’ont reçu voient cette fiche.'),
           !mine && isMeet ? guestBlock(token, r.place) : null,
           mine ? ownerBlock(mine) : showDiscover ? discoveryBlock(r.place.kind, token) : null,
@@ -2793,7 +2897,7 @@
         stateBlock = [h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Adresse reçue le ' + shortDate(q.fulfilled_at)),
           h('p', { class: 'small muted' }, 'Visible uniquement par vous, avec ce téléphone ou la clé de gestion. Le client peut la désactiver à tout moment.'),
           deliveryPanel(rec, 'request'),
-          fiche(q.place)];
+          fiche(q.place, { voice: q.place && q.place.has_voice ? voicePlayer(voicePrivate('request', q.id, rec.owner), q.place.voice_secs) : null })];
       } else if (q.state === 'pending') {
         stateBlock = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de réponse'),
           sharePanel({ kind: 'request', url: url, msg: msg, title: q.purpose, ids: { url: 'request-url', copy: 'copy-request', native: 'share-request' } }),
@@ -3737,7 +3841,7 @@
     var addr;
     if (o.address_state === 'received') {
       addr = [h('span', { class: 'chip ok', style: 'align-self:flex-start' }, icon('check', 12), 'Adresse reçue'),
-        h('details', { id: 'order-address' }, h('summary', null, 'Voir l’adresse'), h('div', { style: 'margin-top:12px' }, o.place ? fiche(o.place) : null))];
+        h('details', { id: 'order-address' }, h('summary', null, 'Voir l’adresse'), h('div', { style: 'margin-top:12px' }, o.place ? fiche(o.place, { voice: o.place.has_voice ? voicePlayer(voicePrivate('order', o.id, shopKey()), o.place.voice_secs) : null }) : null))];
     } else if (o.address_state === 'pending') {
       addr = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de l’adresse')];
     } else {
