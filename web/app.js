@@ -4742,6 +4742,13 @@
     var f = { name: '', phone: '', zone: '', method: 'wave', payout: '', charter: false };
     if (ME && ME.display_name) f.name = ME.display_name;
     if (ME && ME.phone) f.phone = ME.phone;
+    // Profil pas encore chargé (première visite) : on remplit le nom et le numéro dès qu'il arrive, sans écraser une saisie.
+    if (!ME) account.me().then(function (me) {
+      if (!me) return;
+      var n = document.getElementById('amb-name'), t = document.getElementById('amb-phone');
+      if (n && !f.name && me.display_name) { f.name = me.display_name; n.value = me.display_name; }
+      if (t && !f.phone && me.phone) { f.phone = me.phone; t.value = me.phone; }
+    }, function () {});
     var err = h('div', { role: 'alert' });
     var btn = iconBtn('button', { class: 'btn big', type: 'button', id: 'amb-register', onclick: function () {
       setKids(err);

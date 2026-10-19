@@ -63,6 +63,7 @@ await t('inscription : charte obligatoire, puis formation en 6 fiches et test r√
   await signup(A, 'Moussa Diop', 'moussa.amb@example.invalid', 'ambassadeur');
   await A.goto(URL0 + '#/ambassadeur');
   await A.locator('#amb-register').waitFor();
+  await A.waitForFunction(() => document.getElementById('amb-name').value === 'Moussa Diop'); // pr√©-rempli depuis le compte
   await A.fill('#amb-phone', '77 500 00 01');
   await A.fill('#amb-zone', 'Yoff');
   await A.click('#amb-register');
