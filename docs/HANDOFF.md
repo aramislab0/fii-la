@@ -104,6 +104,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 24 | Publication des articles : brique 1 (partage natif, bouton « Publier ») construite 17/10 ; vitrine publique et API Meta/TikTok plus tard (`ARCHITECTURE-RALI.md` §8) | Builder, plus tard | Vitrine V3 |
 | 25 | ~~Valider la stratégie de croissance~~ phase 0 validée 17/10 23:10 et construite (`docs/CROISSANCE.md` §9) | Fondateur | — |
 | 27 | Fixer les récompenses du parrainage (boutiques, livreurs, particuliers ; argent possible) | Fondateur | Annonce du parrainage |
+| 36 | Valider la proposition Sites / Studio IA / assistant / « Événement » (`docs/PROPOSITION-SITES-STUDIO-ASSISTANT.md`) : mention sur le site offert, domaine neutre, budget d'essai IA, « Événement », ordre des étapes | Fondateur | Toute construction de ces fonctions |
 | 35 | Après les 25 places gratuites : décider l'offre (place payante, durée, prix) et l'ordre d'affichage | Fondateur | Boutique n° 26 |
 | 29 | Supprimer 1 fiche « Maison du client (test) » et 1 demande « Boutique Ndèye » restées en production après l'arrêt d'une série de tests (23:32) : suppression SQL refusée à l'exécution, en attente d'accord du fondateur | Fondateur → Builder | Base propre |
 | 34 | Avant toute récompense en argent : vérifier le numéro par SMS (sans cela, n'importe qui peut taper le numéro d'un autre, même en créant une boutique) ; tester sur iPhone l'écoute du repère vocal au premier toucher | Fondateur (décision), Builder | Récompenses du parrainage |
@@ -154,6 +155,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 05:40 | Proposition Sites (vitrines en marque blanche, Site Pro), Studio IA (retouche fidèle, pub, mannequins, motion), assistant d'achat, « Rendez-vous » → « Événement » ; prix des fournisseurs vérifiés | `docs/PROPOSITION-SITES-STUDIO-ASSISTANT.md` |
 | 19/10 05:00 (Mac) | Fil des boutiques en production : migration `20261019300000_fiila_feed` appliquée, `verify-db` 15 migrations / 74 fonctions OK ; Pages déployé ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 48/48, fil 5/5 ; la boutique du fondateur a la place n° 1. Suppression des 2 restes de test refusée une 5e fois par la fenêtre de confirmation | `688655e` |
 | 19/10 05:10 | Fil des boutiques construit (branche `feed`) : migration `20261019300000_fiila_feed`, `#/boutiques`, bloc accueil et fin de tâche, réglage « Fil Fii La » ; tests fil SQL 4/4, fil 5/5. Suppression des 2 restes de test : autorisée par le fondateur, refusée une 4e fois par la fenêtre de confirmation, à relancer | ce commit |
 | 19/10 04:05 (Mac) | Correctifs en production : migration `20261019200000_fiila_bugfixes` appliquée, `verify-db` 14 migrations / 72 fonctions OK ; Pages déployé ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 47/47 ; données du fondateur intactes (6 fiches, 1 boutique, 1 livreur, 2 commandes dont la commande vitrine du fondateur de 03:25) | `58629ea` |
