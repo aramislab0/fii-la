@@ -1869,10 +1869,15 @@
           }))) : null);
     }
 
-    var who = authed() ? h('a', { class: 'who', id: 'account-link', href: '#/compte' }, avatarEl(null, 32), 'Mon compte') : null;
+    // Compte : la photo seule, grande et ronde, en haut à droite ; le prénom dans le bonjour, sous le logo (19/10).
+    var who = authed() ? h('a', { class: 'me-btn', id: 'account-link', href: '#/compte', 'aria-label': 'Mon compte' }, avatarEl(null, 48)) : null;
+    var hello = authed() ? h('p', { class: 'hello', id: 'hello' }, 'Bonjour') : null;
     if (authed()) account.me().then(function (me) {
-      if (!me) { setKids(who, 'Se connecter'); return; }
-      setKids(who, avatarEl(me, 32), h('span', { class: 'who-name' }, me.display_name || 'Mon compte'));
+      if (!me) { setKids(who, h('span', { class: 'me-login' }, 'Se connecter')); who.className = 'who'; hello.remove(); return; }
+      setKids(who, avatarEl(me, 48));
+      who.setAttribute('aria-label', 'Mon compte : ' + (me.display_name || me.email || ''));
+      var first = String(me.display_name || '').trim().split(/\s+/)[0];
+      hello.textContent = first ? 'Bonjour, ' + first : 'Bonjour';
       if (me.shop && shopBtn) shopBtn.setAttribute('aria-label', 'Ma boutique : ' + me.shop.name);
     }, function () { /* hors ligne : on garde le lien */ });
     function tile4(href, name, label, attrs) {
@@ -1884,7 +1889,8 @@
         h('div', { class: 'brand-row' },
           h('div', { class: 'brand' }, h('span', { class: 'mark', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La'))),
           who),
-        h('p', { class: 'promise' }, 'Votre adresse, en une photo.')),
+        hello,
+        h('p', { class: 'promise' + (hello ? ' small-promise' : '') }, 'Votre adresse, en une photo.')),
       inviteBanner(),
       // Une grande action ; quatre raccourcis avec pictogramme ; puis les adresses (proposition validée le 18/10).
       h('a', { class: 'hero', href: '#/new', id: 'create-address', 'aria-label': 'Créer mon adresse' },

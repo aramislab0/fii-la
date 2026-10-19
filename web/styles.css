@@ -697,3 +697,10 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .feed-block .fcard{flex:0 0 80%;max-width:320px;scroll-snap-align:start}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .fgo{color:var(--ink)}}
 :root[data-theme="dark"] .fgo{color:var(--ink)}
+
+/* ---- En-tête de l'accueil avec un compte (19/10) : photo ronde à droite, prénom dans le bonjour. */
+.me-btn{flex:none;display:inline-flex;border-radius:50%;padding:3px;background:var(--surface);box-shadow:0 0 0 2px var(--lime);text-decoration:none}
+.me-btn .avatar{display:block}
+.me-btn:active{transform:scale(.96)}
+.hello{font-family:Montserrat,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;margin-top:4px;overflow-wrap:anywhere}
+.promise.small-promise{font-size:15px;font-weight:500;color:var(--muted)}

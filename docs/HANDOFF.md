@@ -155,6 +155,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 06:00 | Proposition d'en-tête de l'accueil avec compte (branche `entete`, non déployée) : photo ronde 48 px à droite, « Bonjour, Prénom » sous le logo ; captures `docs/screenshots/entete/` | branche `entete` |
 | 19/10 05:40 | Proposition Sites (vitrines en marque blanche, Site Pro), Studio IA (retouche fidèle, pub, mannequins, motion), assistant d'achat, « Rendez-vous » → « Événement » ; prix des fournisseurs vérifiés | `docs/PROPOSITION-SITES-STUDIO-ASSISTANT.md` |
 | 19/10 05:00 (Mac) | Fil des boutiques en production : migration `20261019300000_fiila_feed` appliquée, `verify-db` 15 migrations / 74 fonctions OK ; Pages déployé ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 48/48, fil 5/5 ; la boutique du fondateur a la place n° 1. Suppression des 2 restes de test refusée une 5e fois par la fenêtre de confirmation | `688655e` |
 | 19/10 05:10 | Fil des boutiques construit (branche `feed`) : migration `20261019300000_fiila_feed`, `#/boutiques`, bloc accueil et fin de tâche, réglage « Fil Fii La » ; tests fil SQL 4/4, fil 5/5. Suppression des 2 restes de test : autorisée par le fondateur, refusée une 4e fois par la fenêtre de confirmation, à relancer | ce commit |
