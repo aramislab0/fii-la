@@ -61,6 +61,8 @@ async function newPhone(opts = {}) {
     window.alert = () => { window.__alerts++; };
   });
   if (!BASE) await ctx.route('https://tile.openstreetmap.org/**', (r) => r.abort());
+  // Sur le site en ligne, les compteurs anonymes ne doivent pas monter à chaque test (statistiques du fondateur faussées).
+  if (BASE) await ctx.route('**/rest/v1/rpc/fiila_track', (r) => r.fulfill({ status: 204, body: '' }));
   const page = await ctx.newPage();
   page.setDefaultTimeout(BASE ? 20000 : 12000);
   page.on('response', async (res) => {

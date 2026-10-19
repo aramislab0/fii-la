@@ -15,12 +15,16 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 - **Découverte** : après la fiche reçue, un bloc discret propose de créer sa propre adresse ou son rendez-vous, avec retour vers la fiche.
 - **Réutilisation** : réouvrir et repartager une fiche, « Créer un rendez-vous similaire », relancer une demande expirée.
 - **Gestion** : modifier (même lien), désactiver, nouveau lien, supprimer, clé de gestion pour un autre téléphone.
+- **Boutique (Rali intégré)** : articles, commandes, factures, clients, livreur attitré, vitrine publique `#/b/<lien>` avec commande sans compte.
+- **Fil** (`#/boutiques`) : une publication par article, j'aime, commentaires, enregistrements, onglets Pour vous / Best-sellers / Coups de cœur ; 25 premières boutiques mises en avant gratuitement.
+- **Croissance** : parrainage, programme Ambassadeurs, vide-dressing enfants tenu par Fii La.
+- **Back-office** (`#/bo`) : portail de l'équipe, 5 rôles, invitations nominatives, journal. Voir `docs/BACK-OFFICE.md`.
 
 ## Architecture
 | Élément | Choix | Pourquoi |
 |---|---|---|
 | Front | HTML/CSS/JS sans framework ni build (`web/`) | Page destinataire légère sur réseau lent, aucune chaîne de build à maintenir |
-| Hébergement | GitHub Pages (`.github/workflows/pages.yml`) | Gratuit, HTTPS, déploiement à chaque push |
+| Hébergement | GitHub Pages (`.github/workflows/pages.yml` : tests → migrations → mise en ligne → tests en production) | Gratuit, HTTPS, rien ne part si un test échoue |
 | Données | Supabase Postgres, schéma privé `fiila` | Les tables ne sont jamais exposées par l’API |
 | API | Fonctions SQL `public.fiila_*` (`security definer`), appelées en POST | Vérification des jetons, validation, révocation et expiration appliquées côté serveur |
 | Photos | Dans la même ligne que la fiche (≤ 400 Ko) | Suppression et révocation immédiates, aucune URL publique permanente, aucun bucket à sécuriser |
@@ -35,7 +39,8 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 ## Développer et tester en local
 ```bash
 npm install
-npm run test:sql      # 31 tests de l'API SQL sur un vrai Postgres (PGlite)
+npm run test:all      # toutes les suites : 16 SQL (vrai Postgres en mémoire, PGlite) et 17 navigateur (Chromium, iPhone 13)
+npm run test:sql      # API SQL de base
 npm run test:e2e      # parcours complets dans Chromium, format iPhone 13
 npm run test:discovery # découverte destinataire → créateur, installation, mesure
 npm run test:circuit  # circuit complet : partage, réouverture, rendez-vous similaire, brouillons

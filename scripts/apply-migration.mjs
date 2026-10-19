@@ -14,7 +14,7 @@ if (!process.env.SUPABASE_DB_PASSWORD) { console.error('SUPABASE_DB_PASSWORD man
 const [version, ...rest] = basename(file, '.sql').split('_');
 const name = rest.join('_');
 const url = new URL((process.env.SUPABASE_POOLER_URL || readFileSync('supabase/.temp/pooler-url', 'utf8')).trim());
-url.password = process.env.SUPABASE_DB_PASSWORD;
+url.password = encodeURIComponent(process.env.SUPABASE_DB_PASSWORD); // un « % » ou un « @ » dans le mot de passe ne casse rien
 const c = new Client({ connectionString: url.toString(), ssl: { rejectUnauthorized: false } });
 await c.connect();
 try {

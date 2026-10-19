@@ -1,8 +1,8 @@
 name: Mettre Fii La en production
 
-# À chaque envoi sur main : 1) migrations de la base, 2) mise en ligne du site, 3) tests en production.
-# Ne dépend plus du Mac du fondateur. Seul secret : SUPABASE_DB_PASSWORD (réglages du dépôt > Secrets).
-# Sans ce secret, l'étape 1 est sautée avec un avertissement (les migrations restent à faire depuis le Mac).
+# À chaque envoi sur main : 0) tous les tests sur une base de test (rien ne part si un test échoue), 1) migrations de la base,
+# 2) mise en ligne du site, 3) tests en production. Seul secret : SUPABASE_DB_PASSWORD (réglages du dépôt > Secrets).
+# Sans ce secret : publication seulement si la base en ligne est déjà au moins à la version du dépôt.
 
 on:
   push:
@@ -19,15 +19,44 @@ concurrency:
   group: pages
   cancel-in-progress: false   # ne jamais couper une migration en cours
 
+defaults:
+  run:
+    shell: bash   # bash -eo pipefail : un test qui échoue dans une boucle ou un tube fait échouer l'étape
+
 env:
   # Adresse du serveur de la base, sans mot de passe (non secrète).
   SUPABASE_POOLER_URL: postgresql://postgres.lkvulwocirttozfnyxck@aws-1-eu-west-3.pooler.supabase.com:5432/postgres
   SITE_URL: https://aramislab0.github.io/fii-la/
 
 jobs:
+  test:
+    name: 0. Tests (base de test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - name: Suites SQL
+        run: for f in tests/sql.test.mjs tests/*.sql.test.mjs; do node "$f" | tail -1; done
+      - name: Suites navigateur (Chrome)
+        run: |
+          for f in tests/*.test.mjs; do
+            case "$f" in *.sql.test.mjs|*/sql.test.mjs|*/deployed.test.mjs) continue;; esac
+            node "$f" | tail -1
+          done
+      - name: Captures en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: 'tests-${{ github.sha }}', path: docs/screenshots/, retention-days: 7 }
+
   migrate:
     name: 1. Base de données
-    runs-on: ubuntu-latest
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,16 +70,17 @@ jobs:
         run: |
           if [ -n "$PW" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; exit 0; fi
           echo "ok=0" >> "$GITHUB_OUTPUT"
-          # Garde-fou : sans le secret, on ne publie que si la base en ligne a déjà la dernière migration du dépôt
-          # (sinon le site appellerait des fonctions absentes).
+          # Garde-fou : sans le secret, on ne publie que si la base en ligne a déjà (au moins) la dernière migration du dépôt
+          # (sinon le site appellerait des fonctions absentes). « Au moins » : republier une version antérieure reste possible.
           latest=$(ls supabase/migrations/*.sql | sed 's#.*/##' | cut -c1-14 | sort | tail -1)
-          got=$(curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/fiila_schema_version" -H "apikey: $SUPABASE_KEY" \
-                -H "Authorization: Bearer $SUPABASE_KEY" -H 'Content-Type: application/json' -d '{}' 2>/dev/null | tr -d '"' || true)
-          if [ "$got" != "$latest" ]; then
+          auth=(); case "$SUPABASE_KEY" in eyJ*) auth=(-H "Authorization: Bearer $SUPABASE_KEY");; esac   # comme l'application
+          got=$(curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/fiila_schema_version" -H "apikey: $SUPABASE_KEY" "${auth[@]}" \
+                -H 'Content-Type: application/json' -d '{}' 2>/dev/null | tr -d '"' || true)
+          if [ -z "$got" ] || [[ "$got" < "$latest" ]]; then
             echo "::error::Base en ligne en retard (version ${got:-inconnue}, attendue $latest) et SUPABASE_DB_PASSWORD absent : mise en ligne bloquée. Enregistrer le secret (action #41) puis relancer."
             exit 1
           fi
-          echo "::warning::SUPABASE_DB_PASSWORD absent, mais la base est déjà à jour ($latest) : mise en ligne autorisée."
+          echo "::warning::SUPABASE_DB_PASSWORD absent, mais la base est déjà à jour ($got ≥ $latest) : mise en ligne autorisée."
       - if: steps.s.outputs.ok == '1'
         run: npm ci --ignore-scripts
       - name: Appliquer les migrations (chacune une seule fois, en transaction)
@@ -68,7 +98,7 @@ jobs:
   deploy:
     name: 2. Mise en ligne
     needs: migrate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -95,7 +125,7 @@ jobs:
   verify:
     name: 3. Tests en production (Chrome + Safari)
     needs: deploy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +140,19 @@ jobs:
             sleep 10
           done
           echo "::error::Le site ne sert pas encore cette version après 10 minutes."; exit 1
+      - name: Contrôles en lecture seule de la base en ligne (fil, back-office, version)
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          auth=(); case "$SUPABASE_KEY" in eyJ*) auth=(-H "Authorization: Bearer $SUPABASE_KEY");; esac
+          rpc() { curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/$1" -H "apikey: $SUPABASE_KEY" "${auth[@]}" -H 'Content-Type: application/json' -d "$2"; }
+          rpc fiila_posts '{}' | grep -q '"posts"'                      || { echo "::error::fiila_posts ne répond pas"; exit 1; }
+          rpc fiila_bo_me '{}' | grep -q '"staff": *false'              || { echo "::error::fiila_bo_me doit refuser un visiteur"; exit 1; }
+          latest=$(ls supabase/migrations/*.sql | sed 's#.*/##' | cut -c1-14 | sort | tail -1)
+          [ "$(rpc fiila_schema_version '{}' | tr -d '"')" \> "$latest" ] || [ "$(rpc fiila_schema_version '{}' | tr -d '"')" = "$latest" ] \
+            || { echo "::error::version de la base en retard"; exit 1; }
+          echo "Base en ligne : fil, portail du back-office et version vérifiés."
       - name: Parcours complet sur le site en ligne — Chrome
         run: FIILA_URL=$SITE_URL SHOTS=/tmp/prod-c node tests/e2e.test.mjs
       - name: Parcours complet sur le site en ligne — Safari (WebKit)

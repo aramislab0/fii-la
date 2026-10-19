@@ -93,6 +93,37 @@
       h('div', { class: 'big', 'aria-hidden': 'true' }, icon(STATE_ICONS[glyph] || 'help', 26)),
       h('h2', null, title), text ? h('p', { class: 'muted' }, text) : null, extra || null);
   }
+  /* Feuille du bas commune (audit 19/10) : Échap ferme, le focus entre dans la feuille et y reste (Tab), puis revient sur
+     l'élément qui l'a ouverte ; fermée aussi en changeant d'écran. Renvoie la fonction de fermeture. */
+  function openSheet(back, opts) {
+    opts = opts || {};
+    var prev = document.activeElement;
+    function focusables() {
+      return Array.prototype.slice.call(back.querySelectorAll('button:not([disabled]),a[href],input:not([type=hidden]):not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])'))
+        .filter(function (x) { return x.offsetParent !== null || x === document.activeElement; });
+    }
+    function key(e) {
+      if (!back.isConnected) return;
+      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+      if (e.key !== 'Tab') return;
+      var f = focusables(); if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (!back.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+      else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    function close() {
+      if (!back.isConnected) return;
+      back.remove(); document.removeEventListener('keydown', key, true);
+      if (prev && prev.focus && prev.isConnected) { try { prev.focus({ preventScroll: true }); } catch (e) { /* rien */ } }
+      if (opts.onClose) opts.onClose();
+    }
+    document.addEventListener('keydown', key, true);
+    document.body.append(back);
+    onMedia(close);
+    setTimeout(function () { var t = back.querySelector('[data-autofocus]') || focusables()[0]; if (t) { try { t.focus({ preventScroll: true }); } catch (e) { /* rien */ } } }, 0);
+    return close;
+  }
   function loading(text) { return h('p', { class: 'loading', role: 'status' }, text || 'Chargement…'); }
 
   /* ================================================================ format & liens */
@@ -301,7 +332,9 @@
     not_self: 'Vous ne pouvez pas modifier votre propre rôle.',
     last_super_admin: 'Il faut garder au moins un super admin.',
     invalid_role: 'Rôle non valide.',
-    email_invalid: 'Adresse e-mail non valide.'
+    email_invalid: 'Adresse e-mail non valide.',
+    email_unconfirmed: 'Confirmez d’abord votre adresse e-mail (lien reçu par e-mail), puis rouvrez l’invitation.',
+    payout_pending: 'Un versement vous est encore dû. Contactez Fii La pour le recevoir avant de supprimer votre compte.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
   ApiError.prototype = Object.create(Error.prototype);
@@ -1320,7 +1353,10 @@
         })));
       }
       function draw() {
+        // Une option unique s'affiche en texte (règle 7), jamais en bouton.
+        var fixed = [p.sizes && p.sizes.length === 1 ? 'Taille ' + p.sizes[0] : '', p.colors && p.colors.length === 1 ? p.colors[0] : ''].filter(Boolean);
         setKids(body,
+          fixed.length ? h('p', { class: 'small muted', id: 'variant-fixed' }, fixed.join(' · ')) : null,
           p.sizes && p.sizes.length > 1 ? chips(p.sizes, 'size', 'Taille ou pointure') : null,
           p.colors && p.colors.length > 1 ? chips(p.colors, 'color', 'Couleur') : null);
       }
@@ -1335,9 +1371,8 @@
             close(); done(); refreshBar();
           } }, 'plus', 'Ajouter à la commande'),
           h('button', { class: 'btn ghost', type: 'button', onclick: close }, 'Annuler')));
-      function close() { back.remove(); }
-      document.body.append(back);
-      onMedia(close);
+      var closeSheet; function close() { closeSheet(); }
+      closeSheet = openSheet(back);
     }
     function card(p) {
       var img = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 32));
@@ -1409,9 +1444,8 @@
           }),
           h('button', { class: 'btn', type: 'button', id: 'filter-apply', onclick: function () { Object.keys(draft).forEach(function (k) { filter[k] = draft[k] || ''; }); close(); drawFilters(); drawGrid(); } }, 'Voir les articles'),
           h('button', { class: 'btn ghost', type: 'button', id: 'filter-clear', onclick: function () { Object.keys(draft).forEach(function (k) { filter[k] = ''; }); close(); drawFilters(); drawGrid(); } }, 'Effacer les filtres')));
-      function close() { back.remove(); }
-      document.body.append(back);
-      onMedia(close);
+      var closeSheet; function close() { closeSheet(); }
+      closeSheet = openSheet(back);
     }
     function list() {
       setKids(root,
@@ -1497,8 +1531,8 @@
       h('a', { href: '#/demo?off=1', class: 'btn link' }, 'Quitter'));
   }
   function viewDemo(q) {
-    if (q && q.off) { LS.del(DEMO_LS); FEED_CACHE = null; toast('Mode démo désactivé.'); go('#/'); return loading(); }
-    LS.set(DEMO_LS, true); FEED_CACHE = null; toast('Mode démo activé : boutiques fictives visibles.'); go('#/boutiques'); return loading();
+    if (q && q.off) { LS.del(DEMO_LS); FEED_CACHE = null; toast('Mode démo désactivé.'); redirect('#/'); return loading(); }
+    LS.set(DEMO_LS, true); FEED_CACHE = null; toast('Mode démo activé : boutiques fictives visibles.'); redirect('#/boutiques'); return loading();
   }
   function feedCard(s) {
     var img = h('span', { class: 'fimg loading-skel', 'aria-hidden': 'true' }, icon('shop', 28));
@@ -1529,14 +1563,21 @@
     var wrap = h('div', { class: 'car' }, track, cards.length > 1 ? dots : null);
     var idx = 0, timer = null, held = false, visible = true;
     var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Points créés une fois (le focus clavier reste sur le point choisi) ; seules leurs classes changent.
+    var dotEls = cards.map(function (c, i) {
+      return h('button', { class: 'car-dot', type: 'button', role: 'tab', 'aria-label': 'Boutique ' + (i + 1) + ' sur ' + cards.length,
+        style: '--car-ms:' + CAROUSEL_MS + 'ms', onclick: function () { held = true; go(i); } }, h('i'));
+    });
+    setKids(dots, dotEls);
     function drawDots() {
-      setKids(dots, cards.map(function (c, i) {
-        return h('button', { class: 'car-dot' + (i === idx ? ' on' : '') + (i === idx && !calm && !held ? ' run' : ''), type: 'button', role: 'tab',
-          'aria-selected': i === idx ? 'true' : 'false', 'aria-label': 'Boutique ' + (i + 1) + ' sur ' + cards.length,
-          style: '--car-ms:' + CAROUSEL_MS + 'ms', onclick: function () { held = true; go(i); } }, h('i'));
-      }));
+      dotEls.forEach(function (d, i) {
+        d.classList.toggle('on', i === idx); d.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+        d.classList.remove('run');
+        if (i === idx && !calm && !held) { void d.offsetWidth; d.classList.add('run'); }
+      });
     }
-    function mark() { cards.forEach(function (c, i) { c.classList.toggle('is-active', i === idx); c.setAttribute('aria-hidden', i === idx ? 'false' : 'true'); }); drawDots(); }
+    // Cartes hors écran : « inert » (ni lues ni atteignables au clavier), plutôt qu'aria-hidden sur un lien focalisable.
+    function mark() { cards.forEach(function (c, i) { c.classList.toggle('is-active', i === idx); c.inert = i !== idx; c.removeAttribute('aria-hidden'); }); drawDots(); }
     function go(i, auto) {
       idx = (i + cards.length) % cards.length;
       var c = cards[idx];
@@ -1623,14 +1664,16 @@
       likesLine.hidden = !st.likes && !st.saves;
       cLink.textContent = st.comments ? (st.comments === 1 ? 'Voir le commentaire' : 'Voir les ' + st.comments + ' commentaires') : 'Ajouter un commentaire';
     }
+    var reactSeq = { like: 0, save: 0 };
     function react(kind, on) {
-      var key = kind === 'like' ? 'liked' : 'saved', cnt = kind === 'like' ? 'likes' : 'saves';
+      var key = kind === 'like' ? 'liked' : 'saved', cnt = kind === 'like' ? 'likes' : 'saves', mine = ++reactSeq[kind];
       var before = { v: st[key], n: st[cnt] };
       st[key] = on; st[cnt] = Math.max(0, st[cnt] + (on ? 1 : -1)); draw();
       if (kind === 'save') toast(on ? 'Enregistré. Retrouvez-le dans vos enregistrés.' : 'Retiré des enregistrés.');
       api('fiila_react', { p_product: p.id, p_kind: kind, p_on: on, p_device: deviceId(true), p_demo: demoMode() }).then(function (r) {
+        if (mine !== reactSeq[kind]) return; // un toucher plus récent fait foi
         st.likes = r.likes; st.saves = r.saves; st.comments = r.comments; st.liked = !!r.liked; st.saved = !!r.saved; draw();
-      }, function (e) { st[key] = before.v; st[cnt] = before.n; draw(); toast(errText(e)); });
+      }, function (e) { if (mine !== reactSeq[kind]) return; st[key] = before.v; st[cnt] = before.n; draw(); toast(errText(e)); });
     }
     // Double toucher sur la photo : j'aime (comme Instagram), avec un cœur qui apparaît puis s'efface.
     var lastTap = 0;
@@ -1645,7 +1688,7 @@
       else copy(url, 'Lien');
     }
     draw();
-    var badges = [p.best ? h('span', { class: 'post-badge best' }, icon('star', 14), ' Meilleure vente' + (p.sold ? ' · ' + countText(p.sold, 'vendu', 'vendus') : '')) : null,
+    var badges = [p.best ? h('span', { class: 'post-badge best' }, icon('star', 14), ' Best-seller' + (p.sold ? ' · ' + countText(p.sold, 'vendu', 'vendus') : '')) : null,
       p.heart ? h('span', { class: 'post-badge heart' }, icon('heart', 14), ' Coup de cœur') : null].filter(Boolean);
     return h('article', { class: 'post', id: 'post-' + p.id, style: '--accent:' + acc },
       h('a', { class: 'post-head', href: shopHref },
@@ -1669,7 +1712,7 @@
     var back = h('div', { class: 'sheet-back', id: 'comments-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cm-h', onclick: function (e) { if (e.target === back) close(); } },
       h('div', { class: 'sheet cm-sheet' }, h('div', { class: 'cm-top' }, h('h2', { id: 'cm-h' }, 'Commentaires'),
         h('button', { class: 'btn quiet', type: 'button', 'aria-label': 'Fermer', onclick: close }, '×')), list, foot));
-    function close() { back.remove(); redraw(); }
+    var closeSheet; function close() { closeSheet(); }
     function load() {
       return api('fiila_comments', { p_product: p.id, p_key: shopKey(), p_device: deviceId(false), p_demo: demoMode() }).then(function (r) {
         if (r.state !== 'ok') { setKids(list, h('p', { class: 'muted' }, 'Cette publication n’est plus disponible.')); setKids(foot); return; }
@@ -1677,9 +1720,11 @@
         setKids(list, r.comments.length ? r.comments.map(function (c) {
           var acts = h('span', { class: 'cm-acts' },
             c.can_delete ? h('button', { class: 'btn link small', type: 'button', onclick: function () {
+              if (window.confirm && !window.confirm('Supprimer ce commentaire ?')) return;
+              this.disabled = true;
               api('fiila_comment_delete', { p_id: c.id, p_key: shopKey() }).then(function (x) { st.comments = x.comments; toast('Commentaire supprimé.'); load(); }, function (e) { toast(errText(e)); });
             } }, 'Supprimer') : null,
-            !c.mine && !c.reported ? h('button', { class: 'btn link small muted', type: 'button', 'aria-label': 'Signaler ce commentaire', onclick: function () {
+            r.can_comment && !c.mine && !c.reported ? h('button', { class: 'btn link small muted', type: 'button', 'aria-label': 'Signaler ce commentaire', onclick: function () {
               api('fiila_comment_report', { p_id: c.id, p_device: deviceId(true) }).then(function () { toast('Merci. Le commentaire sera vérifié.'); load(); }, function (e) { toast(errText(e)); });
             } }, 'Signaler') : null);
           return h('div', { class: 'cm' }, h('p', null, h('b', null, c.author), ' ', h('span', { class: 'wrapword' }, c.body)),
@@ -1701,8 +1746,7 @@
           h('p', { class: 'small muted' }, 'Votre prénom est affiché. Pas de lien ni de numéro.'));
       }, function (e) { setKids(list, h('p', { class: 'muted' }, errText(e))); });
     }
-    document.body.append(back);
-    onMedia(close);
+    closeSheet = openSheet(back, { onClose: redraw });
     load();
   }
   function agoLong(iso) {
@@ -2003,8 +2047,8 @@
       if (r.referrer && r.referrer.code) rememberMyCode(r.referrer.code);
       return r.referrer ? referralPage(forWho, r.referrer, back) : referralCardForm(back);
     }, function (e) {
-      if (e.code === 'shop_required') { go('#/boutique'); return loading(); }
-      if (e.code === 'courier_required') { go('#/livreur'); return loading(); }
+      if (e.code === 'shop_required') { redirect('#/boutique'); return loading(); }
+      if (e.code === 'courier_required') { redirect('#/livreur'); return loading(); }
       return page(back, stateCard('!', 'Impossible de charger le parrainage', errText(e), retryBtn()), footer());
     });
   }
@@ -2168,13 +2212,21 @@
     var raw = location.hash.replace(/^#\/?/, '');
     var q = {}, qi = raw.indexOf('?');
     if (qi >= 0) {
-      raw.slice(qi + 1).split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) q[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); });
+      // Adresse mal formée (%E0%A4…) : on garde le texte brut au lieu de bloquer l'application.
+      var dec = function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } };
+      raw.slice(qi + 1).split('&').forEach(function (kv) { var p = kv.split('='); if (p[0]) q[dec(p[0])] = dec(p[1] || ''); });
       raw = raw.slice(0, qi);
     }
     var parts = raw.split('/').filter(Boolean);
     return { parts: parts, q: q };
   }
   function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
+  // Redirection décidée pendant l'affichage : remplace l'entrée d'historique (le bouton Retour ne ramène pas sur une page
+  // qui redirige aussitôt).
+  function redirect(hash) {
+    try { history.replaceState(null, '', location.pathname + location.search + hash); lastHash = hash; } catch (e) { location.replace(hash); return; }
+    setTimeout(render, 0);
+  }
   function render() {
     var seq = ++renderSeq;
     stopMedia();
@@ -2254,6 +2306,7 @@
     else if (lastHash !== cur) NAV.push(lastHash);
     if (NAV.length > 50) NAV.shift();
     lastHash = cur;
+    focusNext = true;
     render();
   });
   function parentOf(parts, q) {
@@ -2270,7 +2323,12 @@
     if (a === 'parrainer' && q && q.pour === 'livreur') return ['#/livreur', 'Espace livreur'];
     return ['#/', 'Accueil'];
   }
-  function showView(node) { stopMedia(); ensureWayBack(node, parseHash()); setKids(app, node); }
+  // Après un changement d'écran, le focus va au début du nouvel écran (lecteurs d'écran, clavier) ; pas lors d'un simple rafraîchissement.
+  var focusNext = false;
+  function showView(node) {
+    stopMedia(); ensureWayBack(node, parseHash()); setKids(app, node);
+    if (focusNext) { focusNext = false; try { app.focus({ preventScroll: true }); } catch (e) { /* rien */ } }
+  }
   function ensureWayBack(node, r) {
     if (!node || !node.querySelector || !r.parts.length) return;
     if (node.classList && (node.classList.contains('bo-shell') || node.classList.contains('bo-portal'))) return; // le back-office a sa propre navigation
@@ -3851,7 +3909,7 @@
   }
   function failPage(title, retour) {
     return function (e) {
-      if (e.code === 'shop_required') { go('#/boutique'); return loading(); }
+      if (e.code === 'shop_required') { redirect('#/boutique'); return loading(); }
       if (e.code === 'session_expired' || e.code === 'auth_required') return needLogin(retour, 'Reconnectez-vous', 'Votre session a expiré.');
       return page(backBtn(), stateCard('!', title, errText(e), retryBtn()), footer());
     };
@@ -4137,13 +4195,16 @@
         segField({ legend: 'Envoi des courses', name: 'courier-auto', id: 'courier-auto', value: shop.courier_auto ? 'on' : 'off',
           options: [['on', 'Automatique'], ['off', 'Manuel']],
           onChange: function (v) { act(v === 'on' ? 'auto_on' : 'auto_off', v === 'on' ? 'Envoi automatique.' : 'Envoi manuel.'); } }),
-        h('button', { class: 'btn ghost small', type: 'button', id: 'courier-remove', style: 'align-self:flex-start', onclick: function () { act('remove', 'Livreur retiré.'); } }, 'Retirer ce livreur'),
+        h('button', { class: 'btn ghost small', type: 'button', id: 'courier-remove', style: 'align-self:flex-start', onclick: function () { if (window.confirm && !window.confirm('Retirer ' + c.name + ' ? Les courses ne lui seront plus envoyées.')) return; act('remove', 'Livreur retiré.'); } }, 'Retirer ce livreur'),
         err]);
       return box;
     }
     var f = { name: inv ? inv.name || '' : '', phone: inv ? inv.phone || '' : '' };
     var sendBox = h('div', { class: 'stack' });
-    add(box, [
+    // Pas encore de livreur : section repliée (règle « simple et intuitif »), ouverte si une invitation attend.
+    var form = h('div', { class: 'stack', style: 'margin-top:12px' });
+    box = h('details', { class: 'card more-sec', id: 'courier-section', open: inv ? true : null }, h('summary', null, 'Livreur attitré'), form);
+    add(form, [
       inv ? h('p', { class: 'small muted', id: 'courier-pending' }, 'Invitation envoyée' + (inv.name ? ' à ' + inv.name : '') + '.') : null,
       textField({ id: 'courier-name', label: 'Nom', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
       textField({ id: 'courier-phone', label: 'WhatsApp', type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
@@ -4238,8 +4299,11 @@
     var shop = r.shop, st = r.stats || {};
     var vue = ['open', 'unpaid', 'done', 'all'].indexOf(q.vue) >= 0 ? q.vue : 'open';
     var listBox = h('div', { class: 'list', id: 'orders' }, loading('Chargement des commandes…'));
+    var seq = 0;
     function load() {
+      var mine = ++seq;
       sapi('fiila_orders', { p_filter: vue === 'all' ? null : vue }).then(function (rows) {
+        if (mine !== seq) return; // un filtre plus récent fait foi
         setKids(listBox, rows.length ? rows.map(orderItem) : h('div', { class: 'card' },
           h('p', { class: 'muted' }, vue === 'open' ? 'Aucune commande en cours.' : vue === 'unpaid' ? 'Rien à encaisser.' : 'Aucune commande.')));
       }, function (e) { errBox(listBox, e); });
@@ -4272,16 +4336,18 @@
   function viewCustomers(q) {
     var term = (q && q.q) || '';
     var listBox = h('div', { class: 'list', id: 'customers' }, loading());
-    var timer;
+    var timer, seq = 0;
     function load() {
+      var mine = ++seq;
       sapi('fiila_customers', { p_query: term.trim() || null }).then(function (rows) {
+        if (mine !== seq) return; // une recherche plus récente fait foi
         setKids(listBox, rows.length ? rows.map(function (c) {
           return h('a', { class: 'item', href: '#/clients/' + c.id },
             h('div', null, h('div', { class: 't' }, c.name), h('div', { class: 'small muted' }, [c.phone, c.orders ? c.orders + ' commande' + (c.orders > 1 ? 's' : '') : null].filter(Boolean).join(' · '))),
             h('span', { class: 'item-end' }, c.has_address ? h('span', { class: 'chip ok' }, icon('check', 12), 'Adresse') : null, h('span', { class: 'chev' }, icon('chev', 18))));
         }) : h('div', { class: 'card' }, h('p', { class: 'muted' }, term ? 'Aucun client trouvé.' : 'Vos clients apparaissent ici dès leur première commande.')));
       }, function (e) {
-        if (e.code === 'shop_required') { go('#/boutique'); return; }
+        if (e.code === 'shop_required') { redirect('#/boutique'); return; }
         errBox(listBox, e);
       });
     }
@@ -4333,7 +4399,7 @@
       var pre = q && q.client ? customers.filter(function (c) { return c.id === q.client; })[0] : null;
       return orderForm(customers, pre || null, res[1]);
     }, function (e) {
-      if (e.code === 'shop_required') { go('#/boutique'); return loading(); }
+      if (e.code === 'shop_required') { redirect('#/boutique'); return loading(); }
       return failPage('Impossible de préparer la commande', 'commande/nouvelle')(e);
     });
   }
@@ -5296,9 +5362,9 @@
   var BO_ROLE_HELP = {
     super_admin: 'Tout, y compris l’équipe, les réglages et le journal.',
     operations: 'Boutiques, commandes, comptes, fil, modération, vide-dressing, ambassadeurs, finances.',
-    moderation: 'Modération des commentaires, vide-dressing, suspension des boutiques.',
+    moderation: 'Modération des commentaires, vérification du vide-dressing, suspension des boutiques.',
     support: 'Lecture des boutiques, commandes et comptes pour aider les utilisateurs.',
-    finance: 'Commandes, finances et versements des ambassadeurs.' };
+    finance: 'Commandes, finances, versements des ambassadeurs et du vide-dressing.' };
   // [chemin, icône, libellé, droit, file d'attente du tableau de bord]
   var BO_NAV = [
     ['', 'home', 'Tableau de bord', 'dashboard'],
@@ -5306,7 +5372,7 @@
     ['commandes', 'box', 'Commandes', 'orders'],
     ['comptes', 'user', 'Comptes', 'accounts'],
     ['moderation', 'flag', 'Modération', 'moderation', 'comments'],
-    ['vide-dressing', 'users', 'Vide-dressing', 'vide_dressing', 'vide_dressing'],
+    ['vide-dressing', 'users', 'Vide-dressing', ['vide_dressing', 'finance'], 'vide_dressing'],
     ['ambassadeurs', 'gift', 'Ambassadeurs', 'ambassadors', 'ambassadors'],
     ['fil', 'heart', 'Fil (25 places)', 'feed'],
     ['finances', 'cash', 'Finances', 'finance'],
@@ -5314,9 +5380,13 @@
     ['equipe', 'key', 'Équipe', 'team'],
     ['journal', 'clock', 'Journal', 'audit'],
     ['reglages', 'settings', 'Réglages', 'settings']];
-  function boCan(perm) { return !!(BO.me && BO.me.perms && BO.me.perms.indexOf(perm) >= 0); }
+  function boCan(perm) {
+    if (Array.isArray(perm)) return perm.some(boCan);
+    return !!(BO.me && BO.me.perms && BO.me.perms.indexOf(perm) >= 0);
+  }
+  // Profil d'équipe gardé 60 s seulement s'il donne accès (un refus est toujours revérifié) ; la base reste juge de chaque geste.
   function boMe(force) {
-    if (!force && BO.me && Date.now() - BO.at < 60000) return Promise.resolve(BO.me);
+    if (!force && BO.me && BO.me.staff && Date.now() - BO.at < 60000) return Promise.resolve(BO.me);
     return api('fiila_bo_me', {}).then(function (m) { BO.me = m; BO.at = Date.now(); return m; });
   }
   function boDate(iso, time) {
@@ -5357,28 +5427,46 @@
     return fn().then(null, function (e) {
       if (!e || e.code !== 'reauth_required') throw e;
       return new Promise(function (resolve, reject) {
-        var pw = h('input', { type: 'password', id: 'bo-reauth-pw', autocomplete: 'current-password', 'aria-label': 'Mot de passe' });
+        var settled = false;
+        function done(ok, v) { if (settled) return; settled = true; (ok ? resolve : reject)(v); }
+        var pw = h('input', { type: 'password', id: 'bo-reauth-pw', autocomplete: 'current-password', 'data-autofocus': '1' });
         var err = h('div', { role: 'alert' });
+        var ok = h('button', { class: 'btn', type: 'submit', id: 'bo-reauth-ok' }, 'Confirmer');
         var back = h('div', { class: 'sheet-back', id: 'bo-reauth', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bo-reauth-h' },
           h('form', { class: 'sheet', onsubmit: function (ev) {
-            ev.preventDefault(); setKids(err);
-            account.signIn(BO.me.email, pw.value).then(function () { back.remove(); return fn(); }).then(resolve, function (x) { if (x && x.code === 'reauth_required') return; errBox(err, x); });
+            ev.preventDefault(); setKids(err); ok.disabled = true;
+            // Le mot de passe d'abord (erreur affichée dans la feuille) ; puis le geste lui-même (erreur remontée à l'écran).
+            account.signIn(BO.me.email, pw.value).then(function () {
+              return fn().then(function (r) { done(true, r); close(); }, function (x) { done(false, x); close(); });
+            }, function (x) { ok.disabled = false; errBox(err, x); pw.select(); });
           } }, h('h2', { id: 'bo-reauth-h' }, 'Confirmez votre mot de passe'),
             h('p', { class: 'small muted' }, 'Ce geste touche à l’équipe ou aux réglages : il demande une connexion de moins de 15 minutes.'),
-            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Mot de passe'), pw), err,
-            h('button', { class: 'btn', type: 'submit', id: 'bo-reauth-ok' }, 'Confirmer'),
-            h('button', { class: 'btn ghost', type: 'button', onclick: function () { back.remove(); reject(e); } }, 'Annuler')));
-        document.body.append(back); pw.focus();
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Mot de passe'), pw), err, ok,
+            h('button', { class: 'btn ghost', type: 'button', onclick: function () { close(); } }, 'Annuler')));
+        var close = openSheet(back, { onClose: function () { done(false, e); } });
       });
     });
   }
-  function boAct(fn, okText, after) {
-    return boSensitive(fn).then(function (r) { if (okText) toast(okText); if (after) after(r); else render(); return r; }, function (e) { if (e && e.code !== 'reauth_required') toast(errText(e)); });
+  // Geste du back-office : une seule fois à la fois (bouton désactivé), compteurs rafraîchis, et retour arrière de l'affichage
+  // (liste déroulante…) si le geste échoue ou est annulé.
+  function boAct(fn, okText, after, onFail, btn) {
+    if (btn) { if (btn.disabled) return Promise.resolve(); btn.disabled = true; }
+    return boSensitive(fn).then(function (r) {
+      BO.overview = null;
+      if (okText) toast(okText);
+      if (after) after(r); else render();
+      return r;
+    }, function (e) {
+      if (btn) btn.disabled = false;
+      if (onFail) onFail(e);
+      if (e && e.code !== 'reauth_required') toast(errText(e));
+    });
   }
   // Récupère le contenu d'un écran d'administration existant (sans son bouton retour ni son pied de page) pour l'afficher dans le cadre.
   function boEmbed(viewFn) {
     return Promise.resolve(viewFn()).then(function (pg) {
       var box = h('div', { class: 'bo-embed stack' });
+      box.addEventListener('click', function (e) { if (e.target.closest('button')) BO.overview = null; }, true);
       Array.prototype.slice.call(pg.childNodes).forEach(function (n) {
         if (n.nodeType === 1 && (n.classList.contains('back') || n.tagName === 'FOOTER' || n.tagName === 'H1')) return;
         box.appendChild(n);
@@ -5419,12 +5507,16 @@
     var sec = parts[1] || '';
     if (sec === 'invitation') return viewBoInvite(parts[2]);
     if (!authed()) return boLogin();
-    return boMe(true).then(function (me) {
-      if (!me.staff) return boDenied(me);
+    // Profil vérifié à chaque écran (un rôle retiré se voit tout de suite), en même temps que les compteurs : pas d'attente en plus.
+    var ov = BO.me && BO.me.staff && !(BO.overview && Date.now() - BO.overview.at < 30000)
+      ? api('fiila_bo_overview', {}).then(function (o) { o.at = Date.now(); BO.overview = o; }, function () { BO.overview = null; }) : Promise.resolve();
+    return Promise.all([boMe(true), ov]).then(function (rr) {
+      var me = rr[0];
+      if (!me.staff) { BO.overview = null; return boDenied(me); }
       var nav = BO_NAV.filter(function (n) { return n[0] === sec; })[0];
       if (!nav) return boShell('', 'Introuvable', stateCard('?', 'Page introuvable', 'Cette page n’existe pas dans le back-office.'));
       if (!boCan(nav[3])) return boShell(sec, nav[2], stateCard('⦸', 'Accès non autorisé', 'Votre rôle (' + (BO_ROLES[me.role] || me.role) + ') ne donne pas accès à cette page.'));
-      var pre = BO.overview && Date.now() - BO.overview.at < 60000 ? Promise.resolve() : api('fiila_bo_overview', {}).then(function (o) { o.at = Date.now(); BO.overview = o; }, function () {});
+      var pre = BO.overview ? Promise.resolve() : api('fiila_bo_overview', {}).then(function (o) { o.at = Date.now(); BO.overview = o; }, function () {});
       return pre.then(function () {
         var id = parts[2];
         switch (sec) {
@@ -5504,10 +5596,12 @@
       ['ambassadors', 'Ambassadeurs à valider', '#/bo/ambassadeurs'], ['rewards', 'Gains d’ambassadeurs à verser', '#/bo/ambassadeurs'], ['suspended', 'Boutiques suspendues', '#/bo/boutiques?f=suspended']];
     var queues = QUEUE.filter(function (x) { return o.queues[x[0]] != null; });
     var max = Math.max.apply(null, [1].concat(o.days.map(function (d) { return d.orders; })));
+    var dayLine = h('p', { class: 'small', id: 'bo-day', 'aria-live': 'polite' });
     var chart = h('div', { class: 'bo-bars', role: 'img', 'aria-label': 'Commandes par jour sur 14 jours : ' + o.days.map(function (d) { return d.orders; }).join(', ') },
       o.days.map(function (d) {
         var dt = new Date(d.day + 'T12:00:00Z');
-        return h('div', { class: 'bo-bar', title: dt.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' : ' + d.orders + ' commande(s), ' + d.shops + ' boutique(s), ' + d.accounts + ' compte(s)' },
+        var txt = dt.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + ' : ' + d.orders + ' commande(s), ' + d.shops + ' boutique(s), ' + d.accounts + ' compte(s)';
+        return h('button', { class: 'bo-bar', type: 'button', title: txt, 'aria-label': txt, onclick: function () { dayLine.textContent = txt; } },
           h('i', { style: 'height:' + Math.round(d.orders / max * 100) + '%' }), h('span', null, dt.getDate()));
       }));
     return boShell('', 'Tableau de bord', [
@@ -5526,7 +5620,7 @@
             return h('a', { class: 'bo-queue' + (n ? '' : ' zero'), href: x[2] }, h('span', null, x[1]), h('b', null, String(n)), icon('chev', 16));
           }) : h('p', { class: 'muted small' }, 'Rien pour votre rôle.')),
         h('section', { class: 'card stack tight' }, h('h2', null, 'Commandes par jour (14 jours)'), chart,
-          h('p', { class: 'small muted' }, 'Hors boutiques de démonstration. Survolez une barre pour le détail du jour.')))]);
+          dayLine, h('p', { class: 'small muted' }, 'Hors boutiques de démonstration. Touchez une barre pour le détail du jour.')))]);
   }
 
   // ----- Boutiques
@@ -5542,15 +5636,18 @@
     var box = h('div', { class: 'stack', id: 'bo-list' }, loading());
     var more = h('div');
     var rows = [];
+    var seq = 0;
     function load(reset) {
       if (reset) { st.page = 0; rows = []; setKids(box, loading()); }
-      var a = Object.assign({}, args(st), { p_page: st.page });
+      var a = Object.assign({}, args(st), { p_page: st.page }), mine = ++seq;
       api(fn, a).then(function (r) {
+        // Réponse périmée (recherche plus récente) ou écran quitté : on ne touche ni à la liste ni à l'adresse.
+        if (mine !== seq || !box.isConnected) return;
         rows = rows.concat(r[key]);
         setKids(box, boTable(cols, rows, { href: href, id: 'bo-table', emptyId: 'bo-empty', empty: st.q || st.f ? 'Aucun résultat pour cette recherche.' : 'Rien pour le moment.' }));
         setKids(more, r[key].length === 50 ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { st.page++; load(false); } }, 'Voir plus') : null);
         try { history.replaceState(null, '', location.pathname + location.search + '#/bo/' + sec + qs({ q: st.q || undefined, f: st.f || undefined })); } catch (e) { /* rien */ }
-      }, function (e) { errBox(box, e); });
+      }, function (e) { if (mine === seq && box.isConnected) errBox(box, e); });
     }
     var chips = filters ? h('div') : null;
     function drawChips() { if (chips) setKids(chips, boChips(filters, st.f, function (v) { st.f = v; drawChips(); load(true); }, 'bo-filters')); }
@@ -5573,22 +5670,24 @@
       var st = s.stats;
       function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
       var reason = h('input', { type: 'text', id: 'bo-suspend-reason', maxlength: 300, placeholder: 'Motif (visible dans le journal)' });
-      var actions = boCan('shops_write') && !s.platform ? h('section', { class: 'card stack tight', id: 'bo-shop-actions' }, h('h2', null, 'Actions'),
-        s.suspended_at ? [h('p', { class: 'small' }, 'Suspendue le ' + boDate(s.suspended_at, true) + ' : ' + (s.suspended_reason || '')),
-            h('button', { class: 'btn', type: 'button', id: 'bo-unsuspend', onclick: function () { boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'unsuspend' }); }, 'Boutique réactivée. Elle peut rouvrir sa vitrine.'); } }, 'Réactiver la boutique')]
+      var actions = (boCan('shops_suspend') || boCan('feed')) && !s.platform ? h('section', { class: 'card stack tight', id: 'bo-shop-actions' }, h('h2', null, 'Actions'),
+        !boCan('shops_suspend') ? null : s.suspended_at ? [h('p', { class: 'small' }, 'Suspendue le ' + boDate(s.suspended_at, true) + ' : ' + (s.suspended_reason || '')),
+            h('button', { class: 'btn', type: 'button', id: 'bo-unsuspend', onclick: function () { boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'unsuspend' }); }, 'Boutique réactivée. Elle peut rouvrir sa vitrine.', null, null, this); } }, 'Réactiver la boutique')]
           : [h('p', { class: 'small muted' }, 'La suspension ferme la vitrine et la retire du fil. La boutique ne peut pas la rouvrir elle-même.'),
             h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif de suspension'), reason),
             h('button', { class: 'btn danger', type: 'button', id: 'bo-suspend', onclick: function () {
               if (!reason.value.trim()) { toast('Indiquez un motif.'); reason.focus(); return; }
-              boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'suspend', p_value: reason.value }); }, 'Boutique suspendue.');
+              boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'suspend', p_value: reason.value }); }, 'Boutique suspendue.', null, null, this);
             } }, 'Suspendre la boutique')],
         boCan('feed') && s.rank ? h('div', { class: 'row' },
-          h('button', { class: 'btn ghost small', type: 'button', id: 'bo-feed-toggle', onclick: function () { boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: s.feed ? 'feed_off' : 'feed_on' }); }, s.feed ? 'Retirée du fil.' : 'Remise dans le fil.'); } }, s.feed ? 'Retirer du fil' : 'Remettre dans le fil'),
+          h('button', { class: 'btn ghost small', type: 'button', id: 'bo-feed-toggle', onclick: function () { boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: s.feed ? 'feed_off' : 'feed_on' }); }, s.feed ? 'Retirée du fil.' : 'Remise dans le fil.', null, null, this); } }, s.feed ? 'Retirer du fil' : 'Remettre dans le fil'),
           h('button', { class: 'btn quiet danger-text', type: 'button', id: 'bo-free-place', onclick: function () {
-            if (!window.confirm || window.confirm('Libérer la place n° ' + s.rank + ' ? Elle ira à la plus ancienne boutique en attente.')) boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'free_place' }); }, 'Place libérée.');
+            if (!window.confirm || window.confirm('Libérer la place n° ' + s.rank + ' ? Elle ira à la plus ancienne boutique en attente.')) boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'free_place' }); }, 'Place libérée.', null, null, this);
           } }, 'Libérer la place n° ' + s.rank)) : null) : null;
       var typeSel = boCan('shops_write') ? h('select', { id: 'bo-shop-type', 'aria-label': 'Type de commerce', onchange: function (e) {
-          boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'set_type', p_value: e.target.value || null }); }, 'Type enregistré.', function () {});
+          var sel = e.target, v = sel.value || null;
+          boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'set_type', p_value: v }); }, 'Type enregistré.', function () { s.type = v; },
+            function () { sel.value = s.type || ''; });
         } }, h('option', { value: '' }, '—'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: s.type === t[0] || null }, t[1]); })) : (typeLabel(s.type) || '—');
       return boShell('boutiques', s.name, [
         h('p', null, boShopState(s), ' ', s.rank ? boBadge('info', 'Fil · place ' + s.rank + (s.feed ? '' : ' (masquée)')) : null),
@@ -5644,8 +5743,7 @@
             row('Créée', boDate(o.created_at, true)),
             o.delivered_at ? row('Livrée', boDate(o.delivered_at, true)) : null,
             o.cancelled_at ? row('Annulée', boDate(o.cancelled_at, true)) : null,
-            o.note ? row('Note', o.note) : null,
-            h('a', { class: 'btn ghost small', href: '#/f/' + o.invoice, style: 'align-self:flex-start' }, 'Voir la facture')),
+            o.note ? row('Note', o.note) : null),
           h('section', { class: 'card stack tight', id: 'bo-order-items' }, h('h2', null, 'Articles'),
             (o.items || []).map(function (it) { return row((it.qty || 1) + ' × ' + (it.label || ''), fcfa((it.price || 0) * (it.qty || 1))); }),
             row(h('b', null, 'Total'), h('b', null, fcfa(o.total))),
@@ -5733,15 +5831,18 @@
           h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Adresse e-mail de la personne'), h('input', { type: 'email', id: 'bo-inv-email', oninput: function (e) { f.email = e.target.value; } })),
           h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Rôle'), roleSel), help, err,
           h('button', { class: 'btn', type: 'button', id: 'bo-inv-send', onclick: function () {
-            setKids(err);
+            var btn = this;
+            if (btn.disabled) return;
+            setKids(err); btn.disabled = true;
             boSensitive(function () { return api('fiila_bo_invite', { p_email: f.email, p_role: f.role }); }).then(function (r) {
+              btn.disabled = false;
               var link = baseUrl() + '#/bo/invitation/' + r.token;
               setKids(out, h('div', { class: 'msg stack tight', id: 'bo-inv-link' },
                 h('p', null, h('b', null, 'Invitation créée. '), 'Envoyez ce lien à la personne : il fonctionne une seule fois, pendant 7 jours, avec son adresse e-mail.'),
                 h('code', { class: 'wrapword' }, link),
                 h('div', { class: 'row' }, h('button', { class: 'btn small', type: 'button', onclick: function () { copy(link, 'Lien'); } }, 'Copier le lien'),
                   h('a', { class: 'btn ghost small', href: 'https://wa.me/?text=' + encodeURIComponent('Invitation au back-office Fii La (' + BO_ROLES[f.role] + ') : ' + link), target: '_blank', rel: 'noopener' }, 'WhatsApp'))));
-            }, function (e) { if (e && e.code !== 'reauth_required') errBox(err, e); });
+            }, function (e) { btn.disabled = false; if (e && e.code !== 'reauth_required') errBox(err, e); });
           } }, 'Créer le lien d’invitation'), out));
       }
       var members = boTable([
@@ -5750,18 +5851,18 @@
         { label: 'Rôle', get: function (m) {
           if (m.me) return BO_ROLES[m.role];
           return h('select', { 'aria-label': 'Rôle de ' + (m.name || m.email), class: 'bo-role', 'data-user': m.user_id, onchange: function (e) {
-            var v = e.target.value;
-            boAct(function () { return api('fiila_bo_staff_set', { p_user: m.user_id, p_role: v }); }, 'Rôle modifié.');
+            var sel = e.target, v = sel.value;
+            boAct(function () { return api('fiila_bo_staff_set', { p_user: m.user_id, p_role: v }); }, 'Rôle modifié.', null, function () { sel.value = m.role; });
           } }, Object.keys(BO_ROLES).map(function (r) { return h('option', { value: r, selected: r === m.role || null }, BO_ROLES[r]); }));
         } },
         { label: 'Dernière activité', get: function (m) { return m.last_seen_at ? boDate(m.last_seen_at, true) : 'Jamais'; } },
         { label: '', get: function (m) { return m.me ? '' : h('button', { class: 'btn quiet danger-text small', type: 'button', 'data-remove': m.user_id, onclick: function () {
-          if (!window.confirm || window.confirm('Retirer ' + (m.name || m.email) + ' de l’équipe ? Son compte reste, sans accès au back-office.')) boAct(function () { return api('fiila_bo_staff_set', { p_user: m.user_id, p_role: null }); }, 'Membre retiré.');
+          if (!window.confirm || window.confirm('Retirer ' + (m.name || m.email) + ' de l’équipe ? Son compte reste, sans accès au back-office.')) boAct(function () { return api('fiila_bo_staff_set', { p_user: m.user_id, p_role: null }); }, 'Membre retiré.', null, null, this);
         } }, 'Retirer'); } }], t.members, { id: 'bo-members' });
       var invites = t.invites.length ? h('section', { class: 'stack tight', id: 'bo-invites' }, h('h2', null, 'Invitations en attente'),
         boTable([{ label: 'E-mail', get: function (i) { return i.email; } }, { label: 'Rôle', get: function (i) { return BO_ROLES[i.role]; } },
           { label: 'Expire', get: function (i) { return boDate(i.expires_at, true); } },
-          { label: '', get: function (i) { return h('button', { class: 'btn quiet danger-text small', type: 'button', onclick: function () { boAct(function () { return api('fiila_bo_invite_revoke', { p_id: i.id }); }, 'Invitation annulée.'); } }, 'Annuler'); } }], t.invites)) : null;
+          { label: '', get: function (i) { return h('button', { class: 'btn quiet danger-text small', type: 'button', onclick: function () { if (window.confirm && !window.confirm('Annuler l’invitation de ' + i.email + ' ? Le lien ne fonctionnera plus.')) return; boAct(function () { return api('fiila_bo_invite_revoke', { p_id: i.id }); }, 'Invitation annulée.', null, null, this); } }, 'Annuler'); } }], t.invites)) : null;
       return boShell('equipe', 'Équipe', [
         h('p', { class: 'small muted' }, 'Chaque membre se connecte avec son propre compte sur le portail du back-office. Personne ne partage de mot de passe.'),
         form, members, invites,
@@ -5778,14 +5879,15 @@
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’ambassadeur versé',
     reward_cancelled: 'a annulé un gain d’ambassadeur', reward_validated: 'a validé un gain d’ambassadeur', ambassador_active: 'a activé un ambassadeur',
-    ambassador_suspended: 'a suspendu un ambassadeur', ambassador_excluded: 'a exclu un ambassadeur', ambassador_training: 'a renvoyé un ambassadeur en formation' };
+    ambassador_suspended: 'a suspendu un ambassadeur', ambassador_excluded: 'a exclu un ambassadeur', ambassador_training: 'a renvoyé un ambassadeur en formation',
+    view_order: 'a consulté la commande', view_account: 'a consulté le compte' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain ambassadeur, niveau 1', 'FCFA'], amb_reward_2: ['Gain ambassadeur, niveau 2', 'FCFA'],
     amb_reward_3: ['Gain ambassadeur, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par ambassadeur et par mois', ''] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {
     d = d || {};
-    var who = d.name || d.email || d.title || d.shop || (d.body ? '« ' + d.body + ' »' : '') || '';
+    var who = a === 'view_order' ? 'n° ' + String(d.number || '').padStart(4, '0') + ' de ' + (d.shop || '') : d.name || d.email || d.title || d.shop || (d.body ? '« ' + d.body + ' »' : '') || '';
     var txt = (BO_ACTIONS[a] || a) + (who ? ' ' + who : '');
     if (a === 'team_role' && d.to) txt += ' (' + (BO_ROLES[d.from] || d.from) + ' → ' + (BO_ROLES[d.to] || d.to) + ')';
     if (a === 'team_invite' && d.role) txt += ' (' + (BO_ROLES[d.role] || d.role) + ')';
@@ -5820,7 +5922,7 @@
           return h('div', { class: 'card bo-setting' },
             h('label', { class: 'field' }, h('span', { class: 'lbl' }, BO_SETTINGS[k][0] + (BO_SETTINGS[k][1] ? ' (' + BO_SETTINGS[k][1] + ')' : '')), input),
             h('button', { class: 'btn ghost small', type: 'button', id: 'bo-save-' + k, onclick: function () {
-              boAct(function () { return api('fiila_bo_setting_set', { p_key: k, p_value: parseInt(input.value, 10) }); }, 'Réglage enregistré.');
+              boAct(function () { return api('fiila_bo_setting_set', { p_key: k, p_value: parseInt(input.value, 10) }); }, 'Réglage enregistré.', null, null, this);
             } }, 'Enregistrer'));
         })),
         h('p', { class: 'small muted' }, 'Le nombre de places gratuites du fil (25) et le prix après ces places restent à décider : ils seront ajoutés ici.')]);
@@ -5848,43 +5950,50 @@
   function viewAdminVd() {
     if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.'), footer());
     return api('fiila_admin_vd', {}).then(function (d) {
-      function act(id, decision, needReason) {
+      // Droits (audit 19/10) : vérifier = modération ; « livré » et « reversé » = finances. Une confirmation pour ce qui engage de l'argent.
+      var canReview = d.can_review !== false, canPay = d.can_pay !== false;
+      var ASK = { sold: 'Confirmer que cet article a été livré ? Il sera retiré de la vente.', paid: 'Confirmer que la vendeuse a été payée ?', unpublish: 'Retirer cet article de la vente ?' };
+      function act(id, decision, needReason, btn) {
         var r = (document.getElementById('vdr-' + id) || {}).value || '';
         if (needReason && !r.trim()) { toast('Indiquez un motif.'); return; }
-        api('fiila_admin_vd_decide', { p_id: id, p_decision: decision, p_reason: r || null }).then(function () { toast('Enregistré.'); render(); }, function (e) { toast(errText(e)); });
+        if (ASK[decision] && window.confirm && !window.confirm(ASK[decision])) return;
+        if (btn) { if (btn.disabled) return; btn.disabled = true; }
+        api('fiila_admin_vd_decide', { p_id: id, p_decision: decision, p_reason: r || null }).then(function () { BO.overview = null; toast('Enregistré.'); render(); },
+          function (e) { if (btn) btn.disabled = false; toast(errText(e)); });
       }
+      function phone(p) { return p ? ' · ' + p : ''; }
       function desc(x) { return [lbl(VD_GENDERS, x.gender), lbl(VD_AGES, x.age_band), x.size, lbl(VD_CONDITIONS, x.condition)].filter(Boolean).join(' · '); }
       return page(backBtn('Statistiques', '#/stats'),
         h('h1', null, 'Vide-dressing'), h('p', { class: 'small muted' }, 'Commission : ' + d.commission + ' %.'),
-        h('section', { class: 'stack tight', id: 'vd-queue' }, h('h2', null, 'À vérifier (' + d.queue.length + ')'),
+        canReview ? h('section', { class: 'stack tight', id: 'vd-queue' }, h('h2', null, 'À vérifier (' + d.queue.length + ')'),
           d.queue.length ? d.queue.map(function (x) {
             return h('div', { class: 'card stack tight' },
               h('img', { src: x.photo, alt: '', class: 'vd-photo' }),
               h('b', null, x.title + ' · ' + fcfa(x.price)), h('span', { class: 'small muted' }, desc(x)),
-              h('span', { class: 'small' }, 'Vendeuse : ' + x.seller + ' · ' + x.phone + (x.quartier ? ' · ' + x.quartier : '')),
+              h('span', { class: 'small' }, 'Vendeuse : ' + x.seller + phone(x.phone) + (x.quartier ? ' · ' + x.quartier : '')),
               h('p', { class: 'hint' }, 'Vérifier : aucun enfant reconnaissable, article autorisé, photo nette, prix cohérent.'),
               h('input', { type: 'text', id: 'vdr-' + x.id, placeholder: 'Motif (correction ou refus)', maxlength: 200 }),
-              h('div', { class: 'row' }, h('button', { class: 'btn small', type: 'button', onclick: function () { act(x.id, 'approve'); } }, 'Publier'),
-                h('button', { class: 'btn ghost small', type: 'button', onclick: function () { act(x.id, 'changes', true); } }, 'Correction'),
-                h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { act(x.id, 'reject', true); } }, 'Refuser')));
-          }) : h('p', { class: 'muted' }, 'Rien à vérifier.')),
-        h('section', { class: 'stack tight', id: 'vd-orders' }, h('h2', null, 'Commandes'),
+              h('div', { class: 'row' }, h('button', { class: 'btn small', type: 'button', onclick: function () { act(x.id, 'approve', false, this); } }, 'Publier'),
+                h('button', { class: 'btn ghost small', type: 'button', onclick: function () { act(x.id, 'changes', true, this); } }, 'Correction'),
+                h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { act(x.id, 'reject', true, this); } }, 'Refuser')));
+          }) : h('p', { class: 'muted' }, 'Rien à vérifier.')) : null,
+        d.orders.length || canPay ? h('section', { class: 'stack tight', id: 'vd-orders' }, h('h2', null, 'Commandes'),
           d.orders.length ? d.orders.map(function (o) {
             return h('div', { class: 'card stack tight' }, h('b', null, o.ref + ' · ' + o.customer + ' · ' + fcfa(o.total)),
               (o.items || []).map(function (it) { return h('span', { class: 'small' }, it.label + (it.seller ? ' — à récupérer chez ' + it.seller + ' (' + it.seller_phone + (it.quartier ? ', ' + it.quartier : '') + ')' : '')); }),
               h('a', { class: 'btn link', href: '#/f/' + o.invoice, style: 'align-self:flex-start' }, 'Voir la facture et l’adresse'));
-          }) : h('p', { class: 'muted' }, 'Aucune commande.')),
+          }) : h('p', { class: 'muted' }, 'Aucune commande.')) : null,
         h('section', { class: 'stack tight', id: 'vd-live' }, h('h2', null, 'En vente (' + d.live.length + ')'),
           d.live.map(function (x) {
             return h('div', { class: 'item' }, h('span', { class: 'small wrapword', style: 'flex:1' }, x.title + ' · ' + fcfa(x.price) + ' · ' + x.seller + (x.stock === 0 ? ' · commandé' : '')),
-              h('button', { class: 'btn ghost small', type: 'button', onclick: function () { act(x.id, 'sold'); } }, 'Livré'),
-              h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { act(x.id, 'unpublish'); } }, 'Retirer'));
+              canPay ? h('button', { class: 'btn ghost small', type: 'button', onclick: function () { act(x.id, 'sold', false, this); } }, 'Livré') : null,
+              canReview ? h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { act(x.id, 'unpublish', false, this); } }, 'Retirer') : null);
           })),
-        h('section', { class: 'stack tight', id: 'vd-pay' }, h('h2', null, 'À reverser'),
+        canPay ? h('section', { class: 'stack tight', id: 'vd-pay' }, h('h2', null, 'À reverser'),
           d.to_pay.length ? d.to_pay.map(function (x) {
-            return h('div', { class: 'item' }, h('span', { class: 'small wrapword', style: 'flex:1' }, x.seller + ' · ' + x.phone + ' · ' + x.title + ' · ' + fcfa(x.net)),
-              h('button', { class: 'btn small', type: 'button', onclick: function () { act(x.id, 'paid'); } }, 'Reversé'));
-          }) : h('p', { class: 'muted' }, 'Rien à reverser.')),
+            return h('div', { class: 'item' }, h('span', { class: 'small wrapword', style: 'flex:1' }, x.seller + phone(x.phone) + ' · ' + x.title + ' · ' + fcfa(x.net)),
+              h('button', { class: 'btn small', type: 'button', onclick: function () { act(x.id, 'paid', false, this); } }, 'Reversé'));
+          }) : h('p', { class: 'muted' }, 'Rien à reverser.')) : null,
         footer());
     }, function (e) { return page(backBtn(), stateCard('!', 'Accès réservé', errText(e)), footer()); });
   }

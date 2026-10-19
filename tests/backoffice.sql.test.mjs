@@ -159,7 +159,8 @@ await t('commandes et comptes : recherche, fiche ; vue support sans droit sur l�
   const list = await ok('fiila_bo_orders', { p_q: '70 111 22 33' }, MOD);
   assert.equal(list.orders.length, 1); assert.equal(list.orders[0].customer, 'Awa Cliente [TEST]');
   const od = await ok('fiila_bo_order', { p_id: list.orders[0].id }, MOD);
-  assert.equal(od.total, 5000); assert.equal(od.address, 'pending'); assert.ok(od.invoice);
+  assert.equal(od.total, 5000); assert.equal(od.address, 'pending');
+  assert.equal(od.invoice, undefined, 'jamais le lien de facture au back-office');
   assert.equal((await ok('fiila_bo_orders', { p_status: 'delivered' }, MOD)).orders.length, 0);
   const acc = await ok('fiila_bo_accounts', { p_q: 'mariama' }, MOD);
   assert.equal(acc.accounts[0].email, 'mod@example.invalid'); assert.equal(acc.accounts[0].role, 'support');
@@ -209,6 +210,74 @@ await t('modération tracée : un commentaire supprimé par l’équipe apparaî
   const log = await ok('fiila_bo_audit', {}, FOUNDER);
   assert.equal(log[0].action, 'comment_delete');
   assert.match(log[0].actor, /Mariama · moderation/);
+});
+
+
+await t('audit : invitation refusée à un compte sans e-mail ou à l’e-mail non confirmé', async () => {
+  const inv = await ok('fiila_bo_invite', { p_email: 'nonconf@example.invalid', p_role: 'support' }, FOUNDER);
+  const noMail = { uid: (await db.query(`insert into auth.users (id, email) values (gen_random_uuid(), null) returning id`)).rows[0].id };
+  await ko('fiila_bo_invite_accept', { p_token: inv.token }, 'invite_email_mismatch', noMail);
+  const nc = await user('nonconf@example.invalid', 'Non Confirmé');
+  await db.query(`update auth.users set email_confirmed_at = null where id = $1`, [nc.uid]);
+  await ko('fiila_bo_invite_accept', { p_token: inv.token }, 'email_unconfirmed', nc);
+  await db.query(`update auth.users set email_confirmed_at = now() where id = $1`, [nc.uid]);
+  assert.equal((await ok('fiila_bo_invite_accept', { p_token: inv.token }, nc)).role, 'support');
+  await ok('fiila_bo_staff_set', { p_user: nc.uid, p_role: null }, FOUNDER);
+});
+
+await t('audit : le dernier super admin ne peut ni supprimer son compte ni disparaître de l’équipe', async () => {
+  await ko('fiila_delete_account', {}, 'last_super_admin', FOUNDER);
+  const r = await db.query(`select count(*)::int n from fiila.staff where role = 'super_admin'`);
+  assert.equal(r.rows[0].n, 1);
+  let threw = false;
+  try { await db.query(`delete from fiila.staff where user_id = $1`, [FOUNDER.uid]); } catch (e) { threw = /last_super_admin/.test(e.message); }
+  assert.ok(threw, 'même en direct, la base refuse');
+});
+
+await t('audit : modération = suspendre oui, changer le type non ; pas de téléphones au vide-dressing ; la finance reverse sans valider', async () => {
+  await db.query(`update fiila.staff set role = 'moderation' where user_id = $1`, [MOD.uid]);
+  await ok('fiila_bo_shop_action', { p_id: SHOP_ID, p_action: 'suspend', p_value: 'Contrôle (test)' }, MOD);
+  await ok('fiila_bo_shop_action', { p_id: SHOP_ID, p_action: 'unsuspend' }, MOD);
+  await ko('fiila_bo_shop_action', { p_id: SHOP_ID, p_action: 'set_type', p_value: 'mode' }, 'not_allowed', MOD);
+  await ko('fiila_bo_shop_action', { p_id: SHOP_ID, p_action: 'set_type', p_value: 'inconnu' }, 'invalid_value', FOUNDER);
+  await db.query(`update fiila.profiles set phone = '77 999 00 01' where user_id = $1`, [NOBODY.uid]);
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  const sub = await ok('fiila_vd_submit', { p: { title: 'Robe [TEST]', gender: 'fille', age_band: '2-4a', size: '3 ans', condition: 'bon', price: 2000,
+    quartier: 'Yoff', photo: Buffer.concat([png, Buffer.alloc(200)]).toString('base64'), photo_ok: true } }, NOBODY);
+  assert.ok(sub);
+  const vdMod = await ok('fiila_admin_vd', {}, MOD);
+  assert.ok(!JSON.stringify(vdMod).includes('77 999'), 'aucun téléphone pour la modération');
+  assert.deepEqual(vdMod.orders, []);
+  const fin = await user('fin@example.invalid', 'Fatim Finance');
+  await db.query(`insert into fiila.staff (user_id, role) values ($1, 'finance')`, [fin.uid]);
+  const vdFin = await ok('fiila_admin_vd', {}, fin);
+  assert.equal(vdFin.can_pay, true); assert.equal(vdFin.can_review, false); assert.deepEqual(vdFin.queue, []);
+  assert.equal(vdMod.queue.length, 1, 'l’article attend la vérification');
+  {
+    await ko('fiila_admin_vd_decide', { p_id: vdMod.queue[0].id, p_decision: 'approve', p_reason: null }, 'not_allowed', fin);
+    await ok('fiila_admin_vd_decide', { p_id: vdMod.queue[0].id, p_decision: 'approve', p_reason: null }, MOD);
+    const live = (await ok('fiila_admin_vd', {}, FOUNDER)).live[0];
+    await ko('fiila_admin_vd_decide', { p_id: live.id, p_decision: 'sold', p_reason: null }, 'not_allowed', MOD);
+    await ok('fiila_admin_vd_decide', { p_id: live.id, p_decision: 'sold', p_reason: null }, fin);
+    // Un versement est dû à la vendeuse : elle ne peut pas supprimer son compte avant d'être payée.
+    await ko('fiila_delete_account', {}, 'payout_pending', NOBODY);
+    await ok('fiila_admin_vd_decide', { p_id: live.id, p_decision: 'paid', p_reason: null }, fin);
+  }
+});
+
+await t('audit : la consultation d’une commande ou d’un compte est journalisée', async () => {
+  const o = (await ok('fiila_bo_orders', {}, FOUNDER)).orders[0];
+  await ok('fiila_bo_order', { p_id: o.id }, FOUNDER);
+  await ok('fiila_bo_account', { p_id: NOBODY.uid }, FOUNDER);
+  const log = await ok('fiila_bo_audit', {}, FOUNDER);
+  assert.equal(log[0].action, 'view_account'); assert.equal(log[1].action, 'view_order');
+});
+
+await t('audit : suppression de compte ordinaire — réactions effacées, articles de vide-dressing retirés', async () => {
+  const u = await user('quitte@example.invalid', 'Quitte Test');
+  await db.query(`insert into fiila.likes (product_id, who) select id, 'u:' || $1 from fiila.products limit 1`, [u.uid]);
+  await ok('fiila_delete_account', {}, u);
+  assert.equal((await db.query(`select count(*)::int n from fiila.likes where who = 'u:' || $1`, [u.uid])).rows[0].n, 0);
 });
 
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');

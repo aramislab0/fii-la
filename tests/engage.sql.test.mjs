@@ -110,13 +110,15 @@ await t('supprimer : l’auteur, la boutique (sa clé), jamais une autre boutiqu
   assert.equal(r.comments, 1);
 });
 
-await t('signaler : 3 personnes différentes masquent le commentaire ; le même téléphone ne compte qu’une fois', async () => {
+const R1 = await user('r1@example.invalid', 'Rokhaya Test'), R2 = await user('r2@example.invalid', 'Ramata Test'), R3 = await user('r3@example.invalid', 'Rama Test');
+await t('signaler : compte obligatoire (sinon des identifiants inventés masqueraient tout) ; 3 comptes masquent ; un compte compte une fois', async () => {
   const c = await ok('fiila_comment_add', { p_product: B1.id, p_body: 'Commentaire désagréable' }, U2);
-  await ok('fiila_comment_report', { p_id: c.id, p_device: dev(1) });
-  await ok('fiila_comment_report', { p_id: c.id, p_device: dev(1) });
-  await ok('fiila_comment_report', { p_id: c.id, p_device: dev(2) });
+  for (const d of [dev(1), dev(2), dev(3)]) await ko('fiila_comment_report', { p_id: c.id, p_device: d }, 'auth_required');
+  await ok('fiila_comment_report', { p_id: c.id }, R1);
+  await ok('fiila_comment_report', { p_id: c.id }, R1);
+  await ok('fiila_comment_report', { p_id: c.id }, R2);
   assert.equal((await ok('fiila_comments', { p_product: B1.id })).comments.length, 1, 'encore visible à 2');
-  const r = await ok('fiila_comment_report', { p_id: c.id, p_device: dev(3) });
+  const r = await ok('fiila_comment_report', { p_id: c.id }, R3);
   assert.equal(r.hidden, true);
   assert.equal((await ok('fiila_comments', { p_product: B1.id })).comments.length, 0);
   const f = await ok('fiila_posts', {});
@@ -171,7 +173,7 @@ await t('modération : file réservée à l’admin (masqués et signalés), ré
   await ko('fiila_admin_comments', {}, 'not_allowed', U2);
   await ko('fiila_admin_comments', {}, 'auth_required');
   const c = await ok('fiila_comment_add', { p_product: A2.id, p_body: 'Signalé une fois' }, U2);
-  await ok('fiila_comment_report', { p_id: c.id, p_device: dev(5) });
+  await ok('fiila_comment_report', { p_id: c.id }, R1);
   let q = await ok('fiila_admin_comments', {}, ADM);
   assert.equal(q[0].hidden, true, 'le masqué (3 signalements) en tête');
   assert.equal(q[0].reports, 3);
@@ -183,6 +185,33 @@ await t('modération : file réservée à l’admin (masqués et signalés), ré
   q = await ok('fiila_admin_comments', {}, ADM);
   assert.equal(q.length, 0, 'file vide');
   await ko('fiila_admin_comment_decide', { p_id: c.id, p_action: 'delete' }, 'not_found', ADM);
+});
+
+
+await t('audit : ventes infalsifiables — 20 lignes dans une commande = 5 ; numéro de la boutique ignoré ; 5 au plus par cliente', async () => {
+  const kc = (await ok('fiila_shop_save', { p_key: null, p: { name: 'Triche [TEST]', phone: '77 300 00 09' } })).key;
+  const P = await ok('fiila_product_save', { p_key: kc, p: { name: 'Objet [TEST]', price: 100, photo } });
+  await ok('fiila_shop_vitrine', { p_key: kc, p: { public: true } });
+  const slug = (await db.query(`select slug from fiila.shops where name = 'Triche [TEST]'`)).rows[0].slug;
+  const order = async (phone, lines, qty) => (await ok('fiila_vitrine_order', { p_slug: slug, p: { items: Array.from({ length: lines }, () => ({ product_id: P.id, qty })), customer: { name: 'X [TEST]', phone } } })).invoice;
+  const inv = [await order('70 100 00 01', 20, 5), await order('70 100 00 01', 3, 2), await order('+221 77 300 00 09', 5, 9), await order('70 100 00 02', 1, 2)];
+  await db.query(`update fiila.orders set status = 'delivered', delivered_at = now() where share_token = any($1)`, [inv]);
+  assert.equal((await ok('fiila_product_stats', { p_key: kc, p_id: P.id })).sold, 7, '5 (cliente 1, plafonnée) + 2 (cliente 2), boutique ignorée');
+});
+
+await t('audit : coups de cœur — mille identifiants depuis la même connexion = une voix', async () => {
+  for (let i = 0; i < 6; i++) await ok('fiila_react', { p_product: B1.id, p_kind: 'like', p_on: true, p_device: dev(100 + i) });
+  const love = (await db.query(`select fiila.product_love($1) n`, [B1.id])).rows[0].n;
+  assert.equal(love, 1, 'une seule connexion : une voix pour le classement');
+  const post = (await ok('fiila_posts', {})).posts.find((p) => p.id === B1.id);
+  assert.ok(post.likes >= 6, 'le total affiché reste le total brut');
+});
+
+await t('audit : filtre des contacts — laisse passer les prix, bloque numéros et réseaux déguisés', async () => {
+  const yes = ['Appelez le 77 123 45 67', 'wa . me / 771234567', 'insta @boutique_x', 'voir shop.fr/x', 'www .site', '7 7 1 2 3 4 5 6 7', 'https://x.y'];
+  const no = ['2 robes à 5000 et 3000 svp', 'Très jolie, taille 38', 'Prix 15 000 FCFA ?', 'Livré en 2 jours, merci !'];
+  for (const t1 of yes) assert.equal((await db.query(`select fiila.has_contact($1) v`, [t1])).rows[0].v, true, 'devait bloquer : ' + t1);
+  for (const t2 of no) assert.equal((await db.query(`select fiila.has_contact($1) v`, [t2])).rows[0].v, false, 'devait passer : ' + t2);
 });
 
 await t('suppression d’un compte : ses commentaires partent avec lui', async () => {

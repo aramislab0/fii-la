@@ -65,6 +65,7 @@ await t('commerçante : boutique sans compte, invitation du livreur sur son What
   await S.click('#shop-save');
   await S.locator('#shop-title').waitFor();
   await S.getByRole('link', { name: 'Réglages' }).click();
+  if (!(await S.locator('#courier-section').evaluate((d) => d.open))) await S.locator('#courier-section summary').click();
   await S.fill('#courier-name', 'Ibou');
   await S.fill('#courier-phone', '76 333 33 33');
   await S.click('#courier-invite');

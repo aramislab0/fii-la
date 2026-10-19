@@ -138,11 +138,13 @@ Ordre de grandeur : une fiche avec photo pèse environ 150 à 300 Ko, soit envir
 - `SUPABASE_PUBLISHABLE_KEY` : clé publique « anon » ou « publishable » du projet (conçue pour être publique)
 - `PUBLIC_URL` (facultatif) : URL publique si un domaine est ajouté
 
-**Base** : `supabase link --project-ref <ref>` puis `supabase db push` applique `supabase/migrations/`.
+**Secret du dépôt** (Settings → Secrets and variables → Actions → Secrets) : `SUPABASE_DB_PASSWORD`, mot de passe de la base, saisi par le fondateur seul.
 
-**Front** : chaque push sur `main` qui touche `web/` redéploie. Déclenchement manuel : onglet Actions → « Déployer Fii La sur GitHub Pages » → Run workflow.
+**Base et front, d'un seul geste** : chaque push sur `main` lance « Mettre Fii La en production » : 0) toutes les suites de tests sur une base de test, 1) migrations (chacune une fois, en transaction) puis `verify-db`, 2) mise en ligne, 3) tests sur le site en ligne (Chrome et WebKit) et contrôles en lecture seule de la base. Rien ne part si l'étape précédente échoue. Sans le secret, la mise en ligne n'a lieu que si la base en ligne est déjà au moins à la version du dépôt.
 
-**Retour arrière** : `git revert <commit>` puis push (redéploie la version précédente), ou relancer le workflow sur un commit antérieur. Pour la base, toute migration future doit être additive ; aucune migration destructive n’est livrée.
+**Déclenchement manuel** : onglet Actions → « Mettre Fii La en production » → Run workflow.
+
+**Retour arrière** : `git revert <commit>` puis push (redéploie la version précédente), ou relancer le workflow sur un commit antérieur (accepté : la base peut être plus récente que le code). Si `verify-db` échoue après des migrations, la base est déjà migrée mais le site reste sur l'ancienne version : sans danger tant que les migrations restent additives. Pour la base, toute migration future doit être additive ; aucune migration destructive n’est livrée.
 
 ## 10. Récupérer, désactiver, supprimer (mode d’emploi utilisateur)
 

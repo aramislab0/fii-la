@@ -13,6 +13,9 @@
   - n'est jamais gardé en clair dans la base.
 - **Retirer quelqu'un** : bouton « Retirer » dans Équipe. Son compte reste, sans accès au back-office.
 - **Gestes sensibles** (équipe, réglages) : une connexion de moins de 15 minutes est exigée. Sinon, le mot de passe est redemandé.
+- **Invitation** : acceptée seulement par un compte dont l'adresse e-mail est celle de l'invitation **et confirmée**.
+- **Jamais sans super admin** : la base refuse de retirer, rétrograder ou supprimer le compte du dernier super admin.
+- **Consultations journalisées** : ouvrir une commande ou un compte laisse une ligne au journal. Le lien de facture d'un client n'est jamais montré au back-office.
 
 ## Rôles
 
@@ -20,9 +23,9 @@
 |---|---|
 | Super admin | Tout, dont l'équipe, les réglages et le journal |
 | Opérations | Boutiques (lecture et actions), commandes, comptes, fil, modération, vide-dressing, ambassadeurs, finances |
-| Modération | Commentaires, vide-dressing, suspension des boutiques |
+| Modération | Commentaires, vérification du vide-dressing (sans téléphones), suspension et réactivation des boutiques |
 | Support | Lecture des boutiques, commandes et comptes |
-| Finances | Commandes, finances, versements des ambassadeurs |
+| Finances | Commandes, finances, versements des ambassadeurs, « livré » et « reversé » du vide-dressing |
 
 C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait que masquer ce qui n'est pas permis.
 

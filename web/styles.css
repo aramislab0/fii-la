@@ -988,3 +988,14 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .bo-login input{min-height:48px}
 .bo-table select,.bo-dl select{width:auto;min-height:36px;padding:0 10px;font-size:14px}
 input[type=number]{font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);width:100%;min-height:52px}
+.bo-bar{border:0;background:none;padding:0;font:inherit;cursor:pointer;color:inherit}
+.bo-bar:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+/* Sections repliées des réglages (livreur…), même aspect que « Plus sur Fii La ». */
+.more-sec summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:18px}
+.more-sec summary::-webkit-details-marker{display:none}
+.more-sec summary::after{content:'';width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin-right:6px;transition:transform .2s}
+.more-sec[open] summary::after{transform:rotate(-135deg)}
+/* Zones de toucher d'au moins 44 px sans changer l'aspect (audit 19/10). */
+.opt,.car-dot,.post-more,.qbtn{position:relative}
+.opt::after,.post-more::after,.qbtn::after{content:'';position:absolute;inset:-5px -2px}
+.car-dot::after{content:'';position:absolute;inset:-8px}

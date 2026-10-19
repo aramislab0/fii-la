@@ -7,9 +7,11 @@
 -- 2. Rôles et droits :
 --      super_admin : tout, y compris l'équipe, les réglages et le journal ;
 --      operations  : tableau de bord, boutiques (lecture et actions), commandes, comptes, fil, modération, vide-dressing, ambassadeurs, finances ;
---      moderation  : tableau de bord, boutiques (lecture et suspension), modération, vide-dressing ;
+--      moderation  : tableau de bord, boutiques (lecture, suspension), modération, vérification du vide-dressing (sans téléphones) ;
 --      support     : tableau de bord, boutiques (lecture), commandes, comptes ;
---      finance     : tableau de bord, commandes, finances, ambassadeurs.
+--      finance     : tableau de bord, commandes, finances, ambassadeurs, reversements du vide-dressing.
+--    Audit 19/10 : signalements par compte, invitation liée à un e-mail confirmé, dernier super admin protégé partout,
+--    suppression de compte bloquée tant qu'un versement est dû, consultations de données personnelles journalisées.
 -- 3. Journal : toute action du back-office est écrite dans fiila.admin_log (qui, quoi, quand, sur quoi).
 -- 4. Gestes sensibles (équipe, réglages) : connexion de moins de 15 minutes exigée (fiila.recent_login).
 -- 5. Les fonctions d'administration existantes passent sur ces droits (plus de simple case « administrateur »).
@@ -56,10 +58,10 @@ language sql stable set search_path = '' as $$ select role from fiila.staff wher
 create or replace function fiila.staff_perms(p_role text) returns text[]
 language sql immutable set search_path = '' as $$
   select case p_role
-    when 'super_admin' then array['dashboard', 'shops', 'shops_write', 'orders', 'accounts', 'feed', 'moderation', 'vide_dressing',
+    when 'super_admin' then array['dashboard', 'shops', 'shops_write', 'shops_suspend', 'orders', 'accounts', 'feed', 'moderation', 'vide_dressing',
                                   'ambassadors', 'finance', 'settings', 'team', 'audit']
-    when 'operations'  then array['dashboard', 'shops', 'shops_write', 'orders', 'accounts', 'feed', 'moderation', 'vide_dressing', 'ambassadors', 'finance']
-    when 'moderation'  then array['dashboard', 'shops', 'shops_write', 'moderation', 'vide_dressing']
+    when 'operations'  then array['dashboard', 'shops', 'shops_write', 'shops_suspend', 'orders', 'accounts', 'feed', 'moderation', 'vide_dressing', 'ambassadors', 'finance']
+    when 'moderation'  then array['dashboard', 'shops', 'shops_suspend', 'moderation', 'vide_dressing']
     when 'support'     then array['dashboard', 'shops', 'orders', 'accounts']
     when 'finance'     then array['dashboard', 'orders', 'finance', 'ambassadors']
     else array[]::text[] end
@@ -87,6 +89,8 @@ begin
   values (v_uid, (select coalesce(nullif(split_part(trim(p.display_name), ' ', 1), ''), 'Membre') || ' · ' || coalesce(fiila.staff_role(v_uid), '?')
                   from (select 1) x left join fiila.profiles p on p.user_id = v_uid),
           p_action, p_type, p_id, p_detail);
+  -- Conservation du journal : 24 mois (comme les commandes).
+  delete from fiila.admin_log where at < now() - interval '24 months';
 end $$;
 
 -- Ancienne case « administrateur » : tenue à jour pour l'affichage (super admin), plus jamais utilisée pour un droit.
@@ -102,6 +106,19 @@ begin
   return new;
 end $$;
 create trigger staff_sync after insert or update or delete on fiila.staff for each row execute function fiila.staff_sync();
+
+-- Jamais d'équipe sans super admin, quel que soit le chemin (rôle changé, membre retiré, compte supprimé) ; verrou contre deux
+-- rétrogradations simultanées.
+create or replace function fiila.staff_keep_super() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if old.role = 'super_admin' and (tg_op = 'DELETE' or new.role <> 'super_admin') then
+    perform pg_advisory_xact_lock(hashtext('fiila_staff_super'));
+    if not exists (select 1 from fiila.staff where role = 'super_admin' and user_id <> old.user_id) then perform fiila.fail('last_super_admin'); end if;
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end $$;
+create trigger staff_keep_super before update or delete on fiila.staff for each row execute function fiila.staff_keep_super();
 
 -- ---------------------------------------------------------------- droits des fonctions d'administration existantes
 create or replace function fiila.is_admin() returns boolean
@@ -130,6 +147,97 @@ begin
              where n.nspname = 'public' and p.proname like 'fiila_%' and (p.prosrc like '%is_admin)%' or p.prosrc like '%need_admin()%')) then
     raise exception 'droit d''administration non converti';
   end if;
+end $$;
+
+-- Vide-dressing : vérifier (modération) et reverser (finances) sont deux métiers ; les téléphones ne vont qu'aux rôles qui
+-- traitent les commandes.
+create or replace function public.fiila_admin_vd() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := fiila.need_uid(); s fiila.shops := fiila.vd_shop(); v_ph boolean;
+begin
+  if not (fiila.staff_can(v_uid, 'vide_dressing') or fiila.staff_can(v_uid, 'finance')) then perform fiila.fail('not_allowed'); end if;
+  v_ph := fiila.staff_can(v_uid, 'orders');
+  return jsonb_build_object('commission', fiila.setting_int('vd_commission'),
+    'can_review', fiila.staff_can(v_uid, 'vide_dressing'), 'can_pay', fiila.staff_can(v_uid, 'finance'),
+    'queue', case when fiila.staff_can(v_uid, 'vide_dressing') then coalesce((select jsonb_agg(fiila.vd_json(v, true)
+         || jsonb_strip_nulls(jsonb_build_object('seller', v.seller_name, 'phone', case when v_ph then v.seller_phone end)) order by v.created_at)
+       from fiila.vd_submissions v where v.status = 'pending'), '[]'::jsonb) else '[]'::jsonb end,
+    'live', coalesce((select jsonb_agg(fiila.vd_json(v, false) || jsonb_strip_nulls(jsonb_build_object('seller', v.seller_name,
+         'phone', case when v_ph then v.seller_phone end, 'stock', (select stock from fiila.products where id = v.product_id))) order by v.decided_at desc)
+       from fiila.vd_submissions v where v.status = 'approved'), '[]'::jsonb),
+    'to_pay', coalesce((select jsonb_agg(fiila.vd_json(v, false) || jsonb_strip_nulls(jsonb_build_object('seller', v.seller_name,
+         'phone', case when v_ph then v.seller_phone end)) order by v.sold_at)
+       from fiila.vd_submissions v where v.status = 'sold' and v.paid_at is null), '[]'::jsonb),
+    'orders', case when v_ph then coalesce((select jsonb_agg(jsonb_build_object('ref', fiila.order_ref(o.number), 'customer', o.customer_name, 'phone', o.customer_phone,
+         'total', o.total, 'status', o.status, 'invoice', o.share_token, 'created_at', o.created_at,
+         'items', (select jsonb_agg(jsonb_build_object('label', it ->> 'label', 'seller', v.seller_name, 'seller_phone', v.seller_phone, 'quartier', v.quartier, 'submission', v.id))
+                     from jsonb_array_elements(o.items) it left join fiila.products pr on pr.id = fiila.as_uuid(it ->> 'product_id')
+                     left join fiila.vd_submissions v on v.id = pr.submission_id)) order by o.created_at desc)
+       from (select * from fiila.orders where shop_id = s.id order by created_at desc limit 50) o), '[]'::jsonb) else '[]'::jsonb end);
+end $$;
+
+create or replace function public.fiila_admin_vd_decide(p_id text, p_decision text, p_reason text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v fiila.vd_submissions; s fiila.shops := fiila.vd_shop(); pr fiila.products;
+begin
+  perform fiila.need_staff(case when p_decision in ('sold', 'paid') then 'finance' else 'vide_dressing' end);
+  select * into v from fiila.vd_submissions where id = fiila.as_uuid(p_id) for update;
+  if v.id is null then perform fiila.fail('not_found'); end if;
+  if p_decision = 'approve' then
+    if v.status <> 'pending' then perform fiila.fail('invalid_state'); end if;
+    insert into fiila.products (shop_id, name, price, description, category, sizes, stock, photo, photo_type, gender, age_band, condition, submission_id)
+    values (s.id, v.title, v.price, null, 'enfants', case when v.size is not null then array[v.size] else '{}' end, 1, v.photo, v.photo_type,
+            v.gender, v.age_band, v.condition, v.id) returning * into pr;
+    update fiila.vd_submissions set status = 'approved', decided_at = now(), reason = null, product_id = pr.id where id = v.id;
+  elsif p_decision in ('changes', 'reject') then
+    if v.status <> 'pending' then perform fiila.fail('invalid_state'); end if;
+    if nullif(trim(coalesce(p_reason, '')), '') is null then perform fiila.fail('reason_required'); end if;
+    update fiila.vd_submissions set status = case when p_decision = 'changes' then 'changes' else 'rejected' end, decided_at = now(),
+      reason = fiila.clean(p_reason, 200) where id = v.id;
+  elsif p_decision = 'sold' then
+    if v.status <> 'approved' then perform fiila.fail('invalid_state'); end if;
+    update fiila.vd_submissions set status = 'sold', sold_at = now() where id = v.id;
+    update fiila.products set active = false where id = v.product_id;
+  elsif p_decision = 'paid' then
+    if v.status <> 'sold' then perform fiila.fail('invalid_state'); end if;
+    update fiila.vd_submissions set paid_at = now() where id = v.id;
+  elsif p_decision = 'unpublish' then
+    if v.status <> 'approved' then perform fiila.fail('invalid_state'); end if;
+    update fiila.vd_submissions set status = 'rejected', reason = coalesce(fiila.clean(p_reason, 200), 'Retiré par Fii La') where id = v.id;
+    update fiila.products set active = false where id = v.product_id;
+  else perform fiila.fail('invalid_payload');
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- Suppression de compte (audit 19/10) : refusée tant qu'un versement est dû (vide-dressing vendu non reversé, gain d'ambassadeur
+-- validé non versé) ; articles de vide-dressing de la personne retirés de la vente ; ses j'aime, enregistrements et signalements
+-- effacés ; le dernier super admin ne peut pas supprimer son compte (trigger fiila.staff_keep_super).
+create or replace function public.fiila_delete_account() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := fiila.need_uid();
+begin
+  perform fiila.rate_check('delete_account', 10);
+  if not fiila.recent_login() then perform fiila.fail('reauth_required'); end if;
+  if exists (select 1 from fiila.vd_submissions where user_id = v_uid and status = 'sold' and paid_at is null)
+     or exists (select 1 from fiila.ambassador_rewards r join fiila.ambassadors a on a.id = r.ambassador_id
+                where a.user_id = v_uid and r.status = 'validated') then
+    perform fiila.fail('payout_pending');
+  end if;
+  update fiila.products set active = false where submission_id in (select id from fiila.vd_submissions where user_id = v_uid);
+  delete from fiila.likes where who = 'u:' || v_uid;
+  delete from fiila.saves where who = 'u:' || v_uid;
+  delete from fiila.comment_reports where who = 'u:' || v_uid;
+  delete from fiila.staff where user_id = v_uid;
+  delete from fiila.requests where id in (select o.request_id from fiila.orders o join fiila.shops s on s.id = o.shop_id
+                                           where s.user_id = v_uid and o.request_id is not null);
+  delete from fiila.shops where user_id = v_uid;
+  delete from fiila.couriers where user_id = v_uid;
+  delete from fiila.places where user_id = v_uid;
+  delete from fiila.requests where user_id = v_uid;
+  delete from fiila.profiles where user_id = v_uid;
+  delete from auth.users where id = v_uid;
+  return jsonb_build_object('deleted', true);
 end $$;
 
 -- ---------------------------------------------------------------- suspension d'une boutique
@@ -244,12 +352,17 @@ end $$;
 -- Actions : suspend (motif obligatoire) / unsuspend / feed_off / feed_on / free_place / set_type.
 create or replace function public.fiila_bo_shop_action(p_id uuid, p_action text, p_value text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare v_uid uuid := fiila.need_staff('shops_write'); s fiila.shops; v_val text := fiila.clean(p_value, 300);
+declare v_uid uuid := fiila.need_staff('shops'); s fiila.shops; v_val text := fiila.clean(p_value, 300);
 begin
   select * into s from fiila.shops where id = p_id for update;
   if not found then perform fiila.fail('not_found'); end if;
   if s.platform and p_action in ('suspend', 'free_place') then perform fiila.fail('not_allowed'); end if;
-  if p_action in ('feed_off', 'feed_on', 'free_place') and not fiila.staff_can(v_uid, 'feed') then perform fiila.fail('not_allowed'); end if;
+  if not fiila.staff_can(v_uid, case when p_action in ('suspend', 'unsuspend') then 'shops_suspend'
+                                     when p_action in ('feed_off', 'feed_on', 'free_place') then 'feed' else 'shops_write' end) then
+    perform fiila.fail('not_allowed');
+  end if;
+  if p_action = 'set_type' and v_val is not null and v_val not in ('mode', 'chaussures', 'beaute', 'coiffure', 'esthetique', 'restauration', 'patisserie',
+      'epicerie', 'electronique', 'maison', 'bijoux', 'enfants', 'fleurs', 'couture', 'services', 'autre') then perform fiila.fail('invalid_value'); end if;
   if p_action = 'suspend' then
     if v_val is null then perform fiila.fail('reason_required'); end if;
     update fiila.shops set suspended_at = now(), suspended_reason = v_val, public = false, updated_at = now() where id = p_id;
@@ -297,12 +410,13 @@ begin
   select * into o from fiila.orders where id = p_id;
   if not found then perform fiila.fail('not_found'); end if;
   select * into s from fiila.shops where id = o.shop_id;
+  -- Jamais le lien de la facture (il permettrait d'agir au nom du client) ; la consultation est journalisée.
+  perform fiila.bo_log('view_order', 'order', o.id::text, jsonb_build_object('shop', s.name, 'number', o.number));
   return jsonb_strip_nulls(jsonb_build_object(
     'id', o.id, 'number', o.number, 'shop', jsonb_build_object('id', s.id, 'name', s.name, 'slug', s.slug),
     'customer', o.customer_name, 'phone', o.customer_phone, 'items', o.items, 'total', o.total, 'note', o.note,
     'status', o.status, 'created_at', o.created_at, 'delivered_at', o.delivered_at, 'cancelled_at', o.cancelled_at,
     'address', case when o.place_id is not null then 'received' when o.request_id is not null then 'pending' else 'none' end,
-    'invoice', o.share_token,
     'paid', (select coalesce(sum(amount), 0) from fiila.payments where order_id = o.id and status = 'confirmed'),
     'payments', (select jsonb_agg(jsonb_build_object('amount', amount, 'method', method, 'at', created_at) order by created_at)
       from fiila.payments where order_id = o.id and status = 'confirmed')));
@@ -329,6 +443,7 @@ language plpgsql security definer set search_path = '' as $$
 declare v_uid uuid := fiila.need_staff('accounts');
 begin
   if not exists (select 1 from auth.users where id = p_id) then perform fiila.fail('not_found'); end if;
+  perform fiila.bo_log('view_account', 'account', p_id::text, jsonb_build_object('email', (select email from auth.users where id = p_id)));
   return jsonb_strip_nulls(jsonb_build_object(
     'id', p_id, 'email', (select email from auth.users where id = p_id), 'created_at', (select created_at from auth.users where id = p_id),
     'name', (select display_name from fiila.profiles where user_id = p_id), 'phone', (select phone from fiila.profiles where user_id = p_id),
@@ -401,6 +516,7 @@ begin
   if exists (select 1 from fiila.staff st join auth.users u on u.id = st.user_id where lower(u.email) = v_email) then perform fiila.fail('already_staff'); end if;
   perform fiila.rate_check('bo_invite', 30);
   update fiila.staff_invites set revoked_at = now() where lower(email) = v_email and used_at is null and revoked_at is null;
+  delete from fiila.staff_invites where coalesce(used_at, revoked_at, expires_at) < now() - interval '90 days';
   insert into fiila.staff_invites (token_hash, email, role, invited_by) values (fiila.h(v_token), v_email, p_role, v_uid) returning id into v_id;
   perform fiila.bo_log('team_invite', 'invite', v_id::text, jsonb_build_object('email', v_email, 'role', p_role));
   return jsonb_build_object('id', v_id, 'token', v_token, 'expires_at', now() + interval '7 days');
@@ -439,7 +555,11 @@ begin
   perform fiila.rate_check('bo_invite_accept', 20);
   select * into i from fiila.staff_invites where token_hash = fiila.h(p_token) for update;
   if not found or i.used_at is not null or i.revoked_at is not null or i.expires_at < now() then perform fiila.fail('invite_invalid'); end if;
-  if lower((select email from auth.users where id = v_uid)) <> lower(i.email) then perform fiila.fail('invite_email_mismatch'); end if;
+  -- Le compte doit porter l'adresse invitée ET l'avoir confirmée (sans e-mail, ou non confirmé : refusé).
+  if not exists (select 1 from auth.users u where u.id = v_uid and u.email is not null and lower(u.email) = lower(i.email)) then
+    perform fiila.fail('invite_email_mismatch');
+  end if;
+  if not exists (select 1 from auth.users u where u.id = v_uid and u.email_confirmed_at is not null) then perform fiila.fail('email_unconfirmed'); end if;
   insert into fiila.staff (user_id, role, added_by) values (v_uid, i.role, i.invited_by)
     on conflict (user_id) do update set role = excluded.role;
   update fiila.staff_invites set used_at = now(), used_by = v_uid where id = i.id;

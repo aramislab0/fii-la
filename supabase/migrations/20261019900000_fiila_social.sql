@@ -11,13 +11,16 @@
 --   (pas de vente hors plateforme, pas d'arnaque). Signalé par 3 personnes : masqué en attendant une revue.
 --   Supprimable par son auteur, par la boutique (sur ses articles) et par l'administrateur.
 -- - Meilleures ventes : quantités des commandes LIVRÉES sur 30 jours (une commande ouverte peut être fictive),
---   5 au plus par commande pour le classement.
--- - Coups de cœur : sur 14 jours, j'aime + 2 × enregistrements + 2 × commentaires visibles.
+--   5 au plus par cliente (numéro), jamais les commandes passées avec le numéro de la boutique (audit 19/10).
+-- - Coups de cœur : sur 14 jours, personnes distinctes (un compte, ou une connexion pour les réactions sans compte) :
+--   j'aime + 2 × enregistrements + 2 × commentaires visibles. Le chiffre affiché reste le total brut.
+-- - Signaler un commentaire : compte obligatoire (sinon n'importe qui masquerait n'importe quel avis).
 -- - Aucun chiffre inventé : une boutique de démonstration n'a que les réactions réelles.
 
 create table fiila.likes (
   product_id uuid not null references fiila.products (id) on delete cascade,
   who        text not null,                 -- 'u:<compte>' ou 'd:<empreinte de l'appareil>'
+  src        text,                          -- sans compte : empreinte de la connexion (classement : une voix par connexion)
   created_at timestamptz not null default now(),
   primary key (product_id, who)
 );
@@ -25,6 +28,7 @@ create index likes_recent on fiila.likes (created_at);
 create table fiila.saves (
   product_id uuid not null references fiila.products (id) on delete cascade,
   who        text not null,
+  src        text,
   created_at timestamptz not null default now(),
   primary key (product_id, who)
 );
@@ -45,6 +49,13 @@ create table fiila.comment_reports (
   primary key (comment_id, who)
 );
 revoke all on fiila.likes, fiila.saves, fiila.comments, fiila.comment_reports from public;
+create index if not exists orders_delivered on fiila.orders (shop_id, status, delivered_at);
+
+-- Empreinte de la connexion (même calcul que la limite de débit) : jamais l'adresse IP en clair.
+create or replace function fiila.ip_bucket() returns text
+language sql stable set search_path = '' as $$
+  select encode(extensions.digest((select value from fiila.settings where key = 'rate_salt') || ':' || fiila.client_ip(), 'sha256'), 'hex')
+$$;
 
 -- Qui réagit : le compte s'il y en a un, sinon l'empreinte de l'identifiant de l'appareil (jamais gardé en clair).
 create or replace function fiila.who(p_device text) returns text
@@ -65,6 +76,27 @@ language sql stable set search_path = '' as $$
       and ((s.featured_rank is not null and not s.demo) or s.platform or (coalesce(p_demo, false) and s.demo)))
 $$;
 
+-- Ventes d'un article (30 jours, commandes livrées) : 5 au plus par cliente, sans les commandes au numéro de la boutique.
+create or replace function fiila.product_sold(p_product uuid) returns int
+language sql stable set search_path = '' as $$
+  select coalesce(sum(n), 0)::int from (
+    select least(sum((it ->> 'qty')::int), 5) n
+    from fiila.products p join fiila.shops s on s.id = p.shop_id
+    join fiila.orders o on o.shop_id = p.shop_id and o.status = 'delivered' and o.delivered_at > now() - interval '30 days'
+    cross join lateral jsonb_array_elements(o.items) it
+    where p.id = p_product and (it ->> 'product_id') = p_product::text
+      and (fiila.phone_key(o.customer_phone) = '' or fiila.phone_key(o.customer_phone) <> fiila.phone_key(s.phone))
+    group by fiila.phone_key(o.customer_phone)) x
+$$;
+-- Score « coup de cœur » sur 14 jours : personnes distinctes (compte, ou connexion pour les réactions sans compte).
+create or replace function fiila.product_love(p_product uuid) returns int
+language sql stable set search_path = '' as $$
+  select ((select count(distinct case when who like 'u:%' then who else coalesce('i:' || src, who) end) from fiila.likes
+            where product_id = p_product and created_at > now() - interval '14 days')
+     + 2 * (select count(distinct case when who like 'u:%' then who else coalesce('i:' || src, who) end) from fiila.saves
+            where product_id = p_product and created_at > now() - interval '14 days')
+     + 2 * (select count(distinct user_id) from fiila.comments where product_id = p_product and not hidden and created_at > now() - interval '14 days'))::int
+$$;
 -- Chiffres d'un article.
 create or replace function fiila.post_stats(p_product uuid) returns jsonb
 language sql stable set search_path = '' as $$
@@ -72,8 +104,7 @@ language sql stable set search_path = '' as $$
     'likes', (select count(*) from fiila.likes where product_id = p_product),
     'saves', (select count(*) from fiila.saves where product_id = p_product),
     'comments', (select count(*) from fiila.comments where product_id = p_product and not hidden),
-    'sold', (select coalesce(sum(least((it ->> 'qty')::int, 5)), 0) from fiila.orders o, jsonb_array_elements(o.items) it
-              where o.status = 'delivered' and o.delivered_at > now() - interval '30 days' and (it ->> 'product_id') = p_product::text))
+    'sold', fiila.product_sold(p_product))
 $$;
 
 -- Le fil. p_tab : 'pour-vous' (récent et apprécié, 3 articles au plus par boutique en tête), 'ventes', 'coeur'.
@@ -90,12 +121,8 @@ begin
         (select count(*) from fiila.likes l where l.product_id = p.id) likes,
         (select count(*) from fiila.saves v where v.product_id = p.id) saves,
         (select count(*) from fiila.comments c where c.product_id = p.id and not c.hidden) comments,
-        (select coalesce(sum(least((it ->> 'qty')::int, 5)), 0) from fiila.orders o, jsonb_array_elements(o.items) it
-          where o.shop_id = p.shop_id and o.status = 'delivered' and o.delivered_at > now() - interval '30 days'
-            and (it ->> 'product_id') = p.id::text) sold,
-        (select count(*) from fiila.likes l where l.product_id = p.id and l.created_at > now() - interval '14 days')
-          + 2 * (select count(*) from fiila.saves v where v.product_id = p.id and v.created_at > now() - interval '14 days')
-          + 2 * (select count(*) from fiila.comments c where c.product_id = p.id and not c.hidden and c.created_at > now() - interval '14 days') love
+        fiila.product_sold(p.id) sold,
+        fiila.product_love(p.id) love
       from fiila.products p join fiila.shops s on s.id = p.shop_id
       where p.active and p.photo is not null and s.public and s.feed and s.slug is not null
         and ((s.featured_rank is not null and not s.demo) or s.platform or (coalesce(p_demo, false) and s.demo))
@@ -105,15 +132,17 @@ begin
         row_number() over (partition by b.shop_id order by b.updated_at desc) nth,
         (b.likes + 2 * b.saves + 3 * b.comments + 1) / power(extract(epoch from now() - b.updated_at) / 3600 + 2, 1.2) score
       from base b
-    ), picked as (
-      select r.* from ranked r
-      where (v_tab = 'pour-vous') or (v_tab = 'ventes' and r.sold > 0) or (v_tab = 'coeur' and r.love > 0)
-      order by
+    ), ordered as (
+      -- Un seul ordre, réutilisé pour la page et pour l'assemblage (ordre garanti).
+      select r.*, row_number() over (order by
         case when v_tab = 'ventes' then r.sold when v_tab = 'coeur' then r.love end desc nulls last,
         case when v_tab = 'pour-vous' then (r.nth > 3)::int end,
         case when v_tab = 'pour-vous' then r.score end desc,
-        r.updated_at desc, r.id
-      limit 30 offset v_page * 30
+        r.updated_at desc, r.id) ord
+      from ranked r
+      where (v_tab = 'pour-vous') or (v_tab = 'ventes' and r.sold > 0) or (v_tab = 'coeur' and r.love > 0)
+    ), picked as (
+      select * from ordered where ord > v_page * 30 and ord <= (v_page + 1) * 30
     )
     select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
       'id', k.id, 'name', k.name, 'price', k.price,
@@ -125,7 +154,7 @@ begin
       'liked', case when v_who is not null and exists (select 1 from fiila.likes l where l.product_id = k.id and l.who = v_who) then true end,
       'saved', case when v_who is not null and exists (select 1 from fiila.saves v where v.product_id = k.id and v.who = v_who) then true end))
       order by k.ord)
-    from (select picked.*, row_number() over () ord from picked) k), '[]'::jsonb));
+    from picked k), '[]'::jsonb));
 end $$;
 
 -- J'aime / retirer (p_on), Enregistrer / retirer. Renvoie les chiffres à jour.
@@ -138,10 +167,10 @@ begin
   if not fiila.post_ok(p_product, p_demo) then perform fiila.fail('not_found'); end if;
   perform fiila.rate_check('react', 300);
   if p_kind = 'like' then
-    if p_on then insert into fiila.likes (product_id, who) values (p_product, v_who) on conflict do nothing;
+    if p_on then insert into fiila.likes (product_id, who, src) values (p_product, v_who, case when v_who like 'd:%' then fiila.ip_bucket() end) on conflict do nothing;
     else delete from fiila.likes where product_id = p_product and who = v_who; end if;
   else
-    if p_on then insert into fiila.saves (product_id, who) values (p_product, v_who) on conflict do nothing;
+    if p_on then insert into fiila.saves (product_id, who, src) values (p_product, v_who, case when v_who like 'd:%' then fiila.ip_bucket() end) on conflict do nothing;
     else delete from fiila.saves where product_id = p_product and who = v_who; end if;
   end if;
   return fiila.post_stats(p_product) || jsonb_strip_nulls(jsonb_build_object(
@@ -158,8 +187,9 @@ begin
   if v_who is null then return '[]'::jsonb; end if;
   return coalesce((select jsonb_agg(jsonb_strip_nulls(jsonb_build_object('id', p.id, 'name', p.name, 'price', p.price,
       'shop', jsonb_build_object('slug', s.slug, 'name', s.name))) order by v.created_at desc)
-    from fiila.saves v join fiila.products p on p.id = v.product_id join fiila.shops s on s.id = p.shop_id
-    where v.who = v_who and p.active and p.photo is not null and s.public and s.slug is not null), '[]'::jsonb);
+    from (select * from fiila.saves where who = v_who order by created_at desc limit 200) v
+    join fiila.products p on p.id = v.product_id join fiila.shops s on s.id = p.shop_id
+    where p.active and p.photo is not null and s.public and s.slug is not null), '[]'::jsonb);
 end $$;
 
 -- Commentaires visibles d'un article. p_key (facultatif) : la boutique qui consulte peut supprimer.
@@ -181,9 +211,17 @@ begin
         'can_delete', case when c.user_id = v_uid or v_shop or v_admin then true end,
         'reported', case when v_who is not null and exists (select 1 from fiila.comment_reports r where r.comment_id = c.id and r.who = v_who) then true end))
         order by c.created_at)
-      from fiila.comments c left join fiila.profiles pf on pf.user_id = c.user_id
-      where c.product_id = p_product and not c.hidden), '[]'::jsonb));
+      from (select * from fiila.comments where product_id = p_product and not hidden order by created_at desc limit 200) c
+      left join fiila.profiles pf on pf.user_id = c.user_id), '[]'::jsonb));
 end $$;
+
+-- Lien, réseau ou numéro dans un texte public (audit 19/10) : « 2 robes à 5000 et 3000 » passe ; « 77 123 45 67 »,
+-- « wa . me », « @boutique », « shop.fr/x » ne passent pas.
+create or replace function fiila.has_contact(p_text text) returns boolean
+language sql immutable set search_path = '' as $$
+  select coalesce(p_text, '') ~* '(https?://|www\s*\.|wa\s*\.?\s*me|t\.me/|@[a-z0-9_.]{3,}|[a-z0-9-]{2,}\s*\.\s*(com|sn|net|org|io|me|ly|fr|co|app|shop|store|info|biz|africa|site|online|link|page)\M)'
+      or coalesce(p_text, '') ~ '([0-9][\s.\-]?){8,}'
+$$;
 
 create or replace function public.fiila_comment_add(p_product uuid, p_body text, p_demo boolean default false) returns jsonb
 language plpgsql security definer set search_path = '' as $$
@@ -193,9 +231,7 @@ begin
   if v_body is null then perform fiila.fail('comment_empty'); end if;
   if char_length(v_body) > 300 then perform fiila.fail('comment_too_long'); end if;
   -- Pas de lien ni de numéro : la vente et le contact restent sur Fii La (protection des clientes).
-  if v_body ~* '(https?://|www\.|\.(com|sn|net|org|io|me|ly)\b)' or regexp_replace(v_body, '[^0-9]', '', 'g') ~ '[0-9]{8,}' then
-    perform fiila.fail('comment_contact');
-  end if;
+  if fiila.has_contact(v_body) then perform fiila.fail('comment_contact'); end if;
   if not exists (select 1 from fiila.profiles where user_id = v_uid and nullif(trim(display_name), '') is not null) then
     perform fiila.fail('name_required');
   end if;
@@ -221,12 +257,11 @@ begin
   return fiila.post_stats(c.product_id);
 end $$;
 
--- Signaler : 3 signalements de personnes différentes masquent le commentaire.
+-- Signaler : compte obligatoire ; 3 comptes différents masquent le commentaire (en attente de la modération).
 create or replace function public.fiila_comment_report(p_id uuid, p_device text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare v_who text := fiila.who(p_device);
+declare v_who text := 'u:' || fiila.need_uid();
 begin
-  if v_who is null then perform fiila.fail('device_required'); end if;
   if not exists (select 1 from fiila.comments where id = p_id) then perform fiila.fail('not_found'); end if;
   perform fiila.rate_check('comment_report', 30);
   insert into fiila.comment_reports (comment_id, who) values (p_id, v_who) on conflict do nothing;
@@ -258,7 +293,8 @@ begin
       order by c.hidden desc, c.created_at desc)
     from fiila.comments c join fiila.products p on p.id = c.product_id join fiila.shops s on s.id = p.shop_id
     left join fiila.profiles pf on pf.user_id = c.user_id
-    where c.hidden or exists (select 1 from fiila.comment_reports r where r.comment_id = c.id)), '[]'::jsonb);
+    where c.hidden or exists (select 1 from fiila.comment_reports r where r.comment_id = c.id)
+    limit 200), '[]'::jsonb);
 end $$;
 
 -- Décision : 'restore' (visible, signalements effacés) ou 'delete'.

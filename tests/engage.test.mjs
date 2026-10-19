@@ -31,6 +31,7 @@ async function newPhone() {
   const page = await ctx.newPage();
   page.setDefaultTimeout(15000);
   page.__errors = []; page.on('pageerror', (e) => page.__errors.push(String(e)));
+  page.on('dialog', (d) => d.accept());
   pages.push(page);
   return page;
 }
@@ -113,7 +114,7 @@ await t('onglets : Meilleures ventes (commande livrée) et Coups de cœur, avec 
   await A.goto(URL0 + '#/boutiques');
   await A.click('#tab-ventes');
   await A.locator('#tab-ventes[aria-selected="true"]').waitFor();
-  await A.locator(`#post-${P2.id}`).getByText('Meilleure vente · 1 vendu').waitFor();
+  await A.locator(`#post-${P2.id}`).getByText('Best-seller · 1 vendu').waitFor();
   assert.equal(await A.locator('#posts .post').count(), 1, 'seul l’article livré');
   await shot(A, '03-meilleures-ventes');
   await A.click('#tab-coeur');
@@ -152,6 +153,11 @@ await t('la boutique supprime un commentaire sur son article ; une autre personn
   await R.goto(URL0 + '#/boutiques');
   await R.click(`#comments-${P1.id}`);
   await R.locator('#cm-list').getByText('Très jolie').waitFor();
+  assert.equal(await R.locator('#cm-list').getByRole('button', { name: 'Signaler ce commentaire' }).count(), 0, 'signaler demande un compte');
+  await signup(R, 'Rokhaya Test', 'rokhaya.fil@example.invalid');
+  await R.goto(URL0 + '#/boutiques');
+  await R.click(`#comments-${P1.id}`);
+  await R.locator('#cm-list').getByText('Très jolie').waitFor();
   assert.equal(await R.locator('#cm-list').getByRole('button', { name: 'Supprimer' }).count(), 0, 'pas de suppression pour une autre personne');
   await R.locator('#cm-list').getByRole('button', { name: 'Signaler ce commentaire' }).click();
   await R.getByText('Merci. Le commentaire sera vérifié.').waitFor();
@@ -170,7 +176,11 @@ await t('modération : le fondateur voit le commentaire masqué (3 signalements)
   await local.db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Ndèye Test')`, [uid]);
   const c = await rpc(local.db, 'fiila_comment_add', { p_product: P2.id, p_body: 'Avis à vérifier' }, { uid });
   assert.equal(c.status, 200, JSON.stringify(c.body));
-  for (const d of ['aaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccc']) await ok('fiila_comment_report', { p_id: c.body.id, p_device: d });
+  for (const n of ['r1', 'r2', 'r3']) {
+    const rid = await createUser(local.db, n + '.fil@example.invalid');
+    const rr = await rpc(local.db, 'fiila_comment_report', { p_id: c.body.id }, { uid: rid });
+    assert.equal(rr.status, 200, JSON.stringify(rr.body));
+  }
   const F = await newPhone();
   await signup(F, 'Fondateur Test', 'fondateur.fil@example.invalid');
   await local.db.query(`insert into fiila.staff (user_id, role) select id, 'super_admin' from auth.users where email = 'fondateur.fil@example.invalid'`);

@@ -34,10 +34,14 @@ const check = (name, ok, detail) => { checks.push({ name, ok, detail }); console
 
 const migrations = await q(`select version from supabase_migrations.schema_migrations order by version`).catch(() => []);
 const expectedMigrations = readdirSync(new URL('../supabase/migrations/', import.meta.url)).filter((f) => f.endsWith('.sql')).sort().map((f) => f.split('_')[0]);
-check('migrations appliquées dans l’ordre (' + expectedMigrations.length + ')', migrations.map((m) => m.version).join(',') === expectedMigrations.join(','), migrations.map((m) => m.version));
+// Le dépôt doit être le début de la liste en base : une base plus récente (republication d'une version antérieure) est acceptée.
+const applied = migrations.map((m) => m.version);
+const dbNewer = applied.length > expectedMigrations.length;
+check('migrations appliquées dans l’ordre (' + expectedMigrations.length + ')', expectedMigrations.every((v, i) => applied[i] === v), applied);
+if (dbNewer) console.log('NOTE base plus récente que ce dépôt (' + applied.slice(expectedMigrations.length).join(', ') + ') : liste des fonctions non comparée.');
 
 const tables = await q(`select table_name from information_schema.tables where table_schema = 'fiila' order by 1`);
-check('tables présentes', ['courier_invites', 'courier_reviews', 'couriers', 'customers', 'metrics', 'orders', 'payments', 'places', 'posts', 'products', 'profiles', 'referrals', 'referrers', 'reviews', 'rate_events', 'requests', 'retired_tokens', 'settings', 'shops', 'trackers'].every((t) => tables.some((r) => r.table_name === t)), tables.map((r) => r.table_name));
+check('tables présentes', ['courier_invites', 'courier_reviews', 'couriers', 'customers', 'metrics', 'orders', 'payments', 'places', 'posts', 'products', 'profiles', 'referrals', 'referrers', 'reviews', 'rate_events', 'requests', 'retired_tokens', 'settings', 'shops', 'trackers', 'likes', 'saves', 'comments', 'comment_reports', 'staff', 'staff_invites', 'admin_log', 'ambassadors', 'ambassador_rewards', 'vd_submissions'].every((t) => tables.some((r) => r.table_name === t)), tables.map((r) => r.table_name));
 
 const usage = await q(`select has_schema_privilege('anon', 'fiila', 'usage') as anon, has_schema_privilege('authenticated', 'fiila', 'usage') as auth`);
 check('schéma fiila fermé à anon et authenticated', !usage[0].anon && !usage[0].auth, usage[0]);
@@ -49,7 +53,8 @@ check('aucun droit sur les tables fiila pour anon / authenticated / PUBLIC', tab
 const fns = await q(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname like 'fiila_%' and has_function_privilege('anon', p.oid, 'execute') order by 1`);
 const names = fns.map((f) => f.proname).sort();
-check('fonctions exécutables par anon = exactement les ' + EXPECTED_FUNCTIONS.length + ' fonctions prévues', JSON.stringify(names) === JSON.stringify(EXPECTED_FUNCTIONS), names);
+if (dbNewer) check('fonctions prévues par ce dépôt toutes présentes', EXPECTED_FUNCTIONS.every((f) => names.includes(f)), EXPECTED_FUNCTIONS.filter((f) => !names.includes(f)));
+else check('fonctions exécutables par anon = exactement les ' + EXPECTED_FUNCTIONS.length + ' fonctions prévues', JSON.stringify(names) === JSON.stringify(EXPECTED_FUNCTIONS), names);
 
 const definer = await q(`select p.proname, p.prosecdef, coalesce(array_to_string(p.proconfig, ','), '') as cfg from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'fiila_%'`);

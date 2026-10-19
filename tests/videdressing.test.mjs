@@ -30,6 +30,7 @@ async function newPhone() {
   const page = await ctx.newPage();
   page.setDefaultTimeout(15000);
   page.__errors = []; page.on('pageerror', (e) => page.__errors.push(String(e)));
+  page.on('dialog', (d) => d.accept());
   pages.push(page);
   return page;
 }

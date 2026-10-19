@@ -10,9 +10,13 @@ on:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash   # bash -eo pipefail : sans lui, « node … | tail -1 » ne pouvait jamais échouer (audit 19/10)
+
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -23,7 +27,7 @@ jobs:
       - name: Suites SQL
         run: |
           fail=0
-          for f in tests/*.sql.test.mjs; do node "$f" | tail -1 || fail=1; done
+          for f in tests/sql.test.mjs tests/*.sql.test.mjs; do node "$f" | tail -1 || fail=1; done
           exit $fail
       - name: Écrans clés — Safari (WebKit)
         if: always()

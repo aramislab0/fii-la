@@ -154,7 +154,7 @@ await t('équipe : inviter un membre (lien à usage unique), il s’inscrit avec
   await D.click('#bo-invite-open');
   await D.fill('#bo-inv-email', 'mariama.bo@example.invalid');
   await D.selectOption('#bo-inv-role', 'moderation');
-  await D.locator('#bo-invite-form').getByText('Modération des commentaires, vide-dressing, suspension des boutiques.').waitFor();
+  await D.locator('#bo-invite-form').getByText('Modération des commentaires, vérification du vide-dressing, suspension des boutiques.').waitFor();
   await D.click('#bo-inv-send');
   INVITE = (await D.locator('#bo-inv-link code').textContent()).trim();
   assert.match(INVITE, /#\/bo\/invitation\/[A-Za-z0-9_-]{20,}$/);

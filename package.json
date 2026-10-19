@@ -34,7 +34,12 @@
     "test:ambassadors": "node tests/ambassadors.test.mjs",
     "test:videdressing-sql": "node tests/videdressing.sql.test.mjs",
     "test:videdressing": "node tests/videdressing.test.mjs",
-    "demo:seed": "node scripts/demo-seed.mjs"
+    "demo:seed": "node scripts/demo-seed.mjs",
+    "test:engage-sql": "node tests/engage.sql.test.mjs",
+    "test:engage": "node tests/engage.test.mjs",
+    "test:backoffice-sql": "node tests/backoffice.sql.test.mjs",
+    "test:backoffice": "node tests/backoffice.test.mjs",
+    "test:all": "bash -eo pipefail -c 'for f in tests/sql.test.mjs tests/*.sql.test.mjs; do node \"$f\" | tail -1; done; for f in tests/*.test.mjs; do case \"$f\" in *.sql.test.mjs|*/sql.test.mjs|*/deployed.test.mjs) continue;; esac; node \"$f\" | tail -1; done'"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",
