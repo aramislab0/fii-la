@@ -47,7 +47,7 @@ async function swatch(color, label) {
     const cv = document.createElement('canvas'); cv.width = 640; cv.height = 360;
     const g = cv.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 640, 360);
     g.fillStyle = 'rgba(255,255,255,.85)'; g.font = '600 44px system-ui'; g.fillText(l, 40, 200);
-    return cv.toDataURL('image/jpeg', 0.8).split(',')[1];
+    return cv.toDataURL('image/png').split(',')[1];
   }, [color, label]);
 }
 const SHOPS = [
