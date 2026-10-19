@@ -5627,8 +5627,8 @@
               h('li', null, 'Installez une application d’authentification : Google Authenticator, Microsoft Authenticator, ou « Mots de passe » sur iPhone.'),
               h('li', null, 'Scannez ce QR code avec l’application.', h('img', { src: mfaQrSrc(en.totp.qr_code), alt: 'QR code de la double authentification', class: 'bo-qr', id: 'bo-mfa-qr', width: 180, height: 180 }),
                 en.totp.uri ? h('a', { class: 'btn ghost small', href: en.totp.uri, id: 'bo-mfa-open', style: 'align-self:flex-start' }, 'Sur ce téléphone : ajouter à l’application') : null,
-                h('span', { class: 'small muted' }, 'Ou saisissez cette clé à la main : '), h('code', { id: 'bo-mfa-secret', class: 'wrapword' }, secret.replace(/(.{4})/g, '$1 ').trim())),
-              h('li', null, 'Saisissez le code à 6 chiffres affiché par l’application.')),
+                h('span', { class: 'small muted' }, 'Sans QR code : dans l’application, choisissez « Saisir une clé de configuration » (type « basé sur l’heure ») et recopiez cette clé. Elle ne se tape pas ici.'), h('code', { id: 'bo-mfa-secret', class: 'wrapword' }, secret.replace(/(.{4})/g, '$1 ').trim())),
+              h('li', null, 'Recopiez ici le code à 6 chiffres que l’application affiche pour « Fii La » (il change toutes les 30 secondes).')),
             codeForm(en.id, 'Activer', 'Double authentification activée.'),
             leave);
         });
