@@ -176,6 +176,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 19:32 | fii-la.com n'appartient pas au fondateur ; fii.com pris (1998). Alternatives proposées, sans enregistrement DNS au 19/10 (NXDOMAIN, à confirmer chez le registraire) : fiila.sn, fiila.app, getfiila.com (aussi fiila.africa) | dns.google |
 | 19/10 15:35 | Décision domaine fii-la.com + 2 e-mails Zoho notée. Contrôle RDAP : fii-la.com déjà enregistré chez LWS depuis le 25/08/2026 — propriétaire à confirmer par le fondateur | RDAP Verisign |
 | 19/10 15:27 | Double authentification du fondateur **activée** : un seul facteur TOTP, statut verified (15:26:42), session aal2 ouverte, entrée au back-office (last_seen 15:26:42). L’ancienne clé non vérifiée (visible sur une capture) n’existe plus. Correctif QR en production (run 39275990530, tout vert) | requête select en lecture seule |
 | 19/10 15:05 | QR code de la double authentification : vraie cause trouvée. L’API Supabase renvoie le SVG brut, sans préfixe « data: » (supabase-js l’ajoute ; nous appelons l’API directement), donc l’image ne s’affichait pas. `mfaQrSrc` accepte les deux formes ; émulation de test alignée sur le format réel (internal/api/mfa.go) ; cache v25 | ce commit |
