@@ -197,7 +197,7 @@ await t('organisateur : « Qui arrive » avec heure d’arrivée et invités pas
   await o.ctx.close();
 });
 
-await t('fiche publique du rendez-vous : aucun nom d’invité, aucune position', async () => {
+await t('fiche publique de l’événement : aucun nom d’invité, aucune position', async () => {
   const pub = await rpc(local.db, 'fiila_get_public', { p_token: meet.share_token });
   assert.ok(!JSON.stringify(pub.body).match(/Assane|Fatou/));
 });

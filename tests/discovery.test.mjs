@@ -259,11 +259,11 @@ const M = anon2.page;
 await t('CTA rendez-vous : texte adapté, ouvre la création de rendez-vous, vierge', async () => {
   await M.goto(meetUrl);
   await M.getByRole('heading', { name: 'Baptême EXPEDITEUR' }).waitFor();
-  await M.locator('#discover').getByRole('heading', { name: 'Votre prochain rendez-vous' }).waitFor();
+  await M.locator('#discover').getByRole('heading', { name: 'Votre prochain événement' }).waitFor();
   await M.getByText('Le lieu, l’heure et le chemin dans un seul lien.').waitFor();
   await shot(M, 'destinataire-rendez-vous-light');
-  await M.getByRole('link', { name: 'Créer un rendez-vous' }).click();
-  await M.getByRole('heading', { name: 'Créer un rendez-vous' }).waitFor();
+  await M.getByRole('link', { name: 'Créer un événement' }).click();
+  await M.getByRole('heading', { name: 'Créer un événement' }).waitFor();
   assert.match(M.url(), /#\/rdv\/nouveau\?retour=/);
   assert.equal(await M.locator('#m-label').inputValue(), '');
   assert.equal(await M.locator('#m-instr').inputValue(), '');
@@ -273,11 +273,11 @@ await t('CTA rendez-vous : texte adapté, ouvre la création de rendez-vous, vie
 });
 
 await t('rendez-vous créé depuis la découverte : mesuré, sans donnée de l’expéditeur, retour possible', async () => {
-  await M.getByRole('link', { name: 'Créer un rendez-vous' }).click();
+  await M.getByRole('link', { name: 'Créer un événement' }).click();
   await M.locator('#m-label').fill('Anniversaire (test)');
   await pastePoint(M, { lat: 14.68, lng: -17.45 });
   const created = waitTrack(M, 'fiche_created', 'meeting_discovery');
-  await M.getByRole('button', { name: 'Créer le rendez-vous' }).click();
+  await M.getByRole('button', { name: 'Créer l’événement' }).click();
   await M.getByRole('heading', { name: 'Partager' }).waitFor();
   await created;
   const body = M.__creates.at(-1);
@@ -335,10 +335,10 @@ await t('mesure en panne (requêtes rejetées ou sans réponse) : affichage et c
     await p.page.goto(meetUrl);
     await p.page.getByRole('heading', { name: 'Baptême EXPEDITEUR' }).waitFor();
     await p.page.locator('#discover').scrollIntoViewIfNeeded();
-    await p.page.getByRole('link', { name: 'Créer un rendez-vous' }).click();
+    await p.page.getByRole('link', { name: 'Créer un événement' }).click();
     await p.page.locator('#m-label').fill('Test panne mesure ' + mode);
     await pastePoint(p.page, { lat: 14.69, lng: -17.44 });
-    await p.page.getByRole('button', { name: 'Créer le rendez-vous' }).click();
+    await p.page.getByRole('button', { name: 'Créer l’événement' }).click();
     await p.page.getByRole('heading', { name: 'Partager' }).waitFor();
     assert.deepEqual(p.page.__errors, []);
     await p.ctx.close();
@@ -361,7 +361,7 @@ async function firstSave(p) {
   await p.page.goto(URL0 + '#/rdv/nouveau');
   await p.page.locator('#m-label').fill('Installation (test)');
   await pastePoint(p.page, { lat: 14.7, lng: -17.45 });
-  await p.page.getByRole('button', { name: 'Créer le rendez-vous' }).click();
+  await p.page.getByRole('button', { name: 'Créer l’événement' }).click();
   await p.page.getByRole('heading', { name: 'Partager' }).waitFor();
 }
 const fakePrompt = () => {
@@ -406,7 +406,7 @@ await t('installation refusée (« Plus tard ») : masquée durablement, l’app
   await p.page.getByRole('heading', { name: 'Partager' }).waitFor();
   assert.equal(await p.page.locator('.install').count(), 0);
   await p.page.goto(URL0 + '#/rdv/nouveau');
-  await p.page.getByRole('heading', { name: 'Créer un rendez-vous' }).waitFor();
+  await p.page.getByRole('heading', { name: 'Créer un événement' }).waitFor();
   await p.ctx.close();
 });
 

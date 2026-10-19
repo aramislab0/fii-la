@@ -2,7 +2,7 @@
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "mode": "automatisation Playwright, émulation iPhone 13, base Postgres locale réelle (PGlite)",
-  "date": "2026-10-19T04:41:32.805Z",
+  "date": "2026-10-19T05:21:50.080Z",
   "reussis": 20,
   "total": 20,
   "results": [
@@ -32,23 +32,23 @@
     },
     {
       "ok": true,
-      "name": "réouverture depuis « Mes rendez-vous » après rechargement, puis repartage"
+      "name": "réouverture depuis « Mes événements » après rechargement, puis repartage"
     },
     {
       "ok": true,
-      "name": "« Créer un rendez-vous similaire » : brouillon neuf, lieu à reconfirmer, nom et date vides"
+      "name": "« Créer un événement similaire » : brouillon neuf, lieu à reconfirmer, nom et date vides"
     },
     {
       "ok": true,
-      "name": "brouillon du rendez-vous similaire conservé si on quitte la page"
+      "name": "brouillon du événement similaire conservé si on quitte la page"
     },
     {
       "ok": true,
-      "name": "enregistrement : fiche distincte, rendez-vous d’origine inchangé"
+      "name": "enregistrement : fiche distincte, événement d’origine inchangé"
     },
     {
       "ok": true,
-      "name": "similaire depuis un rendez-vous désactivé et expiré [SIMULÉ temps] : la copie est active, l’origine reste désactivée"
+      "name": "similaire depuis un événement désactivé et expiré [SIMULÉ temps] : la copie est active, l’origine reste désactivée"
     },
     {
       "ok": true,
@@ -60,7 +60,7 @@
     },
     {
       "ok": true,
-      "name": "position refusée pendant la création d’un rendez-vous : message et alternative manuelle"
+      "name": "position refusée pendant la création d’un événement : message et alternative manuelle"
     },
     {
       "ok": true,
@@ -72,11 +72,11 @@
     },
     {
       "ok": true,
-      "name": "clavier : « Créer un rendez-vous similaire » et le repli des coordonnées sont atteignables, focus visible"
+      "name": "clavier : « Créer un événement similaire » et le repli des coordonnées sont atteignables, focus visible"
     },
     {
       "ok": true,
-      "name": "texte long à 320 px : rendez-vous similaire et fiche sans débordement"
+      "name": "texte long à 320 px : événement similaire et fiche sans débordement"
     },
     {
       "ok": true,

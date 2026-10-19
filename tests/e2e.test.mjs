@@ -114,7 +114,7 @@ let shareUrl, placeId, createBody;
 await t('accueil : une action principale (création), deux secondaires, puis mes adresses', async () => {
   await A.goto(URL0);
   await A.getByText('Votre adresse, en une photo.').waitFor();
-  for (const n of ['Créer mon adresse', 'Demander une adresse', 'Créer un rendez-vous', 'Ma boutique', 'Espace livreur']) await byText(A, n).waitFor();
+  for (const n of ['Créer mon adresse', 'Demander une adresse', 'Créer un événement', 'Ma boutique', 'Espace livreur']) await byText(A, n).waitFor();
   await A.getByRole('heading', { name: 'Mes adresses' }).waitFor();
   // Une seule grande action, avant les raccourcis à pictogramme.
   assert.equal(await A.locator('a.hero').count(), 1);
@@ -458,7 +458,7 @@ await t('demande : le commerçant récupère l’adresse dans sa vue privée', a
 let meetingUrl, meetingId;
 await t('rendez-vous : création avec date, lieu et expiration', async () => {
   await A.goto(URL0 + '#/rdv/nouveau');
-  await A.getByLabel('Nom du rendez-vous').fill('Baptême chez Awa (test)');
+  await A.getByLabel('Nom de l’événement').fill('Baptême chez Awa (test)');
   const now = new Date();
   await A.locator('#m-date').fill(now.toISOString().slice(0, 10));
   await A.locator('#m-time').fill(now.toISOString().slice(11, 16));
@@ -466,7 +466,7 @@ await t('rendez-vous : création avec date, lieu et expiration', async () => {
   await A.getByLabel(/Indications sur place/).fill('Tente blanche derrière la mosquée');
   await A.locator('#m-exp').selectOption('2');
   await shot(A, '12-rendez-vous-form');
-  await byText(A, 'Créer le rendez-vous').click();
+  await byText(A, 'Créer l’événement').click();
   await A.getByRole('heading', { name: 'Partager' }).waitFor();
   meetingUrl = await A.locator('#share-url').textContent();
   meetingId = A.url().split('#/m/')[1].split('?')[0];
@@ -478,7 +478,7 @@ await t('rendez-vous : mise à jour visible sur le même lien', async () => {
   await byText(A, 'Modifier').click();
   await A.getByLabel(/Indications sur place/).fill('Tente BLEUE, entrée côté plage');
   await byText(A, 'Enregistrer les modifications').click();
-  await A.getByText(/Rendez-vous mis à jour/).waitFor();
+  await A.getByText(/Événement mis à jour/).waitFor();
   assert.equal(await A.locator('#share-url').textContent(), meetingUrl);
   await openB(meetingUrl);
   await B.getByText('Tente BLEUE, entrée côté plage').waitFor();
@@ -493,7 +493,7 @@ await t('rendez-vous expiré : le serveur ne renvoie plus le lieu', async () => 
     return;
   }
   await openB(meetingUrl);
-  await B.getByText('Ce rendez-vous est terminé').waitFor();
+  await B.getByText('Cet événement est terminé').waitFor();
   const r = await rpcFromPage(B, 'fiila_get_public', { p_token: meetingUrl.split('#/a/')[1] });
   assert.deepEqual(r.body, { state: 'expired' });
 });

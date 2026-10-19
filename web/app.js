@@ -198,7 +198,7 @@
     date_required: 'Indiquez la date et l’heure.',
     expiry_before_start: 'La fin doit être après le début.',
     expiry_in_past: 'Cette date est déjà passée.',
-    expiry_too_far: 'Un rendez-vous peut rester visible 31 jours au plus.',
+    expiry_too_far: 'Un événement peut rester visible 31 jours au plus.',
     start_too_far: 'La date est trop lointaine.',
     invalid_date: 'Date non valide.',
     name_required: 'Indiquez votre nom ou celui de votre commerce.',
@@ -206,13 +206,13 @@
     already_fulfilled: 'Cette demande a déjà reçu une réponse.',
     expired: 'Cette demande a expiré.',
     place_revoked: 'Cette adresse est désactivée. Choisissez-en une autre.',
-    not_an_address: 'Choisissez une adresse, pas un rendez-vous.',
+    not_an_address: 'Choisissez une adresse, pas un événement.',
     invalid_kind: 'Type de fiche non valide.',
     invalid_payload: 'Données non valides.',
     invalid_theme: 'Modèle ou couleur non reconnu. Choisissez dans la liste.',
     invalid_phone: 'Numéro non reconnu. Exemple : 77 123 45 67.',
     invalid_event: 'Action non reconnue.',
-    not_a_meeting: 'Ce lien n’est pas un rendez-vous.',
+    not_a_meeting: 'Ce lien n’est pas un événement.',
     // comptes
     auth_required: 'Connectez-vous pour continuer.',
     session_expired: 'Votre session a expiré. Reconnectez-vous.',
@@ -647,14 +647,14 @@
     }
     if (p.src === 'paste') return ['neutral', 'Point récupéré. Vérifiez-le sur la carte.'];
     if (p.src === 'saved') return ['neutral', 'Point déjà enregistré.'];
-    if (p.src === 'reused') return ['mid', 'Point repris du rendez-vous précédent : vérifiez-le, puis validez.'];
+    if (p.src === 'reused') return ['mid', 'Point repris de l’événement précédent : vérifiez-le, puis validez.'];
     return ['neutral', 'Placé à la main sur la carte.'];
   }
 
   // opts: { get(), set(p|null), what: 'l’entrée', id }
   function mapPicker(opts) {
     var current = opts.get();
-    // opts.initial : point repris (rendez-vous similaire) affiché mais NON validé tant que l'utilisateur ne confirme pas.
+    // opts.initial : point repris (événement similaire) affiché mais NON validé tant que l'utilisateur ne confirme pas.
     var start = current || opts.initial || null;
     var center = start ? { lat: start.lat, lng: start.lng } : null;
     var src = current ? current.src || 'manual' : opts.initial ? 'reused' : null;
@@ -830,7 +830,7 @@
       });
       setTimeout(function () { programmatic = true; map.invalidateSize(); programmatic = false; }, 60); // recalage d'affichage : ne doit pas déplacer le point
       if (!center) say('', 'info');
-      else if (!opts.get() && opts.initial) say('Point repris du rendez-vous précédent. Vérifiez qu’il est toujours juste, puis validez.', 'info');
+      else if (!opts.get() && opts.initial) say('Point repris de l’événement précédent. Vérifiez qu’il est toujours juste, puis validez.', 'info');
       draw();
     }, function () {
       mapBox.replaceWith(h('p', { class: 'alert' }, 'La carte n’a pas pu se charger. Utilisez votre position ou prenez le point dans Google Maps.'));
@@ -976,7 +976,7 @@
     opts = opts || {};
     var hasStop = p.vehicle_ok === false && p.stop;
     var isMeeting = p.kind === 'meeting';
-    var place = isMeeting ? 'Lieu du rendez-vous' : 'Entrée';
+    var place = isMeeting ? 'Lieu de l’événement' : 'Entrée';
     var note = h('p', { class: 'hint', hidden: true, role: 'status' }, 'Google Maps ne s’est pas ouvert ? Il n’est peut-être pas installé : touchez « Autre appli ».');
     var target = hasStop ? p.stop : p.entry;
     var others = h('div', { class: 'stack tight', id: 'other-apps', hidden: true },
@@ -993,7 +993,7 @@
       p.photo ? h('img', { class: 'door', src: p.photo, alt: 'Photo de l’entrée' + (p.label ? ' : ' + p.label : ''), decoding: 'async' }) : null,
       h('div', { class: 'fiche-body' },
         h('div', { class: 'stack tight' },
-          isMeeting ? h('p', { class: 'eyebrow' }, 'Rendez-vous') : (p.locality ? h('p', { class: 'eyebrow wrapword' }, p.locality) : null),
+          isMeeting ? h('p', { class: 'eyebrow' }, 'Événement') : (p.locality ? h('p', { class: 'eyebrow wrapword' }, p.locality) : null),
           h('h1', { class: 'wrapword' }, p.label || 'Sans nom'),
           isMeeting && p.starts_at ? h('p', { class: 'muted' }, whenText(p.starts_at)) : null),
         p.instruction ? h('p', { class: 'instr' }, p.instruction) : null,
@@ -1288,6 +1288,60 @@
         })),
         h('span', { class: 'fgo' }, s.count > 1 ? s.count + ' articles' : '1 article', icon('chev', 16))));
   }
+  /* Carrousel apaisant : une boutique à la fois, la suivante qui dépasse ; avance seul toutes les 6 s avec un glissement
+     lent, la photo s'approche doucement. S'arrête dès qu'on touche, quand il sort de l'écran ou quand l'onglet est caché.
+     « Réduire les animations » du téléphone : pas de défilement automatique ni de mouvement de photo. */
+  var CAROUSEL_MS = 6000;
+  function carousel(cards) {
+    var track = h('div', { class: 'feed-list car-track', role: 'group', 'aria-roledescription': 'carrousel', 'aria-label': 'Boutiques' }, cards);
+    var dots = h('div', { class: 'car-dots', role: 'tablist', 'aria-label': 'Choisir une boutique' });
+    var wrap = h('div', { class: 'car' }, track, cards.length > 1 ? dots : null);
+    var idx = 0, timer = null, held = false, visible = true;
+    var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function drawDots() {
+      setKids(dots, cards.map(function (c, i) {
+        return h('button', { class: 'car-dot' + (i === idx ? ' on' : '') + (i === idx && !calm && !held ? ' run' : ''), type: 'button', role: 'tab',
+          'aria-selected': i === idx ? 'true' : 'false', 'aria-label': 'Boutique ' + (i + 1) + ' sur ' + cards.length,
+          style: '--car-ms:' + CAROUSEL_MS + 'ms', onclick: function () { held = true; go(i); } }, h('i'));
+      }));
+    }
+    function mark() { cards.forEach(function (c, i) { c.classList.toggle('is-active', i === idx); c.setAttribute('aria-hidden', i === idx ? 'false' : 'true'); }); drawDots(); }
+    function go(i, auto) {
+      idx = (i + cards.length) % cards.length;
+      var c = cards[idx];
+      track.scrollTo({ left: c.offsetLeft - 16, behavior: calm ? 'auto' : 'smooth' });
+      mark(); plan();
+    }
+    function plan() {
+      clearTimeout(timer);
+      if (calm || held || cards.length < 2) return;
+      timer = setTimeout(function () {
+        if (!wrap.isConnected) return; // écran quitté : on s'arrête
+        if (!visible || document.hidden) { plan(); return; }
+        go(idx + 1, true);
+      }, CAROUSEL_MS);
+    }
+    // Glisser à la main : on suit, et le défilement automatique s'arrête (la personne a pris la main).
+    var scrollT = null;
+    track.addEventListener('scroll', function () {
+      clearTimeout(scrollT);
+      scrollT = setTimeout(function () {
+        var x = track.scrollLeft, best = 0, d = Infinity;
+        cards.forEach(function (c, i) { var dd = Math.abs(c.offsetLeft - 16 - x); if (dd < d) { d = dd; best = i; } });
+        if (best !== idx) { idx = best; mark(); }
+      }, 90);
+    }, { passive: true });
+    ['pointerdown', 'touchstart', 'wheel', 'keydown'].forEach(function (ev) {
+      track.addEventListener(ev, function () { if (!held) { held = true; clearTimeout(timer); drawDots(); } }, { passive: true });
+    });
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (es) { visible = es.some(function (e) { return e.isIntersecting; }); }, { threshold: 0.5 });
+      setTimeout(function () { io.observe(track); }, 0);
+    }
+    wrap.carousel = { go: go, index: function () { return idx; } };
+    setTimeout(function () { mark(); plan(); }, 0);
+    return wrap;
+  }
   // Bloc du fil : sur l'accueil (3 boutiques) et à la fin d'une tâche (2 boutiques). Absent s'il n'y a encore aucune boutique.
   function feedSection(limit, o) {
     o = o || {};
@@ -1299,7 +1353,7 @@
         h('div', { class: 'feed-head' }, h('h2', { id: (o.id || 'feed-block') + '-h' }, o.title || 'Boutiques à découvrir'),
           list.length > limit ? h('a', { class: 'btn link', href: '#/boutiques', id: (o.id || 'feed-block') + '-all' }, 'Tout voir (' + list.length + ')') : null),
         o.sub ? h('p', { class: 'small muted' }, o.sub) : null,
-        h('div', { class: 'feed-list' }, list.slice(0, limit).map(feedCard)));
+        carousel(list.slice(0, limit).map(feedCard)));
       box.hidden = false;
     }, function () { /* hors ligne : le bloc reste caché */ });
     return box;
@@ -1510,7 +1564,7 @@
     return box;
   }
 
-  var REF_KIND = { shop: 'Boutique', courier: 'Livreur', address: 'Adresse', meeting: 'Rendez-vous' };
+  var REF_KIND = { shop: 'Boutique', courier: 'Livreur', address: 'Adresse', meeting: 'Événement' };
   function viewReferral(q) {
     var forWho = q.pour === 'boutique' ? 'shop' : q.pour === 'livreur' ? 'courier' : 'person';
     var key = forWho === 'shop' ? shopKey() : forWho === 'courier' ? courierKey() : ((LS.get(REF_LS, null) || {}).key || null);
@@ -1641,7 +1695,7 @@
 
   /* ----- statistiques de croissance (compte administrateur seulement) */
   var SOURCE_LABEL = { code: 'Code tapé', phone: 'Numéro tapé', link: 'Lien de parrainage', request: 'Demande d’adresse', invoice: 'Facture',
-    address: 'Adresse reçue', meeting: 'Rendez-vous reçu', course: 'Course livreur', watch: 'Suivi de livraison', courier_invite: 'Invitation livreur',
+    address: 'Adresse reçue', meeting: 'Événement reçu', course: 'Course livreur', watch: 'Suivi de livraison', courier_invite: 'Invitation livreur',
     post: 'Publication', vitrine: 'Vitrine de boutique', direct: 'Direct' };
   function viewStats() {
     if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.', h('a', { class: 'btn', href: '#/compte' + qs({ retour: 'stats' }) }, 'Se connecter')), footer());
@@ -1652,7 +1706,7 @@
       return page(backBtn(),
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fondateur'), h('h1', null, 'Croissance')),
         h('div', { class: 'tiles', id: 'stats-totals' },
-          tile(T.shops, 'boutiques'), tile(T.couriers, 'livreurs'), tile(T.addresses, 'adresses actives'), tile(T.meetings, 'rendez-vous actifs'),
+          tile(T.shops, 'boutiques'), tile(T.couriers, 'livreurs'), tile(T.addresses, 'adresses actives'), tile(T.meetings, 'événements actifs'),
           tile(T.orders, 'commandes'), tile(T.delivered, 'livrées'), tile(T.referred, 'arrivées parrainées'), tile(T.posts, 'publications')),
         T.pending_phone ? h('p', { class: 'small muted' }, T.pending_phone + ' arrivée(s) avec un numéro pas encore inscrit comme parrain.') : null,
         h('section', { class: 'stack tight' }, h('h2', null, 'D’où viennent les arrivées (30 jours)'),
@@ -1862,9 +1916,9 @@
             return item(x, '#/demande/' + x.id, x.purpose || 'Demande', x.requester_name ? 'De : ' + x.requester_name : null,
               x.cached ? null : x.state === 'fulfilled' ? chip('ok', 'Adresse reçue') : x.state === 'expired' ? chip('off', 'Expirée') : chip('wait', 'En attente'));
           }))) : null,
-        meets.length ? h('section', { class: 'stack', 'aria-labelledby': 'h-rdv' }, h('h2', { id: 'h-rdv' }, 'Mes rendez-vous'),
+        meets.length ? h('section', { class: 'stack', 'aria-labelledby': 'h-rdv' }, h('h2', { id: 'h-rdv' }, 'Mes événements'),
           h('div', { class: 'list' }, meets.map(function (x) {
-            return item(x, '#/m/' + x.id, x.label || 'Rendez-vous', x.starts_at ? whenText(x.starts_at) : null,
+            return item(x, '#/m/' + x.id, x.label || 'Événement', x.starts_at ? whenText(x.starts_at) : null,
               x.cached ? null : x.expired ? chip('off', 'Expiré') : x.status === 'active' ? chip('ok', 'Actif') : chip('off', 'Lien désactivé'));
           }))) : null);
     }
@@ -1892,9 +1946,10 @@
         h('span', null, h('b', null, 'Créer mon adresse'), h('small', null, 'Photo de la porte · repère · lien'))),
       h('nav', { class: 'tiles4', 'aria-label': 'Autres actions' },
         tile4('#/demande/nouvelle', 'ask', 'Demander', { 'aria-label': 'Demander une adresse' }),
-        tile4('#/rdv/nouveau', 'cal', 'Rendez-vous', { 'aria-label': 'Créer un rendez-vous' }),
+        tile4('#/rdv/nouveau', 'cal', 'Événement', { 'aria-label': 'Créer un événement' }),
         CFG.shop === false ? null : shopBtn,
         tile4('#/livreur', 'moto', 'Livreur', { id: 'courier-link', 'aria-label': 'Espace livreur' })),
+      h('p', { class: 'small muted home-hint', id: 'event-hint' }, h('b', null, 'Événement'), ' : mariage, baptême, réunion… un seul lien pour que tous vos invités trouvent le lieu.'),
       accountNudge(),
       listBox,
       feedSection(3, { id: 'home-feed' }),
@@ -2120,7 +2175,7 @@
     var active = pl.status === 'active' && !expired;
     var url = shareUrl(pl.share_token);
     var msg = isMeeting
-      ? pl.label + ', ' + whenText(pl.starts_at) + '. Le lieu et le chemin : ' + url
+      ? 'Vous êtes invité(e) : ' + pl.label + ', ' + whenText(pl.starts_at) + '. Le lieu et le chemin : ' + url
       : pl.label + '. L’entrée, avec la photo : ' + url;
     var zone = h('div', { class: 'stack' });
     var busy = false;
@@ -2155,7 +2210,7 @@
     return page(
       retour ? backBtn('Revenir à la fiche reçue', '#/a/' + retour) : backBtn(),
       h('div', { class: 'stack tight' },
-        h('p', { class: 'eyebrow' }, isMeeting ? 'Mon rendez-vous' : 'Mon adresse'),
+        h('p', { class: 'eyebrow' }, isMeeting ? 'Mon événement' : 'Mon adresse'),
         h('div', { class: 'addr-top' },
           pl.photo ? h('img', { class: 'vthumb', src: pl.photo, alt: '', style: 'width:64px;height:64px' }) : null,
           h('div', null, h('h1', { class: 'wrapword' }, pl.label),
@@ -2170,8 +2225,8 @@
       pl.has_voice ? voiceOwnerBox(pl, owner) : null,
       isMeeting && active ? guestsPanel(pl, owner) : null,
       installSlot(),
-      expired ? h('div', { class: 'notice' }, 'Ce rendez-vous a expiré : le lien n’affiche plus le lieu.') : null,
-      isMeeting ? iconBtn('a', { class: expired ? 'btn' : 'btn ghost', id: 'similar', href: '#/rdv/nouveau' + qs({ depuis: pl.id }) }, 'cal', 'Créer un rendez-vous similaire') : null,
+      expired ? h('div', { class: 'notice' }, 'Cet événement a expiré : le lien n’affiche plus le lieu.') : null,
+      isMeeting ? iconBtn('a', { class: expired ? 'btn' : 'btn ghost', id: 'similar', href: '#/rdv/nouveau' + qs({ depuis: pl.id }) }, 'cal', 'Créer un événement similaire') : null,
       // Lignes avec icône ; actions sensibles à part, en bas.
       h('nav', { class: 'ilist' },
         iconRow(isMeeting ? '#/rdv/modifier/' + pl.id : '#/edit/' + pl.id, 'edit', 'Modifier', { id: 'edit-link' }),
@@ -2397,7 +2452,7 @@
     function checkbox(id, label, key) {
       return h('label', null, h('input', { type: 'checkbox', id: id, checked: opts[key], onchange: function (e) { opts[key] = e.target.checked; redraw(); } }), label);
     }
-    function fileName() { return 'fii-la-' + (o.kind === 'meeting' ? 'rendez-vous' : o.kind === 'request' ? 'demande' : 'adresse') + '.png'; }
+    function fileName() { return 'fii-la-' + (o.kind === 'meeting' ? 'evenement' : o.kind === 'request' ? 'demande' : 'adresse') + '.png'; }
     function download() {
       if (!current) return;
       var supportsDownload = 'download' in HTMLAnchorElement.prototype;
@@ -2517,11 +2572,11 @@
       } else { y += 60; }
       // Type de fiche
       font(600, 34); g.letterSpacing = '3px';
-      text(o.kind === 'meeting' ? 'RENDEZ-VOUS' : o.kind === 'request' ? 'DEMANDE D’ADRESSE' : 'ADRESSE', M, y, C.muted);
+      text(o.kind === 'meeting' ? 'ÉVÉNEMENT' : o.kind === 'request' ? 'DEMANDE D’ADRESSE' : 'ADRESSE', M, y, C.muted);
       g.letterSpacing = '0px';
       y += 30;
       // Titre (ou formule neutre)
-      var title = opts.showTitle && o.title ? o.title : (o.kind === 'meeting' ? 'Un rendez-vous partagé avec Fii La' : o.kind === 'request' ? 'Une demande d’adresse Fii La' : 'Une adresse partagée avec Fii La');
+      var title = opts.showTitle && o.title ? o.title : (o.kind === 'meeting' ? 'Un événement partagé avec Fii La' : o.kind === 'request' ? 'Une demande d’adresse Fii La' : 'Une adresse partagée avec Fii La');
       font(800, 84);
       var tl = wrap(title, CW, photo ? 2 : 3);
       tl.forEach(function (l) { y += 96; text(l, M, y, C.ink); });
@@ -2662,7 +2717,7 @@
       } else if (st === 'arrived') {
         setKids(box, h('p', { class: 'live-big' }, icon('check', 22), 'Arrivée confirmée'),
           // Fin de parcours : le bon moment pour proposer la suite (rétention).
-          o.kind === 'guest' ? h('a', { class: 'btn ghost', id: 'guest-create', href: '#/rdv/nouveau' }, 'Créer votre rendez-vous')
+          o.kind === 'guest' ? h('a', { class: 'btn ghost', id: 'guest-create', href: '#/rdv/nouveau' }, 'Créer votre événement')
             : h('a', { class: 'btn ghost', id: 'courier-more', href: '#/livreur' }, courierKey() ? 'Mes courses' : 'Recevoir les courses de vos boutiques'),
           feedSection(2, { id: 'done-feed' }));
       } else {
@@ -2802,7 +2857,7 @@
     return Promise.resolve(page(brandBar('Livraison'), h('h1', null, 'Votre livraison'), deliveryWatch(token), footer(true)));
   }
 
-  // Invité d'un rendez-vous : accepte de partager son trajet avec l'organisateur.
+  // Invité d'un événement : accepte de partager son trajet avec l'organisateur.
   function guestBlock(shareToken, place) {
     var KEY = 'fiila.guest.' + shareToken;
     var box = h('div', { class: 'stack', id: 'guest' });
@@ -2863,7 +2918,7 @@
         var joined = isMeet && LS.get('fiila.guest.' + token, null);
         // Rendez-vous : « Créer le vôtre » seulement après l'arrivée de l'invité, pas avant qu'il ait agi.
         var showDiscover = !mine && (!joined || joined.arrived);
-        var pg = page(brandBar(isMeet ? 'Rendez-vous' : 'Adresse'),
+        var pg = page(brandBar(isMeet ? 'Événement' : 'Adresse'),
           fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(voiceFrom(token, 'share'), r.place.voice_secs) : null }),
           h('p', { class: 'safe-line', id: 'recipient-safe' }, icon('lock', 18), 'Lien privé : seules les personnes qui l’ont reçu voient cette fiche.'),
           !mine && isMeet ? guestBlock(token, r.place) : null,
@@ -2875,12 +2930,12 @@
       var map = {
         revoked: ['⦸', 'Ce lien a été désactivé', 'La personne qui l’a partagé l’a désactivé. Aucune information n’est affichée.'],
         replaced: ['⦸', 'Ce lien a été remplacé', 'La personne qui l’a partagé a créé un nouveau lien. Demandez-le-lui.'],
-        expired: ['⌛', 'Ce rendez-vous est terminé', 'Le lieu n’est plus affiché.'],
+        expired: ['⌛', 'Cet événement est terminé', 'Le lieu n’est plus affiché.'],
         not_found: ['?', 'Lien introuvable', 'Cette fiche n’existe pas ou a été supprimée.'],
         invalid: ['?', 'Lien non valide', 'Vérifiez que le lien a été copié en entier.']
       }[r.state] || ['?', 'Lien introuvable', ''];
       if (r.state === 'expired') cta = h('div', { class: 'row', style: 'justify-content:center' }, h('div', { style: 'flex:0 1 auto' },
-        h('a', { class: 'btn ghost small', href: '#/rdv/nouveau' }, 'Créer mon rendez-vous')));
+        h('a', { class: 'btn ghost small', href: '#/rdv/nouveau' }, 'Créer mon événement')));
       return page(stateCard(map[0], map[1], map[2]), cta);
     }, function (e) {
       return page(stateCard('!', 'Impossible d’afficher la fiche', errText(e), retryBtn()), create);
@@ -2900,12 +2955,12 @@
     var isMeeting = kind === 'meeting';
     var variant = isMeeting ? 'meeting' : 'address';
     var block = h('section', { class: 'discover', id: 'discover', 'aria-labelledby': 'discover-title' },
-      h('h2', { id: 'discover-title' }, isMeeting ? 'Votre prochain rendez-vous' : 'Votre adresse aussi, en une photo'),
+      h('h2', { id: 'discover-title' }, isMeeting ? 'Votre prochain événement' : 'Votre adresse aussi, en une photo'),
       h('p', null, isMeeting
         ? 'Le lieu, l’heure et le chemin dans un seul lien.'
         : 'La porte, un repère, où se garer. Un lien à envoyer.'),
       h('a', { class: 'btn ghost discover-cta', id: 'discover-cta', href: (isMeeting ? '#/rdv/nouveau' : '#/new') + qs({ retour: token }),
-        onclick: function () { track('discovery_cta', variant); } }, icon(isMeeting ? 'cal' : 'cam', 22), h('span', null, isMeeting ? 'Créer un rendez-vous' : 'Créer mon adresse')),
+        onclick: function () { track('discovery_cta', variant); } }, icon(isMeeting ? 'cal' : 'cam', 22), h('span', null, isMeeting ? 'Créer un événement' : 'Créer mon adresse')),
       h('p', { class: 'hint' }, 'Gratuit. Sans compte.'));
     trackWhenVisible(block, 'discovery_shown', variant);
     return block;
@@ -3097,7 +3152,7 @@
   function viewMeetingForm(editId, q) {
     if (editId) {
       var rec = owned.get('place', editId);
-      if (!rec) return page(backBtn(), stateCard('?', 'Rendez-vous introuvable sur ce téléphone', ''));
+      if (!rec) return page(backBtn(), stateCard('?', 'Événement introuvable sur ce téléphone', ''));
       return api('fiila_get_owned', { p_id: editId, p_owner: rec.owner || null }).then(function (pl) {
         var s = dakarParts(pl.starts_at);
         var hours = Math.round((new Date(pl.expires_at) - new Date(pl.starts_at)) / 3600e3);
@@ -3107,7 +3162,7 @@
           walk: pl.walk || '', instruction: pl.instruction || '', photo: pl.photo || null,
           exp: String([2, 24, 168].indexOf(hours) >= 0 ? hours : 24)
         }, { editId: editId, owner: rec.owner, originalPhoto: pl.photo || null });
-      }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger le rendez-vous', errText(e), retryBtn())); });
+      }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger l’événement', errText(e), retryBtn())); });
     }
     if (q && q.depuis) return viewSimilarMeeting(q.depuis);
     var key = MEETING_DRAFT;
@@ -3117,16 +3172,16 @@
       { retour: tokenParam(q && q.retour), draftKey: key, restored: !!saved });
   }
   var MEETING_DRAFT = 'fiila.draft.meeting';
-  // « Créer un rendez-vous similaire » : nouveau brouillon, enregistré comme une fiche distincte.
+  // « Créer un événement similaire » : nouveau brouillon, enregistré comme une fiche distincte.
   // Repris : lieu (à reconfirmer), arrêt voiture (à reconfirmer), trajet à pied, indications, photo, durée d'affichage.
   // Jamais repris : nom, date et heure, liens, clé de gestion, statut (désactivé, expiré).
   function viewSimilarMeeting(sourceId) {
     var rec = owned.get('place', sourceId);
-    if (!rec) return page(backBtn(), stateCard('?', 'Rendez-vous introuvable sur ce téléphone', 'Ouvrez sa clé de gestion pour le réutiliser ici.'));
+    if (!rec) return page(backBtn(), stateCard('?', 'Événement introuvable sur ce téléphone', 'Ouvrez sa clé de gestion pour le réutiliser ici.'));
     var key = MEETING_DRAFT + '.similaire.' + sourceId;
     var saved = LS.get(key, null);
     return api('fiila_get_owned', { p_id: sourceId, p_owner: rec.owner || null }).then(function (pl) {
-      if (pl.kind !== 'meeting') return page(backBtn(), stateCard('?', 'Ce n’est pas un rendez-vous', ''));
+      if (pl.kind !== 'meeting') return page(backBtn(), stateCard('?', 'Ce n’est pas un événement', ''));
       var hours = Math.round((new Date(pl.expires_at) - new Date(pl.starts_at)) / 3600e3);
       var f = saved || {
         label: '', date: '', time: '', entry: null, entryInitial: { lat: pl.entry.lat, lng: pl.entry.lng },
@@ -3135,12 +3190,30 @@
         exp: String([2, 24, 168].indexOf(hours) >= 0 ? hours : 24)
       };
       return meetingForm(f, { similarOf: sourceId, sourceLabel: pl.label, draftKey: key, restored: !!saved });
-    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger le rendez-vous', errText(e), retryBtn())); });
+    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger l’événement', errText(e), retryBtn())); });
+  }
+  // Types d'événement : un toucher remplit le début du nom (le type n'est pas enregistré à part).
+  var EVENT_TYPES = [['Mariage', 'Mariage de ', 'gift'], ['Baptême', 'Baptême de ', 'users'], ['Anniversaire', 'Anniversaire de ', 'star'],
+    ['Condoléances', 'Condoléances – famille ', 'home'], ['Réunion', 'Réunion ', 'cal'], ['Autre', '', 'plus']];
+  function eventTypes(f, done) {
+    var box = h('div', { class: 'ev-types', role: 'group', 'aria-label': 'Type d’événement', id: 'ev-types' });
+    function draw() {
+      setKids(box, EVENT_TYPES.map(function (t) {
+        var on = t[1] && f.label.indexOf(t[1]) === 0;
+        return h('button', { class: 'ev-type' + (on ? ' on' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false', onclick: function () {
+          var prev = EVENT_TYPES.filter(function (x) { return x[1] && f.label.indexOf(x[1]) === 0; })[0];
+          var rest = prev ? f.label.slice(prev[1].length) : (f.label.trim() ? f.label : '');
+          f.label = t[1] + rest; draw(); done();
+        } }, h('span', { class: 'ev-ic', 'aria-hidden': 'true' }, icon(t[2], 22)), h('span', null, t[0]));
+      }));
+    }
+    draw();
+    return box;
   }
   function meetingForm(f, ctx) {
     var err = h('div', { role: 'alert' });
     var why = h('p', { class: 'hint', role: 'status' });
-    var btn = h('button', { class: 'btn', type: 'button', onclick: submit }, ctx.editId ? 'Enregistrer les modifications' : 'Créer le rendez-vous');
+    var btn = h('button', { class: 'btn', type: 'button', onclick: submit }, ctx.editId ? 'Enregistrer les modifications' : 'Créer l’événement');
     function times() {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(f.date) || !/^\d{2}:\d{2}$/.test(f.time)) return null;
       var start = new Date(f.date + 'T' + f.time + ':00Z');
@@ -3148,12 +3221,12 @@
       return { start: start, end: new Date(start.getTime() + Number(f.exp) * 3600e3) };
     }
     function problem() {
-      if (!f.label.trim()) return 'Donnez un nom au rendez-vous.';
+      if (!f.label.trim()) return 'Donnez un nom à l’événement.';
       var t = times();
       if (!t) return 'Indiquez la date et l’heure.';
       if (t.end <= new Date()) return 'Avec cette date, la fiche aurait déjà disparu. Choisissez une date future ou une durée plus longue.';
       if (!f.entry && f.entryInitial) return 'Confirmez le lieu repris en appuyant sur « Valider ce point ».';
-      if (!f.entry) return 'Validez le point de rendez-vous sur la carte.';
+      if (!f.entry) return 'Validez le lieu de l’événement sur la carte.';
       if (f.hasStop && !f.stop) return 'Validez le point d’arrêt voiture, ou décochez l’option.';
       return '';
     }
@@ -3177,13 +3250,13 @@
       btn.disabled = true; btn.textContent = 'Enregistrement…'; setKids(err);
       var call = ctx.editId ? api('fiila_update_place', { p_id: ctx.editId, p_owner: ctx.owner || null, p: p }) : api('fiila_create_place', { p: p });
       call.then(function (r) {
-        if (ctx.editId) { owned.patch('place', ctx.editId, { label: p.label }); toast('Rendez-vous mis à jour. Le lien reste le même.'); go('#/m/' + ctx.editId); return; }
+        if (ctx.editId) { owned.patch('place', ctx.editId, { label: p.label }); toast('Événement mis à jour. Le lien reste le même.'); go('#/m/' + ctx.editId); return; }
         var stored = owned.put({ type: 'place', kind: 'meeting', id: r.id, owner: r.owner_token, share: r.share_token, label: p.label, created: Date.now() });
         attribute('meeting', r.id, r.owner_token, '', ctx.retour ? { src: 'address', token: ctx.retour } : null);
         if (ctx.draftKey) LS.del(ctx.draftKey);
         LS.set('fiila.saved', true);
         track('fiche_created', ctx.similarOf ? 'meeting_similar' : ctx.retour ? 'meeting_discovery' : 'meeting_direct');
-        toast('Rendez-vous enregistré.');
+        toast('Événement enregistré.');
         go('#/m/' + r.id + qs({ k: stored ? null : r.owner_token, retour: ctx.retour, nouveau: '1' }));
       }, function (e) {
         btn.textContent = 'Réessayer'; chk();
@@ -3199,22 +3272,23 @@
     }
     drawStop(); chk();
     return page(ctx.retour ? backBtn('Revenir à la fiche reçue', '#/a/' + ctx.retour)
-      : ctx.similarOf ? backBtn('Retour au rendez-vous d’origine', '#/m/' + ctx.similarOf)
-      : backBtn(ctx.editId ? 'Retour au rendez-vous' : 'Accueil', ctx.editId ? '#/m/' + ctx.editId : '#/'),
-      h('h1', null, ctx.editId ? 'Modifier le rendez-vous' : ctx.similarOf ? 'Rendez-vous similaire' : 'Créer un rendez-vous'),
+      : ctx.similarOf ? backBtn('Retour à l’événement d’origine', '#/m/' + ctx.similarOf)
+      : backBtn(ctx.editId ? 'Retour à l’événement' : 'Accueil', ctx.editId ? '#/m/' + ctx.editId : '#/'),
+      h('h1', null, ctx.editId ? 'Modifier l’événement' : ctx.similarOf ? 'Événement similaire' : 'Créer un événement'),
       ctx.similarOf
-        ? h('div', { class: 'notice', id: 'similar-notice' }, 'À partir de « ' + ctx.sourceLabel + ' ». Le lieu, l’arrêt voiture, les indications et la photo sont repris. Choisissez un nom, une nouvelle date et confirmez le lieu sur la carte. Le rendez-vous d’origine ne change pas.')
-        : h('p', { class: 'muted' }, 'Une fiche de lieu temporaire pour un rendez-vous ou un événement. Elle cesse d’afficher le lieu à la date choisie.'),
+        ? h('div', { class: 'notice', id: 'similar-notice' }, 'À partir de « ' + ctx.sourceLabel + ' ». Le lieu, l’arrêt voiture, les indications et la photo sont repris. Choisissez un nom, une nouvelle date et confirmez le lieu sur la carte. L’événement d’origine ne change pas.')
+        : h('p', { class: 'muted' }, 'Mariage, baptême, anniversaire, réunion : un seul lien pour que tous vos invités trouvent le lieu. Il cesse de s’afficher après la date.'),
       ctx.restored ? h('div', { class: 'row', style: 'align-items:center' },
         h('p', { class: 'hint', style: 'flex:1 1 200px' }, 'Brouillon repris là où vous l’aviez laissé.'),
         h('button', { class: 'btn link', type: 'button', id: 'clear-draft', style: 'flex:0 0 auto', onclick: function () { LS.del(ctx.draftKey); render(); } }, 'Recommencer')) : null,
-      textField({ id: 'm-label', label: 'Nom du rendez-vous', max: 60, value: f.label, placeholder: 'Ex. : Baptême chez Awa', onInput: function (v) { f.label = v; changed(); } }),
+      ctx.editId || ctx.similarOf ? null : eventTypes(f, function () { var i = document.getElementById('m-label'); if (i) { i.value = f.label; i.focus(); i.setSelectionRange(i.value.length, i.value.length); } changed(); }),
+      textField({ id: 'm-label', label: 'Nom de l’événement', max: 60, value: f.label, placeholder: 'Ex. : Baptême chez Awa', onInput: function (v) { f.label = v; changed(); } }),
       h('div', { class: 'row' },
         h('div', { class: 'field' }, h('label', { for: 'm-date' }, ctx.similarOf ? 'Nouvelle date' : 'Date'), h('input', { type: 'date', id: 'm-date', value: f.date, oninput: function (e) { f.date = e.target.value; changed(); } })),
         h('div', { class: 'field' }, h('label', { for: 'm-time' }, 'Heure'), h('input', { type: 'time', id: 'm-time', value: f.time, oninput: function (e) { f.time = e.target.value; changed(); } }))),
       h('p', { class: 'hint' }, 'Heure de Dakar (GMT), quel que soit le fuseau de votre téléphone.'),
-      h('h2', null, 'Point de rendez-vous'),
-      mapPicker({ id: 'm-entry', what: 'le lieu du rendez-vous', initial: f.entryInitial, get: function () { return f.entry; }, set: function (p) { f.entry = p; changed(); } }),
+      h('h2', null, 'Lieu de l’événement'),
+      mapPicker({ id: 'm-entry', what: 'le lieu de l’événement', initial: f.entryInitial, get: function () { return f.entry; }, set: function (p) { f.entry = p; changed(); } }),
       textField({ id: 'm-instr', label: 'Indications sur place', optional: true, multiline: true, max: 280, value: f.instruction, placeholder: 'Ex. : tente blanche derrière la mosquée', onInput: function (v) { f.instruction = v; saveDraft(); } }),
       photoField({ id: 'm-photo', optional: true, get: function () { return f.photo; }, set: function (p) { f.photo = p; saveDraft(); } }),
       h('div', { class: 'choice one' },
@@ -4362,7 +4436,7 @@
         h('p', null, 'Fii La est en phase pilote. Cette page décrit ce que le service enregistre et comment le supprimer.'),
         h('h2', null, 'Ce qui est enregistré'),
         h('ul', null,
-          h('li', null, 'Ce que vous saisissez : nom du lieu, quartier, repère, point d’entrée, point d’arrêt voiture, photo, et pour un rendez-vous sa date.'),
+          h('li', null, 'Ce que vous saisissez : nom du lieu, quartier, repère, point d’entrée, point d’arrêt voiture, photo, et pour un événement sa date.'),
           h('li', null, 'Pour une demande d’adresse : le nom du demandeur, la raison et la référence éventuelle.'),
           h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.'),
           h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.'),
@@ -4370,21 +4444,21 @@
           h('li', null, 'Si vous ouvrez une boutique : son nom et son téléphone s’il est indiqué ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii La les héberge pour lui.'),
           h('li', null, 'Si vous êtes livreur : votre nom, et si vous les indiquez votre téléphone, votre moyen de livraison et votre zone. Vos boutiques voient votre nom, votre téléphone et votre note ; les clients voient votre prénom.'),
           h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom. Le commerçant voit la moyenne de ses articles.'),
-          h('li', null, 'Origine et parrainage : quand vous créez une adresse, un rendez-vous, une boutique ou un espace livreur, Fii La note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
+          h('li', null, 'Origine et parrainage : quand vous créez une adresse, un événement, une boutique ou un espace livreur, Fii La note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
           h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro. Le numéro n’est jamais affiché ; il sert seulement à vous reconnaître quand quelqu’un le tape. Les personnes qui ouvrent votre lien voient votre prénom.'),
           h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus que vous ajoutez à votre adresse. Le micro n’est utilisé que lorsque vous appuyez sur « Enregistrer ». Toute personne qui a le lien, et le livreur d’une course, peuvent l’écouter. Il est supprimé avec la fiche, ou dès que vous le retirez.'),
           h('li', null, 'Vitrine d’une boutique (si elle l’ouvre) : ses articles visibles par toute personne qui a le lien. Une commande passée sur la vitrine transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
           h('li', null, 'Fil des boutiques : les 25 premières boutiques qui ouvrent leur vitrine y apparaissent gratuitement (nom, présentation, articles, prix, note). La boutique peut en sortir à tout moment dans ses réglages. Aucune donnée de client n’y figure.'),
           h('li', null, 'Publication d’un article : Fii La compte seulement qu’une publication a été faite, pas le réseau choisi.'),
-          h('li', null, 'Suivi en direct (livreur ou invité d’un rendez-vous), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou du rendez-vous. Pour un rendez-vous, votre prénom.')),
+          h('li', null, 'Suivi en direct (livreur ou invité d’un événement), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou de l’événement. Pour un événement, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),
-        h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un rendez-vous : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),
+        h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un événement : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),
         h('h2', null, 'Où sont stockées les données'),
         h('p', null, 'Les fiches sont enregistrées dans une base de données hébergée par Supabase sur des serveurs situés à Paris (France), donc hors du Sénégal. Supabase agit comme prestataire technique et ne les utilise pas pour son propre compte. Le site lui-même est servi par GitHub Pages, qui ne reçoit aucune donnée de fiche.'),
         h('h2', null, 'Combien de temps'),
         h('ul', null,
           h('li', null, 'Adresse : jusqu’à ce que vous la supprimiez.'),
-          h('li', null, 'Rendez-vous : le lieu cesse d’être affiché à la date choisie, puis la fiche est effacée 30 jours plus tard.'),
+          h('li', null, 'Événement : le lieu cesse d’être affiché à la date choisie, puis la fiche est effacée 30 jours plus tard.'),
           h('li', null, 'Demande d’adresse : valable 7 jours, effacée 30 jours après son expiration.'),
           h('li', null, 'Empreinte de l’adresse IP : 24 heures.'),
           h('li', null, 'Commandes, factures et clients d’une boutique : 24 mois au plus, ou moins si le commerçant les supprime. Compte et boutique : jusqu’à leur suppression.'),
@@ -4401,7 +4475,7 @@
         h('h2', null, 'Qui peut voir une fiche'),
         h('p', null, 'Toute personne qui a le lien peut voir la fiche et le transférer. Les fiches ne sont jamais listées publiquement. Une réponse à une demande n’est visible que par le demandeur.'),
         h('h2', null, 'Désactiver et supprimer'),
-        h('p', null, 'Depuis « Mes adresses », vous pouvez désactiver un lien (il n’affiche plus rien) ou supprimer la fiche et sa photo. Les rendez-vous cessent d’afficher le lieu à la date choisie, puis sont effacés 30 jours plus tard. Les copies d’écran ou messages déjà envoyés ne peuvent pas être rappelés. Les sauvegardes techniques de la base peuvent conserver une copie pendant quelques jours avant d’être écrasées.'),
+        h('p', null, 'Depuis « Mes adresses », vous pouvez désactiver un lien (il n’affiche plus rien) ou supprimer la fiche et sa photo. Les événements cessent d’afficher le lieu à la date choisie, puis sont effacés 30 jours plus tard. Les copies d’écran ou messages déjà envoyés ne peuvent pas être rappelés. Les sauvegardes techniques de la base peuvent conserver une copie pendant quelques jours avant d’être écrasées.'),
         h('h2', null, 'Clé de gestion'),
         h('p', null, 'Vos fiches sont gérées depuis le téléphone qui les a créées. Si vous le perdez ou effacez ses données, seule la clé de gestion permet de les modifier ou de les supprimer. Sans elle, Fii La ne peut pas vérifier que la fiche vous appartient.'),
         h('h2', null, 'Services tiers'),

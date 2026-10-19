@@ -127,6 +127,21 @@ await t('page reçue ouverte directement (depuis WhatsApp) : pas de flèche, log
   await C.locator('.hero').waitFor();
 });
 
+await t('« Événement » : tuile et exemples sur l’accueil ; un toucher sur un type remplit le nom', async () => {
+  await P.goto(URL0 + '#/');
+  await P.getByRole('link', { name: 'Créer un événement' }).waitFor();
+  assert.match(await P.locator('#event-hint').textContent(), /mariage, baptême/);
+  await P.getByRole('link', { name: 'Créer un événement' }).click();
+  await P.getByRole('heading', { name: 'Créer un événement' }).waitFor();
+  await P.locator('#ev-types').getByText('Baptême').click();
+  assert.equal(await P.locator('#m-label').inputValue(), 'Baptême de ');
+  await P.locator('#m-label').fill('Baptême de Awa');
+  await P.locator('#ev-types').getByText('Mariage').click();
+  assert.equal(await P.locator('#m-label').inputValue(), 'Mariage de Awa', 'le reste du nom est gardé');
+  assert.equal(await P.locator('#ev-types .ev-type.on').textContent(), 'Mariage');
+  await P.evaluate(() => localStorage.removeItem('fiila.draft.meeting'));
+});
+
 await t('aucune erreur JavaScript', async () => { assert.deepEqual([...P.__errors, ...V.__errors], []); });
 
 await browser.close();

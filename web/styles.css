@@ -697,3 +697,32 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .feed-block .fcard{flex:0 0 80%;max-width:320px;scroll-snap-align:start}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .fgo{color:var(--ink)}}
 :root[data-theme="dark"] .fgo{color:var(--ink)}
+
+/* ---- Carrousel du fil (19/10) : glissement lent, photo qui s'approche, progression dans le point actif. */
+.car{display:flex;flex-direction:column;gap:12px}
+.car-track{scroll-behavior:smooth;position:relative}
+.car-track .fcard{transition:opacity .9s ease,transform .9s cubic-bezier(.22,.61,.36,1)}
+.car-track .fcard:not(.is-active){opacity:.55;transform:scale(.96)}
+.car-track .fcard.is-active .fimg img{animation:car-kb 9s ease-out both}
+@keyframes car-kb{from{transform:scale(1)}to{transform:scale(1.07)}}
+.car-track .fcard.is-active .fbody{animation:car-up .8s ease both}
+@keyframes car-up{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.car-dots{display:flex;justify-content:center;gap:6px}
+.car-dot{width:28px;height:28px;padding:0;border:0;background:none;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.car-dot i{display:block;width:7px;height:7px;border-radius:99px;background:var(--line-strong);transition:width .5s ease,background .5s ease;position:relative;overflow:hidden}
+.car-dot.on i{width:26px;background:var(--surface-3)}
+.car-dot.on i::after{content:"";position:absolute;inset:0;background:var(--green);border-radius:inherit}
+.car-dot.run i::after{transform-origin:left;animation:car-prog var(--car-ms,6000ms) linear both}
+@keyframes car-prog{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media (prefers-reduced-motion: reduce){
+  .car-track{scroll-behavior:auto}
+  .car-track .fcard,.car-track .fcard.is-active .fimg img,.car-track .fcard.is-active .fbody{animation:none;transition:none}
+  .car-track .fcard:not(.is-active){opacity:1;transform:none}
+}
+
+/* ---- Types d'événement (19/10) */
+.ev-types{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ev-type{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;min-height:76px;border-radius:16px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font-size:14px;font-weight:600;cursor:pointer}
+.ev-type .ev-ic{color:var(--green);display:flex}
+.ev-type.on{border-color:var(--green);background:var(--soft)}
+.home-hint{margin-top:-8px}

@@ -1,7 +1,7 @@
 {
   "moteur": "chromium",
   "version": "141.0.7390.37",
-  "date": "2026-10-19T04:42:32.098Z",
+  "date": "2026-10-19T05:23:15.418Z",
   "reussis": 12,
   "total": 12,
   "results": [
@@ -43,7 +43,7 @@
     },
     {
       "ok": true,
-      "name": "fiche publique du rendez-vous : aucun nom d’invité, aucune position"
+      "name": "fiche publique de l’événement : aucun nom d’invité, aucune position"
     },
     {
       "ok": true,

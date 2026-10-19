@@ -75,6 +75,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 18/10 23:31 | Vitrine : 3 modèles au choix et personnalisation simple (« comme Shopify ») | Fondateur |
 | 18/10 23:50 | NINEA retiré de l'application (réglages de la boutique, facture, confidentialité) ; la colonne reste en base, vidée à chaque enregistrement de la boutique | Fondateur |
 | 19/10 04:24 | Fil des boutiques : les 25 premières boutiques mises en avant gratuitement ; tous les utilisateurs le voient sur l'accueil et à la fin de leurs tâches. Suppression des 2 restes de test autorisée | Fondateur |
+| 19/10 05:17 | Fil validé avec carrousel animé apaisant ; proposition Sites / Studio IA / assistant validée dans ses recommandations (mention discrète sur le site offert, domaine neutre à proposer, budget d'essai IA, « Événement », ordre des étapes) | Fondateur |
 | 19/10 04:30 | Commande de vitrine : le numéro tapé n'est pas vérifié, donc l'adresse reçue pour elle n'est jamais copiée sur un client connu de la boutique. Parrainage par numéro : la boutique, le livreur ou le compte qui porte le numéro passe avant une fiche anonyme ; un compte qui supprime son code n'est plus réinscrit d'office | Builder (sécurité ; à confirmer par le fondateur) |
 
 ## 4. En attente / prochaines actions

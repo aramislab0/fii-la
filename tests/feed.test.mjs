@@ -86,6 +86,32 @@ await t('accueil : bloc « Boutiques à découvrir » après les adresses, 3 bou
   await shot(A, '01-accueil');
 });
 
+await t('carrousel : avance seul en douceur, s’arrête quand on touche ; « réduire les animations » : immobile', async () => {
+  const A = await newPhone();
+  await A.goto(URL0 + '#/');
+  await A.locator('#home-feed .car-dot').first().waitFor();
+  await A.locator('#home-feed').scrollIntoViewIfNeeded();
+  assert.equal(await A.locator('#home-feed .car-dot').count(), 3);
+  const active = () => A.evaluate(() => [...document.querySelectorAll('#home-feed .fcard')].findIndex((c) => c.classList.contains('is-active')));
+  assert.equal(await active(), 0);
+  await A.waitForFunction(() => document.querySelectorAll('#home-feed .fcard')[1].classList.contains('is-active'), null, { timeout: 9000 });
+  await A.waitForTimeout(1200);
+  const x = await A.evaluate(() => document.querySelector('#home-feed .car-track').scrollLeft);
+  assert.ok(x > 100, 'la piste a glissé : ' + x);
+  await shot(A, '01b-carrousel');
+  await A.locator('#home-feed .car-dot').nth(2).click();
+  await A.waitForFunction(() => document.querySelectorAll('#home-feed .fcard')[2].classList.contains('is-active'));
+  await A.waitForTimeout(7000);
+  assert.equal(await active(), 2, 'après un toucher, plus de défilement automatique');
+  // Mouvement réduit
+  const ctx = await browser.newContext({ viewport: phone.viewport, isMobile: ENGINE === 'chromium', hasTouch: true, locale: 'fr-FR', serviceWorkers: 'block', reducedMotion: 'reduce' });
+  const R = await ctx.newPage(); R.__errors = []; R.on('pageerror', (e) => R.__errors.push(String(e))); pages.push(R);
+  await R.goto(URL0 + '#/');
+  await R.locator('#home-feed .car-dot').first().waitFor();
+  await R.waitForTimeout(7000);
+  assert.equal(await R.evaluate(() => [...document.querySelectorAll('#home-feed .fcard')].findIndex((c) => c.classList.contains('is-active'))), 0);
+});
+
 await t('page « Boutiques » : les 4 vitrines ouvertes, places gratuites restantes, ouverture d’une vitrine puis retour', async () => {
   const A = await newPhone();
   await A.goto(URL0 + '#/');

@@ -90,7 +90,7 @@ await t('enregistrement lent [SIMULÉ réseau] : l’état « partager » n’ap
   await O.locator('#m-walk').fill('Traverser la place, 60 m');
   let release;
   await O.route('**/rpc/fiila_create_place', async (r) => { await new Promise((res) => { release = res; }); await r.continue(); });
-  await O.getByRole('button', { name: 'Créer le rendez-vous' }).click();
+  await O.getByRole('button', { name: 'Créer l’événement' }).click();
   await O.getByRole('button', { name: 'Enregistrement…' }).waitFor();
   await new Promise((r) => setTimeout(r, 800));
   assert.equal(await O.getByRole('heading', { name: 'Partager' }).count(), 0, 'partage affiché avant enregistrement');
@@ -164,7 +164,7 @@ await t('le propriétaire qui ouvre son propre lien retrouve sa gestion, pas l�
 });
 
 // ================================================================== C. réouvrir et repartager (nouvelle visite)
-await t('réouverture depuis « Mes rendez-vous » après rechargement, puis repartage', async () => {
+await t('réouverture depuis « Mes événements » après rechargement, puis repartage', async () => {
   await O.goto(URL0);
   await O.reload();
   const reopen = waitTrack(O, 'owned_reopened', 'meeting');
@@ -182,13 +182,13 @@ await t('réouverture depuis « Mes rendez-vous » après rechargement, puis rep
   }
 });
 
-// ================================================================== D. rendez-vous similaire
+// ================================================================== D. événement similaire
 let before, simId;
-await t('« Créer un rendez-vous similaire » : brouillon neuf, lieu à reconfirmer, nom et date vides', async () => {
+await t('« Créer un événement similaire » : brouillon neuf, lieu à reconfirmer, nom et date vides', async () => {
   before = await row(meetId);
   await O.goto(URL0 + '#/m/' + meetId);
   await O.locator('#similar').click();
-  await O.getByRole('heading', { name: 'Rendez-vous similaire' }).waitFor();
+  await O.getByRole('heading', { name: 'Événement similaire' }).waitFor();
   await O.locator('#similar-notice').waitFor();
   assert.equal(await O.locator('#m-label').inputValue(), '', 'nom repris');
   assert.equal(await O.locator('#m-date').inputValue(), '', 'date reprise');
@@ -197,36 +197,36 @@ await t('« Créer un rendez-vous similaire » : brouillon neuf, lieu à reconfi
   assert.equal(await O.locator('#m-walk').inputValue(), 'Traverser la place, 60 m');
   assert.ok(await O.locator('#m-hasstop').isChecked());
   assert.equal(await O.locator('img.photo-prev').count(), 1, 'photo non reprise');
-  assert.equal(await O.getByText('Point validé pour le lieu du rendez-vous').count(), 0, 'lieu validé sans confirmation');
-  await O.getByText('Point repris du rendez-vous précédent : vérifiez-le, puis validez.').first().waitFor();
-  assert.ok(await O.getByRole('button', { name: 'Créer le rendez-vous' }).isDisabled(), 'création possible sans nouvelle date');
+  assert.equal(await O.getByText('Point validé pour le lieu de l’événement').count(), 0, 'lieu validé sans confirmation');
+  await O.getByText('Point repris de l’événement précédent : vérifiez-le, puis validez.').first().waitFor();
+  assert.ok(await O.getByRole('button', { name: 'Créer l’événement' }).isDisabled(), 'création possible sans nouvelle date');
   await shot(O, '03-rendez-vous-similaire');
 });
 
-await t('brouillon du rendez-vous similaire conservé si on quitte la page', async () => {
+await t('brouillon du événement similaire conservé si on quitte la page', async () => {
   await O.locator('#m-label').fill('Réunion de quartier — novembre (test)');
-  await O.getByRole('link', { name: '← Retour au rendez-vous d’origine' }).click();
+  await O.getByRole('link', { name: '← Retour à l’événement d’origine' }).click();
   await O.getByRole('heading', { name: 'Partager' }).waitFor();
   await O.locator('#similar').click();
   await O.getByText('Brouillon repris là où vous l’aviez laissé.').waitFor();
   assert.equal(await O.locator('#m-label').inputValue(), 'Réunion de quartier — novembre (test)');
 });
 
-await t('enregistrement : fiche distincte, rendez-vous d’origine inchangé', async () => {
+await t('enregistrement : fiche distincte, événement d’origine inchangé', async () => {
   const d = new Date(Date.now() + 30 * 86400e3);
   await O.locator('#m-date').fill(d.toISOString().slice(0, 10));
   await O.locator('#m-time').fill('17:00');
-  assert.ok(await O.getByRole('button', { name: 'Créer le rendez-vous' }).isDisabled(), 'lieu repris accepté sans confirmation');
+  assert.ok(await O.getByRole('button', { name: 'Créer l’événement' }).isDisabled(), 'lieu repris accepté sans confirmation');
   await O.getByRole('button', { name: 'Valider ce point' }).nth(0).click();
   await O.getByRole('button', { name: 'Valider ce point' }).nth(0).click();
   const created = waitTrack(O, 'fiche_created', 'meeting_similar');
-  await O.getByRole('button', { name: 'Créer le rendez-vous' }).click();
+  await O.getByRole('button', { name: 'Créer l’événement' }).click();
   await O.locator('#saved-ok').waitFor();
   await created;
   simId = O.url().match(/#\/m\/([0-9a-f-]{36})/)[1];
   assert.notEqual(simId, meetId);
   const after = await row(meetId), sim = await row(simId);
-  assert.deepEqual(after, before, 'le rendez-vous d’origine a été modifié');
+  assert.deepEqual(after, before, 'le événement d’origine a été modifié');
   assert.notEqual(sim.share_token, before.share_token);
   assert.notEqual(sim.oh, before.oh, 'même clé de gestion');
   assert.equal(sim.label, 'Réunion de quartier — novembre (test)');
@@ -238,19 +238,19 @@ await t('enregistrement : fiche distincte, rendez-vous d’origine inchangé', a
   assert.equal(await O.evaluate((k) => localStorage.getItem(k), 'fiila.draft.meeting.similaire.' + meetId), null, 'brouillon non effacé');
 });
 
-await t('similaire depuis un rendez-vous désactivé et expiré [SIMULÉ temps] : la copie est active, l’origine reste désactivée', async () => {
+await t('similaire depuis un événement désactivé et expiré [SIMULÉ temps] : la copie est active, l’origine reste désactivée', async () => {
   await local.db.query(`update fiila.places set status = 'revoked', starts_at = now() - interval '3 days', expires_at = now() - interval '2 days' where id = $1`, [meetId]);
   const src = await row(meetId);
   await O.goto(URL0 + '#/m/' + meetId);
-  await O.getByText('Ce rendez-vous a expiré : le lien n’affiche plus le lieu.').waitFor();
-  assert.equal(await O.locator('#similar').evaluate((a) => a.className), 'btn', 'action non mise en avant sur un rendez-vous expiré');
+  await O.getByText('Cet événement a expiré : le lien n’affiche plus le lieu.').waitFor();
+  assert.equal(await O.locator('#similar').evaluate((a) => a.className), 'btn', 'action non mise en avant sur un événement expiré');
   await O.locator('#similar').click();
   await O.locator('#m-label').fill('Réunion relancée (test)');
   await O.locator('#m-date').fill(new Date(Date.now() + 5 * 86400e3).toISOString().slice(0, 10));
   await O.locator('#m-time').fill('10:00');
   await O.getByRole('button', { name: 'Valider ce point' }).nth(0).click();
   await O.getByRole('button', { name: 'Valider ce point' }).nth(0).click();
-  await O.getByRole('button', { name: 'Créer le rendez-vous' }).click();
+  await O.getByRole('button', { name: 'Créer l’événement' }).click();
   await O.locator('#saved-ok').waitFor();
   const id2 = O.url().match(/#\/m\/([0-9a-f-]{36})/)[1];
   const copy = await row(id2);
@@ -267,9 +267,9 @@ await t('liens terminés : désactivé et expiré, avec la bonne suite', async (
   await V.getByText('Ce lien a été désactivé').waitFor();
   await local.db.query(`update fiila.places set status = 'active' where id = $1`, [meetId]);
   await V.reload();
-  await V.getByText('Ce rendez-vous est terminé').waitFor();
-  await V.getByRole('link', { name: 'Créer mon rendez-vous' }).click();
-  await V.getByRole('heading', { name: 'Créer un rendez-vous' }).waitFor();
+  await V.getByText('Cet événement est terminé').waitFor();
+  await V.getByRole('link', { name: 'Créer mon événement' }).click();
+  await V.getByRole('heading', { name: 'Créer un événement' }).waitFor();
 });
 
 // ================================================================== E. brouillon de rendez-vous après échec d'enregistrement
@@ -280,29 +280,29 @@ await t('échec d’enregistrement [SIMULÉ réseau] puis rechargement : le brou
   await p.page.locator('#m-instr').fill('Entrée par le portail blanc');
   await pastePoint(p.page, { lat: 14.70, lng: -17.45 });
   await p.ctx.route('**/rpc/fiila_create_place', (r) => r.abort('failed'));
-  await p.page.getByRole('button', { name: 'Créer le rendez-vous' }).click();
+  await p.page.getByRole('button', { name: 'Créer l’événement' }).click();
   await p.page.getByText(/Connexion impossible/).waitFor();
   assert.equal(await p.page.getByRole('heading', { name: 'Partager' }).count(), 0);
   await p.page.reload();
   await p.page.getByText('Brouillon repris là où vous l’aviez laissé.').waitFor();
   assert.equal(await p.page.locator('#m-label').inputValue(), 'Mariage (test brouillon)');
   assert.equal(await p.page.locator('#m-instr').inputValue(), 'Entrée par le portail blanc');
-  await p.page.getByText('Point validé pour le lieu du rendez-vous').waitFor();
+  await p.page.getByText('Point validé pour le lieu de l’événement').waitFor();
   await p.ctx.unroute('**/rpc/fiila_create_place');
-  await p.page.getByRole('button', { name: 'Créer le rendez-vous' }).click();
+  await p.page.getByRole('button', { name: 'Créer l’événement' }).click();
   await p.page.locator('#saved-ok').waitFor();
   await p.page.goto(URL0 + '#/rdv/nouveau');
   assert.equal(await p.page.locator('#m-label').inputValue(), '', 'ancien brouillon resté après succès');
   await p.ctx.close();
 });
 
-await t('position refusée pendant la création d’un rendez-vous : message et alternative manuelle', async () => {
+await t('position refusée pendant la création d’un événement : message et alternative manuelle', async () => {
   const p = await newPhone();
   await p.page.goto(URL0 + '#/rdv/nouveau');
   await p.page.getByRole('button', { name: 'Utiliser ma position' }).first().click();
   await p.page.getByText(/Accès à la position refusé|Position indisponible/).waitFor();
   await pastePoint(p.page, { lat: 14.71, lng: -17.46 });
-  await p.page.getByText('Point validé pour le lieu du rendez-vous').waitFor();
+  await p.page.getByText('Point validé pour le lieu de l’événement').waitFor();
   await p.ctx.close();
 });
 
@@ -349,12 +349,12 @@ await t('thème sombre : écrans modifiés lisibles (gestion, similaire, demande
   assert.ok(ratio >= 4.5, 'contraste confirmation ' + ratio.toFixed(2));
   await shot(p.page, '04-enregistre-dark');
   await p.page.goto(URL0 + '#/rdv/nouveau?depuis=' + meetId);
-  await p.page.getByRole('heading', { name: 'Rendez-vous similaire' }).waitFor();
+  await p.page.getByRole('heading', { name: 'Événement similaire' }).waitFor();
   await shot(p.page, '05-similaire-dark');
   await p.ctx.close();
 });
 
-await t('clavier : « Créer un rendez-vous similaire » et le repli des coordonnées sont atteignables, focus visible', async () => {
+await t('clavier : « Créer un événement similaire » et le repli des coordonnées sont atteignables, focus visible', async () => {
   await O.goto(URL0 + '#/m/' + simId);
   await O.getByRole('heading', { name: 'Partager' }).waitFor();
   const reach = async (page, test) => {
@@ -371,7 +371,7 @@ await t('clavier : « Créer un rendez-vous similaire » et le repli des coordon
   assert.notEqual(o2, 'none');
 });
 
-await t('texte long à 320 px : rendez-vous similaire et fiche sans débordement', async () => {
+await t('texte long à 320 px : événement similaire et fiche sans débordement', async () => {
   const p = await newPhone({ viewport: { width: 320, height: 640 } });
   await p.page.goto(URL0);
   const longLabel = 'Rassemblement-' + 'é'.repeat(46);

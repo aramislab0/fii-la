@@ -108,7 +108,7 @@ await t('encodage : accents, guillemets, « & », « # » et titre long conserv�
   await O.getByRole('heading', { name: LONG.slice(0, 60) }).waitFor();
   const tg = new URL(await O.locator('#share-telegram').getAttribute('href'));
   assert.ok(!/:\s*$/.test(tg.searchParams.get('text')), 'deux-points final dans le texte');
-  assert.ok(tg.searchParams.get('text').startsWith(LONG.slice(0, 60)), tg.searchParams.get('text'));
+  assert.ok(tg.searchParams.get('text').startsWith('Vous êtes invité(e) : ' + LONG.slice(0, 60)), tg.searchParams.get('text'));
   assert.ok(/%C3%A8|%E2%80%99/.test(tg.search), 'accents non encodés');
   assert.ok(!/[ «»&#]/.test(tg.search.slice(1).replace(/&text=/, '').replace(/^url=/, '')), 'caractères non encodés dans la requête');
 });
@@ -228,7 +228,7 @@ await t('export : fichier PNG 1080 × 1920 téléchargé, QR décodé = lien des
   const m = await sharp(buf).metadata();
   assert.deepEqual([m.width, m.height, m.format], [1080, 1920, 'png']);
   assert.equal(decodePng(buf), recipientUrl.meeting);
-  assert.equal(d.suggestedFilename(), 'fii-la-rendez-vous.png');
+  assert.equal(d.suggestedFilename(), 'fii-la-evenement.png');
   exportedMeeting = path;
 });
 
@@ -256,7 +256,7 @@ await t('TikTok : consigne du champ « Site web » (non garanti), formule neutre
   await O.locator('#v-when').uncheck();
   await O.waitForFunction(() => /partagé avec Fii La/.test(document.getElementById('visual-preview').dataset.meta));
   const meta = JSON.parse(await O.locator('#visual-preview').getAttribute('data-meta'));
-  assert.equal(meta.titleLines.join(' '), 'Un rendez-vous partagé avec Fii La');
+  assert.equal(meta.titleLines.join(' '), 'Un événement partagé avec Fii La');
   assert.ok(!meta.texts.some((x) => x.includes('Ndèye')), 'nom affiché malgré le choix');
   assert.ok(!meta.texts.some((x) => /heure de Dakar/.test(x)), 'date affichée malgré le choix');
 });
@@ -348,13 +348,13 @@ await t('lien désactivé ou rendez-vous expiré [SIMULÉ temps] : plus de panne
   assert.equal(await O.locator('.share-panel, #share-instagram').count(), 0);
   await local.db.query(`update fiila.places set starts_at = now() - interval '3 days', expires_at = now() - interval '1 day' where id = $1`, [meet.id]);
   await O.goto(URL0 + views.meeting);
-  await O.getByText('Ce rendez-vous a expiré', { exact: false }).waitFor();
+  await O.getByText('Cet événement a expiré', { exact: false }).waitFor();
   assert.equal(await O.locator('.share-panel, #share-instagram').count(), 0);
   const p = await newPhone({ owned: false });
   await p.page.goto(recipientUrl.address);
   await p.page.getByText('Ce lien a été désactivé').waitFor();
   await p.page.goto(recipientUrl.meeting); await p.page.reload();
-  await p.page.getByText('Ce rendez-vous est terminé').waitFor();
+  await p.page.getByText('Cet événement est terminé').waitFor();
   await p.ctx.close();
 });
 
