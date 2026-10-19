@@ -111,7 +111,11 @@ await t('personnalisation : modèle Magazine, couleur Prune, couverture ; la vit
   await S.locator('#vitrine-look summary').click();
   await S.locator('#vitrine-theme').getByText('Magazine').click();
   await S.getByText('Modèle « Magazine » appliqué.').waitFor();
-  await S.getByRole('radio', { name: 'Prune' }).check({ force: true });
+  // L'écran se redessine après chaque réglage : on retente si le choix tombe pendant le redessin (vu sous WebKit).
+  for (let i = 0; i < 3; i++) {
+    await S.getByRole('radio', { name: 'Prune' }).check({ force: true }).catch(() => {});
+    if (await S.getByText('Couleur « Prune » appliquée.').waitFor({ timeout: 4000 }).then(() => true, () => false)) break;
+  }
   await S.getByText('Couleur « Prune » appliquée.').waitFor();
   await S.setInputFiles('#vitrine-cover', 'tests/fixtures/door-with-exif.jpg');
   await S.getByText('Couverture enregistrée.').waitFor();
