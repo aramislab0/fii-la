@@ -212,6 +212,19 @@
     invalid_theme: 'Modèle ou couleur non reconnu. Choisissez dans la liste.',
     invalid_category: 'Catégorie non reconnue. Choisissez dans la liste.',
     invalid_business_type: 'Type de commerce non reconnu. Choisissez dans la liste.',
+    charter_required: 'Acceptez la charte de l’ambassadeur pour continuer.',
+    phone_taken: 'Ce numéro est déjà inscrit comme ambassadeur.',
+    invalid_payout: 'Choisissez Wave ou Orange Money.',
+    quiz_done: 'Le test est déjà réussi.',
+    quiz_wait: 'Deux essais par jour : réessayez demain.',
+    quiz_incomplete: 'Répondez aux 10 questions.',
+    ambassador_unknown: 'Code ambassadeur inconnu ou pas encore actif.',
+    ambassador_already: 'Cette boutique a déjà un ambassadeur.',
+    ambassador_too_late: 'Le code ambassadeur se tape dans les 7 jours qui suivent la création de la boutique.',
+    ambassador_self: 'Un ambassadeur ne peut pas être accompagné par lui-même.',
+    ambassador_cap: 'Cet ambassadeur a atteint son nombre de commerçants pour ce mois.',
+    invalid_state: 'Action impossible dans cet état.',
+    reason_required: 'Indiquez un motif.',
     business_type_required: 'Choisissez votre type de commerce.',
     invalid_stock: 'Stock : indiquez un nombre (0 ou plus), ou laissez vide.',
     size_required: 'Choisissez votre taille ou pointure.',
@@ -1865,6 +1878,7 @@
       var src = Object.keys(s.sources || {}).sort(function (a, b) { return s.sources[b] - s.sources[a]; });
       return page(backBtn(),
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fondateur'), h('h1', null, 'Croissance')),
+        iconRow('#/admin/ambassadeurs', 'users', 'Ambassadeurs : inscriptions et versements', { id: 'stats-amb' }),
         h('div', { class: 'tiles', id: 'stats-totals' },
           tile(T.shops, 'boutiques'), tile(T.couriers, 'livreurs'), tile(T.addresses, 'adresses actives'), tile(T.meetings, 'événements actifs'),
           tile(T.orders, 'commandes'), tile(T.delivered, 'livrées'), tile(T.referred, 'arrivées parrainées'), tile(T.posts, 'publications')),
@@ -1934,6 +1948,8 @@
       else if (p[0] === 'boutique' && !p[1]) view = viewShop(r.q);
       else if (p[0] === 'boutiques' && !p[1]) view = viewFeed();
       else if (p[0] === 'demo' && !p[1]) view = viewDemo(r.q);
+      else if (p[0] === 'ambassadeur' && !p[1]) view = viewAmbassador();
+      else if (p[0] === 'admin' && p[1] === 'ambassadeurs') view = viewAdminAmbassadors();
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
@@ -2122,6 +2138,8 @@
       demoBanner(),
       listBox,
       feedSection(3, { id: 'home-feed' }),
+      h('a', { class: 'invite-row', id: 'amb-link-home', href: '#/ambassadeur' }, icon('cash', 24), h('span', null, 'Devenir ambassadeur Fii La'),
+        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
       h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer' }, icon('gift', 24), h('span', null, 'Inviter un proche'),
         h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
       footer());
@@ -3777,6 +3795,7 @@
     var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '', type: shop ? shop.business_type || '' : '' };
     var err = h('div', { role: 'alert' });
     var ask = shop ? null : referralAsk('shop-ref');
+    var ambCode = '';
     var btn = h('button', { class: 'btn', type: 'button', id: 'shop-save', onclick: function () {
       setKids(err);
       if (!f.type) return errBox(err, new ApiError('business_type_required'));
@@ -3784,6 +3803,7 @@
       sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: null, business_type: f.type } }).then(function (r) {
         if (r && r.key) LS.set(SHOP_LS, { id: r.shop.id, key: r.key, linked: authed() || undefined });
         if (!shop) { track('shop_created', authed() ? 'account' : 'no_account'); bumpTx(); attribute('shop', null, r.key || shopKey(), ask.value()); }
+        if (!shop && ambCode.trim()) api('fiila_ambassador_link', { p_key: r.key || shopKey(), p_code: ambCode.trim() }).then(function (x) { toast('Boutique créée, accompagnée par ' + x.ambassador + '.'); }, function (e) { toast('Boutique créée. Code ambassadeur : ' + errText(e)); });
         ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, shop ? 'Enregistrer' : 'Créer ma boutique');
@@ -3797,8 +3817,10 @@
         h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
           h('option', { value: '' }, 'Choisir…'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: f.type === t[0] || null }, t[1]); })),
         h('p', { class: 'hint' }, 'Il nous permet de vous proposer les outils adaptés à votre métier.')),
+      shop ? null : textField({ id: 'shop-amb', label: 'Code ambassadeur', optional: true, max: 10, placeholder: 'Si un ambassadeur Fii La vous aide', onInput: function (v) { ambCode = v; } }),
       ask ? ask.el : null,
       err, btn,
+      shop ? ambassadorShopBox() : null,
       shop ? vitrineSection(shop) : null,
       shop ? courierSection(shop) : null,
       shop ? shopDeleteBox() : null,
@@ -4637,6 +4659,256 @@
         footer(true));
       return pg;
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la commande', errText(e), retryBtn())); });
+  }
+
+  /* ================================================================ FII LA CARRIÈRE : AMBASSADEURS
+     Parcours : présentation → inscription (compte, charte) → 6 fiches → test (8/10) → validation par l'équipe → missions.
+     Règle affichée partout : on est payé pour un commerçant actif, jamais pour une inscription. */
+  var AMB_LESSONS = [
+    ['shop', 'Fii La en une phrase', 'Une boutique en ligne gratuite pour le commerçant : vitrine, commandes, factures, et l’adresse exacte de chaque cliente en une photo.'],
+    ['plus', 'Créer la boutique avec lui', 'Sur SON téléphone : « Boutique », le nom, le type de commerce, puis votre code dans « Code ambassadeur ». Jamais sur votre téléphone.'],
+    ['cam', 'De bonnes photos', 'L’article seul, à la lumière du jour, fond simple. 5 articles avec photo au moins : c’est le niveau 1.'],
+    ['eye', 'Ouvrir la vitrine', 'Réglages → « Ma vitrine en ligne » → Ouverte. Envoyez le lien de la vitrine à ses clientes sur WhatsApp et dans son statut.'],
+    ['ask', 'Les premières commandes', 'Montrez-lui « Nouvelle commande » et « Demander l’adresse ». Niveau 2 : 3 commandes de 3 clientes différentes, dont 1 livrée, en 30 jours.'],
+    ['ban', 'Ce qui est interdit', 'Commander soi-même ou avec des proches, créer des boutiques fictives, promettre des ventes ou de l’argent, garder les numéros des clientes. Sanction : gains annulés, exclusion.']];
+  var AMB_QUIZ = [
+    ['Quand êtes-vous payé pour un commerçant ?', ['Dès qu’il crée sa boutique', 'Quand il atteint un niveau vérifié par Fii La', 'Quand il vous paie']],
+    ['Combien d’articles avec photo pour le niveau 1 ?', ['3', '5', '10']],
+    ['Le niveau 2 demande :', ['3 commandes de 3 clientes différentes, dont 1 livrée', '1 commande', '10 visites de la vitrine']],
+    ['Pouvez-vous passer des commandes vous-même pour aider ?', ['Oui, ça l’aide à démarrer', 'Non : elles ne comptent pas et peuvent vous faire exclure']],
+    ['Où le commerçant tape-t-il votre code ?', ['Dans « Code ambassadeur », en créant sa boutique', 'Dans WhatsApp', 'Nulle part']],
+    ['Une bonne photo d’article :', ['Prise de nuit, au flash', 'L’article seul, bien éclairé, fond simple', 'Avec le prix écrit à la main']],
+    ['Que pouvez-vous promettre à un commerçant ?', ['Des ventes garanties', 'Ce que Fii La offre vraiment : boutique, vitrine et adresses gratuites', 'Un prêt']],
+    ['Vos gains sont versés :', ['Immédiatement', 'Après 30 jours de vérification, une fois par mois', 'Jamais']],
+    ['Les numéros des clientes du commerçant :', ['Vous pouvez les garder', 'Restent confidentiels : vous ne les copiez pas', 'Vous pouvez les revendre']],
+    ['Un commerçant arrête après une semaine :', ['Vous gardez les niveaux déjà validés, pas les suivants', 'Vous perdez tout', 'Vous êtes exclu']]];
+  var GRADES = { ambassadeur: 'Ambassadeur', confirme: 'Ambassadeur confirmé', certifie: 'Ambassadeur certifié Fii La' };
+  var PAYOUT = { wave: 'Wave', orange_money: 'Orange Money' };
+
+  function viewAmbassador() {
+    var intro = h('section', { class: 'card stack tight amb-hero' },
+      h('p', { class: 'eyebrow' }, 'Fii La Carrière'),
+      h('h1', null, 'Devenez ambassadeur Fii La'),
+      h('p', null, 'Aidez les commerçants de votre quartier à ouvrir leur boutique Fii La. Vous êtes payé quand ils vendent vraiment.'));
+    if (!authed()) {
+      return page(backBtn(), intro, ambLevels(null),
+        iconBtn('a', { class: 'btn big', id: 'amb-login', href: '#/compte' + qs({ mode: 'inscription', retour: 'ambassadeur' }) }, 'user', 'Créer mon compte pour commencer'),
+        h('p', { class: 'hint' }, 'Un compte est obligatoire : vos gains y sont rattachés.'), footer());
+    }
+    return api('fiila_ambassador_me', {}).then(function (r) {
+      var a = r.ambassador;
+      if (!a) return ambRegister(intro);
+      if (a.status === 'training') return a.quiz_passed ? ambWaiting(a) : ambTraining(a);
+      if (a.status === 'review') return ambWaiting(a);
+      if (a.status === 'excluded') return page(backBtn(), stateCard('⦸', 'Programme terminé', a.note ? 'Motif : ' + a.note : 'Votre participation au programme a pris fin.'), footer());
+      return ambDashboard(a);
+    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger votre espace', errText(e), retryBtn()), footer()); });
+  }
+  // Les 3 niveaux et leur montant, en une carte simple.
+  function ambLevels(amounts) {
+    var m = amounts || [2000, 5000, 10000];
+    var rows = [['1', 'Installé', 'Boutique, type de commerce, 5 articles avec photo, vitrine ouverte', '7 jours'],
+      ['2', 'Actif', '3 commandes de 3 clientes différentes, dont 1 livrée', '30 jours'],
+      ['3', 'Autonome', 'Toujours actif : des commandes 4 semaines sur 8', 'après 60 jours']];
+    return h('section', { class: 'card stack tight', id: 'amb-levels' }, h('h2', null, 'Vos gains par commerçant'),
+      h('ol', { class: 'amb-lv' }, rows.map(function (x, i) {
+        return h('li', null, h('span', { class: 'amb-n' }, x[0]),
+          h('span', { class: 'amb-lt' }, h('b', null, x[1] + ' · ' + fcfa(m[i])), h('span', { class: 'small muted' }, x[2] + ' (' + x[3] + ')')));
+      })),
+      h('p', { class: 'safe-line' }, icon('lock', 18), 'Payé pour un commerçant actif, jamais pour une inscription. Gains vérifiés 30 jours, versés chaque mois.'));
+  }
+  function ambRegister(intro) {
+    var f = { name: '', phone: '', zone: '', method: 'wave', payout: '', charter: false };
+    if (ME && ME.display_name) f.name = ME.display_name;
+    if (ME && ME.phone) f.phone = ME.phone;
+    var err = h('div', { role: 'alert' });
+    var btn = iconBtn('button', { class: 'btn big', type: 'button', id: 'amb-register', onclick: function () {
+      setKids(err);
+      if (!f.charter) return errBox(err, new ApiError('charter_required'));
+      btn.disabled = true;
+      api('fiila_ambassador_register', { p: { name: f.name.trim(), phone: f.phone.trim(), zone: f.zone.trim() || null, payout_method: f.method, payout_phone: f.payout.trim() || null, charter: true } })
+        .then(function () { toast('Inscription enregistrée. Place à la formation.'); render(); }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, 'check', 'M’inscrire');
+    return page(backBtn(), intro, ambLevels(null),
+      h('section', { class: 'card stack' }, h('h2', null, 'Inscription'),
+        textField({ id: 'amb-name', label: 'Nom complet', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
+        textField({ id: 'amb-phone', label: 'Téléphone', type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+        textField({ id: 'amb-zone', label: 'Quartier ou ville', optional: true, max: 60, value: f.zone, placeholder: 'Ex. : Yoff, Thiès', onInput: function (v) { f.zone = v; } }),
+        segField({ name: 'amb-method', id: 'amb-method', legend: 'Recevoir mes gains par', value: f.method, options: [['wave', 'Wave'], ['orange_money', 'Orange Money']], onChange: function (v) { f.method = v; } }),
+        textField({ id: 'amb-payout', label: 'Numéro de versement', optional: true, type: 'tel', inputmode: 'tel', value: f.payout, placeholder: 'Le même que ci-dessus si vide', onInput: function (v) { f.payout = v; } }),
+        h('details', { class: 'more-details' }, h('summary', null, 'Lire la charte de l’ambassadeur'),
+          h('ul', { class: 'small' },
+            h('li', null, 'Je suis indépendant : je ne suis pas salarié de Fii La.'),
+            h('li', null, 'Je n’aide que de vrais commerçants, avec leur accord, sur leur propre téléphone.'),
+            h('li', null, 'Je ne passe jamais de commande moi-même ou par mes proches pour atteindre un niveau.'),
+            h('li', null, 'Je ne promets ni ventes ni argent au commerçant.'),
+            h('li', null, 'Je garde confidentielles les informations du commerçant et de ses clientes.'),
+            h('li', null, 'En cas de fraude : gains annulés et exclusion du programme.'))),
+        h('label', { class: 'check-line' }, h('input', { type: 'checkbox', id: 'amb-charter', onchange: function (e) { f.charter = e.target.checked; } }), 'J’accepte la charte de l’ambassadeur'),
+        err, btn),
+      footer());
+  }
+  function ambTraining(a) {
+    var root = h('div', { class: 'stack' });
+    var i = 0, answers = [];
+    function lesson() {
+      var l = AMB_LESSONS[i];
+      setKids(root,
+        h('p', { class: 'eyebrow step' }, 'Formation · ' + (i + 1) + ' sur ' + AMB_LESSONS.length),
+        h('div', { class: 'steps', 'aria-hidden': 'true' }, AMB_LESSONS.map(function (x, k) { return h('i', { class: k <= i ? 'on' : '' }); })),
+        h('section', { class: 'card stack amb-lesson' }, h('span', { class: 'amb-lic', 'aria-hidden': 'true' }, icon(l[0], 32)), h('h2', null, l[1]), h('p', null, l[2])),
+        h('div', { class: 'duo' },
+          i > 0 ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { i--; lesson(); } }, 'Précédent') : h('span'),
+          h('button', { class: 'btn', type: 'button', id: 'amb-next', onclick: function () { if (i < AMB_LESSONS.length - 1) { i++; lesson(); } else quiz(); window.scrollTo(0, 0); } },
+            i < AMB_LESSONS.length - 1 ? 'Suivant' : 'Passer le test')));
+    }
+    function quiz() {
+      answers = AMB_QUIZ.map(function () { return null; });
+      var err = h('div', { role: 'alert' });
+      var send = iconBtn('button', { class: 'btn big', type: 'button', id: 'amb-quiz-send', onclick: function () {
+        setKids(err);
+        if (answers.some(function (x) { return x === null; })) return errBox(err, new ApiError('quiz_incomplete'));
+        send.disabled = true;
+        api('fiila_ambassador_quiz', { p_answers: answers }).then(function (r) {
+          if (r.passed) { toast('Test réussi : ' + r.score + '/10.'); render(); return; }
+          setKids(root, stateCard('!', 'Score : ' + r.score + '/10', 'Il faut 8 bonnes réponses. Relisez les fiches, puis réessayez (2 essais par jour).',
+            h('button', { class: 'btn', type: 'button', onclick: function () { i = 0; lesson(); } }, 'Relire les fiches')));
+        }, function (e) { send.disabled = false; errBox(err, e); });
+      } }, 'check', 'Envoyer mes réponses');
+      setKids(root, h('h1', null, 'Test de passage'), h('p', { class: 'muted' }, '10 questions. 8 bonnes réponses pour réussir.' + (a.attempts_today ? ' Essais aujourd’hui : ' + a.attempts_today + ' sur 2.' : '')),
+        AMB_QUIZ.map(function (q, n) {
+          return h('fieldset', { class: 'card stack tight amb-q', id: 'q' + n }, h('legend', null, (n + 1) + '. ' + q[0]),
+            q[1].map(function (opt, k) {
+              return h('label', { class: 'check-line' }, h('input', { type: 'radio', name: 'q' + n, value: String(k), onchange: function () { answers[n] = k; } }), opt);
+            }));
+        }), err, send);
+    }
+    lesson();
+    return page(backBtn(), root, footer());
+  }
+  function ambWaiting(a) {
+    return page(backBtn(), stateCard('⌛', 'Test réussi : ' + (a.quiz_score || 8) + '/10', 'L’équipe Fii La valide votre inscription, en général sous 48 heures. Vous pourrez alors recevoir votre code et commencer.'), footer());
+  }
+  function ambDashboard(a) {
+    var codeMsg = 'Bonjour ! Je vous aide à ouvrir votre boutique en ligne gratuite avec Fii La : vitrine, commandes, factures et l’adresse exacte de vos clientes. ' +
+      'Ouvrez ' + baseUrl() + '#/boutique et, à « Code ambassadeur », tapez : ' + a.code;
+    var shops = a.shops || [];
+    var next = a.grade === 'ambassadeur' ? ['Ambassadeur confirmé', a.l2 || 0, 10, 'commerçants actifs (niveau 2)']
+      : a.grade === 'confirme' ? ['Ambassadeur certifié Fii La', a.l3 || 0, 25, 'commerçants autonomes (niveau 3)'] : null;
+    function shopRow(s) {
+      var miss = s.level === 0 ? [!s.typed ? 'type de commerce' : null, s.photos < 5 ? (5 - s.photos) + ' article(s) avec photo' : null, !s.public ? 'vitrine à ouvrir' : null].filter(Boolean)
+        : s.level === 1 ? [s.clients < 3 ? (3 - s.clients) + ' cliente(s) de plus' : null, !s.delivered ? '1 commande livrée' : null].filter(Boolean)
+        : s.level === 2 ? ['commandes ' + Math.max(0, 4 - (s.active_weeks || 0)) + ' semaine(s) de plus, après 60 jours'] : [];
+      return h('div', { class: 'item amb-shop' },
+        h('div', { class: 'stack tight', style: 'flex:1;min-width:0' },
+          h('div', { class: 't wrapword' }, s.shop),
+          h('div', { class: 'amb-dots', 'aria-label': 'Niveau ' + s.level + ' sur 3' }, [1, 2, 3].map(function (n) { return h('i', { class: n <= s.level ? 'on' : '' }); })),
+          h('div', { class: 'small muted' }, s.expired ? 'Délai dépassé pour le niveau suivant.' : s.level === 3 ? 'Tous les niveaux atteints.' : 'Il manque : ' + miss.join(', ') + '.')),
+        h('span', { class: 'chip ' + (s.level === 3 ? 'ok' : s.expired ? 'off' : 'wait') }, 'Niveau ' + s.level));
+    }
+    var board = h('section', { class: 'card stack tight', id: 'amb-board', hidden: true });
+    api('fiila_ambassador_board', {}).then(function (l) {
+      if (!l.length) return;
+      setKids(board, h('h2', null, 'Classement (90 jours)'), h('ol', { class: 'amb-board' }, l.map(function (x) {
+        return h('li', null, h('b', null, x.name), x.zone ? h('span', { class: 'small muted' }, ' · ' + x.zone) : null, h('span', { class: 'amb-score' }, x.score));
+      })));
+      board.hidden = false;
+    }, function () {});
+    return page(backBtn(),
+      h('header', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fii La Carrière'), h('h1', null, 'Mes missions'),
+        h('span', { class: 'chip ok', style: 'align-self:flex-start', id: 'amb-grade' }, icon('star', 12), GRADES[a.grade] || 'Ambassadeur')),
+      a.status === 'suspended' ? h('div', { class: 'notice' }, 'Compte suspendu : vos nouveaux gains sont en pause.' + (a.note ? ' Motif : ' + a.note : '')) : null,
+      h('section', { class: 'card stack tight', id: 'amb-code' }, h('p', { class: 'small muted' }, 'Votre code ambassadeur'),
+        h('p', { class: 'amb-codev' }, a.code),
+        h('div', { class: 'duo' },
+          iconBtn('a', { class: 'btn mid', href: waLink(codeMsg), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer'),
+          iconBtn('button', { class: 'btn ghost mid', type: 'button', onclick: function () { copy(a.code, 'Code'); } }, 'link', 'Copier')),
+        h('p', { class: 'hint' }, 'Le commerçant tape ce code en créant sa boutique, sur son téléphone, au plus tard 7 jours après.')),
+      h('section', { class: 'card stack tight', id: 'amb-wallet' }, h('h2', null, 'Mon portefeuille'),
+        h('div', { class: 'amb-wal' },
+          h('div', null, h('small', null, 'En vérification'), h('b', null, fcfa(a.rewards.pending))),
+          h('div', null, h('small', null, 'À verser'), h('b', null, fcfa(a.rewards.validated))),
+          h('div', null, h('small', null, 'Déjà reçu'), h('b', null, fcfa(a.rewards.paid)))),
+        h('p', { class: 'small muted' }, 'Versements une fois par mois sur ' + (PAYOUT[a.payout_method] || '') + ' ' + a.payout_phone + '.'),
+        (a.history || []).length ? h('details', { class: 'more-details' }, h('summary', null, 'Historique'),
+          h('div', { class: 'stack tight' }, a.history.map(function (x) {
+            var st = { pending: 'en vérification jusqu’au ' + shortDate(x.validate_after), validated: 'à verser', paid: 'versé', cancelled: 'annulé' + (x.reason ? ' : ' + x.reason : '') }[x.status];
+            return h('div', { class: 'total-row' }, h('span', { class: 'wrapword' }, x.shop + ' · niveau ' + x.level + ' · ' + st), h('span', null, fcfa(x.amount)));
+          }))) : null),
+      next ? h('section', { class: 'card stack tight', id: 'amb-next-grade' }, h('h2', null, 'Prochain grade : ' + next[0]),
+        h('div', { class: 'amb-bar' }, h('i', { style: 'width:' + Math.min(100, Math.round(next[1] / next[2] * 100)) + '%' })),
+        h('p', { class: 'small muted' }, next[1] + ' sur ' + next[2] + ' ' + next[3] + '.')) : null,
+      h('section', { class: 'stack tight', id: 'amb-shops' }, h('h2', null, 'Mes commerçants (' + shops.length + ')'),
+        shops.length ? h('div', { class: 'list' }, shops.map(shopRow))
+          : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun commerçant pour l’instant. Envoyez votre code au premier !'))),
+      board,
+      ambLevels(a.amounts),
+      footer());
+  }
+  // Boutique : rattacher son ambassadeur (7 jours au plus après la création).
+  function ambassadorShopBox() {
+    var box = h('section', { class: 'card stack tight', id: 'shop-ambassador', hidden: true });
+    sapi('fiila_shop_ambassador', {}).then(function (r) {
+      if (r.ambassador) { setKids(box, h('h2', null, 'Ambassadeur'), h('p', { class: 'small muted' }, 'Accompagné par ' + r.ambassador + '.')); box.hidden = false; return; }
+      if (!r.can_link) return;
+      var code = '', err = h('div', { role: 'alert' });
+      setKids(box, h('h2', null, 'Un ambassadeur vous aide ?'),
+        textField({ id: 'amb-code-input', label: 'Code ambassadeur', max: 10, placeholder: 'Ex. : K7M2QD', onInput: function (v) { code = v; } }),
+        err, h('button', { class: 'btn ghost small', type: 'button', id: 'amb-link', onclick: function () {
+          setKids(err);
+          sapi('fiila_ambassador_link', { p_code: code }).then(function (x) { toast('Accompagné par ' + x.ambassador + '.'); render(); }, function (e) { errBox(err, e); });
+        } }, 'Valider le code'));
+      box.hidden = false;
+    }, function () {});
+    return box;
+  }
+  // Fondateur : inscriptions à valider, gains à verser, gains en vérification.
+  function viewAdminAmbassadors() {
+    if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.'), footer());
+    return api('fiila_admin_ambassadors', {}).then(function (d) {
+      function decide(a, decision) {
+        var note = (document.getElementById('note-' + a.id) || {}).value || null;
+        api('fiila_admin_ambassador_decide', { p_id: a.id, p_decision: decision, p_note: note }).then(function () { toast('Enregistré.'); render(); }, function (e) { toast(errText(e)); });
+      }
+      var review = d.ambassadors.filter(function (a) { return a.status === 'review'; });
+      var others = d.ambassadors.filter(function (a) { return a.status !== 'review'; });
+      var byAmb = {}; d.to_pay.forEach(function (r) { (byAmb[r.ambassador + '|' + r.payout_method + '|' + r.payout_phone] = byAmb[r.ambassador + '|' + r.payout_method + '|' + r.payout_phone] || []).push(r); });
+      return page(backBtn('Statistiques', '#/stats'),
+        h('h1', null, 'Ambassadeurs'),
+        h('p', { class: 'small muted' }, 'Gains : ' + d.settings.rewards.map(fcfa).join(' · ') + '. Plafond : ' + d.settings.monthly_cap + ' commerçants par mois et par ambassadeur.'),
+        h('section', { class: 'stack tight', id: 'adm-review' }, h('h2', null, 'À valider (' + review.length + ')'),
+          review.length ? review.map(function (a) {
+            return h('div', { class: 'card stack tight' }, h('b', null, a.name), h('span', { class: 'small muted' }, a.phone + (a.zone ? ' · ' + a.zone : '') + ' · test ' + a.quiz_score + '/10'),
+              h('input', { type: 'text', id: 'note-' + a.id, placeholder: 'Note (facultatif)', maxlength: 200 }),
+              h('div', { class: 'row' }, h('button', { class: 'btn small', type: 'button', onclick: function () { decide(a, 'approve'); } }, 'Valider'),
+                h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { decide(a, 'exclude'); } }, 'Refuser')));
+          }) : h('p', { class: 'muted' }, 'Aucune inscription en attente.')),
+        h('section', { class: 'stack tight', id: 'adm-pay' }, h('h2', null, 'À verser'),
+          Object.keys(byAmb).length ? Object.keys(byAmb).map(function (k) {
+            var l = byAmb[k], p = k.split('|'), sum = l.reduce(function (n, r) { return n + r.amount; }, 0);
+            return h('div', { class: 'card stack tight' }, h('b', null, p[0] + ' · ' + fcfa(sum)), h('span', { class: 'small muted' }, (PAYOUT[p[1]] || p[1]) + ' ' + p[2]),
+              l.map(function (r) { return h('span', { class: 'small' }, r.shop + ' · niveau ' + r.level + ' · ' + fcfa(r.amount)); }),
+              h('button', { class: 'btn small', type: 'button', onclick: function () {
+                api('fiila_admin_reward', { p_ids: l.map(function (r) { return r.id; }), p_action: 'paid', p_reason: null }).then(function () { toast('Marqué versé.'); render(); }, function (e) { toast(errText(e)); });
+              } }, 'J’ai versé ' + fcfa(sum)));
+          }) : h('p', { class: 'muted' }, 'Rien à verser.')),
+        h('section', { class: 'stack tight', id: 'adm-pending' }, h('h2', null, 'En vérification (30 jours)'),
+          d.pending.length ? d.pending.map(function (r) {
+            return h('div', { class: 'item' }, h('span', { class: 'small wrapword' }, r.ambassador + ' · ' + r.shop + ' · niveau ' + r.level + ' · ' + fcfa(r.amount) + ' · le ' + shortDate(r.validate_after)),
+              h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () {
+                var inp = document.getElementById('cancel-' + r.id); var reason = inp && inp.value;
+                api('fiila_admin_reward', { p_ids: [r.id], p_action: 'cancel', p_reason: reason || '' }).then(function () { toast('Gain annulé.'); render(); }, function (e) { toast(errText(e)); });
+              } }, 'Annuler'), h('input', { type: 'text', id: 'cancel-' + r.id, placeholder: 'Motif', maxlength: 200, style: 'max-width:120px' }));
+          }) : h('p', { class: 'muted' }, 'Aucun gain en vérification.')),
+        h('section', { class: 'stack tight' }, h('h2', null, 'Tous les ambassadeurs (' + others.length + ')'),
+          others.map(function (a) {
+            return h('div', { class: 'item' }, h('div', { class: 'stack tight' }, h('b', null, a.name + ' · ' + (GRADES[a.grade] || '')),
+              h('span', { class: 'small muted' }, a.status + ' · ' + a.shops + ' commerçants (' + a.month + ' ce mois) · ' + a.cancelled + ' gain(s) annulé(s)')),
+              a.status === 'active' ? h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { decide(a, 'suspend'); } }, 'Suspendre')
+                : a.status === 'suspended' ? h('button', { class: 'btn ghost small', type: 'button', onclick: function () { decide(a, 'reactivate'); } }, 'Réactiver') : null);
+          })),
+        footer());
+    }, function (e) { return page(backBtn(), stateCard('!', 'Accès réservé', errText(e)), footer()); });
   }
 
   /* ================================================================ CONFIDENTIALITÉ */

@@ -769,3 +769,27 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 @media (prefers-reduced-motion: reduce){.sheet-back,.sheet{animation:none}}
 .sheet .steps-pic{padding:0;margin:0;list-style:none}
 .ftype{font-size:12px;font-weight:600;color:var(--muted);text-transform:none}
+
+/* ---- Fii La Carrière (19/10) */
+.check-line{display:flex;align-items:flex-start;gap:10px;font-size:15px;min-height:44px;cursor:pointer}
+.check-line input{margin-top:3px;width:20px;height:20px;flex:none;accent-color:var(--green)}
+.amb-lv{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px}
+.amb-lv li{display:flex;gap:12px;align-items:flex-start}
+.amb-n{width:32px;height:32px;border-radius:50%;background:var(--green);color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.amb-lt{display:flex;flex-direction:column;gap:2px}
+.amb-lesson{align-items:flex-start;padding:24px}
+.amb-lic{width:56px;height:56px;border-radius:16px;background:var(--soft);color:var(--green);display:flex;align-items:center;justify-content:center}
+.amb-q legend{font-weight:600;padding:0 0 6px}
+.amb-codev{font-family:Montserrat,system-ui,sans-serif;font-weight:800;font-size:34px;letter-spacing:.12em}
+.amb-wal{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.amb-wal div{display:flex;flex-direction:column;gap:2px;background:var(--surface-2);border-radius:14px;padding:10px}
+.amb-wal small{color:var(--muted);font-size:12px}
+.amb-wal b{font-size:15px}
+.amb-bar{height:10px;border-radius:99px;background:var(--surface-3);overflow:hidden}
+.amb-bar i{display:block;height:100%;background:var(--green);border-radius:inherit}
+.amb-dots{display:flex;gap:6px}
+.amb-dots i{width:22px;height:6px;border-radius:99px;background:var(--surface-3)}
+.amb-dots i.on{background:var(--green)}
+.amb-board{padding-left:20px;margin:0;display:flex;flex-direction:column;gap:6px}
+.amb-board li{display:flex;align-items:center;gap:4px}
+.amb-score{margin-left:auto;font-weight:700}

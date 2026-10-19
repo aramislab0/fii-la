@@ -30,6 +30,8 @@
     "test:products": "node tests/products.test.mjs",
     "test:demo-sql": "node tests/demo.sql.test.mjs",
     "test:shoptype-sql": "node tests/shoptype.sql.test.mjs",
+    "test:ambassadors-sql": "node tests/ambassadors.sql.test.mjs",
+    "test:ambassadors": "node tests/ambassadors.test.mjs",
     "demo:seed": "node scripts/demo-seed.mjs"
   },
   "devDependencies": {
