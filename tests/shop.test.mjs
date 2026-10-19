@@ -456,6 +456,7 @@ await t('mot de passe oublié (PKCE + code) : le lien marche là où il a été 
   await O.page.getByText('Ce lien ne s’ouvre pas ici').waitFor();
   await O.ctx.close();
   // Cas réel de l'iPhone (icône Fii La ≠ Safari) : le code du même e-mail, saisi dans l'application, ouvre la session.
+  await R.page.locator('#mail-code-box summary').click();
   await R.page.locator('#mail-code').waitFor();
   await R.page.fill('#mail-code', '000000');
   await R.page.click('#mail-code-ok');

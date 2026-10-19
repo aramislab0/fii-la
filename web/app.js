@@ -3971,7 +3971,7 @@
   /* ----- compte : connexion, inscription, mot de passe oublié */
   function viewAccount(q) {
     q = q || {};
-    if (q.lien === 'invalide') return page(backBtn(), stateCard('!', 'Ce lien ne s’ouvre pas ici', 'Il a expiré, ou il a été ouvert ailleurs que là où la demande a été faite (par exemple Safari au lieu de l’icône Fii La). Revenez dans l’application et saisissez le code à 6 chiffres reçu dans le même e-mail.', h('a', { class: 'btn', href: '#/compte' }, 'Se connecter')), footer());
+    if (q.lien === 'invalide') return page(backBtn(), stateCard('!', 'Ce lien ne s’ouvre pas ici', 'Il a expiré, ou il a été ouvert ailleurs que là où la demande a été faite (par exemple Safari au lieu de l’icône Fii La). Refaites la demande depuis le navigateur où vous ouvrez vos e-mails.', h('a', { class: 'btn', href: '#/compte' }, 'Se connecter')), footer());
     if (!authed()) return authForm(q);
     return account.me().then(function (me) {
       if (!me) return authForm(q);
@@ -4050,14 +4050,15 @@
         else { track('account_created', 'code'); go('#/compte?bienvenue=1'); }
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'check', 'Valider');
+    // Le lien reste la voie principale ; le code (si l'e-mail en contient un) se saisit dans une section repliée.
     setKids(root, backBtn(),
       h('div', { class: 'stack tight' }, h('h1', null, 'Vérifiez vos e-mails'),
-        h('p', { class: 'muted', id: 'mail-code-sent' }, (kind === 'recovery' ? 'Si un compte existe pour ' : 'Code envoyé à ') + email + (kind === 'recovery' ? ', un code vient d’être envoyé.' : '.'))),
-      h('div', { class: 'field' }, h('label', { for: 'mail-code' }, 'Code reçu par e-mail'), input),
-      err, btn,
+        h('p', { class: 'muted', id: 'mail-code-sent' }, (kind === 'recovery' ? 'Si un compte existe pour ' + email + ', un e-mail vient d’être envoyé.' : 'E-mail envoyé à ' + email + '.')
+          + ' Ouvrez le lien dans ce même navigateur.')),
+      h('details', { id: 'mail-code-box' }, h('summary', null, 'L’e-mail contient un code ?'),
+        h('div', { class: 'stack', style: 'margin-top:12px' }, h('div', { class: 'field' }, h('label', { for: 'mail-code' }, 'Code reçu par e-mail'), input), err, btn)),
       h('p', { class: 'small muted' }, 'Pas d’e-mail ? Regardez dans les indésirables.'),
       footer());
-    setTimeout(function () { try { input.focus(); } catch (x) { /* rien */ } }, 0);
   }
 
   // Rattachement explicite des fiches et de la boutique de ce téléphone au compte connecté.
