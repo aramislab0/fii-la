@@ -186,6 +186,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 23:59 | Photos d'articles en ligne (run 39338847386 : tests, base, mise en ligne OK). Étape 3 en échec sur Safari (WebKit) dans `photos.test.mjs` : le test comptait les photos avant la fin de leur chargement après l'enregistrement (course du test). Test corrigé (attente de la fin du chargement) ; relance | run 39338847386, ce commit |
 | 19/10 23:40 | Photos d'articles : table `product_photos` (4 supplémentaires), `fiila_product_photos`, `fiila_vitrine_photo` « id:n », nombre de photos dans la vitrine et le fil ; édition en grille (ajout multiple, principale au toucher, retrait) ; carrousel `photoCarousel`. Tests SQL 4/4, navigateur 6/6 | ce commit |
 | 19/10 22:30 | Code par e-mail (f07338f, run 39329682791) et écran replié (5ea2cf4, run 39330408029) en production, tout vert | GitHub Actions |
 | 19/10 21:55 | Fondateur : ne pas toucher Supabase pour l'instant (SMS et modèles d'e-mail plus tard). Écran « Vérifiez vos e-mails » : le lien reste la voie principale (« ouvrez-le dans ce même navigateur »), le code est dans une section repliée ; shop 26/26 | ce commit |

@@ -64,8 +64,11 @@ await t('boutique : 3 photos ajoutées en une fois, la 3e devient principale, en
   await shot(S, '01-ajout-photos');
   await S.click('#product-save');
   await S.waitForFunction(() => /#\/boutique\/article\/[0-9a-f-]{36}/.test(location.hash));
-  await S.locator('#product-photo-grid .pp-tile').nth(2).waitFor();
-  assert.equal(await S.locator('#product-photo-grid .pp-tile').count(), 3, 'les 3 photos reviennent à la modification');
+  await S.locator('#publish-box').waitFor(); // écran de modification affiché (après l'enregistrement)
+  // les photos supplémentaires se chargent après l'écran : on attend la fin du chargement
+  await S.waitForFunction(() => !document.querySelector('#product-photo-grid .loading-skel')
+    && document.querySelectorAll('#product-photo-grid .pp-tile').length === 3, null, { timeout: 15000 })
+    .catch(async () => { throw new Error('les 3 photos reviennent à la modification : ' + await S.locator('#product-photo-grid .pp-tile').count()); });
   const rows = (await local.db.query(`select (select count(*)::int from fiila.product_photos x where x.product_id = p.id) n from fiila.products p where p.name = 'Robe trois photos (test)'`)).rows;
   assert.equal(rows[0].n, 2);
 });
