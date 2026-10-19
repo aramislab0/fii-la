@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { startServer } from './dev-server.mjs';
-import { rpc } from './db.mjs';
+import { rpc, createUser } from './db.mjs';
 
 const require = createRequire(import.meta.url);
 let pw;
@@ -125,6 +125,7 @@ await t('onglets : Meilleures ventes (commande livrée) et Coups de cœur, avec 
 });
 
 const C = await newPhone();
+let SHOP;
 await t('commentaires : lecture sans compte, compte demandé pour écrire ; prénom affiché ; ni lien ni numéro', async () => {
   await C.goto(URL0 + '#/boutiques');
   await C.click(`#comments-${P1.id}`);
@@ -154,7 +155,7 @@ await t('la boutique supprime un commentaire sur son article ; une autre personn
   assert.equal(await R.locator('#cm-list').getByRole('button', { name: 'Supprimer' }).count(), 0, 'pas de suppression pour une autre personne');
   await R.locator('#cm-list').getByRole('button', { name: 'Signaler ce commentaire' }).click();
   await R.getByText('Merci. Le commentaire sera vérifié.').waitFor();
-  const S = await newPhone();
+  const S = SHOP = await newPhone();
   await S.goto(URL0 + '#/');
   await S.evaluate((k) => localStorage.setItem('fiila.shop', JSON.stringify({ key: k })), KEY);
   await S.goto(URL0 + '#/boutiques');
@@ -164,8 +165,29 @@ await t('la boutique supprime un commentaire sur son article ; une autre personn
   await S.locator('#cm-empty').waitFor();
 });
 
+await t('modération : le fondateur voit le commentaire masqué (3 signalements) et le rétablit', async () => {
+  const uid = await createUser(local.db, 'ndeye.fil@example.invalid');
+  await local.db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Ndèye Test')`, [uid]);
+  const c = await rpc(local.db, 'fiila_comment_add', { p_product: P2.id, p_body: 'Avis à vérifier' }, { uid });
+  assert.equal(c.status, 200, JSON.stringify(c.body));
+  for (const d of ['aaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccc']) await ok('fiila_comment_report', { p_id: c.body.id, p_device: d });
+  const F = await newPhone();
+  await signup(F, 'Fondateur Test', 'fondateur.fil@example.invalid');
+  await local.db.query(`update fiila.profiles set is_admin = true where user_id = (select id from auth.users where email = 'fondateur.fil@example.invalid')`);
+  await F.goto(URL0 + '#/stats');
+  await F.locator('#stats-comments').click();
+  const card = F.locator('#mod-' + c.body.id);
+  await card.getByText('Masqué · 3 signalements').waitFor();
+  await shot(F, '06-moderation', true);
+  await card.getByRole('button', { name: 'Rétablir' }).click();
+  await F.getByText('Commentaire rétabli.').waitFor();
+  await F.locator('#mod-empty').waitFor();
+  const l = await ok('fiila_comments', { p_product: P2.id });
+  assert.equal(l.comments.length, 1);
+});
+
 await t('page de l’article (boutique) : une ligne « Dans le fil »', async () => {
-  const S = pages[pages.length - 1];
+  const S = SHOP;
   await S.goto(URL0 + '#/boutique/article/' + P2.id);
   await S.locator('#product-stats').getByText(/Dans le fil : .*1 enregistrement.*1 vendu/).waitFor();
 });

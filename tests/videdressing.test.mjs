@@ -51,7 +51,7 @@ const V = await newPhone(), F = await newPhone(), C = await newPhone();
 await t('vendeuse : compte, photo du vêtement seul (case obligatoire), fille 2-4 ans, prix et montant reçu affiché', async () => {
   await signup(V, 'Fatou Sow', 'fatou.vd@example.invalid');
   await local.db.query(`update fiila.profiles set phone = '77 700 00 01' where display_name = 'Fatou Sow'`);
-  await V.goto(URL0 + '#/'); await V.locator('#vd-link-home').click();
+  await V.goto(URL0 + '#/'); await V.locator('#home-more summary').click(); await V.locator('#vd-link-home').click();
   await V.locator('#vd-sell').click();
   await V.locator('#vd-photo input[type=file], input[type=file]').first().setInputFiles({ name: 'robe.png', mimeType: 'image/png', buffer: pngFile() });
   await V.fill('#vd-title', 'Robe fleurie (test)');

@@ -62,7 +62,7 @@ async function makeAddress(P, label, typed) {
   await P.getByRole('heading', { name: 'Partager' }).waitFor();
 }
 // Recharge réelle de l'espace (aller à la même adresse ne relance pas l'affichage).
-async function openRef(P, pour) { await P.goto(URL0 + '#/'); await P.locator('#invite-link').waitFor(); await P.goto(URL0 + '#/parrainer' + (pour ? '?pour=' + pour : '')); }
+async function openRef(P, pour) { await P.goto(URL0 + '#/'); await P.locator('#invite-link').waitFor({ state: 'attached' }); await P.goto(URL0 + '#/parrainer' + (pour ? '?pour=' + pour : '')); }
 async function refStats(P, pour) {
   await openRef(P, pour);
   await P.locator('#ref-code').waitFor();
@@ -79,6 +79,7 @@ await t('boutique : « Parrainer une boutique », code, lien et message WhatsApp
   await A.fill('#shop-phone', '77 100 00 01');
   await A.click('#shop-save');
   await A.locator('#shop-title').waitFor();
+  await A.click('#tab-settings');
   await A.click('#shop-referral');
   await A.locator('#ref-code').waitFor();
   CODE = await A.locator('#ref-code').textContent();
@@ -126,6 +127,7 @@ let PCODE;
 await t('particulier : « Inviter un proche », fiche de parrainage, un proche arrive par son lien', async () => {
   const D = await newPhone();
   await D.goto(URL0 + '#/');
+  await D.click('#home-more summary');
   await D.click('#invite-link');
   await D.fill('#ref-name', 'Khady Ndiaye (test)');
   await D.fill('#ref-phone', '78 555 55 55');

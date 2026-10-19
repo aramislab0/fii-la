@@ -2126,6 +2126,7 @@
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fondateur'), h('h1', null, 'Croissance')),
         iconRow('#/admin/ambassadeurs', 'users', 'Ambassadeurs : inscriptions et versements', { id: 'stats-amb' }),
         iconRow('#/admin/vide-dressing', 'box', 'Vide-dressing : articles à vérifier, commandes', { id: 'stats-vd' }),
+        iconRow('#/admin/commentaires', 'flag', 'Commentaires signalés', { id: 'stats-comments' }),
         h('div', { class: 'tiles', id: 'stats-totals' },
           tile(T.shops, 'boutiques'), tile(T.couriers, 'livreurs'), tile(T.addresses, 'adresses actives'), tile(T.meetings, 'événements actifs'),
           tile(T.orders, 'commandes'), tile(T.delivered, 'livrées'), tile(T.referred, 'arrivées parrainées'), tile(T.posts, 'publications')),
@@ -2201,6 +2202,7 @@
       else if (p[0] === 'vide-dressing' && !p[1]) view = viewVideDressing();
       else if (p[0] === 'vide-dressing' && p[1] === 'vendre') view = viewVdSell(r.q);
       else if (p[0] === 'admin' && p[1] === 'vide-dressing') view = viewAdminVd();
+      else if (p[0] === 'admin' && p[1] === 'commentaires') view = viewAdminComments();
       else if (p[0] === 'admin' && p[1] === 'ambassadeurs') view = viewAdminAmbassadors();
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
@@ -2391,12 +2393,15 @@
       demoBanner(),
       listBox,
       feedSection(3, { id: 'home-feed' }),
-      h('a', { class: 'invite-row', id: 'vd-link-home', href: '#/vide-dressing' }, icon('users', 24), h('span', null, 'Vide-dressing enfants : acheter ou vendre'),
-        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
-      h('a', { class: 'invite-row', id: 'amb-link-home', href: '#/ambassadeur' }, icon('cash', 24), h('span', null, 'Devenir ambassadeur Fii La'),
-        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
-      h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer' }, icon('gift', 24), h('span', null, 'Inviter un proche'),
-        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
+      // Règle « simple et intuitif » (19/10) : les propositions secondaires dans une seule section repliée.
+      h('details', { class: 'more-home', id: 'home-more' }, h('summary', null, 'Plus sur Fii La'),
+        h('div', { class: 'stack tight' },
+          h('a', { class: 'invite-row', id: 'vd-link-home', href: '#/vide-dressing' }, icon('users', 24), h('span', null, 'Vide-dressing enfants : acheter ou vendre'),
+            h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
+          h('a', { class: 'invite-row', id: 'amb-link-home', href: '#/ambassadeur' }, icon('cash', 24), h('span', null, 'Devenir ambassadeur Fii La'),
+            h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
+          h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer' }, icon('gift', 24), h('span', null, 'Inviter un proche'),
+            h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))))),
       footer());
   }
 
@@ -4082,6 +4087,8 @@
       shop ? ambassadorShopBox() : null,
       shop ? vitrineSection(shop) : null,
       shop ? courierSection(shop) : null,
+      shop ? h('a', { class: 'invite-row', id: 'shop-referral', href: '#/parrainer?pour=boutique' }, icon('gift', 24), h('span', null, 'Parrainer une boutique'),
+        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))) : null,
       shop ? shopDeleteBox() : null,
       footer());
     return shop ? shopTabs(pg, 'settings') : pg;
@@ -4222,9 +4229,6 @@
       }, function (e) { errBox(listBox, e); });
     }
     if (st.orders) load();
-    function tile(n, label, href, name, kind) {
-      return h('a', { class: 'tile kpi', href: href }, statePill(kind, name), h('span', null, h('strong', null, String(n || 0)), h('span', null, label)));
-    }
     return shopTabs(page(backBtn(),
       h('div', { class: 'stack tight' },
         h('p', { class: 'eyebrow' }, 'Ma boutique'),
@@ -4237,18 +4241,14 @@
       iconBtn('a', { class: !st.orders && !st.products ? 'btn ghost full' : 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'plus', 'Nouvelle commande'),
       // Compte proposé quand la boutique tourne (3 commandes), pas dès sa création.
       shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard(),
-      st.orders ? h('div', { class: 'tiles' },
-        tile(st.open, 'en cours', '#/boutique?vue=open', 'clock', 'wait'),
-        tile(st.unpaid, 'à encaisser', '#/boutique?vue=unpaid', 'cash', 'go')) : null,
+      // Les compteurs sont dans les onglets (plus de tuiles qui répètent la même chose).
       st.orders ? segField({ name: 'vue', id: 'orders-filter', value: vue,
-        options: [['open', 'En cours'], ['unpaid', 'À encaisser'], ['done', 'Terminées'], ['all', 'Toutes']],
+        options: [['open', 'En cours' + (st.open ? ' · ' + st.open : '')], ['unpaid', 'À encaisser' + (st.unpaid ? ' · ' + st.unpaid : '')], ['done', 'Terminées'], ['all', 'Toutes']],
         onChange: function (v) { vue = v; try { history.replaceState(null, '', location.pathname + location.search + '#/boutique?vue=' + v); } catch (e) { /* rien */ } setKids(listBox, loading()); load(); } }) : null,
       st.orders ? listBox : null,
       st.products ? (shop.public && shop.slug
         ? h('a', { class: 'invite-row', id: 'vitrine-link', href: '#/b/' + shop.slug }, icon('shop', 24), h('span', null, 'Ma vitrine en ligne'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))
         : h('a', { class: 'invite-row', id: 'vitrine-open-link', href: '#/boutique/reglages' }, icon('shop', 24), h('span', null, 'Ouvrir ma vitrine en ligne'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))) : null,
-      h('a', { class: 'invite-row', id: 'shop-referral', href: '#/parrainer?pour=boutique' }, icon('gift', 24), h('span', null, 'Parrainer une boutique'),
-        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
       footer()), 'orders');
   }
 
@@ -5269,6 +5269,24 @@
         textField({ id: 'vd-quartier', label: 'Votre quartier', optional: true, max: 60, value: f.quartier, placeholder: 'Pour organiser l’enlèvement', onInput: function (v) { f.quartier = v; } }),
         vdRules(), err, send, footer());
     }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger', errText(e), retryBtn()), footer()); });
+  }
+  // Modération des commentaires du fil : masqués (3 signalements) d'abord, puis signalés. Rétablir ou supprimer.
+  function viewAdminComments() {
+    if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.'), footer());
+    return api('fiila_admin_comments', {}).then(function (list) {
+      function act(id, a) { api('fiila_admin_comment_decide', { p_id: id, p_action: a }).then(function () { toast(a === 'restore' ? 'Commentaire rétabli.' : 'Commentaire supprimé.'); render(); }, function (e) { toast(errText(e)); }); }
+      return page(backBtn('Statistiques', '#/stats'), h('h1', null, 'Commentaires signalés'),
+        h('p', { class: 'small muted' }, 'Masqué automatiquement après 3 signalements. Rétablir le rend visible et efface ses signalements.'),
+        h('div', { class: 'stack', id: 'mod-list' }, list.length ? list.map(function (c) {
+          return h('div', { class: 'card stack tight', id: 'mod-' + c.id },
+            h('p', { class: 'small muted' }, (c.hidden ? 'Masqué' : 'Visible') + ' · ' + c.reports + (c.reports > 1 ? ' signalements' : ' signalement') + ' · ' + agoLong(c.at)),
+            h('p', { class: 'wrapword' }, h('b', null, c.author), ' ', c.body),
+            h('a', { class: 'btn link small', href: '#/b/' + c.slug + qs({ a: c.product_id }), style: 'align-self:flex-start' }, c.product + ' · ' + c.shop),
+            h('div', { class: 'row' }, h('button', { class: 'btn ghost small', type: 'button', onclick: function () { act(c.id, 'restore'); } }, 'Rétablir'),
+              h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { act(c.id, 'delete'); } }, 'Supprimer')));
+        }) : h('p', { class: 'muted', id: 'mod-empty' }, 'Aucun commentaire signalé.')),
+        footer());
+    }, function (e) { return page(backBtn('Statistiques', '#/stats'), stateCard('!', 'Accès refusé', errText(e)), footer()); });
   }
   function viewAdminVd() {
     if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.'), footer());

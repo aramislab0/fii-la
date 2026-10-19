@@ -50,6 +50,7 @@ const F = await newPhone();
 
 await t('accueil → « Devenir ambassadeur » : les 3 niveaux et leurs montants, compte demandé', async () => {
   await A.goto(URL0 + '#/');
+  await A.locator('#home-more summary').click();
   await A.locator('#amb-link-home').click();
   await A.locator('#amb-levels').waitFor();
   const txt = await A.locator('#amb-levels').textContent();

@@ -862,3 +862,14 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .post-badge.heart{background:#3A1E25;color:#F2A7B4}}
 :root[data-theme="dark"] .post-badge.heart{background:#3A1E25;color:#F2A7B4}
 @media (prefers-reduced-motion: reduce){.post-burst.go{animation:none}.post-act:active{transform:none}}
+
+/* Accueil : section repliée « Plus sur Fii La » (règle « simple et intuitif », 19/10). */
+.more-home summary{list-style:none;cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:space-between;font-weight:600;color:var(--muted);padding:0 4px}
+.more-home summary::-webkit-details-marker{display:none}
+.more-home summary::after{content:'';width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin-right:6px;transition:transform .2s}
+.more-home[open] summary::after{transform:rotate(-135deg)}
+.more-home[open] summary{margin-bottom:8px}
+/* Filtre des commandes : toujours une seule rangée (défilement si l'écran est étroit). */
+#orders-filter .segs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+#orders-filter .segs::-webkit-scrollbar{display:none}
+#orders-filter label{padding:0 7px;flex:1 0 auto;letter-spacing:-.01em}

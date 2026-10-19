@@ -243,6 +243,42 @@ begin
   return fiila.post_stats(p_id);
 end $$;
 
+-- Modération (fondateur, 19/10 09:54 : il revoit lui-même les commentaires signalés au lancement).
+-- File : commentaires masqués ou signalés au moins une fois, les masqués d'abord.
+create or replace function public.fiila_admin_comments() returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := fiila.need_uid();
+begin
+  if not exists (select 1 from fiila.profiles where user_id = v_uid and is_admin) then perform fiila.fail('not_allowed'); end if;
+  return coalesce((select jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
+      'id', c.id, 'body', c.body, 'at', c.created_at, 'hidden', c.hidden,
+      'reports', (select count(*) from fiila.comment_reports r where r.comment_id = c.id),
+      'author', coalesce(nullif(trim(pf.display_name), ''), 'Membre'),
+      'product', p.name, 'shop', s.name, 'slug', s.slug, 'product_id', p.id))
+      order by c.hidden desc, c.created_at desc)
+    from fiila.comments c join fiila.products p on p.id = c.product_id join fiila.shops s on s.id = p.shop_id
+    left join fiila.profiles pf on pf.user_id = c.user_id
+    where c.hidden or exists (select 1 from fiila.comment_reports r where r.comment_id = c.id)), '[]'::jsonb);
+end $$;
+
+-- Décision : 'restore' (visible, signalements effacés) ou 'delete'.
+create or replace function public.fiila_admin_comment_decide(p_id uuid, p_action text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_uid uuid := fiila.need_uid();
+begin
+  if not exists (select 1 from fiila.profiles where user_id = v_uid and is_admin) then perform fiila.fail('not_allowed'); end if;
+  if not exists (select 1 from fiila.comments where id = p_id) then perform fiila.fail('not_found'); end if;
+  if p_action = 'restore' then
+    delete from fiila.comment_reports where comment_id = p_id;
+    update fiila.comments set hidden = false where id = p_id;
+  elsif p_action = 'delete' then
+    delete from fiila.comments where id = p_id;
+  else
+    perform fiila.fail('invalid_action');
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
 -- Version de la base (dernière migration appliquée) : permet à la mise en ligne de vérifier, sans secret,
 -- que le site ne sera pas publié avant la base dont il a besoin. Aucune donnée personnelle.
 create or replace function public.fiila_schema_version() returns text
@@ -259,7 +295,7 @@ declare role_name text; fn text;
   fns text[] := array['public.fiila_posts(text, text, boolean, integer)', 'public.fiila_react(uuid, text, boolean, text, boolean)',
     'public.fiila_saved(text)', 'public.fiila_comments(uuid, text, text, boolean)', 'public.fiila_comment_add(uuid, text, boolean)',
     'public.fiila_comment_delete(uuid, text)', 'public.fiila_comment_report(uuid, text)', 'public.fiila_product_stats(text, uuid)',
-    'public.fiila_schema_version()'];
+    'public.fiila_schema_version()', 'public.fiila_admin_comments()', 'public.fiila_admin_comment_decide(uuid, text)'];
 begin
   foreach fn in array fns loop
     execute format('revoke execute on function %s from public', fn);

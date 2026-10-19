@@ -163,6 +163,27 @@ await t('« pour vous » : 3 articles au plus par boutique en tête, puis le res
   assert.ok(head.includes('Bijoux Fatou [TEST]'), 'l’autre boutique apparaît avant le 4e article de la première');
 });
 
+await t('modération : file réservée à l’admin (masqués et signalés), rétablir efface les signalements, supprimer', async () => {
+  const id = await createUser(db, 'admin.fil@example.invalid');
+  await db.query(`insert into fiila.profiles (user_id, display_name, is_admin) values ($1, 'Admin Test', true)`, [id]);
+  const ADM = { uid: id };
+  await ko('fiila_admin_comments', {}, 'not_allowed', U2);
+  await ko('fiila_admin_comments', {}, 'auth_required');
+  const c = await ok('fiila_comment_add', { p_product: A2.id, p_body: 'Signalé une fois' }, U2);
+  await ok('fiila_comment_report', { p_id: c.id, p_device: dev(5) });
+  let q = await ok('fiila_admin_comments', {}, ADM);
+  assert.equal(q[0].hidden, true, 'le masqué (3 signalements) en tête');
+  assert.equal(q[0].reports, 3);
+  const once = q.find((x) => x.id === c.id);
+  assert.equal(once.reports, 1); assert.equal(once.hidden, false); assert.equal(once.product, 'Foulard [TEST]');
+  await ok('fiila_admin_comment_decide', { p_id: q[0].id, p_action: 'restore' }, ADM);
+  assert.equal((await ok('fiila_comments', { p_product: B1.id })).comments.length, 1, 'rétabli et visible');
+  await ok('fiila_admin_comment_decide', { p_id: c.id, p_action: 'delete' }, ADM);
+  q = await ok('fiila_admin_comments', {}, ADM);
+  assert.equal(q.length, 0, 'file vide');
+  await ko('fiila_admin_comment_decide', { p_id: c.id, p_action: 'delete' }, 'not_found', ADM);
+});
+
 await t('suppression d’un compte : ses commentaires partent avec lui', async () => {
   await db.query(`delete from auth.users where id = $1`, [U1.uid]);
   assert.equal((await ok('fiila_comments', { p_product: A1.id })).comments.length, 0);
