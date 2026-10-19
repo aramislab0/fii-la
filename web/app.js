@@ -289,6 +289,12 @@
     // boutique
     shop_required: 'Créez d’abord votre boutique.',
     shop_name_required: 'Donnez un nom à votre boutique.',
+    shop_admin_only: 'Réservé au propriétaire et aux administrateurs de la boutique.',
+    shop_owner_only: 'Seul le propriétaire peut faire cela.',
+    team_full: 'L’équipe compte déjà 10 personnes (invitations comprises).',
+    invalid_role: 'Choisissez un rôle.',
+    already_member: 'Vous faites déjà partie de cette boutique.',
+    has_shop: 'Ce compte a déjà une boutique : utilisez un autre compte pour rejoindre celle-ci.',
     customer_name_required: 'Indiquez le nom du client.',
     your_name_required: 'Indiquez votre nom.',
     phone_required: 'Indiquez votre numéro WhatsApp.',
@@ -2281,6 +2287,7 @@
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
       else if (p[0] === 'livreur' && p[1] === 'invitation' && p[2]) view = viewCourierInvite(p[2]);
+      else if (p[0] === 'equipe' && p[1]) view = viewTeamInvite(p[1]);
       else if (p[0] === 'boutique' && p[1] === 'article' && p[2]) view = viewProductForm(p[2], r.q);
       else if (p[0] === 'clients' && !p[1]) view = viewCustomers(r.q);
       else if (p[0] === 'clients' && p[1]) view = viewCustomer(p[1]);
@@ -4130,8 +4137,11 @@
   }
 
   /* ----- boutique */
+  // Rôle dans la boutique ('owner', 'admin', 'editor') : l'interface masque ce que le serveur refuserait.
+  var SHOP_ROLE = null;
   function viewShop(q) {
     return sapi('fiila_shop_get', {}).then(function (r) {
+      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null;
       return r.shop ? shopDashboard(r, q || {}) : shopForm(null);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
@@ -4142,7 +4152,10 @@
     ['fleurs', 'Fleurs, événements'], ['couture', 'Couture, retouches'], ['services', 'Services, réparations'], ['autre', 'Autre commerce']];
   function typeLabel(k) { var t = BUSINESS_TYPES.filter(function (x) { return x[0] === k; })[0]; return t ? t[1] : ''; }
   function viewShopSettings() {
-    return sapi('fiila_shop_get', {}).then(function (r) { return shopForm(r.shop); }, failPage('Impossible de charger la boutique', 'boutique'));
+    return sapi('fiila_shop_get', {}).then(function (r) {
+      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null;
+      return r.shop && SHOP_ROLE === 'editor' ? memberSettings(r.shop) : shopForm(r.shop);
+    }, failPage('Impossible de charger la boutique', 'boutique'));
   }
   function shopForm(shop) {
     var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '', type: shop ? shop.business_type || '' : '' };
@@ -4175,10 +4188,11 @@
       err, btn,
       shop ? ambassadorShopBox() : null,
       shop ? vitrineSection(shop) : null,
+      shop ? teamSection(shop) : null,
       shop ? courierSection(shop) : null,
       shop ? h('a', { class: 'invite-row', id: 'shop-referral', href: '#/parrainer?pour=boutique' }, icon('gift', 24), h('span', null, 'Parrainer une boutique'),
         h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))) : null,
-      shop ? shopDeleteBox() : null,
+      shop ? (SHOP_ROLE === 'admin' ? leaveShopBox() : shopDeleteBox()) : null,
       footer());
     return shop ? shopTabs(pg, 'settings') : pg;
   }
@@ -4242,6 +4256,118 @@
       sendBox,
       inv ? h('button', { class: 'btn link', type: 'button', style: 'align-self:flex-start', onclick: function () { act('cancel_invite', 'Invitation annulée.'); } }, 'Annuler l’invitation') : null]);
     return box;
+  }
+
+  /* ----- équipe de la boutique : invitation par WhatsApp (nom, numéro, rôle), rôles, retrait, départ */
+  var ROLE_LABEL = { owner: 'Propriétaire', admin: 'Administrateur', editor: 'Éditeur' };
+  function fill(el, kids) { add(el, kids); return el; }
+  var ROLE_HINT = { admin: 'Tout gérer, sauf supprimer la boutique.', editor: 'Commandes, articles et clients. Pas les réglages.' };
+  function teamSection(shop) {
+    var body = h('div', { class: 'stack', style: 'margin-top:12px' });
+    var box = h('details', { class: 'card more-sec', id: 'team-section' }, h('summary', null, 'Équipe'), body);
+    var loaded = false;
+    box.addEventListener('toggle', function () { if (box.open && !loaded) { loaded = true; load(); } });
+    function load() {
+      setKids(body, h('p', { class: 'small muted' }, 'Chargement…'));
+      sapi('fiila_shop_team', {}).then(draw, function (e) { setKids(body); errBox(body, e); });
+    }
+    function draw(t) {
+      var err = h('div', { role: 'alert' });
+      function act(fn, args, okText) {
+        sapi(fn, args).then(function (nt) { toast(okText); draw(nt); }, function (e) { errBox(err, e); });
+      }
+      var rows = [h('li', { class: 'team-row' }, h('span', { class: 'team-name' }, t.owner.name), h('span', { class: 'small muted' }, ROLE_LABEL.owner))];
+      t.members.forEach(function (m) {
+        var edit = h('div', { class: 'stack', hidden: true });
+        rows.push(h('li', { class: 'team-row' },
+          h('span', { class: 'team-name' }, m.name + (m.me ? ' (vous)' : '')),
+          h('span', { class: 'small muted' }, ROLE_LABEL[m.role]),
+          m.me ? null : h('button', { class: 'btn link small', type: 'button', 'aria-expanded': 'false', onclick: function (ev) {
+            edit.hidden = !edit.hidden; ev.currentTarget.setAttribute('aria-expanded', String(!edit.hidden));
+          } }, 'Modifier'),
+          m.me ? null : fill(edit, [
+            segField({ legend: 'Rôle', name: 'role-' + m.id, value: m.role, options: [['admin', ROLE_LABEL.admin], ['editor', ROLE_LABEL.editor]],
+              onChange: function (v) { act('fiila_shop_member_set', { p_user: m.id, p_action: v }, m.name + ' : ' + ROLE_LABEL[v].toLowerCase() + '.'); } }),
+            h('button', { class: 'btn danger small', type: 'button', style: 'align-self:flex-start', onclick: function () {
+              if (window.confirm && !window.confirm('Retirer ' + m.name + ' de l’équipe ? Son accès à la boutique s’arrête aussitôt.')) return;
+              act('fiila_shop_member_set', { p_user: m.id, p_action: 'remove' }, m.name + ' a été retiré(e) de l’équipe.');
+            } }, 'Retirer de l’équipe')])));
+      });
+      t.invites.forEach(function (i) {
+        rows.push(h('li', { class: 'team-row pending' },
+          h('span', { class: 'team-name' }, (i.name || i.phone)), h('span', { class: 'small muted' }, 'Invité · ' + ROLE_LABEL[i.role]),
+          h('button', { class: 'btn link small', type: 'button', onclick: function () { act('fiila_shop_invite_cancel', { p_id: i.id }, 'Invitation annulée.'); } }, 'Annuler')));
+      });
+      var f = { name: '', phone: '', role: 'editor' };
+      var hint = h('p', { class: 'hint', id: 'team-role-hint' }, ROLE_HINT.editor);
+      var sendBox = h('div', { class: 'stack' });
+      var inviteBtn = iconBtn('button', { class: 'btn', type: 'button', id: 'team-invite', onclick: function (ev) {
+        setKids(err);
+        if (!f.phone.trim()) return errBox(err, new ApiError('phone_invalid'));
+        var b = ev.currentTarget; b.disabled = true;
+        sapi('fiila_shop_invite', { p_name: f.name.trim() || null, p_phone: f.phone.trim(), p_role: f.role }).then(function (r) {
+          var link = baseUrl() + '#/equipe/' + r.token;
+          var who = f.name.trim() ? f.name.trim().split(' ')[0] : '';
+          var msg = 'Bonjour' + (who ? ' ' + who : '') + ', ' + shop.name + ' vous invite à rejoindre son équipe sur Fii La (' + ROLE_LABEL[f.role].toLowerCase() + '). Ouvrez ce lien pour accepter : ' + link;
+          track('team_invited', f.role);
+          b.hidden = true;
+          setKids(sendBox, iconBtn('a', { class: 'btn', id: 'team-invite-send', href: waTo(f.phone, msg), target: '_blank', rel: 'noopener noreferrer',
+              onclick: function () { setTimeout(function () { draw(r.team); }, 400); } }, 'chat', 'Envoyer sur WhatsApp'),
+            iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'team-invite-copy', style: 'align-self:flex-start', onclick: function () { copy(link, 'Lien'); } }, 'link', 'Copier le lien'),
+            h('p', { class: 'small muted' }, 'Lien personnel, valable 7 jours, utilisable une seule fois.'));
+        }, function (e) { b.disabled = false; errBox(err, e); });
+      } }, 'chat', 'Inviter sur WhatsApp');
+      setKids(body,
+        h('ul', { class: 'team-list', id: 'team-list' }, rows),
+        h('h3', { class: 'small' }, 'Ajouter une personne'),
+        textField({ id: 'team-name', label: 'Nom', max: 60, onInput: function (v) { f.name = v; } }),
+        textField({ id: 'team-phone', label: 'WhatsApp', type: 'tel', inputmode: 'tel', onInput: function (v) { f.phone = v; } }),
+        segField({ legend: 'Rôle', name: 'team-role', id: 'team-role', value: f.role, options: [['editor', ROLE_LABEL.editor], ['admin', ROLE_LABEL.admin]],
+          onChange: function (v) { f.role = v; hint.textContent = ROLE_HINT[v]; } }),
+        hint, err, inviteBtn, sendBox);
+    }
+    return box;
+  }
+  function leaveShopBox() {
+    var zone = h('div', { class: 'stack' });
+    return h('details', { id: 'shop-leave-box' }, h('summary', null, 'Quitter la boutique'),
+      h('div', { class: 'stack', style: 'margin-top:12px' },
+        h('p', { class: 'small' }, 'Vous n’aurez plus accès aux commandes, articles et clients de la boutique. Le propriétaire pourra vous réinviter.'),
+        h('button', { class: 'btn danger', type: 'button', id: 'shop-leave', onclick: function (ev) {
+          ev.currentTarget.disabled = true;
+          api('fiila_shop_leave', {}).then(function () { ME = null; SHOP_ROLE = null; track('team_left', 'member'); toast('Vous avez quitté la boutique.'); go('#/'); },
+            function (e) { errBox(zone, e); });
+        } }, 'Quitter la boutique'), zone));
+  }
+  // Réglages vus par un éditeur : son rôle, et la sortie.
+  function memberSettings(shop) {
+    var pg = page(backBtn('Ma boutique', '#/boutique'),
+      h('div', { class: 'stack tight' }, h('h1', null, 'Réglages'),
+        h('p', { class: 'muted', id: 'member-role' }, 'Vous êtes ' + ROLE_LABEL.editor.toLowerCase() + ' de ' + shop.name + '.')),
+      h('p', { class: 'small muted' }, 'Les réglages sont gérés par le propriétaire et les administrateurs de la boutique.'),
+      leaveShopBox(), footer());
+    return shopTabs(pg, 'settings');
+  }
+  function viewTeamInvite(token) {
+    return api('fiila_shop_invite_get', { p_token: token }).then(function (r) {
+      if (r.state !== 'ok') return page(stateCard(r.state === 'used' ? '✓' : '⌛', r.state === 'used' ? 'Invitation déjà acceptée' : 'Invitation expirée ou introuvable',
+        r.state === 'used' ? 'Ouvrez votre boutique.' : 'Demandez une nouvelle invitation à la boutique.', h('a', { class: 'btn', href: '#/boutique' }, 'Ma boutique')), footer());
+      var err = h('div', { role: 'alert' });
+      return page(
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Invitation'),
+          h('h1', { class: 'wrapword' }, r.shop + ' vous invite à rejoindre son équipe'),
+          h('p', { class: 'muted', id: 'team-invite-role' }, ROLE_LABEL[r.role] + ' : ' + ROLE_HINT[r.role].charAt(0).toLowerCase() + ROLE_HINT[r.role].slice(1))),
+        authed()
+          ? iconBtn('button', { class: 'btn big', type: 'button', id: 'team-accept', onclick: function (ev) {
+              var b = ev.currentTarget; b.disabled = true;
+              api('fiila_shop_invite_accept', { p_token: token }).then(function (x) {
+                ME = null; SHOP_ROLE = x.role; track('team_joined', x.role); toast('Vous avez rejoint ' + x.shop + '.'); go('#/boutique');
+              }, function (e) { b.disabled = false; errBox(err, e); });
+            } }, 'check', 'Rejoindre la boutique')
+          : h('a', { class: 'btn big', id: 'team-login', href: '#/compte' + qs({ retour: 'equipe/' + token }) }, 'Se connecter ou créer un compte'),
+        authed() ? null : h('p', { class: 'small muted' }, 'Un compte Fii La est nécessaire pour accéder à la boutique.'),
+        err, footer());
+    }, function (e) { return page(stateCard('!', 'Impossible d’afficher l’invitation', errText(e), retryBtn())); });
   }
 
   function shopDeleteBox() {
@@ -4392,7 +4518,7 @@
             h('button', { class: 'btn', type: 'button', onclick: function () {
               sapi('fiila_customer_save', { p: { id: c.id, name: f.name.trim(), phone: f.phone.trim() || null } }).then(function () { toast('Client mis à jour.'); render(); }, function (e) { errBox(err, e); });
             } }, 'Enregistrer'),
-            h('button', { class: 'btn danger', type: 'button', id: 'customer-delete', onclick: function () {
+            SHOP_ROLE === 'editor' ? null : h('button', { class: 'btn danger', type: 'button', id: 'customer-delete', onclick: function () {
               setKids(zone, h('div', { class: 'confirm' },
                 h('p', null, h('strong', null, 'Retirer ce client de votre fichier ?')),
                 h('p', { class: 'small' }, 'Ses commandes passées restent, avec son nom. Son adresse n’est plus mémorisée par la boutique.'),
@@ -4804,7 +4930,7 @@
       productDetails(f),
       pr ? segField({ name: 'product-active', id: 'product-active', value: f.active ? 'on' : 'off', options: [['on', 'Visible'], ['off', 'Masqué']], onChange: function (v) { f.active = v === 'on'; } }) : null,
       err, btn,
-      pr ? h('button', { class: 'btn danger', type: 'button', id: 'product-delete', onclick: function () {
+      pr && SHOP_ROLE !== 'editor' ? h('button', { class: 'btn danger', type: 'button', id: 'product-delete', onclick: function () {
         setKids(zone, h('div', { class: 'confirm' },
           h('p', null, h('strong', null, 'Supprimer cet article ?')),
           h('p', { class: 'small' }, 'Les commandes passées gardent son nom et son prix. Ses notes sont effacées. Pour le retirer sans perdre ses notes, choisissez plutôt « Masqué ».'),

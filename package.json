@@ -39,6 +39,8 @@
     "test:engage": "node tests/engage.test.mjs",
     "test:backoffice-sql": "node tests/backoffice.sql.test.mjs",
     "test:backoffice": "node tests/backoffice.test.mjs",
+    "test:shopteam-sql": "node tests/shopteam.sql.test.mjs",
+    "test:team": "node tests/team.test.mjs",
     "test:all": "scripts/run-suites.sh sql && scripts/run-suites.sh browser"
   },
   "devDependencies": {
