@@ -744,3 +744,27 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .fwrap{position:relative;display:block}
 .fwrap .fimg{width:100%}
 .demo-tag{position:absolute;top:10px;left:10px;padding:4px 10px;border-radius:999px;background:rgba(23,32,27,.82);color:#fff;font-size:12px;font-weight:700;letter-spacing:.02em}
+/* ---- En-tête de l'accueil avec un compte (19/10) : photo ronde à droite, prénom dans le bonjour. */
+.me-btn{flex:none;display:inline-flex;border-radius:50%;padding:3px;background:var(--surface);box-shadow:0 0 0 2px var(--lime);text-decoration:none}
+.me-btn .avatar{display:block}
+.me-btn:active{transform:scale(.96)}
+.hello{font-family:Montserrat,system-ui,sans-serif;font-weight:700;font-size:24px;line-height:1.2;margin-top:4px;overflow-wrap:anywhere}
+.promise.small-promise{font-size:15px;font-weight:500;color:var(--muted)}
+
+/* ---- Bouton « Installer l'app » (19/10) : une ligne bien visible, l'icône de l'app à gauche. */
+.install-cta{display:flex;align-items:center;gap:6px;background:var(--surface);border-radius:20px;box-shadow:var(--shadow-card);border:1.5px solid var(--lime);padding:6px 6px 6px 8px}
+.install-go{flex:1;display:flex;align-items:center;gap:12px;background:none;border:0;padding:6px;color:var(--ink);text-align:left;cursor:pointer;min-height:56px;font:inherit}
+.install-ic{width:44px;height:44px;border-radius:12px;background:var(--green);display:flex;align-items:center;justify-content:center;flex:none}
+.install-ic .mark.tiny{font-size:13px;color:#fff;letter-spacing:-.02em}
+.install-ic .mark.tiny span{padding:0 2px}
+.install-t{display:flex;flex-direction:column;flex:1;min-width:0}
+.install-t b{font-size:16px}
+.install-t small{color:var(--muted);font-size:13px}
+.install-x{width:40px;height:40px;border:0;background:none;color:var(--muted);font-size:22px;cursor:pointer;flex:none}
+.sheet-back{position:fixed;inset:0;background:rgba(10,15,12,.45);display:flex;align-items:flex-end;justify-content:center;z-index:50;animation:sheet-fade .2s ease}
+.sheet{background:var(--bg);width:100%;max-width:560px;border-radius:24px 24px 0 0;padding:22px 18px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;animation:sheet-up .25s cubic-bezier(.22,.61,.36,1)}
+.spic-n{font-weight:700;color:var(--muted);width:14px;flex:none;padding-top:8px}
+@keyframes sheet-fade{from{opacity:0}to{opacity:1}}
+@keyframes sheet-up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){.sheet-back,.sheet{animation:none}}
+.sheet .steps-pic{padding:0;margin:0;list-style:none}

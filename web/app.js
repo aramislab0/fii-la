@@ -566,6 +566,68 @@
   function iosManualInstall() {
     return /iPhone|iPad|iPod/.test(navigator.userAgent || '') && 'standalone' in navigator && navigator.standalone === false;
   }
+  /* Bouton « Installer l'app » de l'accueil (fondateur, 19/10) : simple et visible, tant que l'app n'est pas installée.
+     Android (Chrome) : la fenêtre d'installation du téléphone. iPhone : 3 étapes en images. Autres navigateurs
+     (WhatsApp, Facebook, ordinateur) : ouvrir dans Chrome ou Safari, lien à copier. « × » le masque 30 jours. */
+  function installCta() {
+    var box = h('div', { id: 'install-cta' });
+    function hidden() { return isStandalone() || LS.get('fiila.install.done', false) || (Number(LS.get('fiila.install.hide', 0)) > Date.now()); }
+    function draw() {
+      if (!box.isConnected && box.__drawn) { window.removeEventListener('fiila:installable', draw); return; }
+      box.__drawn = true;
+      if (hidden()) { setKids(box); return; }
+      setKids(box, h('div', { class: 'install-cta' },
+        h('button', { class: 'install-go', type: 'button', id: 'install-app', onclick: open },
+          h('span', { class: 'install-ic', 'aria-hidden': 'true' }, h('span', { class: 'mark tiny' }, 'Fii', h('span', null, 'La'))),
+          h('span', { class: 'install-t' }, h('b', null, 'Installer l’app'), h('small', null, 'L’icône Fii La sur votre téléphone')),
+          icon('down', 20)),
+        h('button', { class: 'install-x', type: 'button', 'aria-label': 'Masquer', onclick: function () { LS.set('fiila.install.hide', Date.now() + 30 * 864e5); draw(); } }, '×')));
+    }
+    function open() {
+      if (deferredInstall) {
+        var ev = deferredInstall; deferredInstall = null;
+        Promise.resolve().then(function () { return ev.prompt(); }).then(function () { return ev.userChoice; })
+          .then(function (c) { if (c && c.outcome === 'accepted') { LS.set('fiila.install.done', true); toast('Fii La est sur votre écran d’accueil.'); } draw(); }, function () { draw(); });
+        return;
+      }
+      sheet();
+    }
+    function sheet() {
+      var ios = /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+      var inApp = /FBAN|FBAV|Instagram|WhatsApp|Line\/|TikTok|; wv\)/i.test(navigator.userAgent || '');
+      var steps = ios && !inApp ? [
+        ['share', 'Touchez le bouton Partager', 'en bas de l’écran (le carré avec une flèche).'],
+        ['plus', 'Choisissez « Sur l’écran d’accueil »', 'faites défiler la liste si besoin.'],
+        ['check', 'Touchez « Ajouter »', 'l’icône Fii La apparaît avec vos autres apps.']]
+        : inApp || !('serviceWorker' in navigator) ? [
+        ['link', 'Copiez le lien', 'avec le bouton ci-dessous.'],
+        ['eye', 'Ouvrez-le dans ' + (ios ? 'Safari' : 'Chrome'), 'l’installation n’est pas possible depuis cette application.'],
+        ['down', 'Touchez « Installer l’app »', 'sur l’accueil de Fii La.']]
+        : [
+        ['dots', 'Ouvrez le menu du navigateur', 'les trois points en haut à droite.'],
+        ['plus', 'Choisissez « Installer l’application »', 'ou « Ajouter à l’écran d’accueil ».'],
+        ['check', 'Confirmez', 'l’icône Fii La apparaît avec vos autres apps.']];
+      var back = h('div', { class: 'sheet-back', id: 'install-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'install-sheet-h',
+        onclick: function (e) { if (e.target === back) close(); } },
+        h('div', { class: 'sheet' },
+          h('h2', { id: 'install-sheet-h' }, 'Mettre Fii La sur votre écran d’accueil'),
+          h('ol', { class: 'steps-pic' }, steps.map(function (st, i) {
+            return h('li', { class: 'spic' }, h('span', { class: 'spic-n' }, String(i + 1)), h('span', { class: 'spic-ic', 'aria-hidden': 'true' }, icon(st[0], 22)),
+              h('span', null, h('b', null, st[1]), h('span', { class: 'small muted' }, ' ' + st[2])));
+          })),
+          inApp || !('serviceWorker' in navigator) ? iconBtn('button', { class: 'btn', type: 'button', onclick: function () { copy(baseUrl(), 'Lien'); } }, 'link', 'Copier le lien de Fii La') : null,
+          h('button', { class: 'btn ghost', type: 'button', id: 'install-sheet-close', onclick: close }, 'J’ai compris')));
+      function close() { back.remove(); document.removeEventListener('keydown', esc); }
+      function esc(e) { if (e.key === 'Escape') close(); }
+      document.addEventListener('keydown', esc);
+      document.body.append(back);
+      onMedia(close);
+      var b = back.querySelector('button.btn'); if (b) b.focus();
+    }
+    window.addEventListener('fiila:installable', draw);
+    draw();
+    return box;
+  }
   function installSlot() {
     var slot = h('div', { id: 'install-slot' });
     function draw() {
@@ -2017,10 +2079,15 @@
           }))) : null);
     }
 
-    var who = authed() ? h('a', { class: 'who', id: 'account-link', href: '#/compte' }, avatarEl(null, 32), 'Mon compte') : null;
+    // Compte : la photo seule, grande et ronde, en haut à droite ; le prénom dans le bonjour, sous le logo (19/10).
+    var who = authed() ? h('a', { class: 'me-btn', id: 'account-link', href: '#/compte', 'aria-label': 'Mon compte' }, avatarEl(null, 48)) : null;
+    var hello = authed() ? h('p', { class: 'hello', id: 'hello' }, 'Bonjour') : null;
     if (authed()) account.me().then(function (me) {
-      if (!me) { setKids(who, 'Se connecter'); return; }
-      setKids(who, avatarEl(me, 32), h('span', { class: 'who-name' }, me.display_name || 'Mon compte'));
+      if (!me) { setKids(who, h('span', { class: 'me-login' }, 'Se connecter')); who.className = 'who'; hello.remove(); return; }
+      setKids(who, avatarEl(me, 48));
+      who.setAttribute('aria-label', 'Mon compte : ' + (me.display_name || me.email || ''));
+      var first = String(me.display_name || '').trim().split(/\s+/)[0];
+      hello.textContent = first ? 'Bonjour, ' + first : 'Bonjour';
       if (me.shop && shopBtn) shopBtn.setAttribute('aria-label', 'Ma boutique : ' + me.shop.name);
     }, function () { /* hors ligne : on garde le lien */ });
     function tile4(href, name, label, attrs) {
@@ -2032,7 +2099,8 @@
         h('div', { class: 'brand-row' },
           h('div', { class: 'brand' }, h('span', { class: 'mark', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La'))),
           who),
-        h('p', { class: 'promise' }, 'Votre adresse, en une photo.')),
+        hello,
+        h('p', { class: 'promise' + (hello ? ' small-promise' : '') }, 'Votre adresse, en une photo.')),
       inviteBanner(),
       // Une grande action ; quatre raccourcis avec pictogramme ; puis les adresses (proposition validée le 18/10).
       h('a', { class: 'hero', href: '#/new', id: 'create-address', 'aria-label': 'Créer mon adresse' },
@@ -2044,6 +2112,7 @@
         CFG.shop === false ? null : shopBtn,
         tile4('#/livreur', 'moto', 'Livreur', { id: 'courier-link', 'aria-label': 'Espace livreur' })),
       h('p', { class: 'small muted home-hint', id: 'event-hint' }, h('b', null, 'Événement'), ' : mariage, baptême, réunion… un seul lien pour que tous vos invités trouvent le lieu.'),
+      installCta(),
       accountNudge(),
       demoBanner(),
       listBox,

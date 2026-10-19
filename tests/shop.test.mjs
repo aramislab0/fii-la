@@ -100,7 +100,8 @@ await t('inscription : compte créé, fiche du téléphone rattachée, nom affic
   const r = await local.db.query('select p.user_id is not null as linked from fiila.places p where p.id = $1', [before.id]);
   assert.equal(r.rows[0].linked, true);
   await M.goto(URL0);
-  await M.locator('#account-link').getByText('Awa Test').waitFor();
+  await M.locator('#hello').getByText('Bonjour, Awa').waitFor();
+  assert.match(await M.locator('#account-link').getAttribute('aria-label'), /Awa Test/);
 });
 
 await t('profil : téléphone et photo enregistrés ; mauvais numéro refusé', async () => {

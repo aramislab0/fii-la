@@ -142,6 +142,33 @@ await t('« Événement » : tuile et exemples sur l’accueil ; un toucher sur 
   await P.evaluate(() => localStorage.removeItem('fiila.draft.meeting'));
 });
 
+await t('« Installer l’app » : visible sur l’accueil, explique les étapes, se masque', async () => {
+  await P.goto(URL0 + '#/');
+  await P.locator('#install-app').waitFor();
+  await P.locator('#mes-adresses').waitFor();
+  const order = await P.evaluate(() => [...document.querySelectorAll('#create-address, #install-cta, #mes-adresses')].map((e) => e.id));
+  assert.deepEqual(order, ['create-address', 'install-cta', 'mes-adresses']);
+  await P.locator('#install-app').click();
+  await P.locator('#install-sheet').waitFor();
+  assert.equal(await P.locator('#install-sheet .spic').count(), 3);
+  await P.waitForTimeout(500);
+  await P.screenshot({ path: 'docs/screenshots/installer-app.png' });
+  await P.locator('#install-sheet-close').click();
+  assert.equal(await P.locator('#install-sheet').count(), 0);
+  await P.locator('#install-cta .install-x').click();
+  assert.equal(await P.locator('#install-app').count(), 0, 'masqué');
+  await P.evaluate(() => localStorage.removeItem('fiila.install.hide'));
+  // iPhone (Safari) : les 3 étapes de l’écran d’accueil
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: ENGINE === 'chromium', hasTouch: true, locale: 'fr-FR', serviceWorkers: 'block',
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+  const I = await ctx.newPage();
+  await I.goto(URL0 + '#/');
+  await I.locator('#install-app').click();
+  await I.getByText('Touchez le bouton Partager').waitFor();
+  await I.getByText('Choisissez « Sur l’écran d’accueil »').waitFor();
+  await ctx.close();
+});
+
 await t('aucune erreur JavaScript', async () => { assert.deepEqual([...P.__errors, ...V.__errors], []); });
 
 await browser.close();
