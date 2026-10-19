@@ -159,6 +159,7 @@ let orderId, invoiceUrl;
 await t('boutique : création, tableau de bord vide', async () => {
   await M.goto(URL0 + '#/boutique');
   await M.fill('#shop-name', 'Boutique Awa (test)');
+  await M.selectOption('#shop-type', 'mode');
   await M.fill('#shop-phone', '33 800 00 00');
   await M.click('#shop-save');
   await M.locator('#shop-title').getByText('Boutique Awa (test)').waitFor();
@@ -298,6 +299,7 @@ await t('boutique sans compte : créée en un geste, le compte est proposé, pas
   await S.page.goto(URL0);
   await S.page.click('#shop-link');
   await S.page.fill('#shop-name', 'Boutique Binta (test)');
+  await S.page.selectOption('#shop-type', 'mode');
   await S.page.click('#shop-save');
   await S.page.locator('#shop-title').getByText('Boutique Binta (test)').waitFor();
   const key = await S.page.evaluate(() => JSON.parse(localStorage.getItem('fiila.shop')).key);

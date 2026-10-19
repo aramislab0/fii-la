@@ -29,6 +29,7 @@
     "test:products-sql": "node tests/products.sql.test.mjs",
     "test:products": "node tests/products.test.mjs",
     "test:demo-sql": "node tests/demo.sql.test.mjs",
+    "test:shoptype-sql": "node tests/shoptype.sql.test.mjs",
     "demo:seed": "node scripts/demo-seed.mjs"
   },
   "devDependencies": {

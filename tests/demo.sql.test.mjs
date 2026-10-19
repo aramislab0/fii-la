@@ -15,12 +15,12 @@ const ok = async (fn, args) => { const r = await rpc(db, fn, args); assert.equal
 const one = async (sql) => (await db.query(sql)).rows[0];
 let REAL;
 
-await t('chargement : 13 boutiques de démonstration, toutes catégories, sans place gratuite', async () => {
+await t('chargement : 14 boutiques de démonstration, toutes catégories, sans place gratuite', async () => {
   REAL = (await ok('fiila_shop_save', { p_key: null, p: { name: 'Vraie boutique [TEST]' } })).key;
   await ok('fiila_product_save', { p_key: REAL, p: { name: 'Article [TEST]', price: 1000 } });
   await ok('fiila_shop_vitrine', { p_key: REAL, p: { public: true } });
   await db.exec(readFileSync('scripts/demo-seed.sql', 'utf8'));
-  assert.equal((await one(`select count(*)::int n from fiila.shops where demo`)).n, 13);
+  assert.equal((await one(`select count(*)::int n from fiila.shops where demo`)).n, 14);
   assert.equal((await one(`select count(*)::int n from fiila.shops where demo and featured_rank is not null`)).n, 0);
   assert.equal((await one(`select count(distinct category)::int n from fiila.products p join fiila.shops s on s.id = p.shop_id where s.demo`)).n, 9);
   assert.equal((await ok('fiila_shop_feed', { p_key: REAL, p_on: null })).free_left, 24, 'les 25 places restent aux vraies boutiques');
@@ -30,7 +30,7 @@ await t('fil : sans mode démo, seulement les vraies boutiques ; en mode démo, 
   const f = await ok('fiila_feed', {});
   assert.deepEqual(f.shops.map((s) => s.name), ['Vraie boutique [TEST]']);
   const d = await ok('fiila_feed', { p_demo: true });
-  assert.equal(d.shops.length, 14);
+  assert.equal(d.shops.length, 15);
   assert.equal(d.shops[0].name, 'Vraie boutique [TEST]', 'les vraies boutiques d’abord');
   assert.ok(d.shops.slice(1).every((s) => s.demo === true && /\(démo\)$/.test(s.name)));
   assert.ok(d.shops.some((s) => s.reviews >= 3 && s.rating < 5), 'notes variées');

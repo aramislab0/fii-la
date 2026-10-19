@@ -47,6 +47,7 @@ let KEY, URLV, P1, P2, INVOICE;
 await t('boutique : ouvre sa vitrine depuis les réglages, lien prêt à envoyer', async () => {
   await S.goto(URL0 + '#/boutique');
   await S.fill('#shop-name', 'Boutique Awa (test)');
+  await S.selectOption('#shop-type', 'mode');
   await S.fill('#shop-phone', '77 100 00 01');
   await S.click('#shop-save');
   await S.locator('#shop-title').waitFor();

@@ -211,6 +211,8 @@
     invalid_payload: 'Données non valides.',
     invalid_theme: 'Modèle ou couleur non reconnu. Choisissez dans la liste.',
     invalid_category: 'Catégorie non reconnue. Choisissez dans la liste.',
+    invalid_business_type: 'Type de commerce non reconnu. Choisissez dans la liste.',
+    business_type_required: 'Choisissez votre type de commerce.',
     invalid_stock: 'Stock : indiquez un nombre (0 ou plus), ou laissez vide.',
     size_required: 'Choisissez votre taille ou pointure.',
     color_required: 'Choisissez une couleur.',
@@ -1423,6 +1425,7 @@
       s.demo ? h('span', { class: 'fwrap' }, img, h('span', { class: 'demo-tag' }, 'Démo')) : img,
       h('span', { class: 'fbody' },
         h('span', { class: 'fname wrapword' }, s.name),
+        s.type ? h('span', { class: 'ftype' }, typeLabel(s.type)) : null,
         s.reviews ? ratingEl(s.rating, s.reviews) : null,
         s.about ? h('span', { class: 'small muted wrapword fabout' }, s.about) : null,
         h('span', { class: 'fitems' }, (s.products || []).map(function (p) {
@@ -1504,14 +1507,16 @@
     return loadFeed().then(function (d) {
       var list = (d && d.shops) || [];
       var mine = shopKey();
-      var cats = []; list.forEach(function (s) { (s.categories || []).forEach(function (c) { if (cats.indexOf(c) < 0) cats.push(c); }); });
+      // Filtre par type de commerce (la catégorie des articles sert seulement si la boutique n'a pas de type).
+      function kinds(s) { return s.type ? [s.type] : (s.categories || []); }
+      var cats = []; list.forEach(function (s) { kinds(s).forEach(function (c) { if (cats.indexOf(c) < 0) cats.push(c); }); });
       var cat = '';
       var listBox = h('div', { class: 'feed-list', id: 'feed-list' });
       var chipsBox = h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Catégorie', id: 'feed-cats' });
       function drawList() {
-        var l = list.filter(function (s) { return !cat || (s.categories || []).indexOf(cat) >= 0; });
+        var l = list.filter(function (s) { return !cat || kinds(s).indexOf(cat) >= 0; });
         setKids(listBox, l.length ? l.map(feedCard) : h('p', { class: 'muted' }, 'Aucune boutique dans cette catégorie pour le moment.'));
-        setKids(chipsBox, [['', 'Tout']].concat(cats.map(function (c) { return [c, catLabel(c) || c]; })).map(function (c) {
+        setKids(chipsBox, [['', 'Tout']].concat(cats.map(function (c) { return [c, (typeLabel(c) || catLabel(c) || c).split(',')[0]]; })).map(function (c) {
           return h('button', { class: 'opt' + (cat === c[0] ? ' on' : ''), type: 'button', 'aria-pressed': cat === c[0] ? 'true' : 'false', onclick: function () { cat = c[0]; drawList(); } }, c[1]);
         }));
       }
@@ -3759,16 +3764,24 @@
       return r.shop ? shopDashboard(r, q || {}) : shopForm(null);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
+  // Types de commerce (19/10) : choisis à la création, ils serviront aux outils propres à chaque métier.
+  var BUSINESS_TYPES = [['mode', 'Vêtements, mode'], ['chaussures', 'Chaussures'], ['beaute', 'Beauté, cosmétiques'], ['coiffure', 'Salon de coiffure, barbier'],
+    ['esthetique', 'Institut, onglerie'], ['restauration', 'Restaurant, traiteur'], ['patisserie', 'Pâtisserie, boulangerie'], ['epicerie', 'Épicerie, alimentation'],
+    ['electronique', 'Téléphones, électronique'], ['maison', 'Maison, déco'], ['bijoux', 'Bijoux, accessoires'], ['enfants', 'Enfants, bébé'],
+    ['fleurs', 'Fleurs, événements'], ['couture', 'Couture, retouches'], ['services', 'Services, réparations'], ['autre', 'Autre commerce']];
+  function typeLabel(k) { var t = BUSINESS_TYPES.filter(function (x) { return x[0] === k; })[0]; return t ? t[1] : ''; }
   function viewShopSettings() {
     return sapi('fiila_shop_get', {}).then(function (r) { return shopForm(r.shop); }, failPage('Impossible de charger la boutique', 'boutique'));
   }
   function shopForm(shop) {
-    var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '' };
+    var f = { name: shop ? shop.name : '', phone: shop ? shop.phone || '' : '', type: shop ? shop.business_type || '' : '' };
     var err = h('div', { role: 'alert' });
     var ask = shop ? null : referralAsk('shop-ref');
     var btn = h('button', { class: 'btn', type: 'button', id: 'shop-save', onclick: function () {
-      btn.disabled = true; setKids(err);
-      sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: null } }).then(function (r) {
+      setKids(err);
+      if (!f.type) return errBox(err, new ApiError('business_type_required'));
+      btn.disabled = true;
+      sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: null, business_type: f.type } }).then(function (r) {
         if (r && r.key) LS.set(SHOP_LS, { id: r.shop.id, key: r.key, linked: authed() || undefined });
         if (!shop) { track('shop_created', authed() ? 'account' : 'no_account'); bumpTx(); attribute('shop', null, r.key || shopKey(), ask.value()); }
         ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
@@ -3780,6 +3793,10 @@
         shop ? null : h('p', { class: 'muted' }, 'Ces informations apparaissent sur vos factures.')),
       textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
       textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+      h('div', { class: 'field' }, h('label', { for: 'shop-type' }, 'Type de commerce'),
+        h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
+          h('option', { value: '' }, 'Choisir…'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: f.type === t[0] || null }, t[1]); })),
+        h('p', { class: 'hint' }, 'Il nous permet de vous proposer les outils adaptés à votre métier.')),
       ask ? ask.el : null,
       err, btn,
       shop ? vitrineSection(shop) : null,

@@ -75,6 +75,7 @@ let CODE, LINK;
 await t('boutique : « Parrainer une boutique », code, lien et message WhatsApp prêts', async () => {
   await A.goto(URL0 + '#/boutique');
   await A.fill('#shop-name', 'Boutique Awa (test)');
+  await A.selectOption('#shop-type', 'mode');
   await A.fill('#shop-phone', '77 100 00 01');
   await A.click('#shop-save');
   await A.locator('#shop-title').waitFor();
@@ -101,6 +102,7 @@ await t('lien de parrainage : bandeau « Boutique Awa vous invite », boutique c
   await B.click('#invite-shop');
   assert.equal(await B.locator('#shop-ref').count(), 0, 'pas de question « qui vous a parlé » : le lien suffit');
   await B.fill('#shop-name', 'Boutique Binta (test)');
+  await B.selectOption('#shop-type', 'mode');
   await B.click('#shop-save');
   await B.locator('#shop-title').waitFor();
   await B.goto(URL0 + '#/');

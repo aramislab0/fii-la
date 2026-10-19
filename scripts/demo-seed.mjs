@@ -41,8 +41,10 @@ const SHOPS = [
   ['Tech Colobane', 'electronique', 'indigo', '#2F3E9E', 'Accessoires téléphone, garantie 3 mois.', [['Écouteurs sans fil', 12000, '', 'Noir,Blanc', 14], ['Chargeur rapide', 5000, '', '', 25], ['Batterie externe', 9000, '', '', 0]], [3, 2, 4, 3]],
   ['Bijoux Soumbédioune', 'accessoires', 'terre', '#8A4B1F', 'Bijoux en argent et perles, fabriqués à Dakar.', [['Bracelet en argent', 9000, '', '', 6], ['Collier de perles', 7000, '', 'Rouge,Bleu,Vert', 10], ['Boucles d’oreilles', 5000, '', '', null]], [5, 4, 5]],
   ['Petits Boubous', 'enfants', 'prune', '#5B2A86', 'Tenues pour enfants, du baptême à la Tabaski.', [['Boubou enfant', 12000, '2 ans,4 ans,6 ans,8 ans', 'Blanc,Bleu', 6], ['Robe fillette wax', 9000, '2 ans,4 ans,6 ans', 'Rose,Jaune', 4], ['Sandales enfant', 5000, '24,26,28,30', '', null]], [5, 5, 4]],
+  ['Salon Khady', 'beaute', 'prune', '#5B2A86', 'Tresses, nattes et soins. Sur rendez-vous à Ouakam.', [['Tresses africaines', 15000, '', '', null], ['Nattes collées', 8000, '', '', null], ['Soin hydratant', 5000, '', '', null]], [5, 4, 5]],
   ['Fleurs Almadies', 'autre', 'foret', '#1E4A34', 'Bouquets livrés le jour même.', [['Bouquet de roses', 15000, '', 'Rouge,Blanc', null], ['Bouquet de saison', 10000, '', '', null], ['Composition mariage', 45000, '', '', 2]], [5, 4]],
 ];
+const TYPE = { 'Awa Couture': 'mode', 'Dakar Street': 'mode', 'Sneakers Médina': 'chaussures', 'Cuirs de Ngaye': 'chaussures', 'Karité Fatou': 'beaute', 'Thiouraye Ndèye': 'beaute', 'Saveurs de Mame': 'restauration', 'Pâtisserie Yoff': 'patisserie', 'Déco Sandaga': 'maison', 'Tech Colobane': 'electronique', 'Bijoux Soumbédioune': 'bijoux', 'Petits Boubous': 'enfants', 'Fleurs Almadies': 'fleurs', 'Salon Khady': 'coiffure' };
 const accentHex = { foret: '#1E4A34', nuit: '#1F2A37', indigo: '#2F3E9E', prune: '#5B2A86', bordeaux: '#7A1F3D', terre: '#8A4B1F' };
 let sql = `-- Généré par scripts/demo-seed.mjs. Boutiques FICTIVES de démonstration (demo = true). Effacement : scripts/demo-clear.sql.
 do $$
@@ -54,8 +56,8 @@ SHOPS.forEach(([name, cat, accent, color, about, items, ratings], i) => {
   const slug = 'demo-' + name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const cover = i % 3 === 0 ? `, cover = decode(${S(png(color, 1, 640, 360))}, 'base64'), cover_type = 'image/png'` : '';
   sql += `
-  insert into fiila.shops (owner_hash, name, about, slug, public, theme, accent, demo, next_number)
-  values (extensions.gen_random_bytes(32), ${S(name + ' (démo)')}, ${S(about)}, ${S(slug)}, true, ${S(['galerie', 'catalogue', 'magazine'][i % 3])}, ${S(accent)}, true, 2) returning id into s;
+  insert into fiila.shops (owner_hash, name, about, slug, public, theme, accent, demo, next_number, business_type)
+  values (extensions.gen_random_bytes(32), ${S(name + ' (démo)')}, ${S(about)}, ${S(slug)}, true, ${S(['galerie', 'catalogue', 'magazine'][i % 3])}, ${S(accent)}, true, 2, ${S(TYPE[name])}) returning id into s;
   ${cover ? `update fiila.shops set ${cover.slice(2)} where id = s;` : ''}
   insert into fiila.orders (shop_id, number, customer_name, items, total, status, share_token, delivered_at)
   values (s, 1, 'Cliente démo', '[]'::jsonb, 0, 'delivered', encode(extensions.gen_random_bytes(16), 'hex'), now()) returning id into o;`;

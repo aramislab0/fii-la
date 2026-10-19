@@ -168,7 +168,7 @@ await t('mode démo : boutiques fictives visibles et marquées, filtre par caté
   await A.goto(URL0 + '#/demo');
   await A.locator('#demo-banner').waitFor();
   await A.locator('#feed-list .demo-tag').first().waitFor();
-  assert.equal(await A.locator('#feed-list .fcard').count(), n0 + 13);
+  assert.equal(await A.locator('#feed-list .fcard').count(), n0 + 14);
   await A.locator('#feed-cats').getByRole('button', { name: 'Chaussures' }).click();
   const names = await A.locator('#feed-list .fname').allTextContents();
   assert.deepEqual(names.sort(), ['Cuirs de Ngaye (démo)', 'Sneakers Médina (démo)']);
