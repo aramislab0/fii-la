@@ -69,7 +69,10 @@ await t('inscription : charte obligatoire, puis formation en 6 fiches et test r�
   await A.getByText('Acceptez la charte').waitFor();
   await A.check('#amb-charter');
   await A.click('#amb-register');
-  await A.getByText('Formation · 1 sur 6').waitFor();
+  await A.getByText('Formation · 1 sur 6').waitFor().catch(async (e) => {
+    const why = await A.evaluate(() => [...document.querySelectorAll('[role=alert], #toast')].map((x) => x.textContent).join(' | ') + ' @ ' + location.hash);
+    throw new Error('formation absente : ' + why);
+  });
   await shot(A, '02-formation');
   for (let i = 0; i < 6; i++) await A.click('#amb-next');
   await A.getByRole('heading', { name: 'Test de passage' }).waitFor();
