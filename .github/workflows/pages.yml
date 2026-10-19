@@ -1,9 +1,13 @@
-name: Déployer Fii La sur GitHub Pages
+name: Mettre Fii La en production
+
+# À chaque envoi sur main : 1) migrations de la base, 2) mise en ligne du site, 3) tests en production.
+# Ne dépend plus du Mac du fondateur. Seul secret : SUPABASE_DB_PASSWORD (réglages du dépôt > Secrets).
+# Sans ce secret, l'étape 1 est sautée avec un avertissement (les migrations restent à faire depuis le Mac).
 
 on:
   push:
     branches: [main]
-    paths: ['web/**', '.github/workflows/pages.yml']
+    paths: ['web/**', 'supabase/migrations/**', 'scripts/**', 'tests/**', 'package*.json', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -13,10 +17,44 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false   # ne jamais couper une migration en cours
+
+env:
+  # Adresse du serveur de la base, sans mot de passe (non secrète).
+  SUPABASE_POOLER_URL: postgresql://postgres.lkvulwocirttozfnyxck@aws-1-eu-west-3.pooler.supabase.com:5432/postgres
+  SITE_URL: https://aramislab0.github.io/fii-la/
 
 jobs:
+  migrate:
+    name: 1. Base de données
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - name: Secret présent ?
+        id: s
+        env: { PW: '${{ secrets.SUPABASE_DB_PASSWORD }}' }
+        run: |
+          if [ -n "$PW" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else
+            echo "::warning::SUPABASE_DB_PASSWORD absent : migrations sautées (à faire depuis le Mac)."; echo "ok=0" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.s.outputs.ok == '1'
+        run: npm ci --ignore-scripts
+      - name: Appliquer les migrations (chacune une seule fois, en transaction)
+        if: steps.s.outputs.ok == '1'
+        env: { SUPABASE_DB_PASSWORD: '${{ secrets.SUPABASE_DB_PASSWORD }}' }
+        run: for f in supabase/migrations/*.sql; do node scripts/apply-migration.mjs "$f"; done
+      - name: Vérifier la base (fonctions, droits du rôle public)
+        if: steps.s.outputs.ok == '1'
+        env: { SUPABASE_DB_PASSWORD: '${{ secrets.SUPABASE_DB_PASSWORD }}' }
+        run: |
+          export DATABASE_URL=$(node -e 'const u=new URL(process.env.SUPABASE_POOLER_URL);u.password=encodeURIComponent(process.env.SUPABASE_DB_PASSWORD);process.stdout.write(u.toString())')
+          echo "::add-mask::$DATABASE_URL"
+          node scripts/verify-db.mjs
+
   deploy:
+    name: 2. Mise en ligne
+    needs: migrate
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -40,3 +78,46 @@ jobs:
           path: web
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  verify:
+    name: 3. Tests en production (Chrome + Safari)
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Attendre que le site en ligne serve cette version
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS "$SITE_URL?v=$RANDOM" | grep -q "build ${GITHUB_SHA}" && { echo "Version en ligne : ${GITHUB_SHA}"; exit 0; }
+            sleep 10
+          done
+          echo "::error::Le site ne sert pas encore cette version après 10 minutes."; exit 1
+      - name: Parcours complet sur le site en ligne — Chrome
+        run: FIILA_URL=$SITE_URL SHOTS=/tmp/prod-c node tests/e2e.test.mjs
+      - name: Parcours complet sur le site en ligne — Safari (WebKit)
+        if: always()
+        run: FIILA_URL=$SITE_URL ENGINE=webkit SHOTS=/tmp/prod-w node tests/e2e.test.mjs
+      - name: Écrans clés — Safari (WebKit, base de test locale)
+        if: always()
+        run: |
+          fail=0
+          for s in referrals shop vitrine products videdressing navigation feed ambassadors; do
+            ENGINE=webkit node tests/$s.test.mjs || fail=1
+          done
+          exit $fail
+      - name: Captures et rapports en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preuves-${{ github.sha }}
+          path: |
+            docs/screenshots/
+            docs/*.json
+            /tmp/prod-c
+            /tmp/prod-w
+          retention-days: 7

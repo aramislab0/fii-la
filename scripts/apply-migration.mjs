@@ -1,6 +1,6 @@
 // Applique une migration sur la base Supabase sans le CLI (qui peut rester bloqué sur macOS).
 // Usage : SUPABASE_DB_PASSWORD=... node scripts/apply-migration.mjs supabase/migrations/<fichier>.sql
-// L'URL du pooler est lue dans supabase/.temp/pooler-url (créé par `supabase link`). Rien n'est affiché du secret.
+// L'URL du pooler (sans mot de passe) vient de SUPABASE_POOLER_URL, sinon de supabase/.temp/pooler-url (créé par `supabase link`). Rien n'est affiché du secret.
 // Transaction unique : la migration et son enregistrement dans supabase_migrations réussissent ensemble ou pas du tout.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -13,7 +13,7 @@ if (!file || !/^\d{14}_[a-z0-9_]+\.sql$/.test(basename(file))) { console.error('
 if (!process.env.SUPABASE_DB_PASSWORD) { console.error('SUPABASE_DB_PASSWORD manquant.'); process.exit(2); }
 const [version, ...rest] = basename(file, '.sql').split('_');
 const name = rest.join('_');
-const url = new URL(readFileSync('supabase/.temp/pooler-url', 'utf8').trim());
+const url = new URL((process.env.SUPABASE_POOLER_URL || readFileSync('supabase/.temp/pooler-url', 'utf8')).trim());
 url.password = process.env.SUPABASE_DB_PASSWORD;
 const c = new Client({ connectionString: url.toString(), ssl: { rejectUnauthorized: false } });
 await c.connect();
