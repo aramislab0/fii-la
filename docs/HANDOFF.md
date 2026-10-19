@@ -159,6 +159,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 06:06 (Mac) | Mode démo en production : migration `20261019500000_fiila_demo` appliquée, `verify-db` 17 migrations / 74 fonctions OK ; 13 boutiques de démonstration chargées (aucune place gratuite prise ; fil réel : 1 boutique, fil démo : 14) ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 49/49, fil 7/7, attributs 3/3 | `097eba6` |
 | 19/10 06:20 | Boutiques de démonstration : 13 boutiques fictives (toutes les catégories, notes variées), visibles seulement en mode démo (`#/demo`), marquées « Démo », jamais dans les 25 places ; filtre par catégorie sur `#/boutiques`. Migration `20261019500000_fiila_demo`, `scripts/demo-seed.sql` / `scripts/demo-clear.sql` ; tests démo SQL 4/4, fil 7/7 | branche `demo` |
 | 19/10 05:55 | Fondateur : Studio IA reporté mais gardé dans le périmètre (action #37) | — |
 | 19/10 05:45 (Mac) | En production : carrousel du fil, « Événement », attributs d'articles. Migration `20261019400000_fiila_product_attributes` appliquée, `verify-db` 16 migrations / 74 fonctions OK ; Pages déployé ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 49/49, fil 6/6, attributs 3/3 | `fb706b5` |
