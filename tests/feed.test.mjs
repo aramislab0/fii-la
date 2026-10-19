@@ -39,16 +39,17 @@ async function newPhone(scheme = 'light') {
 const ok = async (fn, args) => { const r = await rpc(local.db, fn, args); assert.equal(r.status, 200, fn + ' ' + JSON.stringify(r.body)); return r.body; };
 const shot = (page, name) => page.screenshot({ path: `${SHOTS}/${ENGINE}-${name}.png`, fullPage: true });
 
-// Photos synthétiques (aplats de couleur) dessinées par le navigateur.
-const P0 = await newPhone();
-await P0.goto(URL0 + '#/confidentialite');
-async function swatch(color, label) {
-  return P0.evaluate(([c, l]) => {
-    const cv = document.createElement('canvas'); cv.width = 640; cv.height = 360;
-    const g = cv.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 640, 360);
-    g.fillStyle = 'rgba(255,255,255,.85)'; g.font = '600 44px system-ui'; g.fillText(l, 40, 200);
-    return cv.toDataURL('image/png').split(',')[1];
-  }, [color, label]);
+// Photos synthétiques : aplats de couleur encodés ici en PNG (sans métadonnées, quel que soit le navigateur).
+import { deflateSync } from 'node:zlib';
+function crc32(buf) { let c, crc = 0xffffffff; for (const b of buf) { c = (crc ^ b) & 0xff; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crc = (crc >>> 8) ^ c; } return (crc ^ 0xffffffff) >>> 0; }
+function chunk(type, data) { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, crc]); }
+async function swatch(color) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+  const W = 320, H = 180, row = Buffer.alloc(1 + W * 3);
+  for (let x = 0; x < W; x++) { const shade = 0.85 + 0.15 * (x / W); row[1 + 3 * x] = r * shade; row[2 + 3 * x] = g * shade; row[3 + 3 * x] = b * shade; }
+  const raw = Buffer.concat(Array.from({ length: H }, () => row));
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(W, 0); ihdr.writeUInt32BE(H, 4); ihdr[8] = 8; ihdr[9] = 2;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]).toString('base64');
 }
 const SHOPS = [
   { name: 'Awa Couture (test)', about: 'Robes wax et foulards, livrés à Dakar.', accent: 'prune', color: '#5B2A86', items: [['Robe wax', 15000], ['Foulard', 3000], ['Pagne tissé', 8000]] },
