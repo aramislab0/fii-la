@@ -164,8 +164,8 @@ await t('suppression de la boutique : tout part, l’adresse de la cliente reste
   await S.click('#shop-delete-confirm');
   await S.getByText('Boutique supprimée.').waitFor();
   const n = async (sql) => (await local.db.query(sql)).rows[0].n;
-  assert.equal(await n(`select count(*)::int n from fiila.shops`), 0);
-  assert.equal(await n(`select count(*)::int n from fiila.orders`), 0);
+  assert.equal(await n(`select count(*)::int n from fiila.shops where not platform`), 0);
+  assert.equal(await n(`select count(*)::int n from fiila.orders o join fiila.shops s on s.id = o.shop_id where not s.platform`), 0);
   assert.equal(await n(`select count(*)::int n from fiila.places where id = '${clientPlace.id}'`), 1);
   await L.reload();
   await L.getByText('Aucune course pour l’instant.').waitFor();

@@ -793,3 +793,7 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .amb-board{padding-left:20px;margin:0;display:flex;flex-direction:column;gap:6px}
 .amb-board li{display:flex;align-items:center;gap:4px}
 .amb-score{margin-left:auto;font-weight:700}
+.vkid{color:var(--green);font-weight:600}
+.vd-photo{width:100%;max-height:320px;object-fit:contain;border-radius:12px;background:var(--surface-2)}
+.vd-item .vthumb{width:56px;height:56px;border-radius:12px;object-fit:cover;flex:none}
+.demo-tag.fl-tag{background:var(--lime);color:var(--on-lime)}

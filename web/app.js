@@ -225,6 +225,12 @@
     ambassador_cap: 'Cet ambassadeur a atteint son nombre de commerçants pour ce mois.',
     invalid_state: 'Action impossible dans cet état.',
     reason_required: 'Indiquez un motif.',
+    vd_photo_rule: 'Confirmez qu’aucun enfant n’est reconnaissable sur la photo.',
+    vd_photo_required: 'Ajoutez une photo du vêtement.',
+    vd_gender_required: 'Choisissez fille, garçon ou mixte.',
+    vd_age_required: 'Choisissez la tranche d’âge.',
+    vd_condition_required: 'Indiquez l’état du vêtement.',
+    vd_blocked: 'Plusieurs articles ont été refusés récemment : réessayez dans quelques semaines.',
     business_type_required: 'Choisissez votre type de commerce.',
     invalid_stock: 'Stock : indiquez un nombre (0 ou plus), ou laissez vide.',
     size_required: 'Choisissez votre taille ou pointure.',
@@ -1243,7 +1249,7 @@
   function vitrinePage(slug, shop, products, q) {
     var cart = {}; // ligne (article, taille, couleur) → { id, size, color, qty }
     var byId = {}; products.forEach(function (p) { byId[p.id] = p; });
-    var filter = { cat: '', size: '' };
+    var filter = { cat: '', size: '', gender: '', age: '' };
     function lineKey(id, size, color) { return id + '|' + (size || '') + '|' + (color || ''); }
     function qtyOf(id) { return Object.keys(cart).reduce(function (n, k) { return n + (cart[k].id === id ? cart[k].qty : 0); }, 0); }
     function lineLabel(l) { var v = [l.size, l.color].filter(Boolean).join(' · '); return byId[l.id].name + (v ? ' (' + v + ')' : ''); }
@@ -1312,6 +1318,7 @@
           h('h3', { class: 'wrapword' }, p.name),
           h('p', { class: 'vprice' }, fcfa(p.price)),
           p.reviews ? ratingEl(p.rating, p.reviews) : null,
+          p.gender || p.age_band ? h('p', { class: 'small vkid' }, [lbl(VD_GENDERS, p.gender), lbl(VD_AGES, p.age_band), lbl(VD_CONDITIONS, p.condition)].filter(Boolean).join(' · ')) : null,
           p.description ? h('p', { class: 'small muted vdesc' }, p.description) : null,
           p.stock === 0 ? h('span', { class: 'chip off', style: 'align-self:flex-start' }, 'Épuisé')
             : p.sizes || p.colors ? variantPicker(p) : stepper(p),
@@ -1321,7 +1328,8 @@
     var grid = h('div', { class: 'vgrid', id: 'vitrine-products' });
     var filters = h('div', { class: 'stack tight', id: 'vitrine-filters' });
     function shown() {
-      return products.filter(function (p) { return (!filter.cat || p.category === filter.cat) && (!filter.size || (p.sizes && p.sizes.indexOf(filter.size) >= 0)); });
+      return products.filter(function (p) { return (!filter.cat || p.category === filter.cat) && (!filter.size || (p.sizes && p.sizes.indexOf(filter.size) >= 0))
+        && (!filter.gender || p.gender === filter.gender || p.gender === 'mixte') && (!filter.age || p.age_band === filter.age); });
     }
     function drawGrid() {
       var l = shown();
@@ -1335,6 +1343,13 @@
         cats.length >= 2 ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Catégorie', id: 'filter-cat' },
           chip(!filter.cat, 'Tout', function () { filter.cat = ''; drawFilters(); drawGrid(); }),
           cats.map(function (c) { return chip(filter.cat === c, catLabel(c) || c, function () { filter.cat = c; drawFilters(); drawGrid(); }); })) : null,
+        products.some(function (p) { return p.gender; }) ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Pour', id: 'filter-gender' },
+          chip(!filter.gender, 'Tous', function () { filter.gender = ''; drawFilters(); drawGrid(); }),
+          VD_GENDERS.filter(function (g) { return g[0] !== 'mixte'; }).map(function (g) { return chip(filter.gender === g[0], g[1], function () { filter.gender = g[0]; drawFilters(); drawGrid(); }); })) : null,
+        products.some(function (p) { return p.age_band; }) ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Âge', id: 'filter-age' },
+          h('span', { class: 'small muted', style: 'align-self:center;white-space:nowrap' }, 'Âge :'),
+          chip(!filter.age, 'Tous', function () { filter.age = ''; drawFilters(); drawGrid(); }),
+          VD_AGES.filter(function (a) { return products.some(function (p) { return p.age_band === a[0]; }); }).map(function (a) { return chip(filter.age === a[0], a[1], function () { filter.age = a[0]; drawFilters(); drawGrid(); }); })) : null,
         sizes.length ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Ma taille ou pointure', id: 'filter-size' },
           h('span', { class: 'small muted', style: 'align-self:center;white-space:nowrap' }, 'Ma taille :'),
           chip(!filter.size, 'Toutes', function () { filter.size = ''; drawFilters(); drawGrid(); }),
@@ -1435,7 +1450,7 @@
     else img.classList.remove('loading-skel');
     var acc = (VT_ACCENTS[s.accent] || VT_ACCENTS.foret)[1];
     return h('a', { class: 'fcard', href: '#/b/' + s.slug, style: '--accent:' + acc, 'aria-label': 'Voir la boutique ' + s.name, 'data-cats': (s.categories || []).join(' ') },
-      s.demo ? h('span', { class: 'fwrap' }, img, h('span', { class: 'demo-tag' }, 'Démo')) : img,
+      s.demo || s.platform ? h('span', { class: 'fwrap' }, img, h('span', { class: 'demo-tag' + (s.platform ? ' fl-tag' : '') }, s.demo ? 'Démo' : 'Par Fii La')) : img,
       h('span', { class: 'fbody' },
         h('span', { class: 'fname wrapword' }, s.name),
         s.type ? h('span', { class: 'ftype' }, typeLabel(s.type)) : null,
@@ -1879,6 +1894,7 @@
       return page(backBtn(),
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fondateur'), h('h1', null, 'Croissance')),
         iconRow('#/admin/ambassadeurs', 'users', 'Ambassadeurs : inscriptions et versements', { id: 'stats-amb' }),
+        iconRow('#/admin/vide-dressing', 'box', 'Vide-dressing : articles à vérifier, commandes', { id: 'stats-vd' }),
         h('div', { class: 'tiles', id: 'stats-totals' },
           tile(T.shops, 'boutiques'), tile(T.couriers, 'livreurs'), tile(T.addresses, 'adresses actives'), tile(T.meetings, 'événements actifs'),
           tile(T.orders, 'commandes'), tile(T.delivered, 'livrées'), tile(T.referred, 'arrivées parrainées'), tile(T.posts, 'publications')),
@@ -1949,6 +1965,9 @@
       else if (p[0] === 'boutiques' && !p[1]) view = viewFeed();
       else if (p[0] === 'demo' && !p[1]) view = viewDemo(r.q);
       else if (p[0] === 'ambassadeur' && !p[1]) view = viewAmbassador();
+      else if (p[0] === 'vide-dressing' && !p[1]) view = viewVideDressing();
+      else if (p[0] === 'vide-dressing' && p[1] === 'vendre') view = viewVdSell(r.q);
+      else if (p[0] === 'admin' && p[1] === 'vide-dressing') view = viewAdminVd();
       else if (p[0] === 'admin' && p[1] === 'ambassadeurs') view = viewAdminAmbassadors();
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
@@ -2138,6 +2157,8 @@
       demoBanner(),
       listBox,
       feedSection(3, { id: 'home-feed' }),
+      h('a', { class: 'invite-row', id: 'vd-link-home', href: '#/vide-dressing' }, icon('users', 24), h('span', null, 'Vide-dressing enfants : acheter ou vendre'),
+        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
       h('a', { class: 'invite-row', id: 'amb-link-home', href: '#/ambassadeur' }, icon('cash', 24), h('span', null, 'Devenir ambassadeur Fii La'),
         h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
       h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer' }, icon('gift', 24), h('span', null, 'Inviter un proche'),
@@ -4911,6 +4932,132 @@
     }, function (e) { return page(backBtn(), stateCard('!', 'Accès réservé', errText(e)), footer()); });
   }
 
+  /* ================================================================ VIDE-DRESSING ENFANTS (pilote tenu par Fii La)
+     Chacun propose ; Fii La valide, publie dans sa vitrine, coordonne la livraison et reverse le prix moins la commission. */
+  var VD_AGES = [['0-6m', '0-6 mois'], ['6-12m', '6-12 mois'], ['1-2a', '1-2 ans'], ['2-4a', '2-4 ans'], ['4-6a', '4-6 ans'], ['6-8a', '6-8 ans'], ['8-10a', '8-10 ans'], ['10-12a', '10-12 ans'], ['12-14a', '12-14 ans']];
+  var VD_GENDERS = [['fille', 'Fille'], ['garcon', 'Garçon'], ['mixte', 'Mixte']];
+  var VD_CONDITIONS = [['neuf', 'Neuf avec étiquette'], ['tres_bon', 'Très bon état'], ['bon', 'Bon état']];
+  function lbl(list, k) { var x = list.filter(function (y) { return y[0] === k; })[0]; return x ? x[1] : ''; }
+  var VD_STATUS = { pending: ['wait', 'En vérification'], changes: ['wait', 'Correction demandée'], approved: ['ok', 'En vente'], rejected: ['off', 'Refusé'], sold: ['ok', 'Vendu'] };
+  function vdRules() {
+    return h('details', { class: 'more-details', id: 'vd-rules' }, h('summary', null, 'Règles du vide-dressing'),
+      h('ul', { class: 'small' },
+        h('li', null, 'Photo du vêtement seul : à plat, sur cintre ou sur mannequin. Jamais d’enfant reconnaissable.'),
+        h('li', null, 'Vêtements propres, sans trou ni tache. Un article par annonce.'),
+        h('li', null, 'Interdits : sous-vêtements portés, sièges auto, poussettes, lits, produits de soin entamés.'),
+        h('li', null, 'Fii La vérifie chaque annonce avant de la publier, et peut la refuser.'),
+        h('li', null, 'Article vendu : un livreur le récupère chez vous. Vous recevez le prix moins la commission Fii La, après la livraison.')));
+  }
+  function viewVideDressing() {
+    var mine = h('section', { class: 'stack tight', id: 'vd-mine', hidden: true });
+    if (authed()) api('fiila_vd_mine', {}).then(function (d) {
+      if (!d.items.length) return;
+      setKids(mine, h('h2', null, 'Mes articles déposés'), h('div', { class: 'list' }, d.items.map(function (x) {
+        var st = VD_STATUS[x.status] || ['off', x.status];
+        return h('div', { class: 'item vd-item' },
+          x.photo ? h('img', { class: 'vthumb', src: x.photo, alt: '' }) : null,
+          h('div', { class: 'stack tight', style: 'flex:1;min-width:0' }, h('div', { class: 't wrapword' }, x.title),
+            h('div', { class: 'small muted' }, fcfa(x.price) + ' · vous recevrez ' + fcfa(x.net) + (x.paid_at ? ' · reversé' : '')),
+            x.reason ? h('div', { class: 'small' }, 'Motif : ' + x.reason) : null,
+            x.status === 'changes' ? h('a', { class: 'btn ghost small', href: '#/vide-dressing/vendre?id=' + x.id, style: 'align-self:flex-start' }, 'Corriger') : null),
+          h('span', { class: 'chip ' + st[0] }, st[1]));
+      })));
+      mine.hidden = false;
+    }, function () {});
+    return page(backBtn(),
+      h('section', { class: 'card stack tight amb-hero' }, h('p', { class: 'eyebrow' }, 'Fii La'), h('h1', null, 'Vide-dressing enfants'),
+        h('p', null, 'Vêtements et chaussures d’enfants de seconde main, vérifiés par Fii La et livrés à la bonne porte.')),
+      h('div', { class: 'duo' },
+        iconBtn('a', { class: 'btn', href: '#/b/vide-dressing', id: 'vd-buy' }, 'shop', 'Acheter'),
+        iconBtn('a', { class: 'btn ghost', href: '#/vide-dressing/vendre', id: 'vd-sell' }, 'cam', 'Vendre')),
+      vdRules(), mine, footer());
+  }
+  function viewVdSell(q) {
+    if (!authed()) return page(backBtn('Vide-dressing', '#/vide-dressing'), stateCard('!', 'Un compte est nécessaire', 'Pour être payée quand votre article est vendu.',
+      h('a', { class: 'btn', href: '#/compte' + qs({ mode: 'inscription', retour: 'vide-dressing/vendre' }) }, 'Créer mon compte')), footer());
+    return api('fiila_vd_mine', {}).then(function (d) {
+      var ed = q && q.id ? d.items.filter(function (x) { return x.id === q.id && x.status === 'changes'; })[0] : null;
+      var f = ed ? { title: ed.title, gender: ed.gender, age: ed.age_band, size: ed.size || '', condition: ed.condition, price: String(ed.price), quartier: ed.quartier || '', photo: ed.photo || null }
+        : { title: '', gender: '', age: '', size: '', condition: '', price: '', quartier: '', photo: null };
+      var original = f.photo, photoOk = false;
+      var err = h('div', { role: 'alert' });
+      var net = h('p', { class: 'small muted', id: 'vd-net' });
+      function drawNet() { var p = parseInt(String(f.price).replace(/\D/g, ''), 10); net.textContent = p ? 'Vous recevrez ' + fcfa(p - Math.floor(p * d.commission / 100)) + ' (commission Fii La ' + d.commission + ' %).' : ''; }
+      drawNet();
+      var send = iconBtn('button', { class: 'btn big', type: 'button', id: 'vd-send', onclick: function () {
+        setKids(err);
+        if (!f.photo) return errBox(err, new ApiError('vd_photo_required'));
+        if (!photoOk) return errBox(err, new ApiError('vd_photo_rule'));
+        send.disabled = true;
+        var p = { id: ed ? ed.id : undefined, title: f.title.trim(), gender: f.gender, age_band: f.age, size: f.size.trim() || null, condition: f.condition,
+          price: parseInt(String(f.price).replace(/\D/g, ''), 10), quartier: f.quartier.trim() || null, photo_ok: true };
+        if (f.photo !== original) p.photo = f.photo.replace(/^data:[^,]+,/, '');
+        api('fiila_vd_submit', { p: p }).then(function () { toast('Article envoyé. Fii La le vérifie avant de le publier.'); go('#/vide-dressing'); },
+          function (e) { send.disabled = false; errBox(err, e); });
+      } }, 'send', ed ? 'Renvoyer l’article corrigé' : 'Envoyer pour vérification');
+      return page(backBtn('Vide-dressing', '#/vide-dressing'),
+        h('h1', null, ed ? 'Corriger l’article' : 'Vendre un vêtement d’enfant'),
+        ed && ed.reason ? h('div', { class: 'notice' }, 'Correction demandée : ' + ed.reason) : null,
+        photoField({ id: 'vd-photo', label: 'Photo du vêtement', get: function () { return f.photo; }, set: function (v) { f.photo = v; }, maxSide: 960 }),
+        h('label', { class: 'check-line' }, h('input', { type: 'checkbox', id: 'vd-photo-ok', onchange: function (e) { photoOk = e.target.checked; } }),
+          'Le vêtement seul : aucun enfant reconnaissable sur la photo'),
+        textField({ id: 'vd-title', label: 'Article', max: 80, value: f.title, placeholder: 'Ex. : Robe en coton fleurie', onInput: function (v) { f.title = v; } }),
+        segField({ name: 'vd-gender', id: 'vd-gender', legend: 'Pour', value: f.gender, options: VD_GENDERS, onChange: function (v) { f.gender = v; } }),
+        h('div', { class: 'field' }, h('label', { for: 'vd-age' }, 'Âge'),
+          h('select', { id: 'vd-age', onchange: function (e) { f.age = e.target.value; } }, h('option', { value: '' }, 'Choisir…'),
+            VD_AGES.map(function (a) { return h('option', { value: a[0], selected: f.age === a[0] || null }, a[1]); }))),
+        textField({ id: 'vd-size', label: 'Taille ou pointure', optional: true, max: 12, value: f.size, placeholder: 'Ex. : 3 ans, 24', onInput: function (v) { f.size = v; } }),
+        segField({ name: 'vd-cond', id: 'vd-cond', legend: 'État', value: f.condition, options: VD_CONDITIONS, onChange: function (v) { f.condition = v; } }),
+        textField({ id: 'vd-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 4000', onInput: function (v) { f.price = v; drawNet(); } }),
+        net,
+        textField({ id: 'vd-quartier', label: 'Votre quartier', optional: true, max: 60, value: f.quartier, placeholder: 'Pour organiser l’enlèvement', onInput: function (v) { f.quartier = v; } }),
+        vdRules(), err, send, footer());
+    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger', errText(e), retryBtn()), footer()); });
+  }
+  function viewAdminVd() {
+    if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.'), footer());
+    return api('fiila_admin_vd', {}).then(function (d) {
+      function act(id, decision, needReason) {
+        var r = (document.getElementById('vdr-' + id) || {}).value || '';
+        if (needReason && !r.trim()) { toast('Indiquez un motif.'); return; }
+        api('fiila_admin_vd_decide', { p_id: id, p_decision: decision, p_reason: r || null }).then(function () { toast('Enregistré.'); render(); }, function (e) { toast(errText(e)); });
+      }
+      function desc(x) { return [lbl(VD_GENDERS, x.gender), lbl(VD_AGES, x.age_band), x.size, lbl(VD_CONDITIONS, x.condition)].filter(Boolean).join(' · '); }
+      return page(backBtn('Statistiques', '#/stats'),
+        h('h1', null, 'Vide-dressing'), h('p', { class: 'small muted' }, 'Commission : ' + d.commission + ' %.'),
+        h('section', { class: 'stack tight', id: 'vd-queue' }, h('h2', null, 'À vérifier (' + d.queue.length + ')'),
+          d.queue.length ? d.queue.map(function (x) {
+            return h('div', { class: 'card stack tight' },
+              h('img', { src: x.photo, alt: '', class: 'vd-photo' }),
+              h('b', null, x.title + ' · ' + fcfa(x.price)), h('span', { class: 'small muted' }, desc(x)),
+              h('span', { class: 'small' }, 'Vendeuse : ' + x.seller + ' · ' + x.phone + (x.quartier ? ' · ' + x.quartier : '')),
+              h('p', { class: 'hint' }, 'Vérifier : aucun enfant reconnaissable, article autorisé, photo nette, prix cohérent.'),
+              h('input', { type: 'text', id: 'vdr-' + x.id, placeholder: 'Motif (correction ou refus)', maxlength: 200 }),
+              h('div', { class: 'row' }, h('button', { class: 'btn small', type: 'button', onclick: function () { act(x.id, 'approve'); } }, 'Publier'),
+                h('button', { class: 'btn ghost small', type: 'button', onclick: function () { act(x.id, 'changes', true); } }, 'Correction'),
+                h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { act(x.id, 'reject', true); } }, 'Refuser')));
+          }) : h('p', { class: 'muted' }, 'Rien à vérifier.')),
+        h('section', { class: 'stack tight', id: 'vd-orders' }, h('h2', null, 'Commandes'),
+          d.orders.length ? d.orders.map(function (o) {
+            return h('div', { class: 'card stack tight' }, h('b', null, o.ref + ' · ' + o.customer + ' · ' + fcfa(o.total)),
+              (o.items || []).map(function (it) { return h('span', { class: 'small' }, it.label + (it.seller ? ' — à récupérer chez ' + it.seller + ' (' + it.seller_phone + (it.quartier ? ', ' + it.quartier : '') + ')' : '')); }),
+              h('a', { class: 'btn link', href: '#/f/' + o.invoice, style: 'align-self:flex-start' }, 'Voir la facture et l’adresse'));
+          }) : h('p', { class: 'muted' }, 'Aucune commande.')),
+        h('section', { class: 'stack tight', id: 'vd-live' }, h('h2', null, 'En vente (' + d.live.length + ')'),
+          d.live.map(function (x) {
+            return h('div', { class: 'item' }, h('span', { class: 'small wrapword', style: 'flex:1' }, x.title + ' · ' + fcfa(x.price) + ' · ' + x.seller + (x.stock === 0 ? ' · commandé' : '')),
+              h('button', { class: 'btn ghost small', type: 'button', onclick: function () { act(x.id, 'sold'); } }, 'Livré'),
+              h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { act(x.id, 'unpublish'); } }, 'Retirer'));
+          })),
+        h('section', { class: 'stack tight', id: 'vd-pay' }, h('h2', null, 'À reverser'),
+          d.to_pay.length ? d.to_pay.map(function (x) {
+            return h('div', { class: 'item' }, h('span', { class: 'small wrapword', style: 'flex:1' }, x.seller + ' · ' + x.phone + ' · ' + x.title + ' · ' + fcfa(x.net)),
+              h('button', { class: 'btn small', type: 'button', onclick: function () { act(x.id, 'paid'); } }, 'Reversé'));
+          }) : h('p', { class: 'muted' }, 'Rien à reverser.')),
+        footer());
+    }, function (e) { return page(backBtn(), stateCard('!', 'Accès réservé', errText(e)), footer()); });
+  }
+
   /* ================================================================ CONFIDENTIALITÉ */
   function viewPrivacy() {
     return page(backBtn(),
@@ -4932,6 +5079,8 @@
           h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus que vous ajoutez à votre adresse. Le micro n’est utilisé que lorsque vous appuyez sur « Enregistrer ». Toute personne qui a le lien, et le livreur d’une course, peuvent l’écouter. Il est supprimé avec la fiche, ou dès que vous le retirez.'),
           h('li', null, 'Vitrine d’une boutique (si elle l’ouvre) : ses articles visibles par toute personne qui a le lien. Une commande passée sur la vitrine transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
           h('li', null, 'Fil des boutiques : les 25 premières boutiques qui ouvrent leur vitrine y apparaissent gratuitement (nom, présentation, articles, prix, note). La boutique peut en sortir à tout moment dans ses réglages. Aucune donnée de client n’y figure.'),
+          h('li', null, 'Programme Ambassadeurs (facultatif, avec un compte) : votre nom, votre téléphone, votre quartier, votre numéro de versement, votre résultat au test, les boutiques que vous accompagnez et vos gains. Une boutique accompagnée voit le prénom de son ambassadeur ; l’ambassadeur voit le nom de la boutique et ses indicateurs (nombre d’articles, de commandes et de clientes), jamais le nom ni le numéro des clientes.'),
+          h('li', null, 'Vide-dressing enfants : pour vendre, votre nom, votre téléphone, votre quartier et les informations de l’article (photo, genre, âge, taille, état, prix). Ils ne sont visibles que de l’équipe Fii La, pour vérifier l’article et organiser l’enlèvement ; l’acheteur ne voit que l’article. Les photos ne doivent montrer aucun enfant reconnaissable.'),
           h('li', null, 'Publication d’un article : Fii La compte seulement qu’une publication a été faite, pas le réseau choisi.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un événement), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou de l’événement. Pour un événement, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),

@@ -49,7 +49,7 @@ await t('effacement : plus aucune boutique de démonstration, ni article, ni not
   await db.exec(readFileSync('scripts/demo-clear.sql', 'utf8'));
   assert.equal((await one(`select count(*)::int n from fiila.shops where demo`)).n, 0);
   assert.equal((await one(`select count(*)::int n from fiila.reviews`)).n, 0);
-  assert.equal((await one(`select count(*)::int n from fiila.shops`)).n, 1);
+  assert.equal((await one(`select count(*)::int n from fiila.shops where not platform`)).n, 1);
 });
 
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
