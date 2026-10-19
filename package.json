@@ -42,6 +42,8 @@
     "test:shopteam-sql": "node tests/shopteam.sql.test.mjs",
     "test:team": "node tests/team.test.mjs",
     "test:smshook": "node tests/smshook.sql.test.mjs",
+    "test:photos-sql": "node tests/photos.sql.test.mjs",
+    "test:photos": "node tests/photos.test.mjs",
     "test:all": "scripts/run-suites.sh sql && scripts/run-suites.sh browser"
   },
   "devDependencies": {

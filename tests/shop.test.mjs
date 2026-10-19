@@ -312,7 +312,7 @@ await t('articles : ajout avec photo et prix', async () => {
   await P.goto(URL0 + '#/boutique/articles');
   await P.click('#product-new');
   await P.setInputFiles('#product-photo', pngFile());
-  await P.locator('img.photo-prev').waitFor();
+  await P.locator('#product-photo-grid .pp-tile img').first().waitFor();
   await P.fill('#product-name', 'Bissap 1 L');
   await P.fill('#product-price', '1500');
   await P.click('#product-save');

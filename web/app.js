@@ -1418,10 +1418,15 @@
       closeSheet = openSheet(back);
     }
     function card(p) {
-      var img = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 32));
-      if (p.has_photo) lazyPhoto(img, function () {
-        return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; });
-      }, p.name);
+      var img;
+      if (p.has_photo && p.photos > 1) {
+        img = photoCarousel(p.photos, function (k) { return api('fiila_vitrine_photo', { p_slug: slug, p_id: k ? p.id + ':' + k : p.id }).then(function (x) { return x.photo; }); }, p.name, 'vimg');
+      } else {
+        img = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 32));
+        if (p.has_photo) lazyPhoto(img, function () {
+          return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; });
+        }, p.name);
+      }
       return h('article', { class: 'vcard' + (q.a === p.id ? ' focus' : ''), id: 'p-' + p.id },
         img,
         h('div', { class: 'vbody' },
@@ -1546,6 +1551,118 @@
     return pg;
   }
   // Photo chargée quand la carte arrive à l'écran (page légère sur réseau lent).
+
+  /* ----- carrousel des photos d'un article (2 à 5 photos) : glisser au doigt, points, défilement automatique doux quand
+     la carte est bien visible, arrêté dès qu'on y touche ; photos chargées une à une, à l'approche. */
+  var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function photoCarousel(n, load, alt, cls) {
+    var slides = [], loaded = [], dots = [], idx = 0, visible = false, pausedUntil = 0;
+    var track = h('div', { class: 'pc-track', tabindex: '0', role: 'group', 'aria-roledescription': 'carrousel', 'aria-label': (alt || 'Article') + ' : ' + n + ' photos' });
+    for (var i = 0; i < n; i++) {
+      var sl = h('div', { class: 'pc-slide loading-skel', role: 'group', 'aria-roledescription': 'photo', 'aria-label': (i + 1) + ' sur ' + n });
+      slides.push(sl); track.appendChild(sl);
+    }
+    var count = h('span', { class: 'pc-count', 'aria-hidden': 'true' }, '1/' + n);
+    var dotsBox = h('div', { class: 'pc-dots' });
+    for (var j = 0; j < n; j++) (function (k) {
+      var d = h('button', { type: 'button', class: 'pc-dot' + (k === 0 ? ' on' : ''), 'aria-label': 'Photo ' + (k + 1) + ' sur ' + n, 'aria-current': k === 0 ? 'true' : null,
+        onclick: function (e) { e.stopPropagation(); pause(); go(k); } });
+      dots.push(d); dotsBox.appendChild(d);
+    })(j);
+    var wrap = h('div', { class: (cls || '') + ' pc' }, track, count, dotsBox);
+    function ensure(k) {
+      if (k < 0 || k >= n || loaded[k]) return;
+      loaded[k] = true;
+      load(k).then(function (src) {
+        slides[k].classList.remove('loading-skel');
+        if (src) setKids(slides[k], h('img', { src: src, alt: k === 0 ? (alt || '') : '', decoding: 'async', draggable: 'false' }));
+      }, function () { slides[k].classList.remove('loading-skel'); loaded[k] = false; });
+    }
+    function mark(k) {
+      if (k === idx && slides[k].classList.contains('on')) return;
+      idx = k;
+      slides.forEach(function (x, m) { x.classList.toggle('on', m === k); });
+      dots.forEach(function (x, m) { x.classList.toggle('on', m === k); if (m === k) x.setAttribute('aria-current', 'true'); else x.removeAttribute('aria-current'); });
+      count.textContent = (k + 1) + '/' + n;
+      ensure(k); ensure(k + 1);
+    }
+    function go(k) {
+      ensure(k);
+      track.scrollTo({ left: k * track.clientWidth, behavior: REDUCED ? 'auto' : 'smooth' });
+    }
+    function pause() { pausedUntil = Date.now() + 9000; }
+    var raf = 0;
+    track.addEventListener('scroll', function () {
+      if (raf) return;
+      raf = requestAnimationFrame(function () { raf = 0; var w = track.clientWidth || 1; mark(Math.max(0, Math.min(n - 1, Math.round(track.scrollLeft / w)))); });
+    }, { passive: true });
+    ['pointerdown', 'touchstart', 'wheel', 'focusin'].forEach(function (ev) { track.addEventListener(ev, pause, { passive: true }); });
+    track.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') { e.preventDefault(); pause(); go(Math.min(n - 1, idx + 1)); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); pause(); go(Math.max(0, idx - 1)); }
+    });
+    mark(0);
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (es) { es.forEach(function (e) { visible = e.intersectionRatio >= 0.6; if (e.isIntersecting) { ensure(0); ensure(1); } }); },
+        { threshold: [0, 0.6], rootMargin: '200px 0px' });
+      setTimeout(function () { io.observe(wrap); }, 0);
+      onMedia(function () { io.disconnect(); });
+    } else { ensure(0); ensure(1); visible = true; }
+    if (!REDUCED) {
+      var timer = setInterval(function () {
+        if (!visible || Date.now() < pausedUntil || document.visibilityState === 'hidden' || !wrap.isConnected) return;
+        if (!loaded[(idx + 1) % n]) { ensure((idx + 1) % n); return; }
+        go((idx + 1) % n);
+      }, 3800);
+      onMedia(function () { clearInterval(timer); });
+    }
+    return wrap;
+  }
+  // Photos de l'article dans la boutique : 5 au plus, la première est la principale (factures, fil).
+  function productPhotos(pr) {
+    var st = { list: pr && pr.photo ? [pr.photo] : [], ready: !(pr && pr.photos > 1), changed: false, failed: false };
+    var box = h('div', { class: 'stack', id: 'product-photos' });
+    var msg = h('p', { class: 'msg', role: 'status' });
+    var inp = h('input', { type: 'file', accept: 'image/*', multiple: true, id: 'product-photo', hidden: true, onchange: function () {
+      var files = Array.prototype.slice.call(inp.files || []).slice(0, 5 - st.list.length);
+      inp.value = '';
+      if (!files.length) return;
+      msg.textContent = files.length > 1 ? 'Préparation des photos…' : 'Préparation de la photo…'; msg.className = 'msg info';
+      files.reduce(function (pp, fl) {
+        return pp.then(function () { return compressPhoto(fl, 720).then(function (d) { if (st.list.length < 5) { st.list.push(d); st.changed = true; draw(); } }); });
+      }, Promise.resolve()).then(function () { msg.textContent = ''; }, function (e) { msg.textContent = e.message; msg.className = 'msg err'; });
+    } });
+    if (!st.ready) sapi('fiila_product_photos', { p_id: pr.id }).then(function (l) { st.list = st.list.concat(l || []); st.ready = true; draw(); },
+      function () { st.failed = true; draw(); });
+    function draw() {
+      var tiles = st.list.map(function (src, i) {
+        return h('div', { class: 'pp-tile' + (i === 0 ? ' main' : '') },
+          h('button', { type: 'button', class: 'pp-img', 'aria-label': i === 0 ? 'Photo principale' : 'Mettre la photo ' + (i + 1) + ' en principale',
+            disabled: i === 0 || !st.ready || null, onclick: function () { st.list.unshift(st.list.splice(i, 1)[0]); st.changed = true; draw(); } },
+            h('img', { src: src, alt: '' })),
+          i === 0 && st.list.length > 1 ? h('span', { class: 'pp-badge' }, 'Principale') : null,
+          st.ready ? h('button', { type: 'button', class: 'pp-del', 'aria-label': 'Retirer la photo ' + (i + 1), onclick: function () { st.list.splice(i, 1); st.changed = true; draw(); } }, icon('trash', 16)) : null);
+      });
+      if (!st.ready && !st.failed) tiles.push(h('div', { class: 'pp-tile loading-skel', 'aria-hidden': 'true' }));
+      if (st.ready && st.list.length < 5) tiles.push(h('button', { type: 'button', class: 'pp-add', id: 'product-photo-add', onclick: function () { inp.click(); } },
+        icon('cam', 24), h('span', null, st.list.length ? 'Ajouter' : 'Ajouter des photos')));
+      setKids(box,
+        h('span', { class: 'label' }, 'Photos de l’article ', h('span', { class: 'hint' }, '(facultatif, 5 au plus)')),
+        h('div', { class: 'pp-grid', id: 'product-photo-grid' }, tiles),
+        st.failed ? h('p', { class: 'msg err' }, 'Photos supplémentaires indisponibles : rechargez la page pour les modifier.') : null,
+        st.list.length > 1 && st.ready ? h('p', { class: 'hint' }, 'Touchez une photo pour la mettre en principale.') : null,
+        inp, msg);
+    }
+    draw();
+    return {
+      el: box, count: function () { return st.list.length; },
+      payload: function () {
+        if (!st.changed || !st.ready) return null;
+        var b = function (d) { return d.replace(/^data:[^,]+,/, ''); };
+        return { photo: st.list[0] ? b(st.list[0]) : '', photos: st.list.slice(1).map(b) };
+      }
+    };
+  }
   function lazyPhoto(box, load, alt) {
     function go() {
       load().then(function (src) {
@@ -1691,8 +1808,12 @@
     var st = { liked: !!p.liked, saved: !!p.saved, likes: p.likes || 0, saves: p.saves || 0, comments: p.comments || 0 };
     var acc = (VT_ACCENTS[p.shop.accent] || VT_ACCENTS.foret)[1];
     var shopHref = '#/b/' + p.shop.slug, buyHref = shopHref + qs({ a: p.id });
-    var img = h('div', { class: 'post-img loading-skel' });
-    lazyPhoto(img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, p.name);
+    var img;
+    if (p.photos > 1) img = photoCarousel(p.photos, function (k) { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: k ? p.id + ':' + k : p.id }).then(function (r) { return r.photo || null; }); }, p.name, 'post-img');
+    else {
+      img = h('div', { class: 'post-img loading-skel' });
+      lazyPhoto(img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, p.name);
+    }
     var burst = h('span', { class: 'post-burst', 'aria-hidden': 'true' }, icon('heart', 72));
     var likeBtn = h('button', { class: 'post-act', type: 'button', id: 'like-' + p.id, onclick: function () { react('like', !st.liked); } });
     var saveBtn = h('button', { class: 'post-act', type: 'button', id: 'save-' + p.id, onclick: function () { react('save', !st.saved); } });
@@ -5015,10 +5136,10 @@
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
     f.category = pr && pr.category || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');
     f.stock = pr && pr.stock != null ? String(pr.stock) : '';
-    var original = f.photo;
     var err = h('div', { role: 'alert' });
     var zone = h('div', { class: 'stack' });
-    var photoBox = photoField({ id: 'product-photo', optional: true, label: 'Photo de l’article', get: function () { return f.photo; }, set: function (v) { f.photo = v; }, maxSide: 720 });
+    var photos = productPhotos(pr);
+    var photoBox = photos.el;
     var btn = h('button', { class: 'btn', type: 'button', id: 'product-save', onclick: function () {
       setKids(err);
       var price = parseInt(String(f.price).replace(/\D/g, ''), 10);
@@ -5028,10 +5149,11 @@
       if (stock !== null && !(stock >= 0)) return errBox(err, new ApiError('invalid_stock'));
       var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active,
         category: f.category || null, sizes: splitTags(f.sizes), colors: splitTags(f.colors), stock: stock };
-      if (f.photo !== original) p.photo = f.photo ? f.photo.replace(/^data:[^,]+,/, '') : '';
+      var pp = photos.payload();
+      if (pp) { p.photo = pp.photo; p.photos = pp.photos; }
       btn.disabled = true;
       sapi('fiila_product_save', { p: p }).then(function (res) {
-        if (!pr) track('product_created', f.photo ? 'photo' : 'no_photo');
+        if (!pr) track('product_created', photos.count() ? 'photo' : 'no_photo');
         var nid = res && (res.id || (res.product && res.product.id));
         if (!pr && nid && p.active !== false) { go('#/boutique/article/' + nid + '?publier=1'); return; }
         toast(pr ? 'Article mis à jour.' : 'Article ajouté.'); go('#/boutique/articles');

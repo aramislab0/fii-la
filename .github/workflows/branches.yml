@@ -28,7 +28,7 @@ jobs:
         run: scripts/run-suites.sh sql
       - name: Écrans clés — Safari (WebKit)
         if: always()
-        run: ENGINE=webkit scripts/run-suites.sh list backoffice engage feed products vitrine videdressing navigation shop team
+        run: ENGINE=webkit scripts/run-suites.sh list backoffice engage feed products vitrine videdressing navigation shop team photos
       - name: Captures en cas d'échec
         if: failure()
         uses: actions/upload-artifact@v4
