@@ -4,7 +4,7 @@
    - Réseau d'abord : une nouvelle version déployée est servie dès qu'elle est joignable.
    - Ne touche jamais aux appels à l'API (autre origine, ou /rest/ en local), ni aux tuiles de carte,
      ni à aucune requête autre que GET : aucun contenu de fiche n'est mis en cache. */
-var CACHE = 'fiila-shell-v22';
+var CACHE = 'fiila-shell-v23';
 var SHELL = [
   './', 'index.html', 'theme.js', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest',
   'fonts/montserrat-latin-400-normal.woff2', 'fonts/montserrat-latin-600-normal.woff2', 'fonts/montserrat-latin-700-normal.woff2', 'fonts/montserrat-latin-800-normal.woff2',

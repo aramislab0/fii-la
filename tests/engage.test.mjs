@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { startServer } from './dev-server.mjs';
+import { passMfa } from './bo-mfa.mjs';
 import { rpc, createUser } from './db.mjs';
 
 const require = createRequire(import.meta.url);
@@ -185,6 +186,7 @@ await t('modération : le fondateur voit le commentaire masqué (3 signalements)
   await signup(F, 'Fondateur Test', 'fondateur.fil@example.invalid');
   await local.db.query(`insert into fiila.staff (user_id, role) select id, 'super_admin' from auth.users where email = 'fondateur.fil@example.invalid'`);
   await F.goto(URL0 + '#/bo');
+  await passMfa(F, 'fondateur.fil@example.invalid');
   await F.click('#bo-menu');
   await F.click('#bo-nav-moderation');
   const card = F.locator('#mod-' + c.body.id);

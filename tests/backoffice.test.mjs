@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { startServer } from './dev-server.mjs';
+import { passMfa } from './bo-mfa.mjs';
 import { rpc } from './db.mjs';
 
 const require = createRequire(import.meta.url);
@@ -78,6 +79,15 @@ await t('portail : connexion de l’équipe ; un compte hors équipe est refusé
   await D.locator('#bo-login [role="alert"]').getByText(/./).waitFor();
   await D.fill('#bo-pass', 'motdepasse-test-123');
   await D.click('#bo-login-btn');
+  // Double authentification obligatoire : activation à la première connexion (QR code ou clé), refus d'un code faux.
+  await D.locator('#bo-mfa').getByText('Activer la double authentification').waitFor();
+  await D.locator('#bo-mfa-qr').waitFor();
+  await shot(D, '00-double-authentification');
+  await D.fill('#bo-mfa-code', '000000');
+  await D.click('#bo-mfa-ok');
+  await D.locator('#bo-mfa [role="alert"]').getByText(/Code incorrect/).waitFor();
+  assert.equal((await rpc(local.db, 'fiila_bo_overview', {}, { uid: (await local.db.query(`select id from auth.users where email = 'fondateur.bo@example.invalid'`)).rows[0].id, aal: 'aal1' })).body.message, 'fiila:mfa_required');
+  await passMfa(D, 'fondateur.bo@example.invalid');
   await D.locator('#bo-kpis').waitFor();
   assert.equal(await heading(D).textContent(), 'Tableau de bord');
 });
@@ -171,6 +181,7 @@ await t('équipe : inviter un membre (lien à usage unique), il s’inscrit avec
   await M.click('#auth-submit');
   await M.locator('#bo-invite-accept').click();
   await M.getByText('Bienvenue dans l’équipe.').waitFor();
+  await passMfa(M, 'mariama.bo@example.invalid');
   await M.locator('#bo-kpis').waitFor();
   // Téléphone : menu à ouvrir ; seules les sections de la modération.
   assert.equal(await M.locator('#bo-side').isVisible(), true, 'panneau présent');
@@ -233,6 +244,8 @@ await t('téléphone et mode sombre : tableau de bord, liste en cartes, fiche li
   await P.fill('#bo-email', 'fondateur.bo@example.invalid');
   await P.fill('#bo-pass', 'motdepasse-test-123');
   await P.click('#bo-login-btn');
+  await P.locator('#bo-mfa').getByText('Code de vérification').waitFor();
+  await passMfa(P, 'fondateur.bo@example.invalid');
   await P.locator('#bo-kpis').waitFor();
   assert.equal(await P.locator('#bo-menu').isVisible(), true);
   const width = await P.evaluate(() => document.documentElement.scrollWidth);
@@ -248,6 +261,7 @@ await t('téléphone et mode sombre : tableau de bord, liste en cartes, fiche li
   await DD.fill('#bo-email', 'fondateur.bo@example.invalid');
   await DD.fill('#bo-pass', 'motdepasse-test-123');
   await DD.click('#bo-login-btn');
+  await passMfa(DD, 'fondateur.bo@example.invalid');
   await DD.locator('#bo-kpis').waitFor();
   await shot(DD, '14-ordinateur-sombre');
 });

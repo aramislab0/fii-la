@@ -334,6 +334,10 @@
     invalid_role: 'Rôle non valide.',
     email_invalid: 'Adresse e-mail non valide.',
     email_unconfirmed: 'Confirmez d’abord votre adresse e-mail (lien reçu par e-mail), puis rouvrez l’invitation.',
+    mfa_required: 'Saisissez le code de votre application d’authentification.',
+    mfa_verification_failed: 'Code incorrect. Vérifiez qu’il est à jour (il change toutes les 30 secondes) et que l’heure du téléphone est automatique.',
+    mfa_challenge_expired: 'Code expiré. Saisissez le nouveau code affiché.',
+    insufficient_aal: 'Saisissez d’abord le code de votre application d’authentification.',
     payout_pending: 'Un versement vous est encore dû. Contactez Fii La pour le recevoir avant de supprimer votre compte.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
@@ -461,6 +465,17 @@
         if (sk && sk.linked) LS.del('fiila.shop');
       };
       return authCall('/logout', 'POST', null, true).then(done, done);
+    },
+    // Double authentification (application d'authentification, code à 6 chiffres) : API MFA de Supabase Auth.
+    mfaFactors: function () { return authCall('/user', 'GET', null, true).then(function (u) { return (u && u.factors) || []; }); },
+    mfaEnroll: function () {
+      return authCall('/factors', 'POST', { factor_type: 'totp', issuer: 'Fii La', friendly_name: 'Fii La ' + new Date().toISOString().slice(0, 16) }, true);
+    },
+    mfaRemove: function (id) { return authCall('/factors/' + id, 'DELETE', null, true); },
+    mfaVerify: function (factorId, code) {
+      return authCall('/factors/' + factorId + '/challenge', 'POST', {}, true).then(function (c) {
+        return authCall('/factors/' + factorId + '/verify', 'POST', { challenge_id: c.id, code: String(code).replace(/\s/g, '') }, true);
+      }).then(function (r) { saveSession(r); return r; });
     },
     setPassword: function (pw) { return freshToken().then(function () { return authCall('/user', 'PUT', { password: pw }, true); }); },
     recover: function (email) {
@@ -5430,18 +5445,26 @@
         var settled = false;
         function done(ok, v) { if (settled) return; settled = true; (ok ? resolve : reject)(v); }
         var pw = h('input', { type: 'password', id: 'bo-reauth-pw', autocomplete: 'current-password', 'data-autofocus': '1' });
+        var code = h('input', { type: 'text', id: 'bo-reauth-code', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, placeholder: '123 456', class: 'bo-code' });
         var err = h('div', { role: 'alert' });
         var ok = h('button', { class: 'btn', type: 'submit', id: 'bo-reauth-ok' }, 'Confirmer');
         var back = h('div', { class: 'sheet-back', id: 'bo-reauth', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bo-reauth-h' },
           h('form', { class: 'sheet', onsubmit: function (ev) {
             ev.preventDefault(); setKids(err); ok.disabled = true;
             // Le mot de passe d'abord (erreur affichée dans la feuille) ; puis le geste lui-même (erreur remontée à l'écran).
+            // Mot de passe, puis code : la session reste au niveau « double authentification ».
             account.signIn(BO.me.email, pw.value).then(function () {
+              return account.mfaFactors().then(function (fs) {
+                var f = fs.filter(function (x) { return x.status === 'verified'; })[0];
+                return f ? account.mfaVerify(f.id, code.value) : null;
+              });
+            }).then(function () {
               return fn().then(function (r) { done(true, r); close(); }, function (x) { done(false, x); close(); });
             }, function (x) { ok.disabled = false; errBox(err, x); pw.select(); });
           } }, h('h2', { id: 'bo-reauth-h' }, 'Confirmez votre mot de passe'),
-            h('p', { class: 'small muted' }, 'Ce geste touche à l’équipe ou aux réglages : il demande une connexion de moins de 15 minutes.'),
-            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Mot de passe'), pw), err, ok,
+            h('p', { class: 'small muted' }, 'Ce geste touche à l’équipe ou aux réglages : il demande une connexion de moins de 15 minutes (mot de passe et code).'),
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Mot de passe'), pw),
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Code de l’application'), code), err, ok,
             h('button', { class: 'btn ghost', type: 'button', onclick: function () { close(); } }, 'Annuler')));
         var close = openSheet(back, { onClose: function () { done(false, e); } });
       });
@@ -5513,6 +5536,7 @@
     return Promise.all([boMe(true), ov]).then(function (rr) {
       var me = rr[0];
       if (!me.staff) { BO.overview = null; return boDenied(me); }
+      if (!me.mfa) { BO.overview = null; return boMfa(me); }
       var nav = BO_NAV.filter(function (n) { return n[0] === sec; })[0];
       if (!nav) return boShell('', 'Introuvable', stateCard('?', 'Page introuvable', 'Cette page n’existe pas dans le back-office.'));
       if (!boCan(nav[3])) return boShell(sec, nav[2], stateCard('⦸', 'Accès non autorisé', 'Votre rôle (' + (BO_ROLES[me.role] || me.role) + ') ne donne pas accès à cette page.'));
@@ -5555,6 +5579,51 @@
       h('div', { class: 'row', style: 'justify-content:space-between' },
         h('a', { class: 'btn link small', href: '#/compte' + qs({ mode: 'oubli', retour: 'bo' }) }, 'Mot de passe oublié ?'),
         h('a', { class: 'btn link small', href: '#/', id: 'bo-portal-home' }, 'Retour au site'))));
+  }
+  /* Double authentification de l'équipe : à la première connexion, activation (QR code ou clé à saisir dans l'application,
+     puis premier code) ; ensuite, le code à chaque connexion. */
+  function boMfa(me) {
+    function card() { return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-mfa' },
+      h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+      Array.prototype.slice.call(arguments))); }
+    function codeForm(factorId, label, okText) {
+      var err = h('div', { role: 'alert' });
+      var input = h('input', { type: 'text', id: 'bo-mfa-code', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 7, pattern: '[0-9 ]*', 'data-autofocus': '1',
+        placeholder: '123 456', 'aria-label': 'Code à 6 chiffres', class: 'bo-code' });
+      var btn = h('button', { class: 'btn', type: 'submit', id: 'bo-mfa-ok' }, label);
+      return h('form', { class: 'stack', onsubmit: function (e) {
+        e.preventDefault(); setKids(err);
+        if (!/^\d{6}$/.test(input.value.replace(/\s/g, ''))) { errBox(err, new ApiError('mfa_verification_failed')); input.focus(); return; }
+        btn.disabled = true;
+        account.mfaVerify(factorId, input.value).then(function () { BO.me = null; toast(okText); render(); },
+          function (x) { btn.disabled = false; input.value = ''; input.focus(); errBox(err, x); });
+      } }, h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Code à 6 chiffres'), input), err, btn);
+    }
+    var leave = h('button', { class: 'btn link small', type: 'button', onclick: function () { account.signOut().then(function () { BO.me = null; render(); }); } }, 'Changer de compte');
+    return account.mfaFactors().then(function (fs) {
+      var ok = fs.filter(function (f) { return f.status === 'verified'; })[0];
+      if (ok) return card(h('h1', null, 'Code de vérification'),
+        h('p', { class: 'small muted' }, 'Ouvrez votre application d’authentification et saisissez le code « Fii La ».'),
+        codeForm(ok.id, 'Valider', 'Connexion vérifiée.'),
+        h('details', { class: 'small' }, h('summary', null, 'Téléphone perdu ?'),
+          h('p', { class: 'small muted' }, (me.role === 'super_admin' ? 'Retirez votre facteur dans le tableau de bord Supabase (Authentication → Users → votre compte), puis reconnectez-vous ici pour en activer un nouveau.'
+            : 'Demandez au super admin de réinitialiser votre double authentification, puis reconnectez-vous ici.'))),
+        leave);
+      // Première fois : on repart d'un facteur neuf (les essais inachevés sont retirés).
+      return Promise.all(fs.filter(function (f) { return f.status !== 'verified'; }).map(function (f) { return account.mfaRemove(f.id).catch(function () {}); }))
+        .then(function () { return account.mfaEnroll(); }).then(function (en) {
+          var secret = (en.totp && en.totp.secret) || '';
+          return card(h('h1', null, 'Activer la double authentification'),
+            h('p', { class: 'small muted' }, 'Obligatoire pour l’équipe : un mot de passe volé ne suffit plus pour entrer.'),
+            h('ol', { class: 'bo-steps' },
+              h('li', null, 'Installez une application d’authentification : Google Authenticator, Microsoft Authenticator, ou « Mots de passe » sur iPhone.'),
+              h('li', null, 'Scannez ce QR code avec l’application.', h('img', { src: en.totp.qr_code, alt: 'QR code de la double authentification', class: 'bo-qr', id: 'bo-mfa-qr', width: 180, height: 180 }),
+                h('span', { class: 'small muted' }, 'Ou saisissez cette clé à la main : '), h('code', { id: 'bo-mfa-secret', class: 'wrapword' }, secret.replace(/(.{4})/g, '$1 ').trim())),
+              h('li', null, 'Saisissez le code à 6 chiffres affiché par l’application.')),
+            codeForm(en.id, 'Activer', 'Double authentification activée.'),
+            leave);
+        });
+    }, function (e) { return card(h('h1', null, 'Double authentification'), stateCard('!', 'Impossible de continuer', errText(e), retryBtn()), leave); });
   }
   function boDenied(me) {
     return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-denied' },

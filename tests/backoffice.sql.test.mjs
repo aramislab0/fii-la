@@ -280,6 +280,23 @@ await t('audit : suppression de compte ordinaire — réactions effacées, artic
   assert.equal((await db.query(`select count(*)::int n from fiila.likes where who = 'u:' || $1`, [u.uid])).rows[0].n, 0);
 });
 
+
+await t('double authentification : sans le code (aal1), le portail le demande et chaque action est refusée', async () => {
+  const a1 = { ...FOUNDER, aal: 'aal1' };
+  const me = await ok('fiila_bo_me', {}, a1);
+  assert.equal(me.staff, true); assert.equal(me.mfa, false); assert.equal(me.perms, undefined, 'aucun droit annoncé avant le code');
+  for (const fn of ['fiila_bo_overview', 'fiila_bo_team', 'fiila_bo_shops', 'fiila_admin_comments', 'fiila_admin_vd', 'fiila_admin_ambassadors', 'fiila_admin_stats', 'fiila_bo_audit']) {
+    await ko(fn, {}, 'mfa_required', a1);
+  }
+  await ko('fiila_bo_setting_set', { p_key: 'vd_commission', p_value: 15 }, 'mfa_required', a1);
+  const shop = (await db.query(`select id from fiila.shops where not platform limit 1`)).rows[0].id;
+  await ko('fiila_bo_shop_action', { p_id: shop, p_action: 'feed_off' }, 'mfa_required', a1);
+  assert.equal((await ok('fiila_bo_me', {}, FOUNDER)).mfa, true, 'avec le code : accès normal');
+  await ok('fiila_bo_overview', {}, FOUNDER);
+  // Un compte hors équipe n'est pas concerné (rien ne change pour les utilisateurs).
+  assert.equal((await ok('fiila_bo_me', {}, { ...NOBODY, aal: 'aal1' })).staff, false);
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL back-office réussis`);
 process.exit(passed === results.length ? 0 : 1);

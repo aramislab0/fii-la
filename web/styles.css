@@ -1002,3 +1002,11 @@ input[type=number]{font:inherit;font-size:16px;padding:12px 14px;border-radius:1
 /* Rangée d'actions rondes : jamais plus large que l'écran, même avec des polices de remplacement plus larges (audit 19/10). */
 .rnd-t{max-width:100%;overflow-wrap:anywhere}
 @media (max-width:350px){.rnd-ic{width:46px;height:46px}.rnd{font-size:11.5px}}
+
+/* Double authentification (portail du back-office) */
+.bo-steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.bo-steps li{display:list-item;padding-left:2px}
+.bo-steps li>img,.bo-steps li>code,.bo-steps li>span{display:block;margin-top:6px}
+.bo-qr{width:180px;height:180px;background:#fff;padding:8px;border-radius:12px;border:1px solid var(--line);align-self:flex-start}
+#bo-mfa-secret{background:var(--surface-2);padding:6px 10px;border-radius:8px;font-size:13px;letter-spacing:.04em}
+.bo-code{font-size:22px !important;letter-spacing:.2em;text-align:center;font-variant-numeric:tabular-nums}

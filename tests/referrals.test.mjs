@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { startServer } from './dev-server.mjs';
+import { passMfa } from './bo-mfa.mjs';
 import { rpc } from './db.mjs';
 
 const require = createRequire(import.meta.url);
@@ -208,6 +209,7 @@ await t('statistiques : refusées sans compte autorisé ; le fondateur voit orig
   await local.db.query(`insert into fiila.staff (user_id, role) values ($1, 'super_admin')`, [uid]);
   await G.goto(URL0 + '#/');
   await G.goto(URL0 + '#/stats');
+  await passMfa(G, 'fondateur.test@example.test');
   await G.locator('#stats-totals').waitFor();
   await G.locator('#stats-sources').getByText('Lien de parrainage').waitFor();
   await G.locator('#stats-sources').getByText('Numéro tapé').waitFor();

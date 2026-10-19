@@ -12,6 +12,8 @@
   - n'est utilisable **qu'avec le compte de cette adresse e-mail** ;
   - n'est jamais gardé en clair dans la base.
 - **Retirer quelqu'un** : bouton « Retirer » dans Équipe. Son compte reste, sans accès au back-office.
+- **Double authentification obligatoire** pour toute l'équipe (19/10) : à la première connexion, on scanne un QR code avec une application d'authentification (Google Authenticator, Microsoft Authenticator, « Mots de passe » sur iPhone), puis on saisit le code à 6 chiffres à chaque connexion. Sans ce code, la base refuse toute action du back-office (`mfa_required`), même avec le bon mot de passe.
+- **Téléphone perdu** : le super admin retire le facteur dans le tableau de bord Supabase (Authentication → Users → le compte → facteurs MFA). Le membre en active un nouveau à sa connexion suivante. Conseil : à l'activation, scanner aussi le QR code sur un second appareil de confiance.
 - **Gestes sensibles** (équipe, réglages) : une connexion de moins de 15 minutes est exigée. Sinon, le mot de passe est redemandé.
 - **Invitation** : acceptée seulement par un compte dont l'adresse e-mail est celle de l'invitation **et confirmée**.
 - **Jamais sans super admin** : la base refuse de retirer, rétrograder ou supprimer le compte du dernier super admin.
@@ -64,7 +66,6 @@ Les anciennes adresses `#/stats` et `#/admin/…` ouvrent la section corresponda
 
 ## Ensuite (V1)
 
-- Double authentification (code par SMS ou application) pour les rôles Super admin et Finances.
 - Sous-domaine dédié (par exemple `admin.fii-la.com`) quand le domaine sera choisi.
 - Export CSV des commandes et des finances.
 - Blocage d'un compte utilisateur : il demande la clé d'administration de Supabase côté serveur, à prévoir avec les fonctions serveur.

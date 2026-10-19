@@ -5,6 +5,7 @@ import { mkdirSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 import assert from 'node:assert/strict';
 import { startServer } from './dev-server.mjs';
+import { passMfa } from './bo-mfa.mjs';
 
 const require = createRequire(import.meta.url);
 let pw;
@@ -74,6 +75,7 @@ await t('Fii La : vérifie et publie ; la vitrine « Vide-dressing Fii La » se 
   await signup(F, 'Fondateur', 'fondateur.vd@example.invalid');
   await local.db.query(`insert into fiila.staff (user_id, role) select user_id, 'super_admin' from fiila.profiles where display_name = 'Fondateur'`);
   await F.goto(URL0 + '#/admin/vide-dressing');
+  await passMfa(F, 'fondateur.vd@example.invalid');
   await F.locator('#vd-queue').getByText('Robe fleurie (test)').waitFor();
   await F.locator('#vd-queue').getByRole('button', { name: 'Publier' }).click();
   await F.getByText('Enregistré.').waitFor();

@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { startServer } from './dev-server.mjs';
+import { passMfa } from './bo-mfa.mjs';
 import { rpc } from './db.mjs';
 
 const require = createRequire(import.meta.url);
@@ -88,6 +89,7 @@ await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async ()
   await signup(F, 'Fondateur', 'fondateur.amb@example.invalid');
   await local.db.query(`insert into fiila.staff (user_id, role) select id, 'super_admin' from auth.users where email = 'fondateur.amb@example.invalid'`);
   await F.goto(URL0 + '#/admin/ambassadeurs');
+  await passMfa(F, 'fondateur.amb@example.invalid');
   await F.locator('#adm-review').getByText('Moussa Diop').waitFor();
   await F.locator('#adm-review').getByRole('button', { name: 'Valider' }).click();
   await F.getByText('Enregistré.').waitFor();

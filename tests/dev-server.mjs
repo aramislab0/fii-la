@@ -6,6 +6,7 @@ import { join, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import { createDb, rpc } from './db.mjs';
+import { newSecret, totpOk } from './totp.mjs';
 
 const webRoot = fileURLToPath(new URL('../web/', import.meta.url));
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -18,15 +19,18 @@ function makeAuth(db) {
   const access = new Map();     // jeton d'accès -> { uid, exp }
   const refresh = new Map();    // jeton de rafraîchissement -> { uid, loginAt }
   const codes = new Map();      // code PKCE -> { uid, challenge }
+  const factors = new Map();    // uid -> [{ id, secret, status, friendly_name }]
+  const challenges = new Map(); // id du défi -> { factor, uid }
   let lastRecovery = null;
   const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const hash = (pw) => createHash('sha256').update('fiila-test:' + pw).digest('hex');
   let ttl = 3600;
-  function session(u, loginAt = Math.floor(Date.now() / 1000)) {
+  // aal : niveau d'assurance de la session (aal1 = mot de passe ; aal2 = mot de passe + code de l'application), comme Supabase.
+  function session(u, loginAt = Math.floor(Date.now() / 1000), aal = 'aal1') {
     const exp = Math.floor(Date.now() / 1000) + ttl;
-    const at = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: u.id, email: u.email, role: 'authenticated', exp, amr: [{ method: 'password', timestamp: loginAt }] }) + '.' + randomBytes(16).toString('base64url');
+    const at = b64u({ alg: 'HS256', typ: 'JWT' }) + '.' + b64u({ sub: u.id, email: u.email, role: 'authenticated', exp, aal, amr: [{ method: 'password', timestamp: loginAt }] }) + '.' + randomBytes(16).toString('base64url');
     const rt = randomBytes(18).toString('base64url');
-    access.set(at, { uid: u.id, exp, loginAt }); refresh.set(rt, { uid: u.id, loginAt });
+    access.set(at, { uid: u.id, exp, loginAt, aal }); refresh.set(rt, { uid: u.id, loginAt, aal });
     return { access_token: at, token_type: 'bearer', expires_in: ttl, expires_at: exp, refresh_token: rt, user: { id: u.id, email: u.email } };
   }
   const byId = (id) => [...users.values()].find((u) => u.id === id);
@@ -40,7 +44,7 @@ function makeAuth(db) {
       if (!tok || tok[1].split('.').length !== 3) return { uid: null };
       const a = access.get(tok[1]);
       if (!a || a.exp <= Math.floor(Date.now() / 1000)) return { expired: true };
-      return { uid: a.uid, loginAt: a.loginAt };
+      return { uid: a.uid, loginAt: a.loginAt, aal: a.aal };
     },
     async handle(path, method, q, body, authz) {
       const err = (status, code, msg) => [status, { code: status, error_code: code, msg }];
@@ -66,7 +70,7 @@ function makeAuth(db) {
         const u = rt && byId(rt.uid);
         if (!u) return err(400, 'refresh_token_not_found', 'Invalid Refresh Token: Refresh Token Not Found');
         refresh.delete(body.refresh_token);
-        return [200, session(u, rt.loginAt)];
+        return [200, session(u, rt.loginAt, rt.aal)];
       }
       if (path === '/token' && method === 'POST' && q.get('grant_type') === 'pkce') {
         const c = codes.get(body.auth_code);
@@ -88,7 +92,35 @@ function makeAuth(db) {
             u.pw = hash(body.password);
           }
         }
-        return [200, { id: u.id, email: u.email }];
+        return [200, { id: u.id, email: u.email, factors: (factors.get(u.id) || []).map((f) => ({ id: f.id, factor_type: 'totp', status: f.status, friendly_name: f.friendly_name })) }];
+      }
+      // Double authentification (TOTP), comme l'API MFA de Supabase Auth.
+      const fm = /^\/factors(?:\/([0-9a-f-]{36})(?:\/(challenge|verify))?)?$/.exec(path);
+      if (fm) {
+        if (!who.uid) return err(401, 'bad_jwt', 'invalid JWT');
+        const list = factors.get(who.uid) || []; factors.set(who.uid, list);
+        if (!fm[1] && method === 'POST') {
+          const f = { id: randomUUID(), secret: newSecret(), status: 'unverified', friendly_name: body.friendly_name || 'TOTP' };
+          if (list.some((x) => x.friendly_name === f.friendly_name)) return err(422, 'mfa_factor_name_conflict', 'A factor with the friendly name already exists');
+          list.push(f);
+          const uri = 'otpauth://totp/' + encodeURIComponent((body.issuer || 'Fii La') + ':' + byId(who.uid).email) + '?secret=' + f.secret + '&issuer=' + encodeURIComponent(body.issuer || 'Fii La');
+          const qr = 'data:image/svg+xml;utf-8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" fill="#fff"/><rect x="20" y="20" width="120" height="120" fill="#111"/></svg>');
+          return [200, { id: f.id, type: 'totp', friendly_name: f.friendly_name, totp: { qr_code: qr, secret: f.secret, uri } }];
+        }
+        const f = list.find((x) => x.id === fm[1]);
+        if (!f) return err(404, 'mfa_factor_not_found', 'Factor not found');
+        if (method === 'DELETE') {
+          if (f.status === 'verified' && who.aal !== 'aal2') return err(403, 'insufficient_aal', 'AAL2 required');
+          list.splice(list.indexOf(f), 1); return [200, { id: f.id }];
+        }
+        if (fm[2] === 'challenge') { const id = randomUUID(); challenges.set(id, { factor: f.id, uid: who.uid }); return [200, { id, type: 'totp', expires_at: Math.floor(Date.now() / 1000) + 300 }]; }
+        if (fm[2] === 'verify') {
+          const c = challenges.get(body.challenge_id);
+          if (!c || c.factor !== f.id) return err(422, 'mfa_challenge_expired', 'Challenge expired');
+          if (!totpOk(f.secret, body.code)) return err(422, 'mfa_verification_failed', 'Invalid TOTP code entered');
+          challenges.delete(body.challenge_id); f.status = 'verified';
+          return [200, session(byId(who.uid), Math.floor(Date.now() / 1000), 'aal2')];
+        }
       }
       if (path === '/logout' && method === 'POST') {
         const tok = /^Bearer (.+)$/.exec(authz || '');
@@ -117,7 +149,7 @@ export async function startServer(port = 0) {
     if (url.pathname === '/__test/expire-tokens') { auth.expireAll(); res.writeHead(204); return res.end(); }
     if (url.pathname === '/__test/last-recovery') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(auth.lastRecovery())); }
     if (url.pathname === '/__test/forge-session') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(auth.forgeSession(url.searchParams.get('email')))); }
-    const am = url.pathname.match(/^\/auth\/v1(\/[a-z]+)$/);
+    const am = url.pathname.match(/^\/auth\/v1(\/[a-z]+(?:\/[0-9a-f-]{36}(?:\/(?:challenge|verify))?)?)$/);
     if (am) {
       if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
       let body = '';
@@ -138,7 +170,7 @@ export async function startServer(port = 0) {
       const ip = req.headers['x-test-ip'] || '127.0.0.1';
       const who = auth.uidFor(req.headers.authorization);
       if (who.expired) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end('{"code":"PGRST301","message":"JWT expired"}'); }
-      const r = await rpc(db, m[1], args, { ip, uid: who.uid, loginAt: who.loginAt });
+      const r = await rpc(db, m[1], args, { ip, uid: who.uid, loginAt: who.loginAt, aal: who.aal || 'aal1' });
       res.writeHead(r.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(r.body));
     }
