@@ -162,6 +162,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 06:51 (Mac) | Types de commerce en production : migration `20261019600000_fiila_business_type` appliquée, `verify-db` 18 migrations / 75 fonctions OK ; boutiques de démonstration rechargées (14, toutes typées, Salon Khady compris) ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 50/50, fil 7/7, livreurs 8/8 | `d3d8bde` |
 | 19/10 07:00 | Type de commerce des boutiques (16 types dont salon de coiffure ; obligatoire à la création, filtre du fil, statistiques fondateur `fiila_admin_shop_types`) ; boutique de démonstration « Salon Khady » ; proposition vide-dressing enfants et programme Ambassadeurs (`docs/PROPOSITION-VIDE-DRESSING-AMBASSADEURS.md`). Migration `20261019600000_fiila_business_type` ; 25 suites vertes | ce commit |
 | 19/10 06:31 (Mac) | En-tête et « Installer l'app » en production : Pages déployé ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 50/50, fil 7/7 | `3e59bd3` |
 | 19/10 06:40 | En-tête de l'accueil validé (photo ronde, « Bonjour, Prénom ») ; bouton « Installer l'app » sur l'accueil (fenêtre d'installation Android, 3 étapes en images sur iPhone, consigne « ouvrir dans Chrome/Safari » depuis WhatsApp ou Facebook, masquable 30 jours) ; tests navigation 50/50, boutique 26/26 | ce commit |
