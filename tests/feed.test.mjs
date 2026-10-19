@@ -157,6 +157,31 @@ await t('fin de tâche : la facture d’une commande livrée propose le fil', as
   await shot(C, '04-facture-livree-sombre');
 });
 
+await t('mode démo : boutiques fictives visibles et marquées, filtre par catégorie, vitrine signalée ; sans mode démo, invisibles', async () => {
+  const { readFileSync } = await import('node:fs');
+  await local.db.exec(readFileSync('scripts/demo-seed.sql', 'utf8'));
+  const A = await newPhone();
+  await A.goto(URL0 + '#/boutiques');
+  await A.locator('#feed-list .fcard').first().waitFor();
+  const n0 = await A.locator('#feed-list .fcard').count();
+  assert.equal(await A.locator('.demo-tag').count(), 0, 'aucune boutique fictive sans le mode démo');
+  await A.goto(URL0 + '#/demo');
+  await A.locator('#demo-banner').waitFor();
+  await A.locator('#feed-list .demo-tag').first().waitFor();
+  assert.equal(await A.locator('#feed-list .fcard').count(), n0 + 13);
+  await A.locator('#feed-cats').getByRole('button', { name: 'Chaussures' }).click();
+  const names = await A.locator('#feed-list .fname').allTextContents();
+  assert.deepEqual(names.sort(), ['Cuirs de Ngaye (démo)', 'Sneakers Médina (démo)']);
+  await shot(A, '05-mode-demo');
+  await A.locator('#feed-list .fcard').first().click();
+  await A.locator('#vitrine-demo').waitFor();
+  await A.goto(URL0 + '#/demo?off=1');
+  await A.goto(URL0 + '#/boutiques');
+  await A.locator('#feed-list .fcard').first().waitFor();
+  assert.equal(await A.locator('.demo-tag').count(), 0);
+  await local.db.exec(readFileSync('scripts/demo-clear.sql', 'utf8'));
+});
+
 await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors), []); });
 
 await browser.close();

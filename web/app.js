@@ -1270,6 +1270,7 @@
           h('div', null, h('h1', { class: 'wrapword' }, shop.name),
             shop.reviews ? ratingEl(shop.rating, shop.reviews) : null,
             shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null)),
+        shop.demo ? h('div', { class: 'demo-banner', id: 'vitrine-demo' }, h('span', null, h('b', null, 'Boutique fictive de démonstration.'), ' Les commandes passées ici ne sont pas livrées.')) : null,
         q.a && !byId[q.a] ? h('p', { class: 'msg', id: 'vitrine-gone' }, 'Cet article n’est plus proposé. Voici les autres articles de la boutique.') : null,
         products.length ? [filters, grid] : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun article pour le moment.')),
         h('p', { class: 'safe-line' }, icon('lock', 18), 'Commande sans compte. Vous donnez votre adresse à la dernière étape.'));
@@ -1332,9 +1333,22 @@
   /* ----- fil des boutiques : les 25 premières boutiques ouvertes, mises en avant gratuitement (fondateur, 19/10).
      Une image par boutique (couverture, sinon dernier article), chargée au défilement : peu de données mobiles. */
   var FEED_CACHE = null;
+  // Mode démo (#/demo) : ce téléphone voit aussi les boutiques fictives de démonstration, toujours marquées « Démo ».
+  var DEMO_LS = 'fiila.demo';
+  function demoMode() { return LS.get(DEMO_LS, false) === true; }
   function loadFeed() {
-    if (FEED_CACHE && Date.now() - FEED_CACHE.at < 120000) return Promise.resolve(FEED_CACHE.data);
-    return api('fiila_feed', {}).then(function (d) { FEED_CACHE = { at: Date.now(), data: d }; return d; });
+    var demo = demoMode();
+    if (FEED_CACHE && FEED_CACHE.demo === demo && Date.now() - FEED_CACHE.at < 120000) return Promise.resolve(FEED_CACHE.data);
+    return api('fiila_feed', demo ? { p_demo: true } : {}).then(function (d) { FEED_CACHE = { at: Date.now(), demo: demo, data: d }; return d; });
+  }
+  function demoBanner() {
+    if (!demoMode()) return null;
+    return h('div', { class: 'demo-banner', id: 'demo-banner' }, h('span', null, h('b', null, 'Mode démo'), ' : les boutiques fictives sont visibles, marquées « Démo ».'),
+      h('a', { href: '#/demo?off=1', class: 'btn link' }, 'Quitter'));
+  }
+  function viewDemo(q) {
+    if (q && q.off) { LS.del(DEMO_LS); FEED_CACHE = null; toast('Mode démo désactivé.'); go('#/'); return loading(); }
+    LS.set(DEMO_LS, true); FEED_CACHE = null; toast('Mode démo activé : boutiques fictives visibles.'); go('#/boutiques'); return loading();
   }
   function feedCard(s) {
     var img = h('span', { class: 'fimg loading-skel', 'aria-hidden': 'true' }, icon('shop', 28));
@@ -1343,8 +1357,8 @@
     }, '');
     else img.classList.remove('loading-skel');
     var acc = (VT_ACCENTS[s.accent] || VT_ACCENTS.foret)[1];
-    return h('a', { class: 'fcard', href: '#/b/' + s.slug, style: '--accent:' + acc, 'aria-label': 'Voir la boutique ' + s.name },
-      img,
+    return h('a', { class: 'fcard', href: '#/b/' + s.slug, style: '--accent:' + acc, 'aria-label': 'Voir la boutique ' + s.name, 'data-cats': (s.categories || []).join(' ') },
+      s.demo ? h('span', { class: 'fwrap' }, img, h('span', { class: 'demo-tag' }, 'Démo')) : img,
       h('span', { class: 'fbody' },
         h('span', { class: 'fname wrapword' }, s.name),
         s.reviews ? ratingEl(s.rating, s.reviews) : null,
@@ -1428,11 +1442,24 @@
     return loadFeed().then(function (d) {
       var list = (d && d.shops) || [];
       var mine = shopKey();
+      var cats = []; list.forEach(function (s) { (s.categories || []).forEach(function (c) { if (cats.indexOf(c) < 0) cats.push(c); }); });
+      var cat = '';
+      var listBox = h('div', { class: 'feed-list', id: 'feed-list' });
+      var chipsBox = h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Catégorie', id: 'feed-cats' });
+      function drawList() {
+        var l = list.filter(function (s) { return !cat || (s.categories || []).indexOf(cat) >= 0; });
+        setKids(listBox, l.length ? l.map(feedCard) : h('p', { class: 'muted' }, 'Aucune boutique dans cette catégorie pour le moment.'));
+        setKids(chipsBox, [['', 'Tout']].concat(cats.map(function (c) { return [c, catLabel(c) || c]; })).map(function (c) {
+          return h('button', { class: 'opt' + (cat === c[0] ? ' on' : ''), type: 'button', 'aria-pressed': cat === c[0] ? 'true' : 'false', onclick: function () { cat = c[0]; drawList(); } }, c[1]);
+        }));
+      }
+      drawList();
       return page(backBtn(),
+        demoBanner(),
         h('header', { class: 'stack tight' }, h('h1', null, 'Boutiques Fii La'),
           h('p', { class: 'muted' }, 'Commandez sans compte. Vous donnez votre adresse à la fin, la boutique livre à la bonne porte.')),
-        list.length ? h('div', { class: 'feed-list', id: 'feed-list' }, list.map(feedCard))
-          : h('div', { class: 'card' }, h('p', null, 'Les premières boutiques arrivent bientôt.')),
+        cats.length >= 2 ? chipsBox : null,
+        list.length ? listBox : h('div', { class: 'card' }, h('p', null, 'Les premières boutiques arrivent bientôt.')),
         d && d.free_left > 0 ? h('section', { class: 'card', id: 'feed-join' },
           h('h2', null, mine ? 'Votre boutique ici' : 'Vous vendez ?'),
           h('p', { class: 'small muted' }, (d.free_left === 1 ? 'Encore 1 place gratuite' : 'Encore ' + d.free_left + ' places gratuites') +
@@ -1839,6 +1866,7 @@
       else if (p[0] === 'compte') view = viewAccount(r.q);
       else if (p[0] === 'boutique' && !p[1]) view = viewShop(r.q);
       else if (p[0] === 'boutiques' && !p[1]) view = viewFeed();
+      else if (p[0] === 'demo' && !p[1]) view = viewDemo(r.q);
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
@@ -2017,6 +2045,7 @@
         tile4('#/livreur', 'moto', 'Livreur', { id: 'courier-link', 'aria-label': 'Espace livreur' })),
       h('p', { class: 'small muted home-hint', id: 'event-hint' }, h('b', null, 'Événement'), ' : mariage, baptême, réunion… un seul lien pour que tous vos invités trouvent le lieu.'),
       accountNudge(),
+      demoBanner(),
       listBox,
       feedSection(3, { id: 'home-feed' }),
       h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer' }, icon('gift', 24), h('span', null, 'Inviter un proche'),

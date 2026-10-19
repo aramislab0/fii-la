@@ -737,3 +737,10 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .more-details summary{cursor:pointer;font-weight:600;min-height:44px;display:flex;align-items:center}
 .vpick .opt{min-height:32px;min-width:34px;padding:0 9px;font-size:13px}
 .vpick .opt-row{gap:5px}
+
+/* ---- Mode démo (19/10) : toujours signalé, jamais confondu avec une vraie boutique. */
+.demo-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border-radius:14px;background:var(--surface-3);color:var(--ink);font-size:14px}
+.demo-banner .btn.link{min-height:36px}
+.fwrap{position:relative;display:block}
+.fwrap .fimg{width:100%}
+.demo-tag{position:absolute;top:10px;left:10px;padding:4px 10px;border-radius:999px;background:rgba(23,32,27,.82);color:#fff;font-size:12px;font-weight:700;letter-spacing:.02em}

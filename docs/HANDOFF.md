@@ -75,6 +75,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 18/10 23:31 | Vitrine : 3 modèles au choix et personnalisation simple (« comme Shopify ») | Fondateur |
 | 18/10 23:50 | NINEA retiré de l'application (réglages de la boutique, facture, confidentialité) ; la colonne reste en base, vidée à chaque enregistrement de la boutique | Fondateur |
 | 19/10 04:24 | Fil des boutiques : les 25 premières boutiques mises en avant gratuitement ; tous les utilisateurs le voient sur l'accueil et à la fin de leurs tâches. Suppression des 2 restes de test autorisée | Fondateur |
+| 19/10 05:56 | Domaine des sites offerts : Fii La (fii-la.com ou fii-la.sn), adresses du type `boutique.fii-la.sn`. Boutiques fictives de démonstration dans chaque catégorie pour les tests et les avis | Fondateur |
 | 19/10 05:17 | Fil validé avec carrousel animé apaisant ; proposition Sites / Studio IA / assistant validée dans ses recommandations (mention discrète sur le site offert, domaine neutre à proposer, budget d'essai IA, « Événement », ordre des étapes) | Fondateur |
 | 19/10 04:30 | Commande de vitrine : le numéro tapé n'est pas vérifié, donc l'adresse reçue pour elle n'est jamais copiée sur un client connu de la boutique. Parrainage par numéro : la boutique, le livreur ou le compte qui porte le numéro passe avant une fiche anonyme ; un compte qui supprime son code n'est plus réinscrit d'office | Builder (sécurité ; à confirmer par le fondateur) |
 
@@ -105,6 +106,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 24 | Publication des articles : brique 1 (partage natif, bouton « Publier ») construite 17/10 ; vitrine publique et API Meta/TikTok plus tard (`ARCHITECTURE-RALI.md` §8) | Builder, plus tard | Vitrine V3 |
 | 25 | ~~Valider la stratégie de croissance~~ phase 0 validée 17/10 23:10 et construite (`docs/CROISSANCE.md` §9) | Fondateur | — |
 | 27 | Fixer les récompenses du parrainage (boutiques, livreurs, particuliers ; argent possible) | Fondateur | Annonce du parrainage |
+| 38 | Domaine des sites offerts : fii-la.com est déjà enregistré (25/08/2026, registraire LWS) — confirmer qu'il est à Aramis ; fii-la.sn semblait libre au whois du 19/10. Acheter celui retenu (dépense du fondateur) | Fondateur | Sites offerts (étape 3) |
 | 37 | Studio IA : **reporté par le fondateur (19/10 05:51), gardé dans le périmètre** — le moment venu : créer un compte fal.ai, y fixer un plafond de 50 USD et transmettre la clé d'API par un canal sûr (jamais dans le dépôt ni la conversation) ; choisir le domaine neutre des sites offerts (propositions : bitig.sn, jaaykat.sn, marse.sn — disponibilité à vérifier chez le registraire) | Fondateur | Studio IA (étape 2), Sites (étape 3) |
 | 36 | ~~Valider la proposition~~ validée 19/10 05:17 (recommandations retenues) — Sites / Studio IA / assistant / « Événement » (`docs/PROPOSITION-SITES-STUDIO-ASSISTANT.md`) : mention sur le site offert, domaine neutre, budget d'essai IA, « Événement », ordre des étapes | Fondateur | Toute construction de ces fonctions |
 | 35 | Après les 25 places gratuites : décider l'offre (place payante, durée, prix) et l'ordre d'affichage | Fondateur | Boutique n° 26 |
@@ -157,6 +159,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 06:20 | Boutiques de démonstration : 13 boutiques fictives (toutes les catégories, notes variées), visibles seulement en mode démo (`#/demo`), marquées « Démo », jamais dans les 25 places ; filtre par catégorie sur `#/boutiques`. Migration `20261019500000_fiila_demo`, `scripts/demo-seed.sql` / `scripts/demo-clear.sql` ; tests démo SQL 4/4, fil 7/7 | branche `demo` |
 | 19/10 05:55 | Fondateur : Studio IA reporté mais gardé dans le périmètre (action #37) | — |
 | 19/10 05:45 (Mac) | En production : carrousel du fil, « Événement », attributs d'articles. Migration `20261019400000_fiila_product_attributes` appliquée, `verify-db` 16 migrations / 74 fonctions OK ; Pages déployé ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 49/49, fil 6/6, attributs 3/3 | `fb706b5` |
 | 19/10 05:35 | Articles : catégorie, tailles ou pointures, couleurs, stock (formulaire, raccourcis S–XL et 38–45) ; vitrine : filtres catégorie et « ma taille », choix obligatoire de taille et couleur, « Épuisé », stock décompté à la commande, variante sur la facture ; tests attributs SQL 3/3, attributs 3/3 | `fb706b5` |
