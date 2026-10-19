@@ -22,6 +22,7 @@ function makeAuth(db) {
   const factors = new Map();    // uid -> [{ id, secret, status, friendly_name }]
   const challenges = new Map(); // id du défi -> { factor, uid }
   let lastRecovery = null;
+  const smsOut = [];            // SMS « envoyés » (crochet Send SMS simulé) : { phone, otp }
   const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const hash = (pw) => createHash('sha256').update('fiila-test:' + pw).digest('hex');
   let ttl = 3600;
@@ -37,6 +38,7 @@ function makeAuth(db) {
   return {
     expireAll() { for (const v of access.values()) v.exp = 0; },
     lastRecovery() { return lastRecovery; },
+    lastSms() { return smsOut[smsOut.length - 1] || null; },
     forgeSession(email) { const u = users.get(email); return u ? session(u) : null; },
     setTtl(s) { ttl = s; },
     uidFor(authz) {
@@ -86,6 +88,16 @@ function makeAuth(db) {
         const u = byId(who.uid);
         if (!u) return err(404, 'user_not_found', 'User not found');
         if (method === 'PUT') {
+          // Changement de numéro : code à 6 chiffres envoyé par SMS (crochet), confirmé ensuite par POST /verify (type phone_change).
+          if (body.phone != null) {
+            const d = String(body.phone).replace(/\D/g, '');
+            if (!/^\d{8,15}$/.test(d)) return err(400, 'validation_failed', 'Invalid phone number format (E.164 required)');
+            const taken = await db.query('select 1 from auth.users where phone = $1 and phone_confirmed_at is not null and id <> $2', [d, u.id]);
+            if (taken.rows.length) return err(422, 'phone_exists', 'A user with this phone number has already been registered');
+            if (u.smsAt && Date.now() - u.smsAt < 1000 && !process.env.FIILA_SMS_FAST) return err(429, 'over_sms_send_rate_limit', 'For security purposes, you can only request this after 60 seconds.');
+            u.pendingPhone = d; u.phoneOtp = String(Math.floor(100000 + Math.random() * 900000)); u.smsAt = Date.now();
+            smsOut.push({ phone: '+' + d, otp: u.phoneOtp });
+          }
           if (body.password != null) {
             if (String(body.password).length < 8) return err(422, 'weak_password', 'Password should be at least 8 characters.');
             if (hash(body.password) === u.pw) return err(422, 'same_password', 'New password should be different from the old password.');
@@ -93,6 +105,15 @@ function makeAuth(db) {
           }
         }
         return [200, { id: u.id, email: u.email, factors: (factors.get(u.id) || []).map((f) => ({ id: f.id, factor_type: 'totp', status: f.status, friendly_name: f.friendly_name })) }];
+      }
+      if (path === '/verify' && method === 'POST' && body.type === 'phone_change') {
+        if (!who.uid) return err(401, 'bad_jwt', 'invalid JWT');
+        const u = byId(who.uid);
+        const d = String(body.phone || '').replace(/\D/g, '');
+        if (!u || !u.pendingPhone || u.pendingPhone !== d || String(body.token || '') !== u.phoneOtp) return err(403, 'otp_expired', 'Token has expired or is invalid');
+        await db.query('update auth.users set phone = $1, phone_confirmed_at = now() where id = $2', [d, u.id]);
+        u.pendingPhone = null; u.phoneOtp = null;
+        return [200, session(u, who.loginAt, who.aal)];
       }
       // Double authentification (TOTP), comme l'API MFA de Supabase Auth.
       const fm = /^\/factors(?:\/([0-9a-f-]{36})(?:\/(challenge|verify))?)?$/.exec(path);

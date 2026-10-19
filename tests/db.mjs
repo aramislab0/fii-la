@@ -19,7 +19,7 @@ export async function createDb() {
     grant usage on schema public to anon, authenticated;
     -- Équivalent minimal du schéma auth de Supabase (GoTrue) : utilisateurs et auth.uid().
     create schema if not exists auth;
-    create table if not exists auth.users (id uuid primary key, email text unique, created_at timestamptz default now(), email_confirmed_at timestamptz default now());
+    create table if not exists auth.users (id uuid primary key, email text unique, phone text unique, phone_confirmed_at timestamptz, created_at timestamptz default now(), email_confirmed_at timestamptz default now());
     create or replace function auth.uid() returns uuid language sql stable as $$
       select coalesce(nullif(current_setting('request.jwt.claim.sub', true), ''),
                       (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'))::uuid

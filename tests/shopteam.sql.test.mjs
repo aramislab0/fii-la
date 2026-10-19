@@ -50,7 +50,7 @@ await t('invitation : nom, numéro et rôle ; numéro et rôle obligatoires ; un
   TOK_ADMIN = again.token;
   TOK_EDITOR = (await ok('fiila_shop_invite', { p_key: null, p_name: 'Fatou', p_phone: '77 222 22 22', p_role: 'editor' }, OWNER)).token;
   const g = await ok('fiila_shop_invite_get', { p_token: TOK_EDITOR });
-  assert.deepEqual(g, { state: 'ok', shop: 'Boutique Équipe [TEST]', role: 'editor', name: 'Fatou' });
+  assert.deepEqual(g, { state: 'ok', shop: 'Boutique Équipe [TEST]', role: 'editor', name: 'Fatou', phone: '77 222 22 22' });
   const hashed = (await db.query(`select count(*)::int n from fiila.shop_invites where token_hash = convert_to($1, 'UTF8')`, [TOK_EDITOR])).rows[0].n;
   assert.equal(hashed, 0, 'le jeton n’est jamais stocké en clair');
 });
@@ -150,6 +150,28 @@ await t('suppression de la boutique par le propriétaire : membres et invitation
   await ok('fiila_shop_delete', { p_key: null }, OWNER);
   assert.equal((await db.query(`select count(*)::int n from fiila.shop_members`)).rows[0].n, 0);
   assert.equal((await ok('fiila_me', {}, NOBODY)).shop, undefined);
+});
+
+await t('vérification par SMS exigée (réglage sms_verify = 1) : numéro confirmé et identique à celui invité', async () => {
+  await db.query(`update fiila.settings set value = '1' where key = 'sms_verify'`);
+  const S = await user('sms.team@example.invalid', 'Proprio SMS');
+  await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique SMS [TEST]' } }, S);
+  const tok = (await ok('fiila_shop_invite', { p_key: null, p_name: 'Ibou', p_phone: '77 900 00 01', p_role: 'editor' }, S)).token;
+  const g = await ok('fiila_shop_invite_get', { p_token: tok });
+  assert.equal(g.verify, true); assert.equal(g.phone, '77 900 00 01');
+  const M = await user('ibou.team@example.invalid', 'Ibou');
+  await ko('fiila_shop_invite_accept', { p_token: tok }, 'phone_verify_required', M);
+  await db.query(`update auth.users set phone = '221779000099', phone_confirmed_at = now() where id = $1`, [M.uid]);
+  await ko('fiila_shop_invite_accept', { p_token: tok }, 'phone_mismatch', M);
+  await db.query(`update auth.users set phone = '221779000001', phone_confirmed_at = null where id = $1`, [M.uid]);
+  await ko('fiila_shop_invite_accept', { p_token: tok }, 'phone_verify_required', M);
+  await db.query(`update auth.users set phone_confirmed_at = now() where id = $1`, [M.uid]);
+  assert.equal((await ok('fiila_me', {}, M)).phone_verified, '+221779000001');
+  await ok('fiila_shop_invite_accept', { p_token: tok }, M);
+  const team = await ok('fiila_shop_team', { p_key: null }, S);
+  assert.equal(team.members[0].verified, true); assert.equal(team.members[0].phone, '+221779000001');
+  await db.query(`update fiila.settings set value = '0' where key = 'sms_verify'`);
+  assert.equal((await ok('fiila_shop_invite_get', { p_token: (await ok('fiila_shop_invite', { p_key: null, p_name: 'X', p_phone: '77 900 00 02', p_role: 'editor' }, S)).token })).verify, undefined);
 });
 
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');

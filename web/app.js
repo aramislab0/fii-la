@@ -294,6 +294,13 @@
     team_full: 'L’équipe compte déjà 10 personnes (invitations comprises).',
     invalid_role: 'Choisissez un rôle.',
     already_member: 'Vous faites déjà partie de cette boutique.',
+    phone_verify_required: 'Confirmez d’abord ce numéro avec le code reçu par SMS.',
+    phone_mismatch: 'Le numéro confirmé sur votre compte n’est pas celui qui a reçu l’invitation.',
+    phone_exists: 'Ce numéro est déjà confirmé sur un autre compte.',
+    otp_expired: 'Code incorrect ou expiré. Demandez un nouveau code.',
+    sms_send_failed: 'L’envoi du SMS a échoué. Réessayez dans un instant.',
+    over_sms_send_rate_limit: 'Trop de codes demandés. Réessayez plus tard.',
+    phone_provider_disabled: 'La vérification par SMS n’est pas encore activée.',
     has_shop: 'Ce compte a déjà une boutique : utilisez un autre compte pour rejoindre celle-ci.',
     customer_name_required: 'Indiquez le nom du client.',
     your_name_required: 'Indiquez votre nom.',
@@ -482,6 +489,14 @@
       return authCall('/factors/' + factorId + '/challenge', 'POST', {}, true).then(function (c) {
         return authCall('/factors/' + factorId + '/verify', 'POST', { challenge_id: c.id, code: String(code).replace(/\s/g, '') }, true);
       }).then(function (r) { saveSession(r); return r; });
+    },
+    // Numéro du compte confirmé par un code SMS (Supabase Auth, changement de numéro ; envoi par Africa's Talking).
+    phoneStart: function (e164) { return freshToken().then(function () { return authCall('/user', 'PUT', { phone: e164 }, true); }); },
+    phoneVerify: function (e164, code) {
+      return authCall('/verify', 'POST', { type: 'phone_change', phone: e164, token: String(code).replace(/\s/g, '') }, true).then(function (r) {
+        if (r && r.access_token) saveSession(r);
+        ME = null; return r;
+      });
     },
     setPassword: function (pw) { return freshToken().then(function () { return authCall('/user', 'PUT', { password: pw }, true); }); },
     recover: function (email) {
@@ -4046,6 +4061,63 @@
     }, function () {});
     return box;
   }
+
+  // Numéro au format international (+221 par défaut pour un numéro à 9 chiffres).
+  function toE164(v) {
+    var d = String(v || '').replace(/\D/g, '').replace(/^00/, '');
+    if (d.length === 9) d = '221' + d;
+    return d.length >= 11 && d.length <= 15 ? '+' + d : null;
+  }
+  function prettyPhone(e) { var m = /^\+221(\d{2})(\d{3})(\d{2})(\d{2})$/.exec(e || ''); return m ? '+221 ' + m.slice(1).join(' ') : e; }
+  // Vérification d'un numéro par code SMS : numéro → code → confirmé. Une seule action visible à chaque étape.
+  function phoneVerifyBox(o) {
+    var box = h('div', { class: 'stack', id: o.id || 'phone-verify' });
+    var num = o.prefill || '';
+    function stepNumber(err0) {
+      var err = h('div', { role: 'alert' });
+      var btn = iconBtn('button', { class: 'btn', type: 'button', id: 'pv-send', onclick: function () {
+        setKids(err);
+        var e = toE164(num);
+        if (!e) return errBox(err, new ApiError('phone_invalid'));
+        btn.disabled = true;
+        account.phoneStart(e).then(function () { track('phone_code_sent', 'sms'); stepCode(e); }, function (x) { btn.disabled = false; errBox(err, x); });
+      } }, 'chat', 'Recevoir le code par SMS');
+      setKids(box,
+        textField({ id: 'pv-phone', label: 'Numéro de téléphone', type: 'tel', inputmode: 'tel', autocomplete: 'tel', value: num, onInput: function (v) { num = v; } }),
+        err, btn);
+      if (err0) errBox(err, err0);
+    }
+    function stepCode(e) {
+      var err = h('div', { role: 'alert' });
+      var code = '';
+      var input = h('input', { type: 'text', id: 'pv-code', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 8, pattern: '[0-9 ]*',
+        class: 'bo-code', placeholder: '123456', 'aria-label': 'Code reçu par SMS', oninput: function (ev) { code = ev.target.value; } });
+      var ok = iconBtn('button', { class: 'btn', type: 'button', id: 'pv-ok', onclick: function () {
+        setKids(err);
+        if (!/^\d{4,8}$/.test(code.replace(/\s/g, ''))) return errBox(err, new ApiError('otp_expired'));
+        ok.disabled = true;
+        account.phoneVerify(e, code).then(function () {
+          track('phone_verified', 'sms');
+          setKids(box, h('p', { class: 'saved-ok', id: 'pv-done' }, icon('check', 18), 'Numéro confirmé : ' + prettyPhone(e)));
+          if (o.onDone) o.onDone(e);
+        }, function (x) { ok.disabled = false; errBox(err, x); });
+      } }, 'check', 'Confirmer');
+      var again = h('button', { class: 'btn link small', type: 'button', id: 'pv-again', disabled: true, onclick: function () {
+        again.disabled = true;
+        account.phoneStart(e).then(function () { toast('Nouveau code envoyé.'); setTimeout(function () { again.disabled = false; }, 60000); }, function (x) { again.disabled = false; errBox(err, x); });
+      } }, 'Renvoyer le code');
+      setTimeout(function () { again.disabled = false; }, 60000);
+      setKids(box,
+        h('p', { class: 'small', id: 'pv-sent' }, 'Code envoyé par SMS au ', h('strong', null, prettyPhone(e)), '.'),
+        h('div', { class: 'field' }, h('label', { for: 'pv-code' }, 'Code reçu par SMS'), input),
+        err, ok,
+        h('div', { class: 'row', style: 'gap:12px' }, again,
+          h('button', { class: 'btn link small', type: 'button', onclick: function () { stepNumber(); } }, 'Changer de numéro')));
+      setTimeout(function () { try { input.focus(); } catch (x) { /* rien */ } }, 0);
+    }
+    stepNumber();
+    return box;
+  }
   function profileView(me, q) {
     var f = { display_name: me.display_name || '', phone: me.phone || '' };
     var msg = h('div', { role: 'status' });
@@ -4127,6 +4199,9 @@
         h('a', { class: 'item', href: '#/' }, h('div', null, h('div', { class: 't' }, 'Mes adresses'), h('div', { class: 'small muted' }, 'Maison, bureau, boutique…')), h('span', { class: 'chev' }, icon('chev', 18))),
         h('a', { class: 'item', href: '#/boutique', id: 'go-shop' }, h('div', null, h('div', { class: 't' }, me.shop ? me.shop.name : 'Ma boutique'),
           h('div', { class: 'small muted' }, me.shop ? 'Commandes, clients, factures' : 'Vendre et livrer avec Fii La')), h('span', { class: 'chev' }, icon('chev', 18)))),
+      h('details', { id: 'phone-box', open: q.numero === '1' ? true : null },
+        h('summary', null, me.phone_verified ? 'Numéro confirmé : ' + prettyPhone(me.phone_verified) : 'Confirmer mon numéro par SMS'),
+        h('div', { style: 'margin-top:12px' }, phoneVerifyBox({ id: 'me-phone-verify', prefill: me.phone_verified || me.phone || '' }))),
       pwBox,
       h('button', { class: 'btn ghost', type: 'button', id: 'logout', onclick: function () { account.signOut().then(function () { toast('Déconnecté.'); go('#/'); }); } }, 'Se déconnecter'),
       h('details', null, h('summary', null, 'Supprimer mon compte'),
@@ -4280,7 +4355,7 @@
       t.members.forEach(function (m) {
         var edit = h('div', { class: 'stack', hidden: true });
         rows.push(h('li', { class: 'team-row' },
-          h('span', { class: 'team-name' }, m.name + (m.me ? ' (vous)' : '')),
+          h('span', { class: 'team-name' }, m.name + (m.me ? ' (vous)' : ''), m.verified ? h('span', { class: 'small muted', title: 'Numéro confirmé par SMS' }, ' · numéro confirmé') : null),
           h('span', { class: 'small muted' }, ROLE_LABEL[m.role]),
           m.me ? null : h('button', { class: 'btn link small', type: 'button', 'aria-expanded': 'false', onclick: function (ev) {
             edit.hidden = !edit.hidden; ev.currentTarget.setAttribute('aria-expanded', String(!edit.hidden));
@@ -4353,20 +4428,34 @@
       if (r.state !== 'ok') return page(stateCard(r.state === 'used' ? '✓' : '⌛', r.state === 'used' ? 'Invitation déjà acceptée' : 'Invitation expirée ou introuvable',
         r.state === 'used' ? 'Ouvrez votre boutique.' : 'Demandez une nouvelle invitation à la boutique.', h('a', { class: 'btn', href: '#/boutique' }, 'Ma boutique')), footer());
       var err = h('div', { role: 'alert' });
+      var verifyZone = h('div', { class: 'stack' });
+      function join(b) {
+        if (b) b.disabled = true;
+        return api('fiila_shop_invite_accept', { p_token: token }).then(function (x) {
+          ME = null; SHOP_ROLE = x.role; track('team_joined', x.role); toast('Vous avez rejoint ' + x.shop + '.'); go('#/boutique');
+        }, function (e) {
+          if (b) b.disabled = false;
+          // Vérification par SMS exigée : on confirme le numéro invité, puis on rejoint aussitôt.
+          if (e.code === 'phone_verify_required' || e.code === 'phone_mismatch') {
+            if (b) b.hidden = true;
+            var note = document.getElementById('team-verify-note'); if (note) note.hidden = true;
+            setKids(verifyZone, e.code === 'phone_mismatch' ? h('p', { class: 'small' }, errText(e)) : null,
+              phoneVerifyBox({ id: 'team-phone-verify', prefill: r.phone || '', onDone: function () { join(null); } }));
+            return;
+          }
+          errBox(err, e);
+        });
+      }
       return page(
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Invitation'),
           h('h1', { class: 'wrapword' }, r.shop + ' vous invite à rejoindre son équipe'),
           h('p', { class: 'muted', id: 'team-invite-role' }, ROLE_LABEL[r.role] + ' : ' + ROLE_HINT[r.role].charAt(0).toLowerCase() + ROLE_HINT[r.role].slice(1))),
         authed()
-          ? iconBtn('button', { class: 'btn big', type: 'button', id: 'team-accept', onclick: function (ev) {
-              var b = ev.currentTarget; b.disabled = true;
-              api('fiila_shop_invite_accept', { p_token: token }).then(function (x) {
-                ME = null; SHOP_ROLE = x.role; track('team_joined', x.role); toast('Vous avez rejoint ' + x.shop + '.'); go('#/boutique');
-              }, function (e) { b.disabled = false; errBox(err, e); });
-            } }, 'check', 'Rejoindre la boutique')
+          ? iconBtn('button', { class: 'btn big', type: 'button', id: 'team-accept', onclick: function (ev) { join(ev.currentTarget); } }, 'check', 'Rejoindre la boutique')
           : h('a', { class: 'btn big', id: 'team-login', href: '#/compte' + qs({ retour: 'equipe/' + token }) }, 'Se connecter ou créer un compte'),
         authed() ? null : h('p', { class: 'small muted' }, 'Un compte Fii La est nécessaire pour accéder à la boutique.'),
-        err, footer());
+        r.verify && authed() ? h('p', { class: 'small muted', id: 'team-verify-note' }, 'Votre numéro sera confirmé par un code SMS.') : null,
+        verifyZone, err, footer());
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher l’invitation', errText(e), retryBtn())); });
   }
 
@@ -6091,7 +6180,8 @@
     ambassador_suspended: 'a suspendu un ambassadeur', ambassador_excluded: 'a exclu un ambassadeur', ambassador_training: 'a renvoyé un ambassadeur en formation',
     view_order: 'a consulté la commande', view_account: 'a consulté le compte' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain ambassadeur, niveau 1', 'FCFA'], amb_reward_2: ['Gain ambassadeur, niveau 2', 'FCFA'],
-    amb_reward_3: ['Gain ambassadeur, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par ambassadeur et par mois', ''] };
+    amb_reward_3: ['Gain ambassadeur, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par ambassadeur et par mois', ''],
+    sms_verify: ['Code SMS obligatoire pour rejoindre une équipe de boutique', '0 = non, 1 = oui'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

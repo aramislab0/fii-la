@@ -152,6 +152,54 @@ await t('lien déjà utilisé ; aucun débordement à 320 px', async () => {
   assert.ok(await noOverflow(O), 'réglages et équipe sans débordement à 320 px');
 });
 
+await t('compte : confirmer son numéro par code SMS (mauvais code refusé, puis confirmé)', async () => {
+  const P = await newPhone();
+  await signup(P, 'Ibou Fall', 'ibou.sms@example.invalid');
+  await P.goto(URL0 + '#/compte?numero=1');
+  await P.fill('#pv-phone', '77 900 00 01');
+  await P.click('#pv-send');
+  await P.locator('#pv-sent').getByText('+221 77 900 00 01').waitFor();
+  const sms = local.auth.lastSms();
+  assert.equal(sms.phone, '+221779000001');
+  await P.fill('#pv-code', '000000');
+  await P.click('#pv-ok');
+  await P.getByText('Code incorrect ou expiré').waitFor();
+  await P.fill('#pv-code', sms.otp);
+  await P.click('#pv-ok');
+  await P.locator('#pv-done').waitFor();
+  await shot(P, '07-numero-confirme');
+  await P.goto(URL0 + '#/'); await P.goto(URL0 + '#/compte');
+  await P.locator('#phone-box summary').getByText('Numéro confirmé : +221 77 900 00 01').waitFor();
+});
+
+await t('code SMS exigé (réglage) : l’invitée confirme le numéro invité, puis rejoint la boutique', async () => {
+  await local.db.query(`update fiila.settings set value = '1' where key = 'sms_verify'`);
+  await O.setViewportSize(phone.viewport);
+  await O.goto(URL0 + '#/'); await O.goto(URL0 + '#/boutique/reglages');
+  await O.locator('#team-section summary').click();
+  await O.fill('#team-name', 'Mame Diarra');
+  await O.fill('#team-phone', '77 333 44 55');
+  await O.click('#team-invite');
+  const msg = new URL(await O.locator('#team-invite-send').getAttribute('href')).searchParams.get('text');
+  const link = msg.match(/https?:\S+#\/equipe\/[A-Za-z0-9_-]+/)[0].replace(/^https?:\/\/[^#]+/, URL0);
+  const M = await newPhone();
+  await signup(M, 'Mame Diarra', 'mame.sms@example.invalid');
+  await M.goto(link);
+  await M.locator('#team-verify-note').waitFor();
+  await M.click('#team-accept');
+  assert.equal(await M.locator('#pv-phone').inputValue(), '77 333 44 55', 'numéro invité prérempli');
+  await M.click('#pv-send');
+  await M.locator('#pv-sent').waitFor();
+  await M.fill('#pv-code', local.auth.lastSms().otp);
+  await shot(M, '08-invitation-code-sms');
+  await M.click('#pv-ok');
+  await M.getByText('Vous avez rejoint Boutique Awa (test).').waitFor();
+  await O.goto(URL0 + '#/'); await O.goto(URL0 + '#/boutique/reglages');
+  await O.locator('#team-section summary').click();
+  await O.locator('#team-list li', { hasText: 'Mame Diarra' }).getByText('numéro confirmé').waitFor();
+  await local.db.query(`update fiila.settings set value = '0' where key = 'sms_verify'`);
+});
+
 await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors), []); });
 await browser.close();
 local.server.close();

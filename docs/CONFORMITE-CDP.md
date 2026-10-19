@@ -78,7 +78,8 @@ Constaté dans le code au commit `9576bc8`.
 - **Vide-dressing.** Fii La devient intermédiaire de vente entre particuliers. Les photos d'articles ne doivent montrer aucun enfant reconnaissable (contrôlé à la validation).
 - **Fil social.** Les commentaires sont des contenus publics : ni lien ni numéro de téléphone acceptés (pas de démarchage ni de vente hors plateforme), masquage automatique après 3 signalements, suppression par l'auteur, la boutique ou l'administrateur. Les j'aime et enregistrements sans compte sont liés à l'empreinte d'un identifiant aléatoire du téléphone (et, pour le classement, à l'empreinte de la connexion) : c'est une donnée pseudonyme, qui relie les réactions d'un même téléphone. Elle n'est jamais affichée et n'est pas croisée avec un compte. Signaler un commentaire demande un compte.
 - **Équipe de la boutique.** Le numéro de la personne invitée est saisi par le commerçant, qui envoie lui-même le lien depuis son WhatsApp ; Fii La n'envoie aucun message. Le lien est personnel, valable 7 jours et utilisable une seule fois ; il n'est stocké qu'haché.
-- **Prestataires.** Inchangés : Supabase (Paris), GitHub Pages, OpenStreetMap.
+- **Vérification des numéros par SMS (19/10).** Le numéro d'un compte peut être confirmé par un code à 6 chiffres. Le code est créé et contrôlé par Supabase Auth ; le SMS est envoyé par **Africa's Talking** (nouveau sous-traitant, siège au Kenya : à déclarer avec le transfert de données hors du Sénégal). Seuls le numéro et le code lui sont transmis ; Fii La ne conserve aucun code. Le numéro confirmé reste dans le compte jusqu'à sa suppression.
+- **Prestataires.** Supabase (Paris), GitHub Pages, OpenStreetMap ; Africa's Talking pour les SMS (19/10).
 
 ## 3. Lecture des dispositions
 
