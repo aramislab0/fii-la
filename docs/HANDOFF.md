@@ -105,7 +105,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 24 | Publication des articles : brique 1 (partage natif, bouton « Publier ») construite 17/10 ; vitrine publique et API Meta/TikTok plus tard (`ARCHITECTURE-RALI.md` §8) | Builder, plus tard | Vitrine V3 |
 | 25 | ~~Valider la stratégie de croissance~~ phase 0 validée 17/10 23:10 et construite (`docs/CROISSANCE.md` §9) | Fondateur | — |
 | 27 | Fixer les récompenses du parrainage (boutiques, livreurs, particuliers ; argent possible) | Fondateur | Annonce du parrainage |
-| 37 | Studio IA : créer un compte fal.ai, y fixer un plafond de 50 USD et transmettre la clé d'API par un canal sûr (jamais dans le dépôt ni la conversation) ; choisir le domaine neutre des sites offerts (propositions : bitig.sn, jaaykat.sn, marse.sn — disponibilité à vérifier chez le registraire) | Fondateur | Studio IA (étape 2), Sites (étape 3) |
+| 37 | Studio IA : **reporté par le fondateur (19/10 05:51), gardé dans le périmètre** — le moment venu : créer un compte fal.ai, y fixer un plafond de 50 USD et transmettre la clé d'API par un canal sûr (jamais dans le dépôt ni la conversation) ; choisir le domaine neutre des sites offerts (propositions : bitig.sn, jaaykat.sn, marse.sn — disponibilité à vérifier chez le registraire) | Fondateur | Studio IA (étape 2), Sites (étape 3) |
 | 36 | ~~Valider la proposition~~ validée 19/10 05:17 (recommandations retenues) — Sites / Studio IA / assistant / « Événement » (`docs/PROPOSITION-SITES-STUDIO-ASSISTANT.md`) : mention sur le site offert, domaine neutre, budget d'essai IA, « Événement », ordre des étapes | Fondateur | Toute construction de ces fonctions |
 | 35 | Après les 25 places gratuites : décider l'offre (place payante, durée, prix) et l'ordre d'affichage | Fondateur | Boutique n° 26 |
 | 29 | Supprimer 1 fiche « Maison du client (test) » et 1 demande « Boutique Ndèye » restées en production après l'arrêt d'une série de tests (23:32) : suppression SQL refusée à l'exécution, en attente d'accord du fondateur | Fondateur → Builder | Base propre |
@@ -157,6 +157,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 05:55 | Fondateur : Studio IA reporté mais gardé dans le périmètre (action #37) | — |
 | 19/10 05:45 (Mac) | En production : carrousel du fil, « Événement », attributs d'articles. Migration `20261019400000_fiila_product_attributes` appliquée, `verify-db` 16 migrations / 74 fonctions OK ; Pages déployé ; E2E déployé 38/38 Chromium et WebKit ; WebKit local parrainage 8/8, boutique 26/26, vitrine 7/7, navigation 49/49, fil 6/6, attributs 3/3 | `fb706b5` |
 | 19/10 05:35 | Articles : catégorie, tailles ou pointures, couleurs, stock (formulaire, raccourcis S–XL et 38–45) ; vitrine : filtres catégorie et « ma taille », choix obligatoire de taille et couleur, « Épuisé », stock décompté à la commande, variante sur la facture ; tests attributs SQL 3/3, attributs 3/3 | `fb706b5` |
 | 19/10 05:25 | Carrousel du fil (glissement lent toutes les 6 s, photo qui s'approche, progression dans le point, arrêt au toucher, immobile si « réduire les animations ») ; « Rendez-vous » devient « Événement » (tuile, ligne d'exemples, 6 types, message « Vous êtes invité(e) ») | `0f8fca5` |
