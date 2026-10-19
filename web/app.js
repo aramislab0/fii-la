@@ -504,6 +504,13 @@
         return authCall('/recover?redirect_to=' + encodeURIComponent(baseUrl()), 'POST', Object.assign({ email: email }, pk));
       });
     },
+    // Code reçu par e-mail : 'recovery' (mot de passe oublié) ou 'signup' (activation). Ouvre la session.
+    emailVerify: function (kind, email, code) {
+      return authCall('/verify', 'POST', { type: kind === 'recovery' ? 'recovery' : 'email', email: email, token: code }).then(function (r) {
+        if (!r || !r.access_token) throw new ApiError('otp_expired');
+        LS.del('fiila.pkce'); saveSession(r); return afterLogin(null);
+      });
+    },
     me: function () {
       if (!authed()) return Promise.resolve(null);
       if (ME) return Promise.resolve(ME);
@@ -3964,7 +3971,7 @@
   /* ----- compte : connexion, inscription, mot de passe oublié */
   function viewAccount(q) {
     q = q || {};
-    if (q.lien === 'invalide') return page(backBtn(), stateCard('!', 'Lien expiré ou déjà utilisé', 'Demandez un nouveau lien depuis la page de connexion.', h('a', { class: 'btn', href: '#/compte' }, 'Se connecter')), footer());
+    if (q.lien === 'invalide') return page(backBtn(), stateCard('!', 'Ce lien ne s’ouvre pas ici', 'Il a expiré, ou il a été ouvert ailleurs que là où la demande a été faite (par exemple Safari au lieu de l’icône Fii La). Revenez dans l’application et saisissez le code à 6 chiffres reçu dans le même e-mail.', h('a', { class: 'btn', href: '#/compte' }, 'Se connecter')), footer());
     if (!authed()) return authForm(q);
     return account.me().then(function (me) {
       if (!me) return authForm(q);
@@ -3993,14 +4000,8 @@
         var p = mode === 'signup' ? account.signUp(email, f.password, f.name.trim(), q.source)
           : mode === 'forgot' ? account.recover(email) : account.signIn(email, f.password);
         p.then(function (r) {
-          if (mode === 'forgot') {
-            setKids(root, backBtn(), stateCard('✓', 'Vérifiez vos e-mails', 'Si un compte existe pour ' + email + ', un lien pour choisir un nouveau mot de passe vient d’être envoyé.'), footer());
-            return;
-          }
-          if (r && r.confirm) {
-            setKids(root, backBtn(), stateCard('✓', 'Vérifiez vos e-mails', 'Ouvrez le lien envoyé à ' + email + ' pour activer votre compte.'), footer());
-            return;
-          }
+          if (mode === 'forgot') { emailCodeStep(root, 'recovery', email); return; }
+          if (r && r.confirm) { emailCodeStep(root, 'signup', email); return; }
           toast(mode === 'signup' ? 'Compte créé.' : 'Connecté.');
           if (pendingClaims().count) go('#/compte' + qs({ rattacher: '1', retour: q.retour }));
           else go(retour);
@@ -4030,6 +4031,33 @@
     }
     draw();
     return root;
+  }
+
+  // Code à 6 chiffres reçu par e-mail (mot de passe oublié, activation du compte). Il marche quel que soit l'endroit
+  // où l'e-mail est ouvert ; le lien du même e-mail, lui, ne marche que dans le navigateur qui a fait la demande.
+  function emailCodeStep(root, kind, email) {
+    var err = h('div', { role: 'alert' });
+    var code = '';
+    var input = h('input', { type: 'text', id: 'mail-code', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 10, pattern: '[0-9 ]*',
+      class: 'bo-code', placeholder: '123456', 'aria-label': 'Code reçu par e-mail', oninput: function (ev) { code = ev.target.value; } });
+    var btn = iconBtn('button', { class: 'btn', type: 'button', id: 'mail-code-ok', onclick: function () {
+      setKids(err);
+      var c = code.replace(/\s/g, '');
+      if (!/^\d{6,10}$/.test(c)) return errBox(err, new ApiError('otp_expired'));
+      btn.disabled = true;
+      account.emailVerify(kind, email, c).then(function () {
+        if (kind === 'recovery') go('#/compte?mdp=1');
+        else { track('account_created', 'code'); go('#/compte?bienvenue=1'); }
+      }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, 'check', 'Valider');
+    setKids(root, backBtn(),
+      h('div', { class: 'stack tight' }, h('h1', null, 'Vérifiez vos e-mails'),
+        h('p', { class: 'muted', id: 'mail-code-sent' }, (kind === 'recovery' ? 'Si un compte existe pour ' : 'Code envoyé à ') + email + (kind === 'recovery' ? ', un code vient d’être envoyé.' : '.'))),
+      h('div', { class: 'field' }, h('label', { for: 'mail-code' }, 'Code reçu par e-mail'), input),
+      err, btn,
+      h('p', { class: 'small muted' }, 'Pas d’e-mail ? Regardez dans les indésirables.'),
+      footer());
+    setTimeout(function () { try { input.focus(); } catch (x) { /* rien */ } }, 0);
   }
 
   // Rattachement explicite des fiches et de la boutique de ce téléphone au compte connecté.

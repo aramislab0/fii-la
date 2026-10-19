@@ -435,7 +435,7 @@ await t('S1 : un lien piégé #access_token=… n’ouvre aucune session et ne r
   assert.ok(forged && forged.access_token);
   const V = await newPhone({ owned: [{ type: 'place', kind: 'address', id: clientPlace.id, owner: clientPlace.owner_token, share: clientPlace.share_token, label: 'Chez la cliente (test)' }] });
   await V.page.goto(URL0 + '#access_token=' + forged.access_token + '&refresh_token=' + forged.refresh_token + '&expires_in=3600&type=signup');
-  await V.page.getByText('Lien expiré ou déjà utilisé').waitFor();
+  await V.page.getByText('Ce lien ne s’ouvre pas ici').waitFor();
   assert.equal(await V.page.evaluate(() => localStorage.getItem('fiila.session')), null);
   const r = await local.db.query('select user_id from fiila.places where id = $1', [clientPlace.id]);
   assert.equal(r.rows[0].user_id, null);
@@ -443,7 +443,7 @@ await t('S1 : un lien piégé #access_token=… n’ouvre aucune session et ne r
   await V.ctx.close();
 });
 
-await t('mot de passe oublié (PKCE) : le lien marche sur le téléphone qui l’a demandé, pas ailleurs', async () => {
+await t('mot de passe oublié (PKCE + code) : le lien marche là où il a été demandé, pas ailleurs ; le code marche partout', async () => {
   const R = await newPhone();
   await R.page.goto(URL0 + '#/compte');
   await R.page.click('#forgot');
@@ -453,8 +453,20 @@ await t('mot de passe oublié (PKCE) : le lien marche sur le téléphone qui l�
   const { code } = await (await fetch(URL0 + '__test/last-recovery')).json();
   const O = await newPhone(); // autre téléphone : pas de secret PKCE
   await O.page.goto(URL0 + '?code=' + code + '#/');
-  await O.page.getByText('Lien expiré ou déjà utilisé').waitFor();
+  await O.page.getByText('Ce lien ne s’ouvre pas ici').waitFor();
   await O.ctx.close();
+  // Cas réel de l'iPhone (icône Fii La ≠ Safari) : le code du même e-mail, saisi dans l'application, ouvre la session.
+  await R.page.locator('#mail-code').waitFor();
+  await R.page.fill('#mail-code', '000000');
+  await R.page.click('#mail-code-ok');
+  await R.page.getByText('Code incorrect ou expiré').waitFor();
+  await R.page.fill('#mail-code', (await (await fetch(URL0 + '__test/last-recovery')).json()).otp);
+  await R.page.click('#mail-code-ok');
+  await R.page.getByText('Choisissez maintenant votre nouveau mot de passe.').waitFor();
+  await R.page.fill('#new-pass', 'nouveau-mdp-test-1');
+  await R.page.click('#pw-save');
+  await R.page.getByText('Mot de passe changé.').waitFor();
+  await R.page.evaluate(() => localStorage.removeItem('fiila.session')); // déconnexion locale pour rejouer le lien
   await R.page.reload();
   await R.page.click('#forgot');
   await R.page.fill('#acc-email', 'binta.test@example.invalid');

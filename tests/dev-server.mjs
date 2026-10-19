@@ -106,6 +106,12 @@ function makeAuth(db) {
         }
         return [200, { id: u.id, email: u.email, factors: (factors.get(u.id) || []).map((f) => ({ id: f.id, factor_type: 'totp', status: f.status, friendly_name: f.friendly_name })) }];
       }
+      if (path === '/verify' && method === 'POST' && body.type === 'recovery') {
+        const u = users.get(String(body.email || '').trim().toLowerCase());
+        if (!u || !u.recoveryOtp || String(body.token || '') !== u.recoveryOtp) return err(403, 'otp_expired', 'Token has expired or is invalid');
+        u.recoveryOtp = null;
+        return [200, session(u)];
+      }
       if (path === '/verify' && method === 'POST' && body.type === 'phone_change') {
         if (!who.uid) return err(401, 'bad_jwt', 'invalid JWT');
         const u = byId(who.uid);
@@ -155,7 +161,9 @@ function makeAuth(db) {
         if (u && body.code_challenge) {
           const code = randomUUID();
           codes.set(code, { uid: u.id, challenge: body.code_challenge });
-          lastRecovery = { code };
+          // Le même e-mail porte aussi un code à 6 chiffres ({{ .Token }} dans le modèle Supabase).
+          u.recoveryOtp = String(Math.floor(100000 + Math.random() * 900000));
+          lastRecovery = { code, otp: u.recoveryOtp };
         }
         return [200, {}];
       }

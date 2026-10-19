@@ -1,7 +1,7 @@
 {
   "moteur": "chromium",
   "version": "141.0.7390.37",
-  "date": "2026-10-19T20:41:30.825Z",
+  "date": "2026-10-19T21:41:21.016Z",
   "reussis": 26,
   "total": 26,
   "results": [
@@ -103,7 +103,7 @@
     },
     {
       "ok": true,
-      "name": "mot de passe oublié (PKCE) : le lien marche sur le téléphone qui l’a demandé, pas ailleurs"
+      "name": "mot de passe oublié (PKCE + code) : le lien marche là où il a été demandé, pas ailleurs ; le code marche partout"
     },
     {
       "ok": true,
