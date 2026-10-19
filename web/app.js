@@ -1266,46 +1266,61 @@
     function maxQty(p) { return p.stock != null ? Math.min(99, p.stock) : 99; }
     function stepper(p) {
       var box = h('div', { class: 'qty' });
-      var k = lineKey(p.id);
+      var one = { size: p.sizes && p.sizes.length === 1 ? p.sizes[0] : null, color: p.colors && p.colors.length === 1 ? p.colors[0] : null };
+      var k = lineKey(p.id, one.size, one.color);
       function draw() {
         var n = cart[k] ? cart[k].qty : 0;
         setKids(box, n ? [
           h('button', { class: 'qbtn', type: 'button', 'aria-label': 'Retirer un ' + p.name, onclick: function () { if (--cart[k].qty <= 0) delete cart[k]; draw(); refreshBar(); } }, '−'),
           h('span', { class: 'qn', 'aria-live': 'polite' }, String(n)),
           h('button', { class: 'qbtn', type: 'button', 'aria-label': 'Ajouter un ' + p.name, onclick: function () { if (qtyOf(p.id) < maxQty(p)) cart[k].qty++; draw(); refreshBar(); } }, '+')]
-          : iconBtn('button', { class: 'btn small add-btn', type: 'button', 'data-add': p.id, onclick: function () { cart[k] = { id: p.id, qty: 1 }; draw(); refreshBar(); } }, 'plus', 'Ajouter', 18));
+          : iconBtn('button', { class: 'btn small add-btn', type: 'button', 'data-add': p.id, onclick: function () { cart[k] = { id: p.id, size: one.size, color: one.color, qty: 1 }; draw(); refreshBar(); } }, 'plus', 'Ajouter', 18));
       }
       draw();
       return box;
     }
     // Article avec tailles ou couleurs : on choisit, puis « Ajouter » ; chaque choix fait sa ligne de commande.
+    // Article avec plusieurs tailles ou couleurs : la carte reste simple (« Ajouter ») ; le choix se fait dans une feuille.
     function variantPicker(p) {
-      var pick = { size: p.sizes && p.sizes.length === 1 ? p.sizes[0] : (filter.size && p.sizes && p.sizes.indexOf(filter.size) >= 0 ? filter.size : ''), color: p.colors && p.colors.length === 1 ? p.colors[0] : '' };
       var box = h('div', { class: 'stack tight vpick' });
-      var note = h('p', { class: 'small muted', 'aria-live': 'polite' });
-      function chips(list, key, label) {
-        return h('div', { class: 'opt-row', role: 'group', 'aria-label': label }, list.map(function (v) {
-          return h('button', { class: 'opt' + (pick[key] === v ? ' on' : ''), type: 'button', 'aria-pressed': pick[key] === v ? 'true' : 'false', onclick: function () { pick[key] = v; draw(); } }, v);
-        }));
-      }
       function draw() {
         var inCart = qtyOf(p.id);
         setKids(box,
-          p.sizes ? chips(p.sizes, 'size', 'Taille ou pointure') : null,
-          p.colors ? chips(p.colors, 'color', 'Couleur') : null,
-          iconBtn('button', { class: 'btn small add-btn', type: 'button', 'data-add': p.id, onclick: function () {
-            if (p.sizes && !pick.size) { note.textContent = 'Choisissez votre taille ou pointure.'; return; }
-            if (p.colors && !pick.color) { note.textContent = 'Choisissez une couleur.'; return; }
-            if (inCart >= maxQty(p)) { note.textContent = 'Plus de stock disponible.'; return; }
-            var k = lineKey(p.id, pick.size, pick.color);
-            if (cart[k]) cart[k].qty++; else cart[k] = { id: p.id, size: pick.size || null, color: pick.color || null, qty: 1 };
-            note.textContent = ''; draw(); refreshBar();
-          } }, 'plus', 'Ajouter', 18),
-          inCart ? h('p', { class: 'small', style: 'color:var(--green);font-weight:600' }, icon('check', 14), ' Dans la commande : ' + inCart) : null,
-          note);
+          iconBtn('button', { class: 'btn small add-btn', type: 'button', 'data-add': p.id, onclick: function () { if (inCart >= maxQty(p)) { toast('Plus de stock disponible.'); return; } choose(p, draw); } }, 'plus', 'Ajouter', 18),
+          inCart ? h('p', { class: 'small vin' }, icon('check', 14), ' ' + inCart + (inCart > 1 ? ' ajoutés' : ' ajouté')) : null);
       }
       draw();
       return box;
+    }
+    function choose(p, done) {
+      var pick = { size: p.sizes && p.sizes.length === 1 ? p.sizes[0] : (filter.size && p.sizes && p.sizes.indexOf(filter.size) >= 0 ? filter.size : ''),
+                   color: p.colors && p.colors.length === 1 ? p.colors[0] : '' };
+      var note = h('p', { class: 'small', role: 'alert' });
+      var body = h('div', { class: 'stack' });
+      function chips(list, key, label) {
+        return h('div', { class: 'stack tight' }, h('p', { class: 'small muted' }, label), h('div', { class: 'opt-row', role: 'group', 'aria-label': label }, list.map(function (v) {
+          return h('button', { class: 'opt' + (pick[key] === v ? ' on' : ''), type: 'button', 'aria-pressed': pick[key] === v ? 'true' : 'false', onclick: function () { pick[key] = v; draw(); } }, v);
+        })));
+      }
+      function draw() {
+        setKids(body,
+          p.sizes && p.sizes.length > 1 ? chips(p.sizes, 'size', 'Taille ou pointure') : null,
+          p.colors && p.colors.length > 1 ? chips(p.colors, 'color', 'Couleur') : null);
+      }
+      draw();
+      var back = h('div', { class: 'sheet-back', id: 'variant-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'variant-h', onclick: function (e) { if (e.target === back) close(); } },
+        h('div', { class: 'sheet' }, h('h2', { id: 'variant-h', class: 'wrapword' }, p.name), h('p', { class: 'vprice' }, fcfa(p.price)), body, note,
+          iconBtn('button', { class: 'btn', type: 'button', id: 'variant-add', onclick: function () {
+            if (p.sizes && p.sizes.length && !pick.size) { note.textContent = 'Choisissez votre taille ou pointure.'; return; }
+            if (p.colors && p.colors.length && !pick.color) { note.textContent = 'Choisissez une couleur.'; return; }
+            var k = lineKey(p.id, pick.size, pick.color);
+            if (cart[k]) cart[k].qty++; else cart[k] = { id: p.id, size: pick.size || null, color: pick.color || null, qty: 1 };
+            close(); done(); refreshBar();
+          } }, 'plus', 'Ajouter à la commande'),
+          h('button', { class: 'btn ghost', type: 'button', onclick: close }, 'Annuler')));
+      function close() { back.remove(); }
+      document.body.append(back);
+      onMedia(close);
     }
     function card(p) {
       var img = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 32));
@@ -1318,11 +1333,16 @@
           h('h3', { class: 'wrapword' }, p.name),
           h('p', { class: 'vprice' }, fcfa(p.price)),
           p.reviews ? ratingEl(p.rating, p.reviews) : null,
-          p.gender || p.age_band ? h('p', { class: 'small vkid' }, [lbl(VD_GENDERS, p.gender), lbl(VD_AGES, p.age_band), lbl(VD_CONDITIONS, p.condition)].filter(Boolean).join(' · ')) : null,
+          // Une seule ligne d'informations, discrète (âge, taille, état) ; le genre est déjà dans le filtre.
+          (function () {
+            var one = p.sizes && p.sizes.length === 1 && !(p.colors && p.colors.length > 1);
+            var bits = [lbl(VD_AGES, p.age_band), one ? (p.age_band ? p.sizes[0] : 'Taille ' + p.sizes[0]) : null, one && p.colors && p.colors.length === 1 ? p.colors[0] : null, lbl(VD_CONDITIONS, p.condition)].filter(Boolean);
+            return bits.length ? h('p', { class: 'small muted vinfo' }, bits.join(' · ')) : null;
+          })(),
           p.description ? h('p', { class: 'small muted vdesc' }, p.description) : null,
           p.stock === 0 ? h('span', { class: 'chip off', style: 'align-self:flex-start' }, 'Épuisé')
-            : p.sizes || p.colors ? variantPicker(p) : stepper(p),
-          p.stock > 0 && p.stock <= 3 ? h('p', { class: 'small muted' }, 'Plus que ' + p.stock + ' en stock') : null));
+            : (p.sizes && p.sizes.length > 1) || (p.colors && p.colors.length > 1) ? variantPicker(p) : stepper(p),
+          p.stock > 0 && p.stock <= 3 && !shop.platform ? h('p', { class: 'small muted' }, 'Plus que ' + p.stock + ' en stock') : null));
     }
     // Filtres : catégories (s'il y en a au moins deux) et « ma taille / pointure ».
     var grid = h('div', { class: 'vgrid', id: 'vitrine-products' });
@@ -1335,25 +1355,46 @@
       var l = shown();
       setKids(grid, l.length ? l.map(card) : h('p', { class: 'muted', style: 'grid-column:1/-1' }, 'Aucun article pour ce choix.'));
     }
+    // Règle « simple et intuitif » (fondateur, 19/10) : une seule rangée de filtres visible ; le reste dans « Filtres ».
     function drawFilters() {
       var cats = []; products.forEach(function (p) { if (p.category && cats.indexOf(p.category) < 0) cats.push(p.category); });
       var sizes = []; products.forEach(function (p) { (p.sizes || []).forEach(function (z) { if (sizes.indexOf(z) < 0) sizes.push(z); }); });
-      function chip(on, label, fn, id) { return h('button', { class: 'opt' + (on ? ' on' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false', id: id || null, onclick: fn }, label); }
-      setKids(filters,
-        cats.length >= 2 ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Catégorie', id: 'filter-cat' },
-          chip(!filter.cat, 'Tout', function () { filter.cat = ''; drawFilters(); drawGrid(); }),
-          cats.map(function (c) { return chip(filter.cat === c, catLabel(c) || c, function () { filter.cat = c; drawFilters(); drawGrid(); }); })) : null,
-        products.some(function (p) { return p.gender; }) ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Pour', id: 'filter-gender' },
-          chip(!filter.gender, 'Tous', function () { filter.gender = ''; drawFilters(); drawGrid(); }),
-          VD_GENDERS.filter(function (g) { return g[0] !== 'mixte'; }).map(function (g) { return chip(filter.gender === g[0], g[1], function () { filter.gender = g[0]; drawFilters(); drawGrid(); }); })) : null,
-        products.some(function (p) { return p.age_band; }) ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Âge', id: 'filter-age' },
-          h('span', { class: 'small muted', style: 'align-self:center;white-space:nowrap' }, 'Âge :'),
-          chip(!filter.age, 'Tous', function () { filter.age = ''; drawFilters(); drawGrid(); }),
-          VD_AGES.filter(function (a) { return products.some(function (p) { return p.age_band === a[0]; }); }).map(function (a) { return chip(filter.age === a[0], a[1], function () { filter.age = a[0]; drawFilters(); drawGrid(); }); })) : null,
-        sizes.length ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Ma taille ou pointure', id: 'filter-size' },
-          h('span', { class: 'small muted', style: 'align-self:center;white-space:nowrap' }, 'Ma taille :'),
-          chip(!filter.size, 'Toutes', function () { filter.size = ''; drawFilters(); drawGrid(); }),
-          sizes.map(function (z) { return chip(filter.size === z, z, function () { filter.size = z; drawFilters(); drawGrid(); }); })) : null);
+      var ages = VD_AGES.filter(function (a) { return products.some(function (p) { return p.age_band === a[0]; }); });
+      var byGender = products.some(function (p) { return p.gender; });
+      function chip(on, label, fn) { return h('button', { class: 'opt' + (on ? ' on' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false', onclick: fn }, label); }
+      function set(k, v) { filter[k] = v; drawFilters(); drawGrid(); }
+      var primary = byGender
+        ? h('div', { class: 'opt-row', role: 'group', 'aria-label': 'Pour', id: 'filter-gender' },
+            chip(!filter.gender, 'Tous', function () { set('gender', ''); }),
+            VD_GENDERS.filter(function (g) { return g[0] !== 'mixte'; }).map(function (g) { return chip(filter.gender === g[0], g[1], function () { set('gender', g[0]); }); }))
+        : cats.length >= 2 ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Catégorie', id: 'filter-cat' },
+            chip(!filter.cat, 'Tout', function () { set('cat', ''); }),
+            cats.map(function (c) { return chip(filter.cat === c, catLabel(c) || c, function () { set('cat', c); }); }))
+        : null;
+      // Filtres secondaires : dans une feuille, jamais affichés en rangées.
+      var more = [];
+      if (byGender && cats.length >= 2) more.push(['cat', 'Catégorie', cats.map(function (c) { return [c, catLabel(c) || c]; })]);
+      if (ages.length >= 2) more.push(['age', 'Âge', ages]);
+      if (sizes.length >= 2) more.push(['size', 'Taille ou pointure', sizes.map(function (z) { return [z, z]; })]);
+      var active = more.filter(function (m) { return filter[m[0]]; }).length;
+      var btn = more.length ? h('button', { class: 'opt filt-btn' + (active ? ' on' : ''), type: 'button', id: 'filter-more', 'aria-haspopup': 'dialog', onclick: function () { sheet(more); } },
+        icon('settings', 16), active ? 'Filtres · ' + active : 'Filtres') : null;
+      setKids(filters, primary || btn ? h('div', { class: 'filt-bar' }, primary, btn) : null);
+    }
+    function sheet(more) {
+      var draft = {}; more.forEach(function (m) { draft[m[0]] = filter[m[0]]; });
+      var back = h('div', { class: 'sheet-back', id: 'filter-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'filter-sheet-h', onclick: function (e) { if (e.target === back) close(); } },
+        h('div', { class: 'sheet' }, h('h2', { id: 'filter-sheet-h' }, 'Filtres'),
+          more.map(function (m) {
+            return h('div', { class: 'field' }, h('label', { for: 'fs-' + m[0] }, m[1]),
+              h('select', { id: 'fs-' + m[0], onchange: function (e) { draft[m[0]] = e.target.value; } },
+                h('option', { value: '' }, 'Tous'), m[2].map(function (o) { return h('option', { value: o[0], selected: draft[m[0]] === o[0] || null }, o[1]); })));
+          }),
+          h('button', { class: 'btn', type: 'button', id: 'filter-apply', onclick: function () { Object.keys(draft).forEach(function (k) { filter[k] = draft[k] || ''; }); close(); drawFilters(); drawGrid(); } }, 'Voir les articles'),
+          h('button', { class: 'btn ghost', type: 'button', id: 'filter-clear', onclick: function () { Object.keys(draft).forEach(function (k) { filter[k] = ''; }); close(); drawFilters(); drawGrid(); } }, 'Effacer les filtres')));
+      function close() { back.remove(); }
+      document.body.append(back);
+      onMedia(close);
     }
     function list() {
       setKids(root,
@@ -1567,7 +1608,7 @@
   function vitrineSection(shop) {
     var box = h('section', { class: 'card', id: 'vitrine-section' });
     var state = { public: !!shop.public, slug: shop.slug, about: shop.about || '', theme: shop.theme || 'galerie', accent: shop.accent || 'foret', cover: null };
-    var saved = { cover: null };
+    var saved = { cover: null }, lookOpen = false;
     // La couverture n'arrive qu'ici : on ne redessine que si elle change (une saisie en cours n'est pas effacée).
     sapi('fiila_shop_vitrine', { p: null }).then(function (r) {
       var changed = (r.cover || null) !== state.cover || (r.theme && r.theme !== state.theme) || (r.accent && r.accent !== state.accent);
@@ -1623,6 +1664,10 @@
             iconBtn('a', { class: 'btn mid', id: 'vitrine-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer'),
             iconBtn('button', { class: 'btn ghost mid', type: 'button', onclick: function () { copy(url, 'Lien'); } }, 'link', 'Copier')),
           iconRow('#/b/' + state.slug, 'eye', 'Voir ma vitrine', { id: 'vitrine-view' })] : null,
+        // Apparence repliée par défaut (règle « simple ») ; reste ouverte pendant qu'on la règle.
+        h('details', { class: 'more-details', id: 'vitrine-look', open: lookOpen || null, ontoggle: function (e) { lookOpen = e.target.open; } },
+          h('summary', null, 'Personnaliser l’apparence'),
+          h('div', { class: 'stack', style: 'margin-top:12px' },
         h('fieldset', { class: 'vt-pick', id: 'vitrine-theme' }, h('legend', null, 'Modèle'),
           VT_THEMES.map(function (t) {
             return h('label', { class: 'vt-opt' + (state.theme === t[0] ? ' on' : '') },
@@ -1643,7 +1688,7 @@
           set: function (v) { state.cover = v; save({ cover: v ? v.replace(/^data:[^,]+,/, '') : '' }, v ? 'Couverture enregistrée.' : 'Couverture retirée.'); } }),
         textField({ id: 'vitrine-about', label: 'Présentation', optional: true, max: 160, value: state.about, placeholder: 'Ex. : Robes wax et foulards, livrés à Dakar.',
           onInput: function (v) { state.about = v; } }),
-        iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'vitrine-about-save', onclick: function () { save({ about: state.about }, 'Présentation enregistrée.'); } }, 'check', 'Enregistrer la présentation', 18),
+        iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'vitrine-about-save', onclick: function () { save({ about: state.about }, 'Présentation enregistrée.'); } }, 'check', 'Enregistrer la présentation', 18))),
         feedBox, err);
     }
     draw();

@@ -81,15 +81,14 @@ await t('Fii La : vérifie et publie ; la vitrine « Vide-dressing Fii La » se 
   await C.locator('#filter-gender').getByRole('button', { name: 'Garçon' }).click();
   await C.getByText('Aucun article pour ce choix.').waitFor();
   await C.locator('#filter-gender').getByRole('button', { name: 'Fille' }).click();
-  await C.locator('#filter-age').getByRole('button', { name: '2-4 ans' }).click();
-  await C.getByText('Fille · 2-4 ans · Très bon état').waitFor();
+  assert.equal(await C.locator('.filt-bar .opt-row').count(), 1, 'une seule rangée de filtres visible');
+  await C.getByText('2-4 ans · 3 ans · Très bon état').waitFor();
   assert.ok(!/Fatou|77 700/.test(await C.locator('body').textContent()), 'vendeuse invisible');
   await shot(C, '02-vitrine');
 });
 
 await t('cliente commande ; le fondateur voit chez qui récupérer ; « Livré » puis « Reversé » ; la vendeuse voit « Vendu »', async () => {
   const card = C.locator('article', { hasText: 'Robe fleurie (test)' });
-  await card.getByRole('button', { name: '3 ans', exact: true }).click().catch(() => {});
   await card.locator('[data-add]').click();
   await C.click('#cart-go');
   await C.fill('#v-name', 'Cliente (test)'); await C.fill('#v-phone', '70 000 00 81');

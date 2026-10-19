@@ -107,6 +107,8 @@ await t('publication d’un article : la légende renvoie vers la vitrine', asyn
 
 await t('personnalisation : modèle Magazine, couleur Prune, couverture ; la vitrine change aussitôt', async () => {
   await S.goto(URL0 + '#/boutique/reglages');
+  assert.equal(await S.locator('#vitrine-look').evaluate((d) => d.open), false, 'apparence repliée par défaut');
+  await S.locator('#vitrine-look summary').click();
   await S.locator('#vitrine-theme').getByText('Magazine').click();
   await S.getByText('Modèle « Magazine » appliqué.').waitFor();
   await S.getByRole('radio', { name: 'Prune' }).check({ force: true });

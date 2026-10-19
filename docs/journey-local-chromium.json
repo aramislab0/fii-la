@@ -1,20 +1,18 @@
 {
   "cible": "local",
-  "url": "http://127.0.0.1:39735/",
+  "url": "http://127.0.0.1:38133/",
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "mode": "automatisation Playwright, émulation iPhone 13 (pas un téléphone physique)",
-  "date": "2026-10-17T20:07:06.561Z",
-  "reussis": 12,
+  "date": "2026-10-19T08:19:56.804Z",
+  "reussis": 9,
   "total": 12,
   "compteurs": {
     "delta_pendant_le_test": {
       "fiche_created:address_direct": 1,
       "discovery_shown:address": 1,
       "discovery_cta:address": 1,
-      "fiche_created:address_discovery": 1,
-      "share_initiated:whatsapp_address": 1,
-      "link_copied:address": 1
+      "fiche_created:address_discovery": 1
     },
     "note": "Écart des compteurs du jour entre le début et la fin du test. D’autres visiteurs réels peuvent s’y ajouter."
   },
@@ -22,52 +20,52 @@
     {
       "ok": true,
       "name": "configuration publique : URL HTTPS de l’API et clé publique seulement",
-      "ms": 111
+      "ms": 195
     },
     {
       "ok": true,
       "name": "1. propriétaire : créer une adresse avec photo",
-      "ms": 691
+      "ms": 744
     },
     {
       "ok": true,
       "name": "persistance : la fiche et sa photo survivent au rechargement (propriétaire)",
-      "ms": 366
+      "ms": 362
     },
     {
-      "ok": true,
+      "ok": false,
       "name": "2. destinataire (session isolée) : fiche, photo et repère, sans compte",
-      "ms": 376
+      "err": "locator.getAttribute: Timeout 12000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('link', { name: /Itinéraire/ }).first()\u001b[22m\n"
     },
     {
       "ok": true,
       "name": "3. bouton découverte : création vierge d’une 2e adresse",
-      "ms": 605
+      "ms": 791
     },
     {
       "ok": true,
       "name": "4. retour à la fiche d’origine",
-      "ms": 104
+      "ms": 336
     },
     {
-      "ok": true,
+      "ok": false,
       "name": "5. partage : lien copié et message WhatsApp avec la vraie URL",
-      "ms": 212
+      "err": "locator.getAttribute: Timeout 12000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('link', { name: 'Préparer un message WhatsApp' })\u001b[22m\n"
     },
     {
       "ok": true,
       "name": "6. désactivation : la fiche et sa photo ne sont plus servies",
-      "ms": 260
+      "ms": 343
     },
     {
       "ok": true,
       "name": "7. suppression : fiche et photo inaccessibles, même par l’API",
-      "ms": 270
+      "ms": 267
     },
     {
       "ok": true,
       "name": "sécurité en production : tables privées inaccessibles par l’API",
-      "ms": 18
+      "ms": 28
     },
     {
       "ok": true,
@@ -75,9 +73,9 @@
       "ms": 0
     },
     {
-      "ok": true,
+      "ok": false,
       "name": "compteurs agrégés : événements du parcours enregistrés (comptes, pas un tunnel individuel)",
-      "ms": 1
+      "err": "compteur non incrémenté : share_initiated:whatsapp_address"
     }
   ]
 }

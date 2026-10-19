@@ -797,3 +797,9 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .vd-photo{width:100%;max-height:320px;object-fit:contain;border-radius:12px;background:var(--surface-2)}
 .vd-item .vthumb{width:56px;height:56px;border-radius:12px;object-fit:cover;flex:none}
 .demo-tag.fl-tag{background:var(--lime);color:var(--on-lime)}
+/* Une seule rangée de filtres (19/10) ; « Filtres » ouvre une feuille pour le reste. */
+.filt-bar{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.filt-bar .opt-row{flex:1;min-width:0}
+.filt-btn{display:inline-flex;align-items:center;gap:6px;flex:none}
+.filt-bar .opt-row.scroll{margin:0;padding:2px 0}
+.vin{color:var(--green);font-weight:600;display:flex;align-items:center;gap:2px}
