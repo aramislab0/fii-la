@@ -1139,7 +1139,8 @@
             onclick: function () { if (audio) audio.pause(); audio = null; state.action = state.existing ? 'clear' : 'keep'; state.existing = null; state.b64 = null; state.url = null; onChange(); draw(); } }, icon('trash', 20))));
         return;
       }
-      if (!voiceSupported()) { setKids(box); return; }
+      // Jamais masqué en silence : certains navigateurs intégrés (WhatsApp, Instagram, Facebook) n'ont pas le micro.
+      if (!voiceSupported()) { setKids(box, h('p', { class: 'small muted', id: 'voice-unsupported' }, icon('mic', 14), ' Repère vocal : ouvrez Fii La dans Safari ou Chrome pour l’enregistrer.')); return; }
       setKids(box, h('div', { class: 'voice' },
         h('button', { class: 'btn vbtn', type: 'button', id: 'voice-record', 'aria-label': 'Enregistrer un message vocal', onclick: start }, icon('mic', 24)),
         h('div', { class: 'vtxt' }, h('strong', null, 'Repère vocal'), h('span', { class: 'muted' }, 'Facultatif. 30 secondes, dans votre langue.'))));

@@ -144,6 +144,19 @@ await t('modification : retrait du repère vocal ; il disparaît chez le destina
   assert.equal(await B.locator('#voice-player').count(), 0);
 });
 
+await t('navigateur sans micro (ex. intégré à une app) : le repère vocal n’est pas masqué, une ligne explique quoi faire', async () => {
+  const N = await newPhone();
+  await N.addInitScript(() => { delete window.MediaRecorder; });
+  await N.goto(URL0 + '#/new');
+  await N.getByRole('button', { name: 'Utiliser ma position' }).click();
+  await N.getByText('Position précise.').first().waitFor();
+  await N.locator('#wizard-next').click();
+  await N.getByLabel('Oui').check();
+  await N.locator('#wizard-next').click();
+  await N.locator('#voice-unsupported').getByText('ouvrez Fii La dans Safari ou Chrome').waitFor();
+  assert.equal(await N.locator('#voice-record').count(), 0);
+});
+
 await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors), []); });
 
 await browser.close();
