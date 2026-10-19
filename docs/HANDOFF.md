@@ -175,6 +175,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 19/10 15:27 | Double authentification du fondateur **activée** : un seul facteur TOTP, statut verified (15:26:42), session aal2 ouverte, entrée au back-office (last_seen 15:26:42). L’ancienne clé non vérifiée (visible sur une capture) n’existe plus. Correctif QR en production (run 39275990530, tout vert) | requête select en lecture seule |
 | 19/10 15:05 | QR code de la double authentification : vraie cause trouvée. L’API Supabase renvoie le SVG brut, sans préfixe « data: » (supabase-js l’ajoute ; nous appelons l’API directement), donc l’image ne s’affichait pas. `mfaQrSrc` accepte les deux formes ; émulation de test alignée sur le format réel (internal/api/mfa.go) ; cache v25 | ce commit |
 | 19/10 15:00 | Double authentification en production (run 39269572845, tout vert). Texte d'activation clarifié après un essai du fondateur : la clé se saisit dans l'application d'authentification, pas sur le site | ce commit |
 | 19/10 14:50 | QR code de double authentification illisible en production (signalé par le fondateur) : Supabase renvoie un SVG brut non encodé dont les « # » coupent l'URL `data:`. Réencodé côté application ; lien « ajouter à l'application » (otpauth) ; l'émulation de test reproduit désormais le format réel, et un test vérifie que l'image s'affiche | ce commit |
