@@ -63,10 +63,13 @@ const D = await newPage('desktop');
 await t('portail : connexion de l’équipe ; un compte hors équipe est refusé', async () => {
   await D.goto(URL0 + '#/bo');
   await D.locator('#bo-login').waitFor();
+  await D.locator('#bo-back').waitFor(); // flèche retour sur le portail
+  assert.equal(await D.locator('#bo-back').getAttribute('href'), '#/');
   await shot(D, '01-portail');
   await signup(D, 'Client Test', 'client.bo@example.invalid');
   await D.goto(URL0 + '#/bo');
   await D.locator('#bo-denied').getByText('Accès non autorisé').waitFor();
+  await D.locator('#bo-back').waitFor();
   await D.locator('#bo-denied').getByRole('button', { name: 'Changer de compte' }).click();
   await D.locator('#bo-login').waitFor();
   // Le fondateur : compte créé puis super admin (comme en production après la migration).

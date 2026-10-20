@@ -2595,7 +2595,17 @@
   }
   function ensureWayBack(node, r) {
     if (!node || !node.querySelector || !r.parts.length) return;
-    if (node.classList && (node.classList.contains('bo-shell') || node.classList.contains('bo-portal'))) return; // le back-office a sa propre navigation
+    if (node.classList && node.classList.contains('bo-shell')) return; // le back-office a sa propre navigation
+    // Portail du back-office (connexion, code, accès refusé, invitation) : une flèche retour en haut à gauche.
+    if (node.classList && node.classList.contains('bo-portal')) {
+      if (node.querySelector('.bo-back')) return;
+      var pv = NAV.length ? NAV[NAV.length - 1] : null;
+      var bb = backBtn(pv ? 'Retour' : authed() ? 'Mon compte' : 'Accueil', pv || (authed() ? '#/compte' : '#/'));
+      bb.classList.add('bo-back'); bb.id = 'bo-back';
+      if (pv) bb.onclick = function (e) { e.preventDefault(); history.back(); };
+      node.insertBefore(bb, node.firstChild);
+      return;
+    }
     var prev = NAV.length ? NAV[NAV.length - 1] : null;
     var bar = node.querySelector('.brand-bar');
     // Pages reçues par lien : le logo ramène à l'accueil ; une flèche apparaît si l'on vient d'un autre écran de l'application.
@@ -4302,6 +4312,17 @@
         } }, 'Pas maintenant')));
     return card;
   }
+  // Fii La Carrière depuis le compte : l'état de l'ambassadeur en un coup d'œil, ou l'invitation à le devenir.
+  function ambEntry() {
+    var AMB_STATE = { training: 'formation en cours', review: 'validation en cours', active: 'ambassadeur actif', suspended: 'suspendu', excluded: 'programme terminé' };
+    var box = h('div', null, iconRow('#/carriere', 'star', 'Fii La Carrière', { id: 'amb-entry' }));
+    api('fiila_ambassador_me', {}).then(function (r) {
+      var a = r && r.ambassador;
+      var label = a ? 'Fii La Carrière · ' + (AMB_STATE[a.status] || a.status) + (a.status === 'training' && a.quiz_passed ? ' (test réussi)' : '') : 'Fii La Carrière · devenir ambassadeur';
+      setKids(box, iconRow('#/carriere', 'star', label, { id: 'amb-entry' }));
+    }, function () {});
+    return box;
+  }
   // Lien vers le back-office, seulement pour les membres de l'équipe.
   function boEntry() {
     var box = h('div');
@@ -4439,6 +4460,7 @@
       q.mdp === '1' ? h('div', { class: 'notice' }, 'Choisissez maintenant votre nouveau mot de passe.') : null,
       h('section', { class: 'card' }, avatarBox, msg),
       boEntry(),
+      ambEntry(),
       h('section', { class: 'card' },
         h('h2', null, 'Profil'),
         textField({ id: 'me-name', label: 'Nom affiché', max: 60, value: f.display_name, autocomplete: 'name', onInput: function (v) { f.display_name = v; } }),

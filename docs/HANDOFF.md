@@ -91,6 +91,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 19/10 08:02 | Règle permanente : interface simple et intuitive, hiérarchie nette, jamais trop de filtres ou d'options affichés ; à appliquer à toute l'application et aux builds à venir | Fondateur |
 | 19/10 07:15 | Vide-dressing : pilote tenu par Fii La validé ; Ambassadeurs : règle « on paie un commerçant actif » et 3 niveaux validés, récompenses entre 2 000 et 10 000 FCFA (fixées à 2 000 / 5 000 / 10 000) ; construire l'espace ambassadeur puis le vide-dressing. Commission du vide-dressing non précisée : 15 % par défaut (réglage), **à confirmer** ; plafond 20 commerçants par mois et par ambassadeur (réglage), **à confirmer** | Fondateur |
 | 19/10 20:04 | Équipe de la boutique : ajouter un membre (administrateur ou éditeur) avec son nom et son numéro, invitation envoyée par WhatsApp. Droits par défaut fixés par le Builder (propriétaire / administrateur / éditeur, voir §2), modifiables sur demande | Fondateur (demande), Builder (droits) |
+| 20/10 03:48 | Entrée « Fii La Carrière » dans le compte (comme le back-office) ; flèche retour sur le portail du back-office ; vérifier que toutes les logiques fonctionnent | Fondateur |
 | 20/10 03:03 | Portail de connexion Fii La Carrière et test complet du parcours ambassadeur par le fondateur ; Studio IA gardé dans les prochaines actions (#48) | Fondateur |
 | 20/10 02:58 | Studio IA : banc d'essai des meilleurs modèles via fal, routeur de missions (besoin, budget, mise à jour selon les évolutions), corpus XEL branche e-commerce qui apprend des usages et des erreurs — **demandé** ; proposition du Builder : banc réel dès la clé fal, routeur + journal d'apprentissage en V1, entraînement (LoRA) et branche XEL seulement après preuve d'usage (voir action #48) | Fondateur (demande) |
 | 20/10 02:30 | **Règle de format des photos d'articles** : toutes au même format que les cartes de la vitrine, recadrées (ou régénérées) avant publication. Format retenu par le Builder : portrait 4:5 (864 × 1080), celui des publications Instagram | Fondateur (règle), Builder (format) |
@@ -197,6 +198,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 20/10 04:55 | Compte : entrée « Fii La Carrière » avec l'état de l'ambassadeur (`ambEntry`) ; portail du back-office (connexion, code, accès refusé, invitation) : flèche retour en haut à gauche ; tests back-office 10/10, ambassadeurs 7/7 ; vérification complète : 38 suites (SQL + navigateur) vertes | ce commit |
 | 20/10 04:30 | Portail Fii La Carrière en production (run 39363049005, tout vert) ; test du parcours par le fondateur en attente | GitHub Actions |
 | 20/10 04:00 | Portail Fii La Carrière (`ambAccess`, alias `#/carriere`, retour après confirmation e-mail via `pkce.after`) ; test ambassadeurs 7/7 ; guide de test envoyé au fondateur | ce commit |
 | 20/10 03:40 | Format 4:5 des photos d'articles en production (run 39361010044 : tests, base, mise en ligne, production Chrome + Safari, tout vert) | GitHub Actions |

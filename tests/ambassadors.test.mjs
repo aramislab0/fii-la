@@ -154,6 +154,11 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   await A.goto(URL0 + '#/'); await A.goto(URL0 + '#/ambassadeur');
   const w = (await A.locator('#amb-wallet').textContent()).replace(/\s/g, ' ');
   assert.match(w, /Déjà reçu\s*2 000 FCFA/);
+  // Depuis le compte : l'entrée « Fii La Carrière » montre l'état de l'ambassadeur
+  await A.goto(URL0 + '#/compte');
+  await A.locator('#amb-entry').getByText('Fii La Carrière · ambassadeur actif').waitFor();
+  await A.click('#amb-entry');
+  await A.locator('#amb-code').waitFor();
   await shot(A, '05-portefeuille');
 });
 

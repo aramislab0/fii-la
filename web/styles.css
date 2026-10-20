@@ -1155,3 +1155,7 @@ input[type=number]{font:inherit;font-size:16px;padding:12px 14px;border-radius:1
 .crop-zoom{display:flex;align-items:center;gap:10px}
 .crop-zoom input{flex:1;accent-color:var(--green)}
 .bo-warn{color:#9A6512;font-weight:600}
+
+/* Portail du back-office : flèche retour en haut à gauche */
+.bo-portal{position:relative}
+.bo-portal > .bo-back{position:absolute;top:16px;left:16px;margin:0}
