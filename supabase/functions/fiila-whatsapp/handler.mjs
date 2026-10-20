@@ -70,7 +70,8 @@ export function makeHandler({ env, fetch, timeoutMs = 20000 }) {
       const want = String(env('WA_VERIFY_TOKEN') || '').trim(), got = String(url.searchParams.get('hub.verify_token') || '').trim();
       const ok = url.searchParams.get('hub.mode') === 'subscribe' && want !== '' && got === want;
       // Diagnostic sans valeur secrète : présence et longueurs seulement.
-      if (!ok) console.log(JSON.stringify({ webhook_verify: 'refused', mode: url.searchParams.get('hub.mode'), secret_set: want !== '', secret_len: want.length, received_len: got.length }));
+      if (!ok) console.log(JSON.stringify({ webhook_verify: 'refused', mode: url.searchParams.get('hub.mode'), secret_set: want !== '', secret_len: want.length, received_len: got.length,
+        others: { WA_TOKEN: !!env('WA_TOKEN'), WA_PHONE_ID: !!env('WA_PHONE_ID'), WA_APP_SECRET: !!env('WA_APP_SECRET') } }));
       return ok ? new Response(url.searchParams.get('hub.challenge') || '', { status: 200 }) : new Response('forbidden', { status: 403 });
     }
     if (req.method !== 'POST') return json(405, { error: 'method' });
