@@ -15,7 +15,7 @@ const ko = async (fn, args, code, opt) => {
   assert.equal(r.status, 400, `${fn} aurait dû échouer, a renvoyé ${JSON.stringify(r.body)}`);
   if (code) assert.match(r.body.message, new RegExp(code));
 };
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAFCAYAAABirU3bAAAAHklEQVR4AWM8EWDznwEJMDGgASYGNMDEgAaYGNAAAMF1Al31VHyvAAAAAElFTkSuQmCC', 'base64');
 const photo = Buffer.concat([png, Buffer.alloc(200)]).toString('base64');
 async function shop(i, open = true, product = true) {
   const k = (await ok('fiila_shop_save', { p_key: null, p: { name: `Boutique ${i} [TEST]`, phone: '77 200 00 ' + String(i).padStart(2, '0') } })).key;

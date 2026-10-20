@@ -134,6 +134,52 @@ await t('fil : carrousel sur la carte ; double toucher = j’aime ; article à u
   await shot(F, '03-fil-carrousel');
 });
 
+await t('format 4:5 : photo carrée recadrée à l’ajout ; recadrage ajustable (glisser, zoom) ; cartes en 4:5', async () => {
+  await S.setViewportSize(phone.viewport);
+  await S.goto(URL0 + '#/boutique/article/nouveau');
+  await S.setInputFiles('#product-photo', [pngFile('carre.png', RED)]);
+  const img = S.locator('#product-photo-grid .pp-tile img').first();
+  await img.waitFor();
+  await S.waitForFunction(() => { const i = document.querySelector('#product-photo-grid .pp-tile img'); return i && i.naturalWidth > 0; });
+  const [w, hh] = await img.evaluate((i) => [i.naturalWidth, i.naturalHeight]);
+  assert.ok(Math.abs(w / hh - 0.8) < 0.02, 'photo recadrée en 4:5 : ' + w + '×' + hh);
+  await S.getByRole('button', { name: 'Recadrer la photo 1' }).click();
+  await S.locator('#crop-frame').waitFor();
+  await S.locator('#crop-zoom').fill('2');
+  const box = await S.locator('#crop-frame').boundingBox();
+  await S.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await S.mouse.down();
+  await S.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 30); await S.mouse.up();
+  await S.waitForTimeout(500);
+  await S.screenshot({ path: `${SHOTS}/${ENGINE}-05-recadrage.png` }); // écran visible (feuille du bas)
+  await S.click('#crop-ok');
+  await S.locator('#crop-sheet').waitFor({ state: 'detached' });
+  await S.fill('#product-name', 'Article carré (test)');
+  await S.fill('#product-price', '2000');
+  await S.click('#product-save');
+  await S.waitForFunction(() => /#\/boutique\/article\/[0-9a-f-]{36}/.test(location.hash));
+  const ok = (await local.db.query(`select fiila.ratio_ok(photo) ok from fiila.products where name = 'Article carré (test)'`)).rows[0].ok;
+  assert.equal(ok, true, 'photo enregistrée au format 4:5');
+  // cartes de la vitrine : 4:5
+  const V = await newPhone();
+  await V.goto(URL0 + '#/b/' + SLUG);
+  const r = await V.locator('.vcard .vimg').first().evaluate((el) => el.getBoundingClientRect().width / el.getBoundingClientRect().height);
+  assert.ok(Math.abs(r - 0.8) < 0.02, 'carte de vitrine en 4:5 : ' + r);
+});
+
+await t('ancienne photo hors format : signalée « À recadrer », recadrée au centre à l’enregistrement', async () => {
+  // [SIMULÉ] photo carrée enregistrée avant la règle (directement en base)
+  const sq = Buffer.from((await (async () => { const { PNG } = await import('pngjs'); const p = new PNG({ width: 40, height: 40 }); p.data.fill(120); return PNG.sync.write(p); })()));
+  const id = (await local.db.query(`select id from fiila.products where name = 'Sac une photo (test)'`)).rows[0].id;
+  await local.db.query(`update fiila.products set photo = $1, photo_type = 'image/png' where id = $2`, [sq, id]);
+  await S.goto(URL0 + '#/boutique/article/' + id);
+  await S.locator('#product-photo-grid .pp-badge.warn').waitFor();
+  await S.locator('#product-photo-off').waitFor();
+  await shot(S, '06-a-recadrer');
+  await S.click('#product-save');
+  await S.getByText('Article mis à jour.').waitFor();
+  assert.equal((await local.db.query(`select fiila.ratio_ok(photo) ok from fiila.products where id = $1`, [id])).rows[0].ok, true);
+});
+
 await t('aucun débordement à 320 px (édition des photos)', async () => {
   const N = await newPhone(320);
   await N.goto(URL0 + '#/'); 

@@ -40,7 +40,7 @@ const shot = (page, name, full = false) => page.screenshot({ path: `${SHOTS}/${E
 const ok = async (fn, args) => { const r = await rpc(local.db, fn, args); assert.equal(r.status, 200, fn + ' ' + JSON.stringify(r.body)); return r.body; };
 // Photo synthétique : dégradé de deux couleurs (PNG sans métadonnées).
 function photo(c1, c2) {
-  const png = new PNG({ width: 240, height: 240 });
+  const png = new PNG({ width: 240, height: 300 }); // format 4:5
   for (let y = 0; y < 240; y++) for (let x = 0; x < 240; x++) {
     const k = (x + y) / 480, i = (y * 240 + x) * 4;
     for (let j = 0; j < 3; j++) png.data[i + j] = Math.round(c1[j] * (1 - k) + c2[j] * k);

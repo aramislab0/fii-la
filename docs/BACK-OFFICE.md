@@ -35,8 +35,8 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 
 | Section | Contenu |
 |---|---|
-| Tableau de bord | Indicateurs (boutiques, commandes, volume livré, comptes, adresses, livreurs, ambassadeurs, places du fil, membres d'équipe de boutiques et numéros confirmés par SMS, articles à plusieurs photos), file « À traiter », commandes sur 14 jours |
-| Boutiques | Recherche (nom, lien, téléphone), filtres, fiche (dont l'équipe de la boutique : membres, rôle, numéro confirmé, invitations en attente ; articles à plusieurs photos) |
+| Tableau de bord | Indicateurs (boutiques, commandes, volume livré, comptes, adresses, livreurs, ambassadeurs, places du fil, membres d'équipe de boutiques et numéros confirmés par SMS, articles à plusieurs photos et photos principales hors format 4:5), file « À traiter », commandes sur 14 jours |
+| Boutiques | Recherche (nom, lien, téléphone), filtres, fiche (dont l'équipe de la boutique : membres, rôle, numéro confirmé, invitations en attente ; articles à plusieurs photos, articles hors format 4:5) |
 | Commandes | Recherche (boutique, client, numéro, téléphone), filtre par statut, fiche avec articles et paiements, lien vers la facture |
 | Comptes | Recherche par nom ou e-mail, fiche (boutique possédée ou dont il est membre, numéro confirmé par SMS, ambassadeur, rôle, activité) |
 | Modération | Commentaires masqués ou signalés : rétablir ou supprimer |

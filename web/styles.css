@@ -1134,3 +1134,24 @@ input[type=number]{font:inherit;font-size:16px;padding:12px 14px;border-radius:1
 .amb-q legend{float:left;width:100%;padding:0 0 6px}
 .amb-q legend + *{clear:both}
 .card.amb-mission{flex-direction:row}
+
+/* Règle de format des photos d'articles (20/10) : portrait 4:5 partout où une carte d'article s'affiche */
+.vimg,.vt-magazine .vimg{aspect-ratio:4/5}
+.vt-catalogue .vimg{width:104px;flex:none;aspect-ratio:4/5;min-height:0;height:auto}
+.post-img,.saved-img,.pp-tile,.pp-add{aspect-ratio:4/5}
+.photo-prev.r45{aspect-ratio:4/5;width:min(100%,320px)}
+.pp-tile.off{outline:2px dashed #C0841A;outline-offset:-2px}
+.pp-badge.warn{background:#C0841A}
+.pp-crop{position:absolute;bottom:4px;right:4px;width:32px;height:32px;border:0;border-radius:999px;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;cursor:pointer}
+.pp-crop .ico path{stroke:#fff}
+.crop-sheet{gap:12px}
+.crop-frame{position:relative;width:min(100%,320px,calc(52vh * .8));aspect-ratio:4/5;align-self:center;overflow:hidden;border-radius:16px;background:#111;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.crop-frame:active{cursor:grabbing}
+.crop-frame:focus-visible{outline:3px solid var(--focus);outline-offset:3px}
+.crop-img{position:absolute;left:0;top:0;max-width:none;transform-origin:0 0;pointer-events:none}
+.crop-grid{position:absolute;inset:0;pointer-events:none;background:
+  linear-gradient(to right,transparent calc(33.33% - .5px),rgba(255,255,255,.35) calc(33.33% - .5px),rgba(255,255,255,.35) calc(33.33% + .5px),transparent calc(33.33% + .5px),transparent calc(66.66% - .5px),rgba(255,255,255,.35) calc(66.66% - .5px),rgba(255,255,255,.35) calc(66.66% + .5px),transparent calc(66.66% + .5px)),
+  linear-gradient(to bottom,transparent calc(33.33% - .5px),rgba(255,255,255,.35) calc(33.33% - .5px),rgba(255,255,255,.35) calc(33.33% + .5px),transparent calc(33.33% + .5px),transparent calc(66.66% - .5px),rgba(255,255,255,.35) calc(66.66% - .5px),rgba(255,255,255,.35) calc(66.66% + .5px),transparent calc(66.66% + .5px))}
+.crop-zoom{display:flex;align-items:center;gap:10px}
+.crop-zoom input{flex:1;accent-color:var(--green)}
+.bo-warn{color:#9A6512;font-weight:600}

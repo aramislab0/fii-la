@@ -241,7 +241,7 @@ await t('audit : modération = suspendre oui, changer le type non ; pas de tél�
   await ko('fiila_bo_shop_action', { p_id: SHOP_ID, p_action: 'set_type', p_value: 'mode' }, 'not_allowed', MOD);
   await ko('fiila_bo_shop_action', { p_id: SHOP_ID, p_action: 'set_type', p_value: 'inconnu' }, 'invalid_value', FOUNDER);
   await db.query(`update fiila.profiles set phone = '77 999 00 01' where user_id = $1`, [NOBODY.uid]);
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAFCAYAAABirU3bAAAAHklEQVR4AWM8EWDznwEJMDGgASYGNMDEgAaYGNAAAMF1Al31VHyvAAAAAElFTkSuQmCC', 'base64');
   const sub = await ok('fiila_vd_submit', { p: { title: 'Robe [TEST]', gender: 'fille', age_band: '2-4a', size: '3 ans', condition: 'bon', price: 2000,
     quartier: 'Yoff', photo: Buffer.concat([png, Buffer.alloc(200)]).toString('base64'), photo_ok: true } }, NOBODY);
   assert.ok(sub);

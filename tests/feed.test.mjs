@@ -45,7 +45,8 @@ function crc32(buf) { let c, crc = 0xffffffff; for (const b of buf) { c = (crc ^
 function chunk(type, data) { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type), data]); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, crc]); }
 async function swatch(color) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
-  const W = 320, H = 180, row = Buffer.alloc(1 + W * 3);
+  const W = 240, H = 300, // format 4:5 des photos d’articles
+  row = Buffer.alloc(1 + W * 3);
   for (let x = 0; x < W; x++) { const shade = 0.85 + 0.15 * (x / W); row[1 + 3 * x] = r * shade; row[2 + 3 * x] = g * shade; row[3 + 3 * x] = b * shade; }
   const raw = Buffer.concat(Array.from({ length: H }, () => row));
   const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(W, 0); ihdr.writeUInt32BE(H, 4); ihdr[8] = 8; ihdr[9] = 2;

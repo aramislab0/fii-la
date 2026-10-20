@@ -23,7 +23,7 @@ const user = async (email, admin = false) => {
   return { uid: id };
 };
 const GOOD = [1, 1, 0, 1, 0, 1, 1, 1, 1, 0];
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAFCAYAAABirU3bAAAAHklEQVR4AWM8EWDznwEJMDGgASYGNMDEgAaYGNAAAMF1Al31VHyvAAAAAElFTkSuQmCC', 'base64');
 const photo = Buffer.concat([png, Buffer.alloc(200)]).toString('base64');
 let A, ADMIN, CODE, AMB_ID;
 

@@ -22,7 +22,7 @@ const user = async (email, admin = false) => {
   if (admin) await db.query(`insert into fiila.staff (user_id, role) values ($1, 'super_admin')`, [id]);
   return { uid: id };
 };
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAFCAYAAABirU3bAAAAHklEQVR4AWM8EWDznwEJMDGgASYGNMDEgAaYGNAAAMF1Al31VHyvAAAAAElFTkSuQmCC', 'base64');
 const photo = Buffer.concat([png, Buffer.alloc(200)]).toString('base64');
 const item = (x = {}) => ({ title: 'Robe fillette [TEST]', gender: 'fille', age_band: '2-4a', size: '3 ans', condition: 'tres_bon', price: 4000, quartier: 'Yoff', photo, photo_ok: true, ...x });
 let V, ADMIN, S1;

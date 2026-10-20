@@ -114,7 +114,7 @@ await t('ambassadeur : code, portefeuille, aucun commerçant ; un commerçant ta
 });
 
 await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondateur le verse ; l’ambassadeur le voit reçu', async () => {
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAFCAYAAABirU3bAAAAHklEQVR4AWM8EWDznwEJMDGgASYGNMDEgAaYGNAAAMF1Al31VHyvAAAAAElFTkSuQmCC', 'base64');
   const photo = Buffer.concat([png, Buffer.alloc(200)]).toString('base64');
   const owner = (await local.db.query(`select id from fiila.shops where name = 'Boutique Awa (test)'`)).rows[0].id;
   // [SIMULÉ] articles et vitrine ajoutés directement en base pour la boutique du commerçant.

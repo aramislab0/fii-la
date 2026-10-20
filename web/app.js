@@ -289,6 +289,7 @@
     // boutique
     shop_required: 'Créez d’abord votre boutique.',
     shop_name_required: 'Donnez un nom à votre boutique.',
+    photo_ratio: 'Photo hors format : rechargez l’application, elle recadre les photos au format des cartes (4:5).',
     shop_admin_only: 'Réservé au propriétaire et aux administrateurs de la boutique.',
     shop_owner_only: 'Seul le propriétaire peut faire cela.',
     team_full: 'L’équipe compte déjà 10 personnes (invitations comprises).',
@@ -1070,6 +1071,88 @@
     for (var j = 0; j < res.length; j += CH) s += String.fromCharCode.apply(null, res.subarray(j, j + CH));
     return 'data:image/jpeg;base64,' + btoa(s);
   }
+
+  /* ----- format des photos d'articles : portrait 4:5 (règle du 20/10), 864 × 1080. Recadrage automatique au centre à l'ajout,
+     ajustable (glisser, zoomer) ; le serveur refuse une photo d'article hors format. */
+  var PHOTO_RATIO = 0.8, PHOTO_H = 1080;
+  function jpegUnder(c) {
+    var q = 0.82, url = c.toDataURL('image/jpeg', q);
+    while (url.length > 380000 && q > 0.4) { q -= 0.08; url = c.toDataURL('image/jpeg', q); }
+    return stripJpegMetadata(url);
+  }
+  // Découpe { sx, sy, sw, sh } de l'image source vers une photo 4:5 (au plus 864 × 1080).
+  function cropToRatio(img, rect) {
+    var W = img.width || img.naturalWidth, H = img.height || img.naturalHeight;
+    var r = rect || (function () {
+      var sw = Math.min(W, H * PHOTO_RATIO), sh = sw / PHOTO_RATIO;
+      return { sx: (W - sw) / 2, sy: (H - sh) / 2, sw: sw, sh: sh };
+    })();
+    var oh = Math.min(PHOTO_H, Math.round(r.sh)), ow = Math.round(oh * PHOTO_RATIO);
+    var c = document.createElement('canvas'); c.width = ow; c.height = oh;
+    var g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+    g.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, ow, oh);
+    return jpegUnder(c);
+  }
+  function urlToImage(src) {
+    return new Promise(function (res, rej) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { rej(new Error('Impossible de lire cette image.')); }; i.src = src; });
+  }
+  function isRatio(img) { var W = img.naturalWidth || img.width, H = img.naturalHeight || img.height; return H > 0 && Math.abs(W / H - PHOTO_RATIO) <= 0.016; }
+  // Photo d'article ajoutée : l'original réduit (pour recadrer plus tard) et la photo 4:5 recadrée au centre.
+  function importProductPhoto(file) {
+    if (!file || !/^image\//.test(file.type || '')) return Promise.reject(new Error('Ce fichier n’est pas une image.'));
+    if (file.size > 25 * 1024 * 1024) return Promise.reject(new Error('Image trop lourde (25 Mo maximum).'));
+    return blobToImage(file).then(function (img) {
+      var W = img.width || img.naturalWidth, H = img.height || img.naturalHeight;
+      if (!W || !H) throw new Error('Impossible de lire cette image.');
+      var s = Math.min(1, 1800 / Math.max(W, H));
+      var c = document.createElement('canvas'); c.width = Math.round(W * s); c.height = Math.round(H * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      if (img.close) img.close();
+      var orig = stripJpegMetadata(c.toDataURL('image/jpeg', 0.85));
+      return { orig: orig, photo: cropToRatio(c) };
+    });
+  }
+  // Recadrage au format 4:5 : glisser pour cadrer, curseur pour zoomer. Résout avec la nouvelle photo (ou null).
+  function cropSheet(origSrc) {
+    return urlToImage(origSrc).then(function (img) {
+      return new Promise(function (resolve) {
+        var W = img.naturalWidth, H = img.naturalHeight, z = 1, x = 0, y = 0, fw = 0, fh = 0, base = 1, drag = null;
+        var pic = h('img', { src: origSrc, alt: '', draggable: 'false', class: 'crop-img' });
+        var frame = h('div', { class: 'crop-frame', id: 'crop-frame', 'aria-label': 'Cadre de la photo : glissez pour cadrer' }, pic, h('span', { class: 'crop-grid', 'aria-hidden': 'true' }));
+        var zoom = h('input', { type: 'range', min: '1', max: '3', step: '0.01', value: '1', id: 'crop-zoom', 'aria-label': 'Zoom', oninput: function () {
+          var cx = (fw / 2 - x) / (base * z), cy = (fh / 2 - y) / (base * z);
+          z = parseFloat(zoom.value); x = fw / 2 - cx * base * z; y = fh / 2 - cy * base * z; clamp(); paint();
+        } });
+        function clamp() { var dw = W * base * z, dh = H * base * z; x = Math.min(0, Math.max(fw - dw, x)); y = Math.min(0, Math.max(fh - dh, y)); }
+        function paint() { pic.style.width = (W * base * z) + 'px'; pic.style.height = (H * base * z) + 'px'; pic.style.transform = 'translate(' + x + 'px,' + y + 'px)'; }
+        function layout() {
+          fw = frame.clientWidth; fh = frame.clientHeight; base = Math.max(fw / W, fh / H);
+          x = (fw - W * base * z) / 2; y = (fh - H * base * z) / 2; clamp(); paint();
+        }
+        frame.addEventListener('pointerdown', function (e) { drag = { px: e.clientX, py: e.clientY, x: x, y: y }; try { frame.setPointerCapture(e.pointerId); } catch (er) { /* rien */ } });
+        frame.addEventListener('pointermove', function (e) { if (!drag) return; x = drag.x + e.clientX - drag.px; y = drag.y + e.clientY - drag.py; clamp(); paint(); });
+        ['pointerup', 'pointercancel'].forEach(function (ev) { frame.addEventListener(ev, function () { drag = null; }); });
+        frame.addEventListener('keydown', function (e) {
+          var d = { ArrowLeft: [12, 0], ArrowRight: [-12, 0], ArrowUp: [0, 12], ArrowDown: [0, -12] }[e.key];
+          if (d) { e.preventDefault(); x += d[0]; y += d[1]; clamp(); paint(); }
+        });
+        frame.tabIndex = 0;
+        var done = false;
+        function finish(v) { if (done) return; done = true; closeSheet(); resolve(v); }
+        var back = h('div', { class: 'sheet-back', id: 'crop-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'crop-h', onclick: function (e) { if (e.target === back) finish(null); } },
+          h('div', { class: 'sheet crop-sheet' }, h('h2', { id: 'crop-h' }, 'Recadrer la photo'),
+            h('p', { class: 'small muted' }, 'Format des cartes de la vitrine (4:5). Glissez pour cadrer, zoomez avec le curseur.'),
+            frame, h('label', { class: 'crop-zoom' }, icon('plus', 18), zoom),
+            iconBtn('button', { class: 'btn', type: 'button', id: 'crop-ok', onclick: function () {
+              var s = base * z;
+              finish(cropToRatio(img, { sx: -x / s, sy: -y / s, sw: fw / s, sh: fh / s }));
+            } }, 'check', 'Valider le cadrage'),
+            h('button', { class: 'btn ghost', type: 'button', onclick: function () { finish(null); } }, 'Annuler')));
+        var closeSheet = openSheet(back, { onClose: function () { if (!done) { done = true; resolve(null); } } });
+        requestAnimationFrame(layout);
+      });
+    });
+  }
   // Réduit, recompresse en JPEG puis retire les métadonnées (dont la position GPS).
   function compressPhoto(file, maxSide) {
     if (!file || !/^image\//.test(file.type || '')) return Promise.reject(new Error('Ce fichier n’est pas une image.'));
@@ -1102,7 +1185,7 @@
         var f = inp.files && inp.files[0];
         if (!f) return;
         msg.textContent = 'Préparation de la photo…'; msg.className = 'msg info';
-        compressPhoto(f, opts.maxSide).then(function (d) { opts.set(d); msg.textContent = ''; draw(); },
+        (opts.ratio ? importProductPhoto(f).then(function (x) { return x.photo; }) : compressPhoto(f, opts.maxSide)).then(function (d) { opts.set(d); msg.textContent = ''; draw(); },
           function (e) { msg.textContent = e.message; msg.className = 'msg err'; });
         inp.value = '';
       }
@@ -1111,7 +1194,7 @@
       var p = opts.get();
       setKids(box, 
         h('span', { class: 'label' }, (opts.label || 'Photo de l’entrée') + ' ', h('span', { class: 'hint' }, opts.optional ? '(facultatif)' : '(conseillé)')),
-        p ? h('img', { class: 'photo-prev', src: p, alt: 'Aperçu : ' + (opts.label || 'photo de l’entrée') }) : null,
+        p ? h('img', { class: 'photo-prev' + (opts.ratio ? ' r45' : ''), src: p, alt: 'Aperçu : ' + (opts.label || 'photo de l’entrée') }) : null,
         h('div', { class: 'row' },
           h('button', { class: p || opts.optional ? 'btn ghost' : 'btn', type: 'button', onclick: function () { inp.click(); } }, icon('cam', 22), h('span', null, p ? 'Remplacer la photo' : 'Prendre ou choisir une photo')),
           p ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { opts.set(null); draw(); } }, 'Retirer') : null),
@@ -1618,48 +1701,67 @@
     }
     return wrap;
   }
-  // Photos de l'article dans la boutique : 5 au plus, la première est la principale (factures, fil).
+  // Photos de l'article dans la boutique : 5 au plus, la première est la principale (factures, fil), toutes au format 4:5.
   function productPhotos(pr) {
-    var st = { list: pr && pr.photo ? [pr.photo] : [], ready: !(pr && pr.photos > 1), changed: false, failed: false };
+    // items : { src (photo 4:5 ou ancienne photo), orig (pour recadrer), off (hors format) }
+    var st = { list: pr && pr.photo ? [{ src: pr.photo, orig: pr.photo }] : [], ready: !(pr && pr.photos > 1), changed: false, failed: false };
     var box = h('div', { class: 'stack', id: 'product-photos' });
     var msg = h('p', { class: 'msg', role: 'status' });
+    function check(it) {
+      urlToImage(it.src).then(function (im) { var off = !isRatio(im); if (off !== !!it.off) { it.off = off; draw(); } }, function () {});
+    }
     var inp = h('input', { type: 'file', accept: 'image/*', multiple: true, id: 'product-photo', hidden: true, onchange: function () {
       var files = Array.prototype.slice.call(inp.files || []).slice(0, 5 - st.list.length);
       inp.value = '';
       if (!files.length) return;
       msg.textContent = files.length > 1 ? 'Préparation des photos…' : 'Préparation de la photo…'; msg.className = 'msg info';
       files.reduce(function (pp, fl) {
-        return pp.then(function () { return compressPhoto(fl, 720).then(function (d) { if (st.list.length < 5) { st.list.push(d); st.changed = true; draw(); } }); });
+        return pp.then(function () { return importProductPhoto(fl).then(function (d) { if (st.list.length < 5) { st.list.push({ src: d.photo, orig: d.orig }); st.changed = true; draw(); } }); });
       }, Promise.resolve()).then(function () { msg.textContent = ''; }, function (e) { msg.textContent = e.message; msg.className = 'msg err'; });
     } });
-    if (!st.ready) sapi('fiila_product_photos', { p_id: pr.id }).then(function (l) { st.list = st.list.concat(l || []); st.ready = true; draw(); },
-      function () { st.failed = true; draw(); });
+    st.list.forEach(check);
+    if (!st.ready) sapi('fiila_product_photos', { p_id: pr.id }).then(function (l) {
+      (l || []).forEach(function (src) { var it = { src: src, orig: src }; st.list.push(it); check(it); });
+      st.ready = true; draw();
+    }, function () { st.failed = true; draw(); });
+    function recrop(it) {
+      cropSheet(it.orig).then(function (d) { if (d) { it.src = d; it.off = false; st.changed = true; draw(); } }, function (e) { msg.textContent = e.message; msg.className = 'msg err'; });
+    }
     function draw() {
-      var tiles = st.list.map(function (src, i) {
-        return h('div', { class: 'pp-tile' + (i === 0 ? ' main' : '') },
+      var tiles = st.list.map(function (it, i) {
+        return h('div', { class: 'pp-tile' + (i === 0 ? ' main' : '') + (it.off ? ' off' : '') },
           h('button', { type: 'button', class: 'pp-img', 'aria-label': i === 0 ? 'Photo principale' : 'Mettre la photo ' + (i + 1) + ' en principale',
             disabled: i === 0 || !st.ready || null, onclick: function () { st.list.unshift(st.list.splice(i, 1)[0]); st.changed = true; draw(); } },
-            h('img', { src: src, alt: '' })),
-          i === 0 && st.list.length > 1 ? h('span', { class: 'pp-badge' }, 'Principale') : null,
+            h('img', { src: it.src, alt: '' })),
+          i === 0 && st.list.length > 1 && !it.off ? h('span', { class: 'pp-badge' }, 'Principale') : null,
+          it.off ? h('span', { class: 'pp-badge warn' }, 'À recadrer') : null,
+          st.ready ? h('button', { type: 'button', class: 'pp-crop', 'aria-label': 'Recadrer la photo ' + (i + 1), onclick: function () { recrop(it); } }, icon('edit', 16)) : null,
           st.ready ? h('button', { type: 'button', class: 'pp-del', 'aria-label': 'Retirer la photo ' + (i + 1), onclick: function () { st.list.splice(i, 1); st.changed = true; draw(); } }, icon('trash', 16)) : null);
       });
       if (!st.ready && !st.failed) tiles.push(h('div', { class: 'pp-tile loading-skel', 'aria-hidden': 'true' }));
       if (st.ready && st.list.length < 5) tiles.push(h('button', { type: 'button', class: 'pp-add', id: 'product-photo-add', onclick: function () { inp.click(); } },
         icon('cam', 24), h('span', null, st.list.length ? 'Ajouter' : 'Ajouter des photos')));
+      var offN = st.list.filter(function (x) { return x.off; }).length;
       setKids(box,
-        h('span', { class: 'label' }, 'Photos de l’article ', h('span', { class: 'hint' }, '(facultatif, 5 au plus)')),
+        h('span', { class: 'label' }, 'Photos de l’article ', h('span', { class: 'hint' }, '(facultatif, 5 au plus, format 4:5)')),
         h('div', { class: 'pp-grid', id: 'product-photo-grid' }, tiles),
         st.failed ? h('p', { class: 'msg err' }, 'Photos supplémentaires indisponibles : rechargez la page pour les modifier.') : null,
-        st.list.length > 1 && st.ready ? h('p', { class: 'hint' }, 'Touchez une photo pour la mettre en principale.') : null,
+        offN ? h('p', { class: 'hint', id: 'product-photo-off' }, offN === 1 ? 'Une photo n’est pas au format des cartes : elle sera recadrée au centre à l’enregistrement, ou recadrez-la vous-même.'
+          : offN + ' photos ne sont pas au format des cartes : elles seront recadrées au centre à l’enregistrement, ou recadrez-les vous-même.')
+          : st.list.length > 1 && st.ready ? h('p', { class: 'hint' }, 'Touchez une photo pour la mettre en principale.') : null,
         inp, msg);
     }
     draw();
     return {
       el: box, count: function () { return st.list.length; },
+      // Photos à envoyer (null si rien n'a changé) ; les photos hors format sont recadrées au centre avant l'envoi.
       payload: function () {
-        if (!st.changed || !st.ready) return null;
-        var b = function (d) { return d.replace(/^data:[^,]+,/, ''); };
-        return { photo: st.list[0] ? b(st.list[0]) : '', photos: st.list.slice(1).map(b) };
+        var off = st.list.filter(function (x) { return x.off; });
+        if ((!st.changed && !off.length) || !st.ready) return Promise.resolve(null);
+        return Promise.all(off.map(function (it) { return urlToImage(it.src).then(function (im) { it.src = cropToRatio(im); it.off = false; }); })).then(function () {
+          var b = function (it) { return it.src.replace(/^data:[^,]+,/, ''); };
+          return { photo: st.list[0] ? b(st.list[0]) : '', photos: st.list.slice(1).map(b) };
+        });
       }
     };
   }
@@ -5171,10 +5273,11 @@
       if (stock !== null && !(stock >= 0)) return errBox(err, new ApiError('invalid_stock'));
       var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active,
         category: f.category || null, sizes: splitTags(f.sizes), colors: splitTags(f.colors), stock: stock };
-      var pp = photos.payload();
-      if (pp) { p.photo = pp.photo; p.photos = pp.photos; }
       btn.disabled = true;
-      sapi('fiila_product_save', { p: p }).then(function (res) {
+      photos.payload().then(function (pp) {
+        if (pp) { p.photo = pp.photo; p.photos = pp.photos; }
+        return sapi('fiila_product_save', { p: p });
+      }).then(function (res) {
         if (!pr) track('product_created', photos.count() ? 'photo' : 'no_photo');
         var nid = res && (res.id || (res.product && res.product.id));
         if (!pr && nid && p.active !== false) { go('#/boutique/article/' + nid + '?publier=1'); return; }
@@ -5776,7 +5879,7 @@
       return page(backBtn('Vide-dressing', '#/vide-dressing'),
         h('h1', null, ed ? 'Corriger l’article' : 'Vendre un vêtement d’enfant'),
         ed && ed.reason ? h('div', { class: 'notice' }, 'Correction demandée : ' + ed.reason) : null,
-        photoField({ id: 'vd-photo', label: 'Photo du vêtement', get: function () { return f.photo; }, set: function (v) { f.photo = v; }, maxSide: 960 }),
+        photoField({ id: 'vd-photo', label: 'Photo du vêtement', ratio: true, get: function () { return f.photo; }, set: function (v) { f.photo = v; }, maxSide: 960 }),
         h('label', { class: 'check-line' }, h('input', { type: 'checkbox', id: 'vd-photo-ok', onchange: function (e) { photoOk = e.target.checked; } }),
           'Le vêtement seul : aucun enfant reconnaissable sur la photo'),
         textField({ id: 'vd-title', label: 'Article', max: 80, value: f.title, placeholder: 'Ex. : Robe en coton fleurie', onInput: function (v) { f.title = v; } }),
@@ -6125,7 +6228,7 @@
         kpi('addresses', boNum(k.addresses), 'adresses actives', boNum(k.meetings) + ' événements'),
         kpi('couriers', boNum(k.couriers), 'livreurs', boNum(k.ambassadors) + ' ambassadeurs actifs'),
         kpi('members', boNum(k.shop_members || 0), 'membres d’équipe de boutiques', boNum(k.phones_verified || 0) + ' numéros confirmés par SMS'),
-        kpi('photos', boNum(k.multi_photos || 0), 'articles à plusieurs photos', 'carrousel dans la vitrine et le fil'),
+        kpi('photos', boNum(k.multi_photos || 0), 'articles à plusieurs photos', (k.off_format ? boNum(k.off_format) + ' photo(s) principale(s) hors format 4:5' : 'toutes au format 4:5')),
         kpi('feed', boNum(k.feed_left), 'places gratuites restantes', 'sur 25 dans le fil')),
       h('div', { class: 'bo-grid2' },
         h('section', { class: 'card stack tight', id: 'bo-queues' }, h('h2', null, 'À traiter'),
@@ -6206,7 +6309,8 @@
       return boShell('boutiques', s.name, [
         h('p', null, boShopState(s), ' ', s.rank ? boBadge('info', 'Fil · place ' + s.rank + (s.feed ? '' : ' (masquée)')) : null),
         h('div', { class: 'bo-kpis small' },
-          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.products)), h('span', null, 'articles'), st.multi_photos ? h('small', { class: 'muted' }, boNum(st.multi_photos) + ' à plusieurs photos') : null),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.products)), h('span', null, 'articles'), st.multi_photos ? h('small', { class: 'muted' }, boNum(st.multi_photos) + ' à plusieurs photos') : null,
+            st.off_format ? h('small', { class: 'bo-warn', id: 'bo-shop-off-format' }, boNum(st.off_format) + ' hors format 4:5 (recadrées à la prochaine modification)') : null),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.orders)), h('span', null, 'commandes'), h('small', { class: 'muted' }, boNum(st.delivered) + ' livrées')),
           h('div', { class: 'bo-kpi' }, h('strong', null, fcfa(st.gmv)), h('span', null, 'volume livré')),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.customers)), h('span', null, 'clients')),
