@@ -49,6 +49,7 @@ export function makeHandler({ env, fetch, timeoutMs = 20000 }) {
     if (!env('WA_TOKEN') || !env('WA_PHONE_ID') || !to || !body) return false;
     const r = await fetch(`${GRAPH}/${env('WA_PHONE_ID')}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env('WA_TOKEN') },
       body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: String(body).slice(0, 4000), preview_url: true } }) });
+    if (!r.ok) { const e = await r.json().catch(() => ({})); console.log(JSON.stringify({ wa_send: 'failed', status: r.status, code: e.error && e.error.code, subcode: e.error && e.error.error_subcode, type: e.error && e.error.type })); }
     return r.ok;
   }
   async function handleInbound(m) {
@@ -91,11 +92,15 @@ export function makeHandler({ env, fetch, timeoutMs = 20000 }) {
       } catch (e) { return json(e.status === 400 ? 400 : 502, { error: 'failed' }); }
     }
     // Notification de Meta : signature obligatoire.
-    const secret = env('WA_APP_SECRET');
+    const secret = String(env('WA_APP_SECRET') || '').trim();
     const sig = String(req.headers.get('x-hub-signature-256') || '').replace(/^sha256=/, '');
-    if (!secret || !sig || !same(sig, await hmacHex(secret, raw))) return new Response('bad signature', { status: 401 });
+    if (!secret || !sig || !same(sig, await hmacHex(secret, raw))) {
+      // Diagnostic sans valeur secrète : une clé secrète d'app Meta fait 32 caractères hexadécimaux.
+      console.log(JSON.stringify({ webhook_signature: 'refused', secret_set: secret !== '', secret_len: secret.length, secret_hex: /^[0-9a-f]+$/.test(secret), signature_present: sig !== '' }));
+      return new Response('bad signature', { status: 401 });
+    }
     for (const m of inboundMessages(body)) {
-      try { await handleInbound(m); } catch (_e) { /* un message en échec n'empêche pas les autres ; la réponse de secours arrive à la lecture suivante */ }
+      try { await handleInbound(m); } catch (e) { console.log(JSON.stringify({ wa_inbound: 'failed', error: String((e && e.message) || e).slice(0, 200) })); /* un message en échec n'empêche pas les autres */ }
     }
     return json(200, { ok: true });
   };
