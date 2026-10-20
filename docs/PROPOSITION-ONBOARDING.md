@@ -1,114 +1,106 @@
-# Proposition — Parcours d'accueil (onboarding) et accueil allégé
+# Proposition — Parcours d'accueil et accueil allégé (v2)
 
-> Statut : **PROPOSITION, en attente de validation du fondateur** (20/10/2026, 23:15).
-> Rédigée par le Builder (Claude). À relire par ChatGPT, puis à valider par Assane. Rien n'est construit avant validation, sauf le point 0 (déjà livré).
+> Statut : **v2, en attente de validation du fondateur** (20/10/2026, 23:40).
+> v1 rédigée par le Builder (Claude) ; relue par ChatGPT (verdict : « valider avec changements », 5 changements) ; v2 = v1 + ces 5 changements + 2 arbitrages du Builder signalés (A1, A2). Rien n'est construit avant validation, sauf le point 0.
 
 ## Le problème
 
-Retour d'utilisateurs proches, même critiques : l'application plaît, mais **une personne qui arrive sans connaître le concept est perdue**. L'accueil montre d'emblée 1 grande action, 4 raccourcis, une phrase d'explication, une carte d'installation, des suggestions, des listes, le fil des boutiques et une section « Plus sur Fii La ». Tout est utile, mais tout arrive en même temps.
+Une personne qui arrive sans connaître le concept est perdue : l'accueil montre tout en même temps (grande action, 4 raccourcis, phrase d'explication, installation, suggestions, listes, fil, « Plus sur Fii La »).
 
 ## Le principe
 
-**Une personne découvre Fii La par ce qu'on lui a envoyé, puis ajoute les fonctions une à une, quand elle le veut.**
+**On entre par son besoin (le lien reçu), on retrouve facilement ses activités, on découvre les autres services un à un.**
 
-1. Chacun entre par un lien (une demande d'adresse, une vitrine, un événement, une livraison, une invitation d'équipe).
-2. Il fait **l'action de base**, sans compte, sans explication préalable.
-3. À la fin, il reçoit **une seule belle carte** : ce qu'il vient de faire, et 2 ou 3 choix adaptés à sa situation (« Ouvrir ma boutique », « Devenir livreur », « Créer mon adresse »…), plus « Plus tard ».
-4. Chaque fonction choisie s'installe en **3 étapes au maximum**, une carte par étape, un seul bouton par carte, une barre de progression.
-5. L'accueil ne montre ensuite **que les fonctions qu'il a installées**, avec un bouton bien visible **« + Ajouter une fonction »**.
+- Aucun service ne s'« installe » : tout est déjà disponible. **Le premier usage d'un service ajoute son raccourci** à l'accueil.
+- Après une action, la tâche en cours passe d'abord ; la découverte vient ensuite, discrète.
+- On mesure des **tâches réussies**, pas des tuiles ajoutées.
 
 ## 0. Thème automatique — déjà livré (20/10, 23:10)
 
-Le choix « Clair / Sombre / Automatique » en bas de page est supprimé. L'application suit toujours le réglage du téléphone. Un ancien choix gardé sur un téléphone est effacé. Test automatique mis à jour (téléphone clair → clair, téléphone sombre → sombre).
+Sélecteur « Clair / Sombre / Automatique » supprimé ; l'application suit le réglage du téléphone ; ancien choix effacé ; test mis à jour.
 
-## 1. Le nouvel accueil (léger)
-
-De haut en bas, rien d'autre :
+## 1. Accueil léger (lot 1)
 
 | Zone | Contenu |
 |---|---|
-| En-tête | Logo, photo du compte (si connecté), « Bonjour, Prénom ». |
-| Action principale | « Créer mon adresse » (inchangée : c'est la promesse de Fii La). |
-| Mes fonctions | Les tuiles des fonctions **installées** uniquement (Boutique, Livreur, Événement, Demander une adresse, Vide-dressing, Ambassadeur). |
-| Ajouter | Un bouton large et visible **« + Ajouter une fonction »**. |
-| Mes éléments | Les listes existantes (adresses, demandes, événements), seulement si elles ne sont pas vides. |
-| Découvrir | Le fil des boutiques (carrousel), une seule rangée. |
+| En-tête | Logo, photo du compte, « Bonjour, Prénom ». |
+| Action principale | **Nouveau visiteur** : « Créer mon adresse ». **Activité commencée et non finie** : « Reprendre… » (ex. « Reprendre ma boutique »). **Sinon** : l'activité la plus utilisée (A1). |
+| Mes activités | Les raccourcis des services déjà utilisés (Boutique, Livreur, Événement, Demander une adresse, Vide-dressing enfants, Ambassadeur, Mes adresses). |
+| Découvrir | Un bouton large et visible **« Découvrir les services »**. |
+| Listes | Adresses, demandes, événements, seulement si non vides. |
+| En bas | Fil des boutiques, une rangée, chargé après le reste (décision du 19/10). |
 
-Retirés de l'accueil : la phrase d'explication « Événement : mariage… » (elle va dans la carte de la fonction), la section « Plus sur Fii La » (son contenu devient des fonctions à ajouter), le sélecteur de thème (fait). La carte « Installer l'app » n'apparaît qu'à partir de la 2ᵉ visite.
+Retirés : phrase « Événement : mariage… », section « Plus sur Fii La », sélecteur de thème (fait). « Installer l'app » à partir de la 2ᵉ visite.
 
-**Aucune régression pour les utilisateurs actuels** : une fonction déjà utilisée sur le téléphone est installée d'office (boutique existante → Boutique ; livreur inscrit → Livreur ; un événement créé → Événement ; etc.).
+**Reprise des activités existantes** : les raccourcis sont retrouvés à partir de ce qui existe déjà — le compte (boutique, rôle de livreur, ambassadeur) et les clés gardées sur le téléphone (adresses, événements, demandes) — sans mélanger les droits : un raccourci ne donne jamais un accès que la personne n'a pas. Retirer un raccourci ne retire aucun accès.
 
-**Nouveau visiteur sans lien** : « Créer mon adresse » + « + Ajouter une fonction ». C'est tout.
+**A1 (arbitrage Builder)** — ChatGPT propose « la dernière activité utilisée » comme action principale. Je recommande **la plus utilisée sur 14 jours** : l'action principale ne doit pas changer d'une visite à l'autre (un repère qui bouge désoriente).
 
-## 2. « + Ajouter une fonction » (feuille du bas)
+## 2. « Découvrir les services » (feuille du bas, lot 1)
 
-Une carte par fonction, avec une illustration simple, une phrase, un bouton « Ajouter ». Ordre :
+Une carte par service : pictogramme existant, une phrase, un bouton qui **ouvre directement le parcours** (pas d'activation).
 
-| Fonction | Phrase | Pour qui |
+| Service | Phrase | Le bouton ouvre |
 |---|---|---|
-| Boutique | Vendez en ligne : vitrine, commandes, factures, adresse exacte des clientes. | Commerçants |
-| Vente personnelle (vide-dressing) | Vendez ou achetez des articles d'occasion près de chez vous. | Particuliers |
-| Livreur | Recevez les courses de vos commerçants avec l'adresse exacte. | Livreurs |
-| Événement | Un seul lien pour que tous vos invités trouvent le lieu. | Tout le monde |
-| Demander une adresse | Recevez l'adresse exacte d'un client en un lien. | Commerçants, livreurs |
-| Ambassadeur | Gagnez de l'argent en installant Fii La chez les commerçants. | Tout le monde |
+| Boutique | Vendez en ligne : vitrine, commandes, factures, adresse exacte des clientes. | Le démarrage guidé (lot 2) |
+| Demander une adresse | Recevez l'adresse exacte d'un client en un lien. | Le parcours existant |
+| Événement | Un seul lien pour que tous vos invités trouvent le lieu. | Le parcours existant |
+| Livreur | Recevez les courses de vos commerçants, avec l'adresse exacte. | L'espace livreur existant (invitation par le commerçant, livreur attitré) |
+| Vide-dressing enfants | Proposez un article enfant à Fii La, ou achetez. | Le vide-dressing existant (tenu par Fii La) |
+| Ambassadeur | Gagnez de l'argent en installant Fii La chez les commerçants, après formation et validation. | L'espace ambassadeur existant (formation, test, validation inchangés) |
 
-Une fonction installée disparaît de la feuille et apparaît dans « Mes fonctions ». On peut la retirer de l'accueil (appui long ou « Retirer de l'accueil »), sans rien supprimer.
+Aucune carte ne promet plus que le service actuel (la « vente personnelle » au sens large n'existe pas encore : à décider séparément si souhaitée).
 
-## 3. La carte de fin d'action, selon le lien reçu
+## 3. Démarrage guidé de la boutique (lot 2)
 
-Une seule carte, jamais bloquante, toujours avec « Plus tard ». Elle ne revient pas si la personne a dit « Plus tard » (7 jours de silence, comme les suggestions actuelles).
+1. **Nom et type de commerce** → « Continuer ».
+2. **Premier article** : nom, prix, photo (facultative) → « Continuer ». « Plus tard » possible.
+3. **Aperçu de la vitrine** → « Ouvrir ma vitrine » (choix explicite) → « Partager sur WhatsApp ».
 
-| Lien reçu | Action de base | Carte de fin : titre | Choix proposés (2 à 3) |
-|---|---|---|---|
-| Demande d'adresse (d'un commerçant ou livreur) | Donner son adresse | « C'est envoyé. » | Garder mon adresse pour mes prochaines livraisons · Vous vendez aussi ? Ouvrir ma boutique |
-| Vitrine d'une boutique | Commander | « Commande envoyée. » | Créer mon adresse (livraisons plus rapides) · Ouvrir ma boutique |
-| Événement | Voir le lieu, itinéraire | « Bon trajet. » | Créer mon événement · Créer mon adresse |
-| Fiche d'adresse partagée | Itinéraire | « Vous êtes arrivé ? » | Créer mon adresse |
-| Course de livraison (livreur) | Livrer | « Course terminée. » | Installer l'espace Livreur |
-| Invitation d'équipe de boutique | Rejoindre | « Bienvenue dans l'équipe. » | (aucun choix : on entre dans la boutique) |
-| Lien d'ambassadeur (commerçant parrainé) | — | Parcours Boutique directement (3 étapes) | — |
+- Si l'article est sauté : boutique enregistrée, **vitrine non proposée au partage** (une boutique vide n'est pas prête).
+- Chaque étape est enregistrée ; une interruption reprend au même endroit (« Reprendre ma boutique » sur l'accueil).
+- Fin : carte de réussite légère + **une seule** prochaine étape, puis le moteur de suggestions existant prend le relais les jours suivants.
+- « 3 étapes » est une cible, pas une règle absolue.
+- Forme : une carte par écran, un titre, une phrase, un bouton principal, « Plus tard » discret, progression 1/3 → 3/3.
 
-## 4. L'installation guidée d'une fonction (3 étapes au maximum)
+## 4. Découverte après action (lot 3)
 
-Exemple **Boutique** :
-1. **Nom et type de commerce** (un champ, une liste) → « Continuer ».
-2. **Premier article** (une photo, un prix) → « Continuer » (ou « Plus tard »).
-3. **Partager ma vitrine** sur WhatsApp → « Partager ».
-→ Carte de réussite (animation légère) : « Votre boutique est prête. » + **une seule** prochaine étape, qui reviendra les jours suivants par le moteur de suggestions déjà en place (« Ajoutez 2 ou 3 articles », etc.).
+La tâche du lien reste l'action principale ; la découverte est **une seule proposition secondaire, discrète et masquable**, sous l'action principale — jamais une carte qui surgit.
 
-Exemple **Livreur** : 1) nom et numéro → 2) quartier → 3) partager mon lien de livreur à mes commerçants → réussite.
+| Lien reçu | Action principale après la tâche | Proposition secondaire (une) |
+|---|---|---|
+| Vitrine → commande | « Donner mon adresse » si elle manque ; sinon « Voir ma commande » | Ouvrir ma boutique |
+| Demande d'adresse → réponse | « Retrouver mon adresse » (sans recréer la fiche) | Demander une adresse à mes clients |
+| Fiche d'adresse reçue | « Itinéraire » (inchangé) | Créer mon adresse (sous l'itinéraire, rien au départ vers Maps) |
+| Événement reçu | « Itinéraire » (inchangé) | Créer mon événement |
+| Course de livraison | Parcours livreur inchangé | Mon espace livreur |
+| Invitation d'équipe | Entrer dans la boutique | — |
 
-Règles de forme pour toutes les cartes : un titre court, une phrase, une illustration, **un seul bouton principal**, un lien discret « Plus tard », une barre de progression (1/3, 2/3, 3/3), une carte par écran, rien d'autre visible.
+**A2 (arbitrage Builder)** — Vous aviez demandé que la personne ait « le choix entre plusieurs fonctionnalités ». ChatGPT recommande une seule proposition. Les deux tiennent : **une proposition adaptée + un lien « Voir tous les services »** qui ouvre la feuille « Découvrir les services ». Le choix reste complet, sans concurrencer la tâche.
 
-## 5. Back-office (règle du 20/10)
+## 5. Back-office (dans chaque lot)
 
-Nouvelle rubrique **« Parcours d'accueil »** :
-- **Voir** : pour chaque entrée (demande, vitrine, événement, livraison…), le taux qui va de l'action de base → carte vue → choix cliqué → fonction installée ; les fonctions les plus installées.
-- **Agir / régler** : activer ou couper chaque carte de fin d'action et le nouvel accueil (réglage `onboarding_v2`, coupé = retour à l'accueil actuel, sans redéploiement) ; ordre des fonctions dans « + Ajouter ».
-- **Tracer** : chaque changement de réglage dans le journal d'administration.
-- **Tester** : aperçu de chaque carte depuis le back-office.
+Rubrique **« Parcours d'accueil »** :
+- **Voir** (agrégé, anonyme) : par entrée et par service, carte vue → choix touché → **tâche réussie** (adresse envoyée, premier article enregistré, vitrine ouverte, invitation acceptée). « Partage ouvert » n'est jamais présenté comme « message envoyé ».
+- **Régler** : réglage `onboarding_v2` (coupé = accueil actuel, sans redéploiement) ; chaque proposition secondaire activable ou coupable ; ordre des services.
+- **Tracer** : chaque changement dans le journal d'administration.
+- **Tester** : aperçu de chaque carte.
 
-Mesure anonyme (comme les suggestions actuelles) : aucune donnée personnelle, seulement des compteurs.
+## 6. Déploiement (3 lots ; durées = estimations, le passage dépend des preuves)
 
-## 6. Déploiement proposé (3 lots, chacun testé et réversible)
+| Lot | Contenu | Critère de passage |
+|---|---|---|
+| 1 | Accueil léger, Mes activités, Découvrir les services, reprise des activités existantes, réglage de retour arrière, back-office minimal | Tests verts ; **recette sur un Android et un iPhone physiques** par le fondateur : retrouver une activité existante, découvrir un service, ouvrir un lien reçu sur WhatsApp. Aucun accès perdu, aucun compte imposé. |
+| 2 | Démarrage guidé de la boutique (les autres services gardent leurs parcours) | **3 novices** réussissent sans aide : créer la boutique, ajouter un article, ouvrir la vitrine, transmettre le lien à un 2ᵉ téléphone ; interruption et reprise vérifiées ; la même personne peut acheter ailleurs sans perdre sa boutique. |
+| 3 | Découverte après action (§4) | Chaque lien garde sa tâche principale ; aucune suggestion ne détourne d'une adresse manquante ou d'une commande en cours ; 7 jours d'observation des tâches réussies et abandons (7 jours ne valent pas validation à eux seuls). |
 
-| Lot | Contenu | Durée estimée | Critère pour passer au suivant |
-|---|---|---|---|
-| 1 | Accueil léger + « + Ajouter une fonction » + installation d'office pour les utilisateurs actuels + réglage `onboarding_v2` + rubrique back-office (vue simple) | 1 session | Tests automatiques verts ; capture validée par le fondateur ; aucun utilisateur actuel ne perd une tuile |
-| 2 | Cartes de fin d'action pour les 6 liens + mesures | 1 session | Test sur téléphone par 3 proches (dont un qui ne connaît pas l'app) : chacun comprend quoi faire sans aide |
-| 3 | Installations guidées en 3 étapes (Boutique, Livreur, Événement, Vente personnelle, Demander, Ambassadeur) + carte de réussite | 1 à 2 sessions | Taux « carte vue → fonction installée » suivi 7 jours dans le back-office |
+## 7. Volontairement exclu
 
-Chaque lot : tests navigateur Chrome et Safari (iPhone), captures clair et sombre, back-office livré dans le même commit, retour arrière par le réglage `onboarding_v2`.
+Tutoriel au premier lancement ; compte obligatoire ; choix de « profil » au démarrage ; illustrations dédiées (pictogrammes existants sur les 3 lots ; une petite capture réelle de l'interface quand il faut montrer un geste).
 
-## 7. Ce qui n'est pas proposé (volontairement)
+## 8. À valider par le fondateur
 
-- Pas de tutoriel en plusieurs écrans au premier lancement : on apprend en faisant.
-- Pas de compte obligatoire (décision du 17/10, maintenue).
-- Pas de choix de « profil » au démarrage (commerçant / client / livreur) : c'est le lien reçu et les fonctions ajoutées qui définissent l'usage. Une personne peut être cliente le matin et vendeuse le soir.
-
-## 8. Questions ouvertes pour le fondateur
-
-1. « Créer mon adresse » reste-t-il l'action principale de l'accueil pour tout le monde ? (Recommandation : oui, c'est la promesse.)
-2. Le fil des boutiques reste-t-il sur l'accueil d'un nouveau visiteur ? (Recommandation : oui, une rangée, en bas.)
-3. Illustrations des cartes : pictogrammes actuels agrandis (rapide) ou illustrations dédiées produites par GPT Image dans le style de l'icône (plus beau, à produire) ? (Recommandation : pictogrammes au lot 1-2, illustrations au lot 3.)
+1. La v2 dans son ensemble.
+2. A1 : action principale = activité la plus utilisée sur 14 jours (au lieu de la dernière).
+3. A2 : une proposition + « Voir tous les services » après une action.
+4. Hors proposition : élargir le vide-dressing enfants à la vente personnelle de tout article — sujet séparé, non inclus ici.
