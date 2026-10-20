@@ -442,17 +442,17 @@
   // PKCE : le lien reçu par e-mail ne contient qu'un code, échangé avec un secret resté sur ce téléphone.
   // Un lien fabriqué par un tiers ne peut donc ouvrir aucune session ici.
   function b64url(bytes) { var s = ''; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
-  function pkceStart(kind) {
+  function pkceStart(kind, after) {
     var v = new Uint8Array(32); crypto.getRandomValues(v);
     var verifier = b64url(v);
-    LS.set('fiila.pkce', { verifier: verifier, kind: kind, at: Date.now() });
+    LS.set('fiila.pkce', { verifier: verifier, kind: kind, at: Date.now(), after: after || undefined });
     return crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)).then(function (d) {
       return { code_challenge: b64url(new Uint8Array(d)), code_challenge_method: 's256' };
     });
   }
   var account = {
-    signUp: function (email, password, name, source) {
-      return pkceStart('signup').then(function (pk) {
+    signUp: function (email, password, name, source, after) {
+      return pkceStart('signup', after).then(function (pk) {
         return authCall('/signup?redirect_to=' + encodeURIComponent(baseUrl()), 'POST',
           Object.assign({ email: email, password: password, data: { display_name: name || undefined } }, pk));
       }).then(function (r) {
@@ -535,7 +535,7 @@
     if (!pk || !pk.verifier || Date.now() - pk.at > 3600e3) { clean('#/compte?lien=invalide'); return Promise.resolve(); }
     return authCall('/token?grant_type=pkce', 'POST', { auth_code: code, code_verifier: pk.verifier }).then(function (r) {
       saveSession(r);
-      clean(pk.kind === 'recovery' ? '#/compte?mdp=1' : '#/compte?bienvenue=1');
+      clean(pk.kind === 'recovery' ? '#/compte?mdp=1' : pk.after && /^#\/[a-z0-9\/-]{1,40}$/.test(pk.after) ? pk.after : '#/compte?bienvenue=1');
     }, function () { clean('#/compte?lien=invalide'); });
   })();
 
@@ -2522,7 +2522,7 @@
       else if (p[0] === 'boutiques' && p[1] === 'liste') view = viewShops();
       else if (p[0] === 'enregistres' && !p[1]) view = viewSaved();
       else if (p[0] === 'demo' && !p[1]) view = viewDemo(r.q);
-      else if (p[0] === 'ambassadeur' && !p[1]) view = viewAmbassador();
+      else if ((p[0] === 'ambassadeur' || p[0] === 'carriere') && !p[1]) view = viewAmbassador();
       else if (p[0] === 'vide-dressing' && !p[1]) view = viewVideDressing();
       else if (p[0] === 'vide-dressing' && p[1] === 'vendre') view = viewVdSell(r.q);
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
@@ -4255,7 +4255,7 @@
 
   // Code à 6 chiffres reçu par e-mail (mot de passe oublié, activation du compte). Il marche quel que soit l'endroit
   // où l'e-mail est ouvert ; le lien du même e-mail, lui, ne marche que dans le navigateur qui a fait la demande.
-  function emailCodeStep(root, kind, email) {
+  function emailCodeStep(root, kind, email, after) {
     var err = h('div', { role: 'alert' });
     var code = '';
     var input = h('input', { type: 'text', id: 'mail-code', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 10, pattern: '[0-9 ]*',
@@ -4267,7 +4267,7 @@
       btn.disabled = true;
       account.emailVerify(kind, email, c).then(function () {
         if (kind === 'recovery') go('#/compte?mdp=1');
-        else { track('account_created', 'code'); go('#/compte?bienvenue=1'); }
+        else { track('account_created', 'code'); go(after || '#/compte?bienvenue=1'); }
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'check', 'Valider');
     // Le lien reste la voie principale ; le code (si l'e-mail en contient un) se saisit dans une section repliée.
@@ -5553,6 +5553,43 @@
           h('span', { class: 'amb-path-dot', 'aria-hidden': 'true' }, icon(k < step ? 'check' : x[0] === 'book' ? 'edit' : x[0], 16)), h('span', { class: 'amb-path-l' }, x[1]));
       }));
   }
+
+  // Portail Fii La Carrière : connexion ou inscription sur place, retour direct à l'espace ambassadeur.
+  function ambAccess() {
+    var mode = 'signup', f = { name: '', email: '', password: '' };
+    var root = h('section', { class: 'card stack', id: 'amb-access' });
+    function draw() {
+      var err = h('div', { role: 'alert' });
+      var btn = h('button', { class: 'btn', type: 'submit', id: 'amb-auth-submit' }, mode === 'signup' ? 'Créer mon compte ambassadeur' : 'Me connecter');
+      function submit(ev) {
+        ev.preventDefault(); setKids(err);
+        var email = f.email.trim().toLowerCase();
+        if (mode === 'signup' && !f.name.trim()) return errBox(err, new ApiError('your_name_required'));
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return errBox(err, new ApiError('email_address_invalid'));
+        if (mode === 'signup' && f.password.length < 8) return errBox(err, new ApiError('weak_password'));
+        if (mode === 'login' && !f.password) return errBox(err, new ApiError('invalid_credentials'));
+        btn.disabled = true;
+        (mode === 'signup' ? account.signUp(email, f.password, f.name.trim(), 'ambassador', '#/ambassadeur') : account.signIn(email, f.password)).then(function (r) {
+          if (r && r.confirm) { emailCodeStep(root, 'signup', email, '#/ambassadeur'); return; }
+          toast(mode === 'signup' ? 'Compte créé. Bienvenue dans Fii La Carrière.' : 'Connecté.'); render();
+        }, function (e) { btn.disabled = false; errBox(err, e); });
+      }
+      setKids(root,
+        h('h2', null, 'Accès ambassadeur'),
+        h('div', { class: 'tabs', role: 'tablist' },
+          h('button', { type: 'button', role: 'tab', id: 'amb-tab-signup', 'aria-selected': String(mode === 'signup'), onclick: function () { mode = 'signup'; draw(); } }, 'Je commence'),
+          h('button', { type: 'button', role: 'tab', id: 'amb-tab-login', 'aria-selected': String(mode === 'login'), onclick: function () { mode = 'login'; draw(); } }, 'Me connecter')),
+        h('form', { class: 'stack', novalidate: true, onsubmit: submit },
+          mode === 'signup' ? textField({ id: 'amb-acc-name', label: 'Nom complet', max: 60, value: f.name, autocomplete: 'name', onInput: function (v) { f.name = v; } }) : null,
+          textField({ id: 'amb-acc-email', label: 'E-mail', type: 'email', inputmode: 'email', autocomplete: 'email', max: 254, value: f.email, onInput: function (v) { f.email = v; } }),
+          passwordField('amb-acc-pass', 'Mot de passe', mode === 'signup' ? 'new-password' : 'current-password', function (v) { f.password = v; }),
+          err, btn),
+        mode === 'login' ? h('a', { class: 'btn link small', href: '#/compte' + qs({ mode: 'oubli', retour: 'ambassadeur' }), style: 'align-self:flex-start' }, 'Mot de passe oublié ?')
+          : h('p', { class: 'hint' }, 'Votre compte porte vos gains et vos commerçants. Le même compte sert pour toute l’application.'));
+    }
+    draw();
+    return root;
+  }
   function viewAmbassador() {
     function hero(cta) {
       return inviteCard({ id: 'amb-hero', kind: 'Fii La Carrière', title: 'Devenez ambassadeur Fii La',
@@ -5561,9 +5598,8 @@
         cta: cta || null });
     }
     if (!authed()) {
-      return page(backBtn(), hero(ivcBtn('a', { id: 'amb-login', href: '#/compte' + qs({ mode: 'inscription', retour: 'ambassadeur' }) }, 'Créer mon compte')),
-        ambPath(0), ambLevels(null),
-        h('p', { class: 'hint' }, 'Un compte est obligatoire : vos gains y sont rattachés.'), footer());
+      return page(backBtn(), hero(ivcBtn('a', { id: 'amb-login', href: '#amb-access', onclick: function (e) { e.preventDefault(); var el = document.getElementById('amb-access'); if (el) { el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' }); var i = el.querySelector('input'); if (i) setTimeout(function () { try { i.focus({ preventScroll: true }); } catch (x) { /* rien */ } }, 350); } } }, 'Accéder à mon espace')),
+        ambAccess(), ambPath(0), ambLevels(null), footer());
     }
     var intro = hero(ivcBtn('a', { href: '#amb-form', id: 'amb-start', onclick: function (e) { e.preventDefault(); var el = document.getElementById('amb-form'); if (el) el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' }); } }, 'Commencer l’inscription'));
     return api('fiila_ambassador_me', {}).then(function (r) {

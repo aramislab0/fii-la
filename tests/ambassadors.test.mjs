@@ -61,6 +61,30 @@ await t('accueil → « Devenir ambassadeur » : les 3 niveaux et leurs montants
   await shot(A, '01-presentation');
 });
 
+await t('portail Fii La Carrière (#/carriere) : inscription sur place, puis connexion ; retour direct à l’espace ambassadeur', async () => {
+  const P = await newPhone();
+  await P.goto(URL0 + '#/carriere');
+  await P.locator('#amb-access').waitFor();
+  await P.click('#amb-login'); // « Accéder à mon espace » mène au formulaire
+  await P.fill('#amb-acc-name', 'Awa Portail');
+  await P.fill('#amb-acc-email', 'awa.portail@example.invalid');
+  await P.fill('#amb-acc-pass', 'motdepasse-test-123');
+  await shot(P, '00-portail');
+  await P.click('#amb-auth-submit');
+  await P.locator('#amb-register').waitFor();
+  assert.ok(/#\/carriere$/.test(P.url()), 'on reste dans Fii La Carrière');
+  await P.waitForFunction(() => document.getElementById('amb-name').value === 'Awa Portail');
+  // déconnexion puis connexion par l'onglet « J’ai déjà un compte »
+  await P.evaluate(() => localStorage.removeItem('fiila.session'));
+  await P.reload();
+  await P.click('#amb-tab-login');
+  await P.fill('#amb-acc-email', 'awa.portail@example.invalid');
+  await P.fill('#amb-acc-pass', 'motdepasse-test-123');
+  await P.click('#amb-auth-submit');
+  await P.locator('#amb-register').waitFor();
+  await P.context().close();
+});
+
 await t('inscription : charte obligatoire, puis formation en 6 fiches et test réussi → en attente de validation', async () => {
   await signup(A, 'Moussa Diop', 'moussa.amb@example.invalid', 'ambassadeur');
   await A.goto(URL0 + '#/ambassadeur');
