@@ -205,6 +205,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 20/10 06:34 | Audit et back-office v3 en production (run 39379661585, tout vert) ; vérifié en base : 0 photo de démo hors format, index des clés étrangères présents | GitHub Actions + lecture seule |
 | 20/10 06:18 | Audit système (tests, conseillers Supabase sécurité et performance, journaux d'API 24 h, données de production en lecture seule, secrets dans le dépôt) ; correctifs : index des clés étrangères, photos de démonstration au format 4:5 ; back-office v3 (recherche globale ⌘K, barre vitrée, onglets du bas, squelettes) ; 38 suites vertes | ce commit |
 | 20/10 05:41 | Back-office v2 et rubrique Ambassadeurs en production (run 39374985550 : tests, base, mise en ligne, tests en production verts) | GitHub Actions |
 | 20/10 05:27 | Back-office v2 (présentation) et rubrique Ambassadeurs native (`boAmbassadors`, `boAmbassador`, décisions `training` et `delete`) ; suppression du profil ambassadeur du fondateur par le MCP annulée à la confirmation (aucune modification) : il peut désormais le faire depuis la fiche ; 38 suites vertes | ce commit |
