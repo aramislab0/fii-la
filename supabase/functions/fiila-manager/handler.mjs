@@ -46,6 +46,28 @@ export function parseJson(text) {
   try { return JSON.parse(s.slice(i, j + 1)); } catch { return null; }
 }
 
+// Appel au modèle ; null si pas de clé, erreur ou réponse illisible.
+export async function askClaude({ env, fetch, timeoutMs = 25000 }, system, user, maxTokens) {
+  const key = env('ANTHROPIC_API_KEY');
+  if (!key) return null;
+  const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: env('MANAGER_MODEL') || DEFAULT_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }) });
+    if (!r.ok) return null;
+    const b = await r.json();
+    return parseJson((b.content || []).filter((c) => c.type === 'text').map((c) => c.text).join(''));
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+// Réponse du Manager à un message (contexte de fiila_amb_manager_context) : IA si activée et utilisable, sinon règles.
+export async function draftReply(deps, ctx) {
+  let out = ctx.llm ? await askClaude(deps, replyPrompt(ctx), ctx.message.body, 600) : null;
+  const usable = !!(out && typeof out.reply === 'string' && out.reply.trim().length > 1);
+  if (!usable) out = { reply: ctx.fallback, tags: [], escalate: (ctx.message.tags || []).includes('probleme') };
+  return { reply: String(out.reply).trim().slice(0, 1500), tags: Array.isArray(out.tags) ? out.tags.filter((t) => TAGS.includes(t)) : [], escalate: !!out.escalate, mode: usable ? 'ia' : 'rules' };
+}
+
 export function makeHandler({ env, fetch, timeoutMs = 25000 }) {
   const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
   const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
@@ -57,19 +79,7 @@ export function makeHandler({ env, fetch, timeoutMs = 25000 }) {
     if (!r.ok) { const e = new Error((body && body.message) || 'rpc ' + r.status); e.status = r.status; throw e; }
     return body;
   }
-  async function claude(system, user, maxTokens) {
-    const key = env('ANTHROPIC_API_KEY');
-    if (!key) return null;
-    const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: ctrl.signal,
-        headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: env('MANAGER_MODEL') || DEFAULT_MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }) });
-      if (!r.ok) return null;
-      const b = await r.json();
-      return parseJson((b.content || []).filter((c) => c.type === 'text').map((c) => c.text).join(''));
-    } catch { return null; } finally { clearTimeout(timer); }
-  }
+  const claude = (system, user, maxTokens) => askClaude({ env, fetch, timeoutMs }, system, user, maxTokens);
   async function userOf(token) {
     const r = await fetch(`${base()}/auth/v1/user`, { headers: { apikey: env('SUPABASE_ANON_KEY'), Authorization: 'Bearer ' + token } });
     if (!r.ok) return null;
@@ -90,12 +100,9 @@ export function makeHandler({ env, fetch, timeoutMs = 25000 }) {
         const ctx = await rest('fiila_amb_manager_context', { p_message: body.message });
         if (ctx.user_id !== uid) return json(403, { error: 'not_allowed' });
         if (ctx.message.answered) return json(200, { ok: true, mode: 'done' });
-        let out = ctx.llm ? await claude(replyPrompt(ctx), ctx.message.body, 600) : null;
-        const usable = out && typeof out.reply === 'string' && out.reply.trim().length > 1;
-        if (!usable) out = { reply: ctx.fallback, tags: [], escalate: (ctx.message.tags || []).includes('probleme') };
-        await rest('fiila_amb_manager_post', { p_message: ctx.message.id, p_reply: out.reply.trim().slice(0, 1500),
-          p_tags: Array.isArray(out.tags) ? out.tags.filter((t) => TAGS.includes(t)) : [], p_escalate: !!out.escalate });
-        return json(200, { ok: true, mode: usable ? 'ia' : 'rules' });
+        const d = await draftReply({ env, fetch, timeoutMs }, ctx);
+        await rest('fiila_amb_manager_post', { p_message: ctx.message.id, p_reply: d.reply, p_tags: d.tags, p_escalate: d.escalate });
+        return json(200, { ok: true, mode: d.mode });
       }
       if (body.action === 'digest') {
         const me = await rest('fiila_bo_me', {}, token);

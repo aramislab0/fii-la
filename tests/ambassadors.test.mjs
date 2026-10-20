@@ -242,15 +242,22 @@ await t('back-office : Manager Carrière — cap du mois, conversation de l’am
   await F.click('#bo-obj-save');
   await F.getByText('Cap du mois enregistré.').waitFor();
   await F.locator('#bo-objective').getByText('Priorité aux restaurants de Yoff.').waitFor();
+  // Canal WhatsApp du Manager : numéro réglé par le Head of Stratégie (ici le super admin).
+  F.once('dialog', (d) => d.accept('+221 77 999 00 00'));
+  await F.click('#bo-wa-edit');
+  await F.getByText('Numéro WhatsApp enregistré.').waitFor();
+  await F.locator('#bo-wa').getByText('+221779990000').waitFor();
   await F.locator('#bo-threads-table tbody tr').filter({ hasText: 'Moussa Diop' }).locator('td').nth(1).click();
   await F.locator('#bo-career-thread').getByText('Quand suis-je payé ?').waitFor();
   await F.locator('#bo-career-thread').getByText(/vraie vitrine/).waitFor();
+  assert.equal(await F.locator('#bo-career-wa').getAttribute('href'), 'https://wa.me/221775000001?text=' + encodeURIComponent('Bonjour Moussa, c’est votre Manager Fii La Carrière.'));
   await F.fill('#bo-career-input', 'Bravo Moussa, continuez !');
   await F.click('#bo-career-send');
   await F.getByText('Message envoyé.').waitFor();
   await shot(F, '08-bo-manager');
   await A.goto(URL0 + '#/'); await A.goto(URL0 + '#/ambassadeur');
   await A.locator('#amb-manager').getByText('Priorité aux restaurants de Yoff.').waitFor();
+  assert.match(await A.locator('#amb-wa').getAttribute('href'), /^https:\/\/wa\.me\/221779990000\?text=Bonjour%2C%20c%E2%80%99est%20Moussa/);
   await A.click('#amb-chat-open');
   await A.locator('#mgr-thread').getByText('Bravo Moussa, continuez !').waitFor();
   await A.click('#mgr-close');

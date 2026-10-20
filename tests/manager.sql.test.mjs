@@ -181,6 +181,42 @@ await t('découverte progressive : réglage public, mesure anonyme des suggestio
   await ok('fiila_bo_setting_set', { p_key: 'nudges', p_value: 1 }, ADMIN);
 });
 
+await t('WhatsApp : numéro du Manager (Head of Stratégie), message reçu sur WhatsApp dans la même conversation, réponse sur le même canal', async () => {
+  await ko('fiila_bo_manager_whatsapp_set', { p_phone: '77 999 00 00' }, 'not_allowed', A);
+  await ko('fiila_bo_manager_whatsapp_set', { p_phone: '12' }, 'phone_required', HEAD);
+  assert.equal((await ok('fiila_bo_manager_whatsapp_set', { p_phone: '77 999 00 00' }, HEAD)).whatsapp, '221779990000');
+  assert.equal((await ok('fiila_amb_today', {}, A)).whatsapp, '221779990000');
+  assert.equal((await ok('fiila_bo_career', {}, ADMIN)).whatsapp, '221779990000');
+  // Message WhatsApp d'Awa (numéro au format international) : reconnu, réponse sans IA sur WhatsApp.
+  await ko('fiila_wa_inbound', { p_phone: '221776000001', p_body: 'x', p_wamid: 'w0' }, 'permission denied', A);
+  assert.equal((await ok('fiila_wa_inbound', { p_phone: '221776000001', p_body: 'x', p_wamid: 'w0' }, SVC)).off, true, 'API coupée : rien enregistré');
+  await ok('fiila_bo_setting_set', { p_key: 'amb_whatsapp', p_value: 1 }, ADMIN);
+  const r = await ok('fiila_wa_inbound', { p_phone: '221776000001', p_body: 'Mon code ne marche pas', p_wamid: 'wamid.1' }, SVC);
+  assert.equal(r.known, true); assert.match(r.reply, /transmets/);
+  assert.equal((await ok('fiila_wa_inbound', { p_phone: '221776000001', p_body: 'Mon code ne marche pas', p_wamid: 'wamid.1' }, SVC)).duplicate, true, 'renvoi de Meta ignoré');
+  const last2 = (await db.query(`select author, channel from fiila.amb_messages where ambassador_id = $1 order by created_at desc limit 2`, [AID])).rows;
+  assert.deepEqual(last2.map((x) => x.channel), ['whatsapp', 'whatsapp']);
+  const app = await ok('fiila_amb_messages', {}, A);
+  assert.equal(app.at(-2).channel, 'whatsapp', 'visible aussi dans l’application');
+  assert.equal((await ok('fiila_wa_inbound', { p_phone: '221700000000', p_body: 'Bonjour', p_wamid: 'wamid.2' }, SVC)).known, false);
+  assert.match((await ok('fiila_wa_inbound', { p_phone: '+221 77 600 00 01', p_body: '', p_wamid: 'wamid.3' }, SVC)).reply, /messages écrits/);
+  // Avec IA : en attente, la réponse rédigée part sur WhatsApp.
+  await db.query(`update fiila.settings set value = '1' where key = 'amb_manager_llm'`);
+  const p = await ok('fiila_wa_inbound', { p_phone: '221776000001', p_body: 'Comment avoir plus de clientes ?', p_wamid: 'wamid.4' }, SVC);
+  assert.equal(p.pending, true);
+  await ok('fiila_amb_manager_post', { p_message: p.message, p_reply: 'Partagez la vitrine.', p_tags: [], p_escalate: false }, SVC);
+  assert.equal((await one(`select channel from fiila.amb_messages where author = 'manager' order by created_at desc limit 1`)).channel, 'whatsapp');
+  await db.query(`update fiila.settings set value = '0' where key = 'amb_manager_llm'`);
+  // Équipe : fenêtre de 24 h ouverte seulement si l'API est activée et l'agent a écrit sur WhatsApp.
+  const th = await ok('fiila_bo_career_thread', { p_amb: AID }, ADMIN);
+  assert.equal(th.ambassador.wa, '221776000001'); assert.equal(th.ambassador.wa_open, true);
+  await ok('fiila_bo_career_reply', { p_amb: AID, p_body: 'On regarde votre code.' }, ADMIN);
+  const push = await ok('fiila_wa_push_data', { p_amb: AID }, SVC);
+  assert.deepEqual(push, { to: '221776000001', body: 'On regarde votre code.', open: true });
+  await ok('fiila_bo_setting_set', { p_key: 'amb_whatsapp', p_value: 0 }, ADMIN);
+  assert.equal((await ok('fiila_wa_push_data', { p_amb: AID }, SVC)).open, false, 'API coupée : rien n’est envoyé');
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL Manager Fii La Carrière réussis`);
 process.exit(passed === results.length ? 0 : 1);

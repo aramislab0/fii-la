@@ -6109,7 +6109,7 @@
     function bubble(m) {
       return h('div', { class: 'mgr-msg ' + (m.author === 'agent' ? 'me' : m.author) },
         m.author === 'staff' ? h('small', null, 'Équipe Fii La') : null, h('p', null, m.body),
-        h('time', null, m.at ? new Date(m.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''));
+        h('time', null, (m.channel === 'whatsapp' ? 'via WhatsApp · ' : '') + (m.at ? new Date(m.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '')));
     }
     function draw(msgs) {
       var waiting = msgs.length && msgs[msgs.length - 1].author === 'agent';
@@ -6159,7 +6159,10 @@
         })),
         h('div', { class: 'mgr-foot' },
           d.streak ? h('span', { class: 'small muted' }, icon('star', 12), ' ' + d.streak + ' jour' + (d.streak > 1 ? 's' : '') + ' actif' + (d.streak > 1 ? 's' : '') + ' ce mois-ci') : h('span'),
-          h('button', { class: 'btn ghost small', type: 'button', id: 'amb-chat-open', onclick: function () { ambChat(load); } }, icon('chat', 16), ' Écrire à mon Manager', unread)));
+          h('div', { class: 'row', style: 'gap:8px' },
+            h('button', { class: 'btn ghost small', type: 'button', id: 'amb-chat-open', onclick: function () { ambChat(load); } }, icon('chat', 16), ' Écrire à mon Manager', unread),
+            d.whatsapp ? h('a', { class: 'btn ghost small mgr-wa', id: 'amb-wa', target: '_blank', rel: 'noopener noreferrer', 'aria-label': 'Écrire à mon Manager sur WhatsApp',
+              href: 'https://wa.me/' + d.whatsapp + '?text=' + encodeURIComponent('Bonjour, c’est ' + String(a.name || '').split(' ')[0] + ' (ambassadeur, code ' + a.code + ').') }, icon('phone', 16), ' WhatsApp') : null)));
     }
     function finish(t) {
       var fb = h('textarea', { id: 'mgr-feedback', rows: 3, maxlength: 500, placeholder: 'Facultatif : ce qui s’est passé, ce qui a bloqué, une idée…' });
@@ -7271,6 +7274,15 @@
             infos.length ? h('details', { class: 'more-details' }, h('summary', null, 'Constats récents (' + infos.length + ')'),
               infos.map(function (n) { return h('p', { class: 'small' }, h('b', null, n.title + ' : '), n.body || ''); })) : null,
             analyse)),
+        h('section', { class: 'card bo-panel bo-wa', id: 'bo-wa' },
+          h('span', { class: 'bo-queue-ic', style: 'background:color-mix(in srgb,#25D366 16%,var(--surface));color:#128C4B', 'aria-hidden': 'true' }, icon('phone', 16)),
+          h('div', { class: 'stack tight', style: 'gap:2px;flex:1;min-width:0' }, h('b', null, 'Canal WhatsApp du Manager'),
+            h('span', { class: 'small muted' }, d.whatsapp ? '+' + d.whatsapp + ' · ' + (d.wa_api ? 'API branchée : le Manager répond sur WhatsApp' : 'lien direct : l’équipe répond depuis ce numéro') : 'Aucun numéro : les ambassadeurs écrivent seulement dans l’application.')),
+          d.can_strategy ? h('button', { class: 'btn ghost small', type: 'button', id: 'bo-wa-edit', onclick: function () {
+            var v = window.prompt ? window.prompt('Numéro WhatsApp du Manager (vide pour retirer)', d.whatsapp ? '+' + d.whatsapp : '') : null;
+            if (v === null) return;
+            boAct(function () { return api('fiila_bo_manager_whatsapp_set', { p_phone: v }); }, v.trim() ? 'Numéro WhatsApp enregistré.' : 'Numéro retiré.', null, null, this);
+          } }, d.whatsapp ? 'Modifier' : 'Ajouter le numéro') : null),
         h('section', { class: 'stack tight', id: 'bo-threads' }, h('h2', null, 'Conversations'),
           boTable([
             { label: 'Ambassadeur', get: function (x) { return h('span', { class: 'bo-cell' }, boAv(x.name), h('span', { class: 'stack tight', style: 'gap:0;min-width:0' }, h('span', null, x.name), h('small', { class: 'muted wrapword' }, x.last || ''))); } },
@@ -7297,13 +7309,15 @@
       var a = t.ambassador, body = '';
       var input = h('textarea', { id: 'bo-career-input', rows: 2, maxlength: 1500, placeholder: 'Répondre au nom de l’équipe Fii La…', oninput: function (e) { body = e.target.value; } });
       var TAGL = { question: 'question', objection: 'objection', probleme: 'problème', gains: 'gains', idee: 'idée', positif: 'positif', retour: 'retour de mission', formation: 'formation', motivation: 'motivation' };
+      var waBtn = a.wa ? h('a', { class: 'btn ghost small', id: 'bo-career-wa', target: '_blank', rel: 'noopener noreferrer',
+        href: 'https://wa.me/' + a.wa + '?text=' + encodeURIComponent('Bonjour ' + String(a.name).split(' ')[0] + ', c’est votre Manager Fii La Carrière.') }, icon('phone', 14), ' WhatsApp') : null;
       return boShell('carriere', a.name, [
-        boHero(a.name, [boAmbState(a), h('span', { class: 'bo-code-tag' }, a.code)], [a.zone, h('a', { href: '#/bo/ambassadeurs/' + a.id }, 'Fiche ambassadeur')].filter(Boolean).map(function (x, i) { return [i ? ' · ' : '', x]; })),
+        boHero(a.name, [boAmbState(a), h('span', { class: 'bo-code-tag' }, a.code), a.wa_open ? boBadge('ok', 'WhatsApp ouvert 24 h') : null], [a.zone, h('a', { href: '#/bo/ambassadeurs/' + a.id }, 'Fiche ambassadeur')].filter(Boolean).map(function (x, i) { return [i ? ' · ' : '', x]; })),
         h('div', { class: 'bo-grid2' },
           h('section', { class: 'card stack tight bo-panel', id: 'bo-career-thread' }, h('h2', null, 'Conversation'),
             h('div', { class: 'mgr-thread', style: 'max-height:520px;border-radius:14px' }, t.messages.map(function (m) {
               return h('div', { class: 'mgr-msg ' + (m.author === 'agent' ? 'staff-in' : m.author === 'staff' ? 'me' : 'manager') },
-                h('small', null, m.author === 'agent' ? a.name : m.author === 'staff' ? 'Équipe Fii La' : 'Manager'),
+                h('small', null, (m.author === 'agent' ? a.name : m.author === 'staff' ? 'Équipe Fii La' : 'Manager') + (m.channel === 'whatsapp' ? ' · WhatsApp' : '')),
                 h('p', null, m.body),
                 m.tags && m.tags.length ? h('div', { class: 'bo-hero-b' }, m.tags.map(function (x) { return boBadge(x === 'probleme' ? 'danger' : x === 'objection' ? 'warn' : 'muted', TAGL[x] || x); })) : null,
                 h('time', null, boDate(m.at, true)));
@@ -7311,13 +7325,17 @@
             h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Répondre'), input),
             h('button', { class: 'btn', type: 'button', id: 'bo-career-send', style: 'align-self:flex-start', onclick: function () {
               if (!body.trim()) { toast('Écrivez un message.'); return; }
-              boAct(function () { return api('fiila_bo_career_reply', { p_amb: a.id, p_body: body }); }, 'Message envoyé.', null, null, this);
+              boAct(function () { return api('fiila_bo_career_reply', { p_amb: a.id, p_body: body }); }, a.wa_open ? 'Message envoyé (application et WhatsApp).' : 'Message envoyé.', function () {
+                if (!a.wa_open) return render();
+                freshToken().then(function () { return fetch(API_URL + '/functions/v1/fiila-whatsapp', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ action: 'push', ambassador: a.id }) }); })
+                  .then(function () { render(); }, function () { toast('Envoi WhatsApp impossible : message visible dans l’application.'); render(); });
+              }, null, this);
             } }, 'Envoyer')),
           h('section', { class: 'card stack tight bo-panel', id: 'bo-career-tasks' }, h('h2', null, 'Missions récentes'),
             t.tasks.length ? t.tasks.map(function (x) {
               return h('div', { class: 'bo-dl' }, h('span', { class: 'wrapword' }, (x.done ? '✓ ' : '○ ') + x.title + (x.feedback ? ' — « ' + x.feedback + ' »' : '')), h('span', { class: 'muted' }, boDate(x.day)));
             }) : h('p', { class: 'muted small' }, 'Aucune mission pour le moment.')))
-      ], { back: back });
+      ], { back: back, action: waBtn });
     }, function (e) { return boShell('carriere', 'Conversation', stateCard('!', 'Introuvable', errText(e)), { back: back }); });
   }
 

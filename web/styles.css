@@ -1600,3 +1600,5 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
 .nudge2-x{position:absolute;top:8px;right:8px;width:32px;height:32px;min-height:0;padding:0;border:0;border-radius:10px;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
 .nudge2-x:hover{background:var(--surface-2)}
 @media (prefers-reduced-motion: reduce){.nudge2{animation:none}}
+.card.bo-wa{display:flex;flex-direction:row;align-items:center;gap:12px}
+.mgr-wa .ico path{stroke:#128C4B}
