@@ -556,21 +556,20 @@ await t('hors connexion : message clair sur la page destinataire', async () => {
   await p.ctx.close();
 });
 
-await t('thème : Sombre gardé après rechargement, Automatique revient au réglage du téléphone', async () => {
-  const p = await newPhone({ ctx: { colorScheme: 'light' } });
-  await p.page.goto(URL0 + '#/confidentialite');
-  await p.page.getByText('Sombre', { exact: true }).click();
-  assert.equal(await p.page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark');
-  const bg = await p.page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  assert.equal(bg, 'rgb(13, 19, 16)');
-  await p.page.reload();
-  await p.page.getByRole('heading', { name: 'Données et confidentialité' }).waitFor();
-  assert.equal(await p.page.evaluate(() => document.documentElement.getAttribute('data-theme')), 'dark', 'thème perdu au rechargement');
-  assert.equal(await p.page.locator('input[name="theme"][value="dark"]').isChecked(), true);
-  await p.page.getByText('Automatique', { exact: true }).click();
-  assert.equal(await p.page.evaluate(() => document.documentElement.hasAttribute('data-theme')), false);
-  assert.equal(await p.page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(245, 242, 234)');
-  await p.ctx.close();
+await t('thème : suit le réglage du téléphone, sans sélecteur ; ancien choix « Sombre » effacé', async () => {
+  const L = await newPhone({ ctx: { colorScheme: 'light' } });
+  await L.ctx.addInitScript(() => { try { localStorage.setItem('fiila-theme', 'dark'); } catch (e) {} });
+  await L.page.goto(URL0 + '#/confidentialite');
+  await L.page.getByRole('heading', { name: 'Données et confidentialité' }).waitFor();
+  assert.equal(await L.page.locator('.theme-switch, input[name="theme"]').count(), 0, 'plus de sélecteur de thème');
+  assert.equal(await L.page.evaluate(() => document.documentElement.hasAttribute('data-theme')), false);
+  assert.equal(await L.page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(245, 242, 234)');
+  await L.ctx.close();
+  const D = await newPhone({ ctx: { colorScheme: 'dark' } });
+  await D.page.goto(URL0 + '#/confidentialite');
+  await D.page.getByRole('heading', { name: 'Données et confidentialité' }).waitFor();
+  assert.equal(await D.page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(13, 19, 16)');
+  await D.ctx.close();
 });
 await t('presse-papiers refusé : texte à copier affiché', async () => {
   const p = await newPhone({ clipboard: false });

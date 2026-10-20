@@ -50,7 +50,6 @@
     if (minimal) return h('footer', { class: 'foot foot-min' },
       h('div', { class: 'foot-links' }, h('a', { href: '#/', class: 'foot-brand' }, 'Fii La'), h('a', { href: '#/confidentialite' }, 'Données et confidentialité')));
     return h('footer', { class: 'foot' },
-      themeSwitch(),
       h('div', { class: 'foot-links' },
         h('a', { href: '#/' }, 'Fii La'),
         h('a', { href: '#/compte', id: 'foot-account' }, authed() ? 'Mon compte' : 'Se connecter'),
@@ -58,31 +57,7 @@
         h('a', { href: '#/confidentialite' }, 'Données et confidentialité'),
         h('a', { href: '#/cle' }, 'Restaurer une clé de gestion')));
   }
-  // Thème : Automatique (réglage du téléphone, par défaut), Clair ou Sombre. Choix gardé sur ce téléphone.
-  function currentTheme() { var t = document.documentElement.getAttribute('data-theme'); return t === 'light' || t === 'dark' ? t : 'auto'; }
-  function setTheme(t) {
-    if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
-    else document.documentElement.removeAttribute('data-theme');
-    try { if (t === 'light' || t === 'dark') localStorage.setItem('fiila-theme', t); else localStorage.removeItem('fiila-theme'); } catch (e) { /* navigation privée */ }
-    syncThemeColor();
-  }
-  function syncThemeColor() {
-    var bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
-    var metas = document.querySelectorAll('meta[name="theme-color"]');
-    for (var i = 0; i < metas.length; i++) {
-      if (currentTheme() === 'auto') metas[i].setAttribute('content', /dark/.test(metas[i].media) ? '#0D1310' : '#F5F2EA');
-      else if (bg) metas[i].setAttribute('content', bg);
-    }
-  }
-  function themeSwitch() {
-    var cur = currentTheme();
-    function opt(val, text) {
-      return h('label', null, h('input', { type: 'radio', name: 'theme', value: val, checked: cur === val ? 'checked' : null,
-        onchange: function () { setTheme(val); } }), text);
-    }
-    return h('fieldset', { class: 'theme-switch' }, h('legend', null, 'Thème'),
-      h('div', { class: 'segs' }, opt('light', 'Clair'), opt('dark', 'Sombre'), opt('auto', 'Automatique')));
-  }
+  // Thème : toujours celui du téléphone (clair ou sombre), sans réglage dans l'application (fondateur, 20/10).
   // En-tête discret des pages reçues par lien : de quoi il s'agit, en un coup d'œil.
   function brandBar(kind) {
     return h('div', { class: 'brand-bar' }, h('span', { class: 'mark small', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La')), kind ? h('span', { class: 'brand-kind' }, kind) : null);

@@ -2,7 +2,7 @@
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "mode": "automatisation Playwright, émulation iPhone 13, base Postgres locale réelle (PGlite)",
-  "date": "2026-10-20T07:52:27.909Z",
+  "date": "2026-10-20T23:07:01.107Z",
   "reussis": 20,
   "total": 20,
   "results": [

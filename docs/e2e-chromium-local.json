@@ -2,189 +2,189 @@
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "cible": "locale",
-  "date": "2026-10-20T07:53:22.470Z",
+  "date": "2026-10-20T23:07:55.656Z",
   "reussis": 38,
   "total": 38,
   "results": [
     {
       "ok": true,
       "name": "accueil : une action principale (création), deux secondaires, puis mes adresses",
-      "ms": 409
+      "ms": 374
     },
     {
       "ok": true,
       "name": "création : géolocalisation après action explicite, précision affichée, point validé",
-      "ms": 472
+      "ms": 513
     },
     {
       "ok": true,
       "name": "correction manuelle : déplacer la carte invalide le point et change les coordonnées",
-      "ms": 899
+      "ms": 914
     },
     {
       "ok": true,
       "name": "arrêt voiture distinct + instructions à pied",
-      "ms": 319
+      "ms": 353
     },
     {
       "ok": true,
       "name": "photo : compressée, métadonnées GPS retirées avant envoi ; fichier non image refusé",
-      "ms": 455
+      "ms": 475
     },
     {
       "ok": true,
       "name": "enregistrement en échec réseau : message clair, saisie conservée, puis réussite",
-      "ms": 222
+      "ms": 216
     },
     {
       "ok": true,
       "name": "photo envoyée sans aucune métadonnée EXIF/GPS et allégée",
-      "ms": 0
-    },
-    {
-      "ok": true,
-      "name": "lien de partage sans clé propriétaire ; clé gardée localement",
-      "ms": 151
-    },
-    {
-      "ok": true,
-      "name": "QR code : se décode exactement en lien de la fiche",
-      "ms": 3004
-    },
-    {
-      "ok": true,
-      "name": "copie du lien (presse-papiers) et lien WhatsApp avec la vraie URL",
-      "ms": 61
-    },
-    {
-      "ok": true,
-      "name": "2e téléphone : la fiche s’ouvre sans compte, photo et instructions visibles",
-      "ms": 399
-    },
-    {
-      "ok": true,
-      "name": "destinataire : aucune demande de position, aucun script injecté exécuté",
-      "ms": 8
-    },
-    {
-      "ok": true,
-      "name": "texte long : aucune largeur de page débordante (390 px)",
       "ms": 1
     },
     {
       "ok": true,
+      "name": "lien de partage sans clé propriétaire ; clé gardée localement",
+      "ms": 165
+    },
+    {
+      "ok": true,
+      "name": "QR code : se décode exactement en lien de la fiche",
+      "ms": 2526
+    },
+    {
+      "ok": true,
+      "name": "copie du lien (presse-papiers) et lien WhatsApp avec la vraie URL",
+      "ms": 56
+    },
+    {
+      "ok": true,
+      "name": "2e téléphone : la fiche s’ouvre sans compte, photo et instructions visibles",
+      "ms": 393
+    },
+    {
+      "ok": true,
+      "name": "destinataire : aucune demande de position, aucun script injecté exécuté",
+      "ms": 7
+    },
+    {
+      "ok": true,
+      "name": "texte long : aucune largeur de page débordante (390 px)",
+      "ms": 3
+    },
+    {
+      "ok": true,
       "name": "itinéraires et coordonnées copiées = points enregistrés",
-      "ms": 46
+      "ms": 50
     },
     {
       "ok": true,
       "name": "le destinataire ne peut ni gérer ni modifier la fiche",
-      "ms": 251
+      "ms": 210
     },
     {
       "ok": true,
       "name": "modification : même lien, contenu mis à jour chez le destinataire",
-      "ms": 1033
+      "ms": 995
     },
     {
       "ok": true,
       "name": "clé de gestion : restaurée sur un autre téléphone, elle donne la gestion",
-      "ms": 266
+      "ms": 256
     },
     {
       "ok": true,
       "name": "géolocalisation refusée : marche à suivre iPhone, réessayer, et point pris dans Google Maps",
-      "ms": 688
+      "ms": 691
     },
     {
       "ok": true,
       "name": "Google Maps : lien sans point précis → consigne claire ; coordonnées et lien long acceptés",
-      "ms": 534
+      "ms": 627
     },
     {
       "ok": true,
       "name": "Android : itinéraire par lien Google Maps https (ouvre l’application), sans Plans",
-      "ms": 263
+      "ms": 210
     },
     {
       "ok": true,
       "name": "géolocalisation trop lente : message de délai dépassé",
-      "ms": 535
+      "ms": 552
     },
     {
       "ok": true,
       "name": "géolocalisation imprécise : avertissement",
-      "ms": 365
+      "ms": 397
     },
     {
       "ok": true,
       "name": "demande : le commerçant crée la demande",
-      "ms": 469
+      "ms": 432
     },
     {
       "ok": true,
       "name": "demande : le client voit qui demande, crée son adresse, prévisualise et envoie",
-      "ms": 939
+      "ms": 996
     },
     {
       "ok": true,
       "name": "demande : un visiteur du lien public ne voit jamais la réponse",
-      "ms": 197
+      "ms": 200
     },
     {
       "ok": true,
       "name": "demande : le commerçant récupère l’adresse dans sa vue privée",
-      "ms": 271
+      "ms": 253
     },
     {
       "ok": true,
       "name": "rendez-vous : création avec date, lieu et expiration",
-      "ms": 839
+      "ms": 823
     },
     {
       "ok": true,
       "name": "rendez-vous : mise à jour visible sur le même lien",
-      "ms": 982
+      "ms": 945
     },
     {
       "ok": true,
       "name": "rendez-vous expiré : le serveur ne renvoie plus le lieu",
-      "ms": 180
+      "ms": 178
     },
     {
       "ok": true,
       "name": "désactivation : la fiche et sa photo ne sont plus servies",
-      "ms": 564
+      "ms": 613
     },
     {
       "ok": true,
       "name": "nouveau lien : l’ancien affiche « remplacé »",
-      "ms": 456
+      "ms": 462
     },
     {
       "ok": true,
       "name": "suppression : confirmation, puis fiche et photo inaccessibles",
-      "ms": 360
+      "ms": 283
     },
     {
       "ok": true,
       "name": "liens invalides : réponse sûre",
-      "ms": 792
+      "ms": 808
     },
     {
       "ok": true,
       "name": "hors connexion : message clair sur la page destinataire",
-      "ms": 228
+      "ms": 223
     },
     {
       "ok": true,
-      "name": "thème : Sombre gardé après rechargement, Automatique revient au réglage du téléphone",
-      "ms": 797
+      "name": "thème : suit le réglage du téléphone, sans sélecteur ; ancien choix « Sombre » effacé",
+      "ms": 408
     },
     {
       "ok": true,
       "name": "presse-papiers refusé : texte à copier affiché",
-      "ms": 574
+      "ms": 546
     },
     {
       "ok": true,
@@ -194,7 +194,7 @@
     {
       "ok": true,
       "name": "page destinataire sur réseau lent (3G simulée) : poids et temps mesurés",
-      "ms": 4361
+      "ms": 4384
     }
   ]
 }
