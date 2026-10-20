@@ -84,7 +84,8 @@ await t('propriétaire : Réglages → Équipe (section repliée), invitation av
 
 await t('invitée : le lien explique le rôle ; connexion demandée, puis « Rejoindre la boutique »', async () => {
   await E.goto(LINK.replace(/^https?:\/\/[^#]+/, URL0));
-  await E.getByRole('heading', { name: 'Boutique Awa (test) vous invite à rejoindre son équipe' }).waitFor();
+  await E.getByRole('heading', { name: 'Vous êtes invité(e) à rejoindre son équipe' }).waitFor();
+  await E.locator('#team-invite-card').getByText('Boutique Awa (test)', { exact: true }).waitFor();
   assert.match(await E.locator('#team-invite-role').textContent(), /Éditeur : commandes, articles et clients/);
   await E.locator('#team-login').waitFor();
   await shot(E, '03-lien-sans-compte');

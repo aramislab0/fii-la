@@ -2184,19 +2184,16 @@
   function inviteBanner() {
     var t = touchGet();
     if (!t || t.src !== 'link' || owned.all().length || shopKey() || courierKey()) return null;
-    var box = h('section', { class: 'card invite', id: 'invite-banner', hidden: true });
+    var box = h('div', { id: 'invite-banner', hidden: true });
     api('fiila_referral_public', { p_code: t.token }).then(function (r) {
       // Code inconnu ou supprimé : on l'oublie, pour ne bloquer ni une autre origine ni la question « recommandé ? ».
       if (r.state === 'unknown' || r.state === 'invalid') { var c = touchGet(); if (c && c.token === t.token) forgetTouch(); return; }
       if (r.state !== 'ok' || !r.name) return;
-      setKids(box, h('p', null, h('strong', null, r.name), ' vous invite sur Fii La.'),
-        h('p', { class: 'small muted' }, r.kind === 'shop' || r.kind === 'courier'
-          ? 'Recevez l’adresse exacte de vos clients en une photo. Gratuit, sans compte.'
-          : 'Créez votre adresse une fois, envoyez-la par un lien. Gratuit, sans compte.'),
-        r.kind === 'shop' || r.kind === 'courier'
-          ? h('div', { class: 'row' }, iconBtn('a', { class: 'btn', href: '#/boutique', id: 'invite-shop' }, 'shop', 'Créer ma boutique'),
-              iconBtn('a', { class: 'btn ghost', href: '#/livreur' }, 'moto', 'Je suis livreur'))
-          : null);
+      var pro = r.kind === 'shop' || r.kind === 'courier';
+      setKids(box, inviteCard({ compact: true, kind: 'Invitation', from: r.name, title: 'Vous êtes invité(e) sur Fii La',
+        sub: pro ? 'Recevez l’adresse exacte de vos clients en une photo. Gratuit, sans compte.' : 'Créez votre adresse une fois, envoyez-la par un lien. Gratuit, sans compte.',
+        cta: pro ? ivcBtn('a', { href: '#/boutique', id: 'invite-shop' }, 'Créer ma boutique') : ivcBtn('a', { href: '#/new', id: 'invite-address' }, 'Créer mon adresse'),
+        more: pro ? h('a', { class: 'ivc-link', href: '#/livreur' }, 'Je suis livreur') : null }));
       box.hidden = false;
     }, function () { /* hors ligne : pas de bandeau */ });
     return box;
@@ -4483,6 +4480,33 @@
     return box;
   }
 
+
+  /* ----- carte d'invitation (équipe de boutique, livreur attitré, équipe Fii La, parrainage) : une seule carte premium.
+     o : { id, kind (petit titre), from (qui invite), title, sub, points: [[icône, texte]], cta (élément), more (élément), compact } */
+  function inviteCard(o) {
+    var initial = String(o.from || 'F').trim().charAt(0).toUpperCase() || 'F';
+    return h('section', { class: 'ivc' + (o.compact ? ' compact' : ''), id: o.id || null },
+      h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
+      h('div', { class: 'ivc-top' },
+        h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')),
+        h('span', { class: 'ivc-kind' }, o.kind || 'Invitation')),
+      h('div', { class: 'ivc-from' },
+        h('span', { class: 'ivc-mono', 'aria-hidden': 'true' }, h('span', null, initial)),
+        o.from ? h('span', { class: 'ivc-who' }, h('span', { class: 'ivc-who-l' }, 'De la part de'), h('strong', { class: 'wrapword' }, o.from)) : null),
+      h(o.compact ? 'p' : 'h1', { class: 'ivc-title wrapword' }, o.title),
+      o.sub ? h('p', { class: 'ivc-sub', id: o.subId || null }, o.sub) : null,
+      o.points && o.points.length ? h('ul', { class: 'ivc-points' }, o.points.map(function (pt) {
+        return h('li', null, h('span', { class: 'ivc-ico', 'aria-hidden': 'true' }, icon(pt[0], 18)), h('span', null, pt[1]));
+      })) : null,
+      o.cta ? h('div', { class: 'ivc-cta' }, o.cta) : null,
+      o.more || null);
+  }
+  // Bouton d'action de la carte : clair sur fond sombre, flèche qui avance.
+  function ivcBtn(tag, attrs, label) {
+    attrs = Object.assign({}, attrs); attrs['class'] = 'ivc-btn' + (attrs['class'] ? ' ' + attrs['class'] : '');
+    if (tag === 'button' && !attrs.type) attrs.type = 'button';
+    return h(tag, attrs, h('span', null, label), h('span', { class: 'ivc-arrow', 'aria-hidden': 'true' }, icon('chev', 20)));
+  }
   /* ----- équipe de la boutique : invitation par WhatsApp (nom, numéro, rôle), rôles, retrait, départ */
   var ROLE_LABEL = { owner: 'Propriétaire', admin: 'Administrateur', editor: 'Éditeur' };
   function fill(el, kids) { add(el, kids); return el; }
@@ -4597,14 +4621,12 @@
         });
       }
       return page(
-        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Invitation'),
-          h('h1', { class: 'wrapword' }, r.shop + ' vous invite à rejoindre son équipe'),
-          h('p', { class: 'muted', id: 'team-invite-role' }, ROLE_LABEL[r.role] + ' : ' + ROLE_HINT[r.role].charAt(0).toLowerCase() + ROLE_HINT[r.role].slice(1))),
-        authed()
-          ? iconBtn('button', { class: 'btn big', type: 'button', id: 'team-accept', onclick: function (ev) { join(ev.currentTarget); } }, 'check', 'Rejoindre la boutique')
-          : h('a', { class: 'btn big', id: 'team-login', href: '#/compte' + qs({ retour: 'equipe/' + token }) }, 'Se connecter ou créer un compte'),
-        authed() ? null : h('p', { class: 'small muted' }, 'Un compte Fii La est nécessaire pour accéder à la boutique.'),
-        r.verify && authed() ? h('p', { class: 'small muted', id: 'team-verify-note' }, 'Votre numéro sera confirmé par un code SMS.') : null,
+        inviteCard({ id: 'team-invite-card', kind: 'Équipe · ' + ROLE_LABEL[r.role], from: r.shop, title: 'Vous êtes invité(e) à rejoindre son équipe',
+          sub: ROLE_LABEL[r.role] + ' : ' + ROLE_HINT[r.role].charAt(0).toLowerCase() + ROLE_HINT[r.role].slice(1), subId: 'team-invite-role',
+          cta: authed() ? ivcBtn('button', { id: 'team-accept', onclick: function (ev) { join(ev.currentTarget); } }, 'Rejoindre la boutique')
+            : ivcBtn('a', { id: 'team-login', href: '#/compte' + qs({ retour: 'equipe/' + token }) }, 'Rejoindre l’équipe'),
+          more: authed() ? (r.verify ? h('p', { class: 'ivc-note', id: 'team-verify-note' }, 'Votre numéro sera confirmé par un code SMS.') : null)
+            : h('p', { class: 'ivc-note' }, 'Un compte Fii La gratuit suffit. Pas encore de compte ? Créez-le en un instant.') }),
         verifyZone, err, footer());
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher l’invitation', errText(e), retryBtn())); });
   }
@@ -5311,12 +5333,13 @@
           track('courier_linked', 'invite'); toast('Vous êtes le livreur attitré de ' + r.shop + '.'); go('#/livreur');
         }, function (e) { errBox(err, e); });
       }
+      var reg = courierKey();
       return page(
-        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Invitation'),
-          h('h1', { class: 'wrapword' }, r.shop + ' vous propose d’être son livreur attitré'),
-          h('p', { class: 'muted' }, 'Ses courses arrivent ici, avec la photo de l’entrée.')),
-        courierKey() ? iconBtn('button', { class: 'btn big', type: 'button', id: 'courier-accept', onclick: function (ev) { ev.currentTarget.disabled = true; accept(); } }, 'check', 'Accepter') :
-          courierForm({ name: r.name, phone: r.phone }, function () { accept(); }),
+        inviteCard({ id: 'courier-invite-card', kind: 'Livreur attitré', from: r.shop, title: 'Devenez son livreur attitré',
+          points: [['moto', 'Ses courses arrivent ici, automatiquement'], ['door', 'La photo de l’entrée, le bon repère'], ['nav', 'L’itinéraire en un geste']],
+          cta: reg ? ivcBtn('button', { id: 'courier-accept', onclick: function (ev) { ev.currentTarget.disabled = true; accept(); } }, 'Accepter') : null,
+          more: reg ? null : h('p', { class: 'ivc-note' }, 'Dernière étape : présentez-vous ci-dessous, puis acceptez.') }),
+        reg ? null : courierForm({ name: r.name, phone: r.phone }, function () { accept(); }),
         err, footer());
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher l’invitation', errText(e), retryBtn())); });
   }
@@ -6023,17 +6046,21 @@
         h('a', { class: 'btn', href: '#/bo' }, 'Aller au back-office'));
       var back = 'bo/invitation/' + token;
       var err = h('div', { role: 'alert' });
-      return box(h('h1', null, 'Rejoindre l’équipe Fii La'),
-        h('p', null, 'Rôle : ', h('b', null, BO_ROLES[r.role] || r.role), '. ', h('span', { class: 'muted' }, BO_ROLE_HELP[r.role] || '')),
-        h('p', { class: 'small muted' }, 'Invitation nominative pour ' + r.email + '. Utilisez le compte qui porte cette adresse.'),
-        authed() ? [err, h('button', { class: 'btn', type: 'button', id: 'bo-invite-accept', onclick: function () {
-            api('fiila_bo_invite_accept', { p_token: token }).then(function () { toast('Bienvenue dans l’équipe.'); BO.me = null; go('#/bo'); }, function (e) {
-              if (e.code === 'invite_email_mismatch') setKids(err, h('p', { class: 'msg' }, 'Ce lien a été créé pour une autre adresse e-mail. Déconnectez-vous puis connectez-vous avec le bon compte.'));
-              else errBox(err, e);
-            });
-          } }, 'Rejoindre l’équipe')]
-          : [h('a', { class: 'btn', href: '#/compte' + qs({ mode: 'inscription', retour: back }), id: 'bo-invite-signup' }, 'Créer mon compte'),
-             h('a', { class: 'btn ghost', href: '#/compte' + qs({ retour: back }), id: 'bo-invite-login' }, 'J’ai déjà un compte')]);
+      return h('div', { class: 'bo-portal' }, h('div', { class: 'stack', id: 'bo-invite', style: 'width:100%;max-width:460px' },
+        inviteCard({ id: 'bo-invite-card', kind: 'Équipe Fii La · ' + (BO_ROLES[r.role] || r.role), from: 'Fii La', title: 'Rejoindre l’équipe Fii La',
+          sub: BO_ROLE_HELP[r.role] || '',
+          points: [['key', 'Accès au back-office selon votre rôle'], ['lock', 'Double authentification à la première connexion']],
+          cta: authed() ? ivcBtn('button', { id: 'bo-invite-accept', onclick: function () {
+              api('fiila_bo_invite_accept', { p_token: token }).then(function () { toast('Bienvenue dans l’équipe.'); BO.me = null; go('#/bo'); }, function (e) {
+                if (e.code === 'invite_email_mismatch') setKids(err, h('p', { class: 'msg' }, 'Ce lien a été créé pour une autre adresse e-mail. Déconnectez-vous puis connectez-vous avec le bon compte.'));
+                else errBox(err, e);
+              });
+            } }, 'Rejoindre l’équipe')
+            : ivcBtn('a', { href: '#/compte' + qs({ mode: 'inscription', retour: back }), id: 'bo-invite-signup' }, 'Créer mon compte'),
+          more: h('div', { class: 'stack tight' },
+            authed() ? null : h('a', { class: 'ivc-link', href: '#/compte' + qs({ retour: back }), id: 'bo-invite-login' }, 'J’ai déjà un compte'),
+            h('p', { class: 'ivc-note' }, 'Invitation nominative pour ' + r.email + '. Utilisez le compte qui porte cette adresse.')) }),
+        err));
     }, function (e) { return page(stateCard('!', 'Invitation indisponible', errText(e), retryBtn())); });
   }
 

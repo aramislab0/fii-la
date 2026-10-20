@@ -78,7 +78,8 @@ await t('commerçante : boutique sans compte, invitation du livreur sur son What
 
 await t('livreur : ouvre l’invitation, crée son espace sans compte, accepte', async () => {
   await L.goto(invite);
-  await L.getByText('Boutique Fatim (test) vous propose d’être son livreur attitré').waitFor();
+  await L.getByRole('heading', { name: 'Devenez son livreur attitré' }).waitFor();
+  await L.locator('#courier-invite-card').getByText('Boutique Fatim (test)', { exact: true }).waitFor();
   assert.equal(await L.inputValue('#cr-name'), 'Ibou');
   await L.locator('#cr-vehicle').getByText('Moto').click();
   await L.click('#courier-register');

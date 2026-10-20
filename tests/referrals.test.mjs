@@ -98,7 +98,7 @@ await t('boutique : « Parrainer une boutique », code, lien et message WhatsApp
 await t('lien de parrainage : bandeau « Boutique Awa vous invite », boutique créée et comptée', async () => {
   const B = await newPhone();
   await B.goto(LINK);
-  await B.locator('#invite-banner').getByText('Boutique Awa (test)').waitFor();
+  await B.locator('#invite-banner').getByText('Boutique Awa (test)', { exact: true }).waitFor();
   assert.ok(B.url().endsWith('#/'), 'le code ne reste pas dans la barre d’adresse');
   await shot(B, '02-bandeau-invitation');
   await B.click('#invite-shop');

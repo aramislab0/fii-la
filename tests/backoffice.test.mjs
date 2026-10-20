@@ -172,7 +172,7 @@ await t('équipe : inviter un membre (lien à usage unique), il s’inscrit avec
   await shot(D, '07-invitation');
   const M = await newPage('mobile');
   await M.goto(INVITE.replace(/^.*#/, URL0 + '#'));
-  assert.equal(await M.locator('#bo-invite p b').first().textContent(), 'Modération');
+  assert.match(await M.locator('#bo-invite .ivc-kind').textContent(), /Modération$/);
   await M.locator('#bo-invite').getByText('m•••@example.invalid').waitFor();
   await shot(M, '08-invitation-recue');
   await M.click('#bo-invite-signup');
