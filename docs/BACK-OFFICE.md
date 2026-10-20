@@ -35,10 +35,10 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 
 | Section | Contenu |
 |---|---|
-| Tableau de bord | Indicateurs (boutiques, commandes, volume livré, comptes, adresses, livreurs, ambassadeurs, places du fil), file « À traiter », commandes sur 14 jours |
-| Boutiques | Recherche (nom, lien, téléphone), filtres, fiche |
+| Tableau de bord | Indicateurs (boutiques, commandes, volume livré, comptes, adresses, livreurs, ambassadeurs, places du fil, membres d'équipe de boutiques et numéros confirmés par SMS, articles à plusieurs photos), file « À traiter », commandes sur 14 jours |
+| Boutiques | Recherche (nom, lien, téléphone), filtres, fiche (dont l'équipe de la boutique : membres, rôle, numéro confirmé, invitations en attente ; articles à plusieurs photos) |
 | Commandes | Recherche (boutique, client, numéro, téléphone), filtre par statut, fiche avec articles et paiements, lien vers la facture |
-| Comptes | Recherche par nom ou e-mail, fiche (boutique, ambassadeur, rôle, activité) |
+| Comptes | Recherche par nom ou e-mail, fiche (boutique possédée ou dont il est membre, numéro confirmé par SMS, ambassadeur, rôle, activité) |
 | Modération | Commentaires masqués ou signalés : rétablir ou supprimer |
 | Vide-dressing | Articles à vérifier, commandes, reversements |
 | Ambassadeurs | Validations, gains, versements |
@@ -47,16 +47,27 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 | Croissance | Origine des arrivées, parrainages |
 | Équipe | Membres, rôles, invitations |
 | Journal | Toutes les actions de l'équipe (qui, quoi, quand), non modifiables depuis le back-office |
-| Réglages | Commission du vide-dressing, gains des 3 niveaux d'ambassadeur, plafond mensuel ; bornes contrôlées |
+| Réglages | Commission du vide-dressing, gains des 3 niveaux d'ambassadeur, plafond mensuel, code SMS obligatoire pour rejoindre une équipe de boutique ; bornes contrôlées |
 
 Actions possibles sur la fiche d'une boutique :
 - suspendre, avec un motif obligatoire. La vitrine est fermée, la boutique sort du fil et ne peut pas rouvrir sa vitrine elle-même ;
 - réactiver ;
 - retirer du fil ou l'y remettre ;
 - libérer sa place du fil, qui passe à la boutique en attente la plus ancienne ;
-- changer son type de commerce.
+- changer son type de commerce ;
+- retirer un membre de l'équipe de la boutique (son accès s'arrête aussitôt ; le nom du membre est gardé au journal).
 
 Les anciennes adresses `#/stats` et `#/admin/…` ouvrent la section correspondante du back-office.
+
+## Règle : chaque nouvelle fonction arrive avec son back-office
+
+Décision du fondateur (20/10/2026) : toute fonction livrée dans l'application est, dans la même livraison, visible et pilotable dans le back-office.
+Avant de livrer, vérifier :
+1. **Voir** : les nouvelles données apparaissent sur la bonne fiche (boutique, compte, commande) et, si utile, dans un indicateur du tableau de bord ;
+2. **Agir** : l'équipe peut corriger ou arrêter ce qui pose problème (retirer, suspendre, masquer), avec le bon droit ;
+3. **Tracer** : chaque action de l'équipe est au journal, avec un libellé lisible ;
+4. **Régler** : un paramètre qui peut changer (montant, seuil, interrupteur) est dans Réglages, avec des bornes ;
+5. **Tester** : un test SQL et un test navigateur couvrent la partie back-office ; ce document est à jour.
 
 ## Vérification
 

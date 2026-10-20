@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { startServer } from './dev-server.mjs';
+import { passMfa } from './bo-mfa.mjs';
 
 const require = createRequire(import.meta.url);
 let pw;
@@ -199,6 +200,27 @@ await t('code SMS exigé (réglage) : l’invitée confirme le numéro invité, 
   await O.locator('#team-section summary').click();
   await O.locator('#team-list li', { hasText: 'Mame Diarra' }).getByText('numéro confirmé').waitFor();
   await local.db.query(`update fiila.settings set value = '0' where key = 'sms_verify'`);
+});
+
+await t('back-office : l’équipe de la boutique (rôle, numéro confirmé) et le retrait d’un membre, tracé au journal', async () => {
+  await local.db.query(`insert into fiila.staff (user_id, role) select id, 'super_admin' from auth.users where email = 'awa.equipe@example.invalid'`);
+  const shopId = (await local.db.query(`select id from fiila.shops where name = 'Boutique Awa (test)'`)).rows[0].id;
+  await O.setViewportSize({ width: 1280, height: 900 });
+  await O.goto(URL0 + '#/bo/boutiques/' + shopId);
+  await passMfa(O, 'awa.equipe@example.invalid');
+  const team = O.locator('#bo-shop-team');
+  await team.getByText('Mame Diarra').waitFor();
+  await team.getByText('Confirmé par SMS').waitFor();
+  await O.locator('#bo-shop-team').scrollIntoViewIfNeeded();
+  await shot(O, '09-back-office-equipe');
+  O.once('dialog', (d) => d.accept());
+  await team.getByRole('button', { name: 'Retirer' }).first().click();
+  await O.getByText('Mame Diarra retiré(e) de l’équipe.').waitFor();
+  await O.goto(URL0 + '#/bo/journal');
+  await O.getByText(/a retiré un membre de l’équipe de la boutique Boutique Awa \(test\) \(Mame Diarra\)/).first().waitFor();
+  await O.goto(URL0 + '#/bo');
+  await O.locator('#kpi-members').waitFor();
+  await O.locator('#kpi-photos').waitFor();
 });
 
 await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors), []); });

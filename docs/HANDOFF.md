@@ -89,6 +89,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 19/10 08:02 | Règle permanente : interface simple et intuitive, hiérarchie nette, jamais trop de filtres ou d'options affichés ; à appliquer à toute l'application et aux builds à venir | Fondateur |
 | 19/10 07:15 | Vide-dressing : pilote tenu par Fii La validé ; Ambassadeurs : règle « on paie un commerçant actif » et 3 niveaux validés, récompenses entre 2 000 et 10 000 FCFA (fixées à 2 000 / 5 000 / 10 000) ; construire l'espace ambassadeur puis le vide-dressing. Commission du vide-dressing non précisée : 15 % par défaut (réglage), **à confirmer** ; plafond 20 commerçants par mois et par ambassadeur (réglage), **à confirmer** | Fondateur |
 | 19/10 20:04 | Équipe de la boutique : ajouter un membre (administrateur ou éditeur) avec son nom et son numéro, invitation envoyée par WhatsApp. Droits par défaut fixés par le Builder (propriétaire / administrateur / éditeur, voir §2), modifiables sur demande | Fondateur (demande), Builder (droits) |
+| 20/10 02:16 | Back-office mis à jour avec les nouvelles fonctions ; **règle permanente** : chaque nouvelle fonction est livrée avec sa partie back-office (CLAUDE.md règle 8, liste de contrôle dans BACK-OFFICE.md) | Fondateur |
 | 20/10 00:16 | Même traitement premium pour Fii La Carrière (ambassadeurs) : cartes qui facilitent l'onboarding, la formation et l'exécution | Fondateur |
 | 20/10 00:00 | Cartes d'invitation plus belles, premium et dynamiques, avec un vrai appel à l'action, pour tous les types d'invitation | Fondateur |
 | 19/10 22:48 | Jusqu'à 5 photos par article, facultatives, avec carrousel dynamique et premium sur les cartes des articles qui en ont plusieurs | Fondateur |
@@ -190,6 +191,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 20/10 02:50 | Back-office : équipe de boutique sur la fiche (rôle, numéro confirmé, invitations, retrait tracé), numéro confirmé et appartenance sur la fiche compte, indicateurs (membres, numéros confirmés, articles à plusieurs photos), réglage code SMS documenté. Migration `20261020500000_fiila_bo_new_features`. Tests SQL 12/12, navigateur équipe 9/9. CLAUDE.md règle 8 | ce commit |
 | 20/10 02:15 | Run 39348923274 entièrement vert (Chrome + Safari, production) : test vitrine stabilisé | GitHub Actions |
 | 20/10 01:45 | Fii La Carrière en ligne (run 39347584456). Étape 3 : test vitrine encore instable sous WebKit (choix de couleur) ; le test touche maintenant la pastille comme une vraie utilisatrice au lieu de cocher le bouton radio masqué | ce commit |
 | 20/10 01:10 | Fii La Carrière en cartes premium (`ambPath`, fiches `.amb-lesson-card`, test `.amb-opt`, code `#amb-code`, `#amb-mission`) ; carte d'invitation : monogramme seulement s'il y a un expéditeur | ce commit |

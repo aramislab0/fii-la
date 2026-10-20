@@ -174,6 +174,33 @@ await t('vérification par SMS exigée (réglage sms_verify = 1) : numéro confi
   assert.equal((await ok('fiila_shop_invite_get', { p_token: (await ok('fiila_shop_invite', { p_key: null, p_name: 'X', p_phone: '77 900 00 02', p_role: 'editor' }, S)).token })).verify, undefined);
 });
 
+await t('back-office : équipe de la boutique, numéro confirmé, retrait d’un membre tracé au journal, tableau de bord', async () => {
+  const STAFF = await user('staff.team@example.invalid', 'Fondateur BO');
+  await db.query(`insert into fiila.staff (user_id, role) values ($1, 'super_admin')`, [STAFF.uid]);
+  const B = await user('bo.proprio@example.invalid', 'Proprio BO');
+  const shop = (await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique BO Équipe [TEST]' } }, B)).shop;
+  const tok = (await ok('fiila_shop_invite', { p_key: null, p_name: 'Ndeye', p_phone: '77 910 00 01', p_role: 'admin' }, B)).token;
+  const M = await user('ndeye.bo@example.invalid', 'Ndeye');
+  await ok('fiila_shop_invite_accept', { p_token: tok }, M);
+  await db.query(`update auth.users set phone = '221779100001', phone_confirmed_at = now() where id = $1`, [M.uid]);
+  await ok('fiila_shop_invite', { p_key: null, p_name: 'Attente', p_phone: '77 910 00 02', p_role: 'editor' }, B);
+  const bs = await ok('fiila_bo_shop', { p_id: shop.id }, STAFF);
+  assert.equal(bs.team.members.length, 1);
+  assert.equal(bs.team.members[0].role, 'admin'); assert.equal(bs.team.members[0].verified, true); assert.equal(bs.team.members[0].email, 'ndeye.bo@example.invalid');
+  assert.equal(bs.team.invites, 1);
+  const acc = await ok('fiila_bo_account', { p_id: M.uid }, STAFF);
+  assert.equal(acc.phone_verified, '+221779100001'); assert.deepEqual(acc.member_of, { id: shop.id, name: 'Boutique BO Équipe [TEST]', role: 'admin' });
+  const ov = await ok('fiila_bo_overview', {}, STAFF);
+  assert.ok(ov.kpis.shop_members >= 1); assert.ok(ov.kpis.phones_verified >= 1); assert.equal(typeof ov.kpis.multi_photos, 'number');
+  await ko('fiila_bo_shop_action', { p_id: shop.id, p_action: 'member_remove', p_value: B.uid }, 'not_found', STAFF);
+  await ok('fiila_bo_shop_action', { p_id: shop.id, p_action: 'member_remove', p_value: M.uid }, STAFF);
+  assert.equal((await ok('fiila_shop_get', { p_key: null }, M)).shop, null, 'accès coupé');
+  const log = (await db.query(`select action, detail from fiila.admin_log where action = 'shop_member_remove'`)).rows;
+  assert.equal(log.length, 1); assert.equal(log[0].detail.value, 'Ndeye'); assert.equal(log[0].detail.name, 'Boutique BO Équipe [TEST]');
+  // sans le code (aal1), refusé
+  await ko('fiila_bo_shop', { p_id: shop.id }, 'mfa_required', { ...STAFF, aal: 'aal1' });
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL équipe de boutique réussis`);
 process.exit(passed === results.length ? 0 : 1);

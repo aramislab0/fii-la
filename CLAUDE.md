@@ -15,3 +15,4 @@
    - jamais de choix inutile : une option unique (une seule taille, une seule couleur) s'affiche en texte, pas en bouton ;
    - une ligne d'informations discrète plutôt que plusieurs ;
    - avant de livrer un écran, vérifier sa capture : si l'écran paraît chargé, replier ou retirer avant d'ajouter.
+8. **Back-office à jour à chaque fonction** (fondateur, 20/10/2026, « que ça devienne une habitude ») : toute nouvelle fonction est livrée avec sa partie back-office dans le même commit — voir, agir, tracer, régler, tester (liste de contrôle dans `docs/BACK-OFFICE.md`). Le message de livraison au fondateur dit ce qui a été ajouté au back-office.

@@ -6124,6 +6124,8 @@
         kpi('accounts', boNum(k.accounts), 'comptes', '+' + (k.accounts_7d || 0) + ' en 7 jours'),
         kpi('addresses', boNum(k.addresses), 'adresses actives', boNum(k.meetings) + ' événements'),
         kpi('couriers', boNum(k.couriers), 'livreurs', boNum(k.ambassadors) + ' ambassadeurs actifs'),
+        kpi('members', boNum(k.shop_members || 0), 'membres d’équipe de boutiques', boNum(k.phones_verified || 0) + ' numéros confirmés par SMS'),
+        kpi('photos', boNum(k.multi_photos || 0), 'articles à plusieurs photos', 'carrousel dans la vitrine et le fil'),
         kpi('feed', boNum(k.feed_left), 'places gratuites restantes', 'sur 25 dans le fil')),
       h('div', { class: 'bo-grid2' },
         h('section', { class: 'card stack tight', id: 'bo-queues' }, h('h2', null, 'À traiter'),
@@ -6204,7 +6206,7 @@
       return boShell('boutiques', s.name, [
         h('p', null, boShopState(s), ' ', s.rank ? boBadge('info', 'Fil · place ' + s.rank + (s.feed ? '' : ' (masquée)')) : null),
         h('div', { class: 'bo-kpis small' },
-          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.products)), h('span', null, 'articles')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.products)), h('span', null, 'articles'), st.multi_photos ? h('small', { class: 'muted' }, boNum(st.multi_photos) + ' à plusieurs photos') : null),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.orders)), h('span', null, 'commandes'), h('small', { class: 'muted' }, boNum(st.delivered) + ' livrées')),
           h('div', { class: 'bo-kpi' }, h('strong', null, fcfa(st.gmv)), h('span', null, 'volume livré')),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.customers)), h('span', null, 'clients')),
@@ -6220,6 +6222,7 @@
             row('Créée', boDate(s.created_at, true)),
             s.about ? row('Présentation', s.about) : null),
           actions),
+        boShopTeam(s, id),
         s.recent_orders ? h('section', { class: 'stack tight' }, h('h2', null, 'Dernières commandes'),
           boTable([{ label: 'N°', get: function (o) { return String(o.number).padStart(4, '0'); } }, { label: 'Total', get: function (o) { return fcfa(o.total); }, cls: 'num' },
             { label: 'Statut', get: boOrderState }, { label: 'Date', get: function (o) { return boDate(o.created_at, true); } }], s.recent_orders || [],
@@ -6275,6 +6278,25 @@
       { label: 'Créé', get: function (a) { return boDate(a.created_at); } }],
       function (a) { return '#/bo/comptes/' + a.id; }, null, q, 'Nom ou e-mail');
   }
+  // Équipe de la boutique (membres invités par le commerçant) : rôle, numéro confirmé, retrait par l'équipe Fii La.
+  var SHOP_ROLE_LABEL = { admin: 'Administrateur', editor: 'Éditeur' };
+  function boShopTeam(s, id) {
+    var t = s.team || { members: [] };
+    if (!t.members.length && !t.invites) return null;
+    return h('section', { class: 'stack tight', id: 'bo-shop-team' }, h('h2', null, 'Équipe de la boutique'),
+      boTable([
+        { label: 'Membre', get: function (m) { return m.email && boCan('accounts') ? h('a', { href: '#/bo/comptes/' + m.id }, m.name) : m.name; } },
+        { label: 'Rôle', get: function (m) { return SHOP_ROLE_LABEL[m.role] || m.role; } },
+        { label: 'Numéro', get: function (m) { return m.verified ? boBadge('ok', 'Confirmé par SMS') : boBadge('muted', 'Non confirmé'); } },
+        { label: 'Depuis', get: function (m) { return boDate(m.since); } },
+        { label: '', get: function (m) {
+          return boCan('shops_write') ? h('button', { class: 'btn quiet danger-text small', type: 'button', onclick: function () {
+            if (window.confirm && !window.confirm('Retirer ' + m.name + ' de l’équipe de ' + s.name + ' ? Son accès s’arrête aussitôt.')) return;
+            boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'member_remove', p_value: m.id }); }, m.name + ' retiré(e) de l’équipe.', null, null, this);
+          } }, 'Retirer') : '';
+        } }], t.members, { id: 'bo-shop-members', empty: 'Aucun membre.' }),
+      t.invites ? h('p', { class: 'small muted' }, t.invites + ' invitation(s) en attente (valables 7 jours).') : null);
+  }
   function boAccount(id) {
     return api('fiila_bo_account', { p_id: id }).then(function (a) {
       function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
@@ -6283,7 +6305,8 @@
         h('section', { class: 'card stack tight', id: 'bo-account-info' },
           row('E-mail', a.email), row('Téléphone', a.phone || '—'), row('Créé', boDate(a.created_at, true)),
           row('Équipe', a.role ? BO_ROLES[a.role] : '—'),
-          row('Boutique', a.shop ? h('a', { href: '#/bo/boutiques/' + a.shop.id }, a.shop.name) : '—'),
+          row('Numéro confirmé', a.phone_verified ? boBadge('ok', a.phone_verified) : '—'),
+          row('Boutique', a.shop ? h('a', { href: '#/bo/boutiques/' + a.shop.id }, a.shop.name) : a.member_of ? h('span', null, h('a', { href: '#/bo/boutiques/' + a.member_of.id }, a.member_of.name), ' · ' + (SHOP_ROLE_LABEL[a.member_of.role] || a.member_of.role)) : '—'),
           row('Ambassadeur', a.ambassador ? (AMB[a.ambassador.status] || a.ambassador.status) + ' · code ' + a.ambassador.code : '—'),
           row('Adresses', boNum(a.counts.addresses)), row('Événements', boNum(a.counts.meetings)),
           row('Commentaires', boNum(a.counts.comments)), row('Articles de vide-dressing', boNum(a.counts.vide_dressing))),
@@ -6392,7 +6415,7 @@
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’ambassadeur versé',
     reward_cancelled: 'a annulé un gain d’ambassadeur', reward_validated: 'a validé un gain d’ambassadeur', ambassador_active: 'a activé un ambassadeur',
     ambassador_suspended: 'a suspendu un ambassadeur', ambassador_excluded: 'a exclu un ambassadeur', ambassador_training: 'a renvoyé un ambassadeur en formation',
-    view_order: 'a consulté la commande', view_account: 'a consulté le compte' };
+    view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain ambassadeur, niveau 1', 'FCFA'], amb_reward_2: ['Gain ambassadeur, niveau 2', 'FCFA'],
     amb_reward_3: ['Gain ambassadeur, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par ambassadeur et par mois', ''],
     sms_verify: ['Code SMS obligatoire pour rejoindre une équipe de boutique', '0 = non, 1 = oui'] };
@@ -6403,6 +6426,7 @@
     var who = a === 'view_order' ? 'n° ' + String(d.number || '').padStart(4, '0') + ' de ' + (d.shop || '') : d.name || d.email || d.title || d.shop || (d.body ? '« ' + d.body + ' »' : '') || '';
     var txt = (BO_ACTIONS[a] || a) + (who ? ' ' + who : '');
     if (a === 'team_role' && d.to) txt += ' (' + (BO_ROLES[d.from] || d.from) + ' → ' + (BO_ROLES[d.to] || d.to) + ')';
+    if (a === 'shop_member_remove' && d.value) txt += ' (' + d.value + ')';
     if (a === 'team_invite' && d.role) txt += ' (' + (BO_ROLES[d.role] || d.role) + ')';
     if (a === 'shop_suspend' && d.value) txt += ' : ' + d.value;
     if (a === 'shop_set_type' && d.value) txt += ' : ' + (typeLabel(d.value) || d.value);
