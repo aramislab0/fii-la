@@ -96,17 +96,36 @@ await t('inscription : charte obligatoire, puis formation en 6 fiches et test r�
   await A.getByText('Acceptez la charte').waitFor();
   await A.check('#amb-charter');
   await A.click('#amb-register');
+  await A.locator('#cel').getByRole('heading', { name: 'Bienvenue, Moussa' }).waitFor();
+  await shot(A, '01b-bienvenue');
+  await A.click('#cel-close');
+  await A.locator('#cel').waitFor({ state: 'detached' });
   await A.getByText('Formation · 1 sur 6').waitFor().catch(async (e) => {
     const why = await A.evaluate(() => [...document.querySelectorAll('[role=alert], #toast')].map((x) => x.textContent).join(' | ') + ' @ ' + location.hash);
     throw new Error('formation absente : ' + why);
   });
+  // La démonstration animée de la fiche 2 tape le vrai code de l'ambassadeur.
+  await A.click('#amb-next');
+  const code0 = (await local.db.query(`select code from fiila.ambassadors where name = 'Moussa Diop'`)).rows[0].code;
+  await A.waitForFunction((c) => [...document.querySelectorAll('.dm-in')].some((x) => x.textContent === c), code0, { timeout: 12000 });
   await shot(A, '02-formation');
-  for (let i = 0; i < 6; i++) await A.click('#amb-next');
-  await A.getByRole('heading', { name: 'Test de passage' }).waitFor();
-  for (let q = 0; q < 10; q++) await A.locator(`#q${q} input[value="${GOOD[q]}"]`).check();
-  await shot(A, '03-test');
-  await A.click('#amb-quiz-send');
-  await A.getByRole('heading', { name: /Test réussi : 10\/10/ }).waitFor();
+  for (let i = 1; i < 6; i++) await A.click('#amb-next');
+  // Test : une question par écran, « Vérifier », correction immédiate (une erreur volontaire à la question 4).
+  const PICK = GOOD.map((g, q) => (q === 3 ? 0 : g));
+  for (let q = 0; q < 10; q++) {
+    await A.locator('#qz-q').waitFor();
+    assert.equal(await A.locator('#qz-check').isDisabled(), true, 'Vérifier attend un choix');
+    await A.click(`#qz-opt-${PICK[q]}`);
+    await A.click('#qz-check');
+    await A.locator('#qz-next').waitFor();
+    if (q === 0) { assert.match(await A.locator('#qz-foot').textContent(), /niveau vérifié/); await shot(A, '03-test-correct'); }
+    if (q === 3) { assert.match(await A.locator('#qz-foot').textContent(), /vos commandes ou celles de vos proches/); await shot(A, '03b-test-erreur'); }
+    await A.click('#qz-next');
+  }
+  await A.locator('#cel').getByRole('heading', { name: 'Test réussi : 9/10' }).waitFor();
+  await shot(A, '03c-test-reussi');
+  await A.click('#cel-close');
+  await A.locator('#amb-waiting').waitFor();
 });
 
 await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async () => {
@@ -115,6 +134,9 @@ await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async ()
   await F.goto(URL0 + '#/admin/ambassadeurs');
   await passMfa(F, 'fondateur.amb@example.invalid');
   await F.locator('#adm-review').getByText('Moussa Diop').waitFor();
+  // Back-office : taux d'erreur par question du test (Moussa a manqué la question 4).
+  await F.locator('#adm-quiz summary').click();
+  assert.match((await F.locator('#adm-quiz').textContent()).replace(/\s/g, ' '), /1 test\(s\) terminé\(s\)[\s\S]*4\. Pouvez-vous passer des commandes[^%]*100 %/);
   await F.locator('#adm-review').getByRole('button', { name: 'Valider' }).click();
   await F.getByText('Enregistré.').waitFor();
   CODE = (await local.db.query(`select code from fiila.ambassadors`)).rows[0].code;
@@ -122,8 +144,16 @@ await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async ()
 
 await t('ambassadeur : code, portefeuille, aucun commerçant ; un commerçant tape le code en créant sa boutique', async () => {
   await A.goto(URL0 + '#/'); await A.goto(URL0 + '#/ambassadeur');
+  // Profil validé : la carte ambassadeur s'affiche une fois, en grand, avec le code.
+  await A.locator('#cel').getByRole('heading', { name: 'Bienvenue dans l’équipe Fii La' }).waitFor();
+  await A.locator('#cel').getByText(CODE).waitFor();
+  await shot(A, '03d-profil-valide');
+  await A.click('#cel-close');
+  await A.locator('#cel').waitFor({ state: 'detached' });
   await A.locator('#amb-code').getByText(CODE).waitFor();
   await A.getByText('Aucun commerçant pour l’instant').waitFor();
+  await A.reload(); await A.locator('#amb-code').waitFor(); await A.waitForTimeout(900);
+  assert.equal(await A.locator('#cel').count(), 0, 'la carte de validation ne revient pas');
   const M = await newPhone();
   await M.goto(URL0 + '#/boutique');
   await M.fill('#shop-name', 'Boutique Awa (test)');
@@ -145,6 +175,9 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   for (let i = 0; i < 5; i++) await local.db.query(`insert into fiila.products (shop_id, name, price, photo, photo_type) values ($1, $2, 1000, decode($3, 'base64'), 'image/png')`, [owner, 'Article ' + i, photo]);
   await local.db.query(`update fiila.shops set public = true, slug = 'boutique-awa-test' where id = $1`, [owner]);
   await A.goto(URL0 + '#/'); await A.goto(URL0 + '#/ambassadeur');
+  await A.locator('#cel').getByText('+ 2 000 FCFA').waitFor(); // le commerçant passe le niveau 1
+  await shot(A, '04b-niveau');
+  await A.click('#cel-close');
   await A.locator('#amb-wallet').getByText('2 000 FCFA').first().waitFor();
   await local.db.query(`update fiila.ambassador_rewards set validate_after = now() - interval '1 minute'`);
   await F.goto(URL0 + '#/'); await F.goto(URL0 + '#/admin/ambassadeurs');
@@ -152,6 +185,8 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   await F.locator('#adm-pay').getByRole('button', { name: /J’ai versé 2 000/ }).click();
   await F.getByText('Marqué versé.').waitFor();
   await A.goto(URL0 + '#/'); await A.goto(URL0 + '#/ambassadeur');
+  await A.locator('#cel').getByRole('heading', { name: /2 000 FCFA versés/ }).waitFor();
+  await A.click('#cel-close');
   const w = (await A.locator('#amb-wallet').textContent()).replace(/\s/g, ' ');
   assert.match(w, /Déjà reçu\s*2 000 FCFA/);
   // Depuis le compte : l'entrée « Fii La Carrière » montre l'état de l'ambassadeur

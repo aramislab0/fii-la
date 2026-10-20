@@ -51,6 +51,44 @@ await t('test : corrigé par le serveur, 2 essais par 24 h, 8/10 pour réussir, 
   assert.equal((await ok('fiila_ambassador_me', {}, A)).ambassador.status, 'review');
 });
 
+await t('test question par question : correction immédiate, réponse verrouillée, reprise, score serveur, 2 essais commencés par 24 h', async () => {
+  const C = await user('awa.quiz@example.test');
+  await ok('fiila_ambassador_register', { p: { name: 'Awa Quiz', phone: '77 500 00 09', payout_method: 'wave', charter: true } }, C);
+  const s = await ok('fiila_ambassador_quiz_start', {}, C);
+  assert.ok(s.run); assert.deepEqual(s.answered, []);
+  const a0 = await ok('fiila_ambassador_quiz_answer', { p_run: s.run, p_q: 0, p_answer: 0 }, C);
+  assert.equal(a0.correct, false); assert.equal(a0.right, 1); assert.match(a0.why, /niveau vérifié/);
+  // Changer sa réponse après la correction ne change rien : la première réponse compte.
+  const again = await ok('fiila_ambassador_quiz_answer', { p_run: s.run, p_q: 0, p_answer: 1 }, C);
+  assert.equal(again.correct, false); assert.equal(again.answer, 0);
+  await ko('fiila_ambassador_quiz_answer', { p_run: s.run, p_q: 10, p_answer: 0 }, 'invalid_payload', C);
+  await ko('fiila_ambassador_quiz_answer', { p_run: s.run, p_q: 1, p_answer: 1 }, 'not_found', A); // l'essai d'un autre
+  // Reprise : l'essai en cours revient, avec les réponses déjà données.
+  const r = await ok('fiila_ambassador_quiz_start', {}, C);
+  assert.equal(r.run, s.run); assert.equal(r.answered.length, 1);
+  let last;
+  for (let q = 1; q < 10; q++) last = await ok('fiila_ambassador_quiz_answer', { p_run: s.run, p_q: q, p_answer: GOOD[q] }, C);
+  assert.equal(last.done, true); assert.equal(last.score, 9); assert.equal(last.passed, true);
+  await ko('fiila_ambassador_quiz_answer', { p_run: s.run, p_q: 9, p_answer: 0 }, 'quiz_done', C);
+  const me = (await ok('fiila_ambassador_me', {}, C)).ambassador;
+  assert.equal(me.status, 'review'); assert.equal(me.quiz_score, 9);
+  await ko('fiila_ambassador_quiz_start', {}, 'quiz_done', C);
+  // Limite : 2 essais commencés par 24 h, même abandonnés.
+  const D = await user('binta.quiz@example.test');
+  await ok('fiila_ambassador_register', { p: { name: 'Binta Quiz', phone: '77 500 00 08', payout_method: 'wave', charter: true } }, D);
+  const d1 = await ok('fiila_ambassador_quiz_start', {}, D);
+  await db.query(`update fiila.ambassador_quiz_runs set started_at = now() - interval '4 hours' where id = $1`, [d1.run]);
+  const d2 = await ok('fiila_ambassador_quiz_start', {}, D);
+  assert.notEqual(d2.run, d1.run);
+  await db.query(`update fiila.ambassador_quiz_runs set started_at = now() - interval '4 hours' where id = $1`, [d2.run]);
+  await ko('fiila_ambassador_quiz_start', {}, 'quiz_wait', D);
+  // Back-office : taux d'erreur par question (essais terminés).
+  const adm = await ok('fiila_admin_ambassadors', {}, ADMIN);
+  assert.equal(adm.quiz_stats.length, 10);
+  assert.equal(adm.quiz_stats[0].wrong, 1); assert.equal(adm.quiz_stats[1].wrong, 0); assert.equal(adm.quiz_stats[0].answered, 1);
+  await db.query(`delete from fiila.ambassadors where name in ('Awa Quiz', 'Binta Quiz')`);
+});
+
 await t('validation par le fondateur seulement ; avant, le code ne marche pas', async () => {
   const k = (await ok('fiila_shop_save', { p_key: null, p: { name: 'Trop tôt [TEST]', business_type: 'mode' } })).key;
   await ko('fiila_ambassador_link', { p_key: k, p_code: CODE }, 'ambassador_unknown');

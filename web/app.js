@@ -3098,6 +3098,7 @@
     home: 'M4 11 12 4l8 7v9H4v-9ZM10 20v-5h4v5',
     settings: 'M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M12 2.5v3M12 18.5v3M4.2 6.5l2.6 1.5M17.2 16l2.6 1.5M4.2 17.5l2.6-1.5M17.2 8l2.6-1.5',
     back: 'M15 6l-6 6 6 6',
+    close: 'M6 6l12 12M18 6 6 18',
     down: 'M6 9l6 6 6-6'
   };
   function icon(name, size) {
@@ -5545,22 +5546,24 @@
   /* ================================================================ FII LA CARRIÈRE : AMBASSADEURS
      Parcours : présentation → inscription (compte, charte) → 6 fiches → test (8/10) → validation par l'équipe → missions.
      Règle affichée partout : on est payé pour un commerçant actif, jamais pour une inscription. */
+  // Les 6 fiches : une démonstration animée de l'écran, deux phrases simples, une chose à retenir.
   var AMB_LESSONS = [
-    ['shop', 'Fii La en une phrase', 'Une boutique en ligne gratuite pour le commerçant : vitrine, commandes, factures, et l’adresse exacte de chaque cliente en une photo.'],
-    ['plus', 'Créer la boutique avec lui', 'Sur SON téléphone : « Boutique », le nom, le type de commerce, puis votre code dans « Code ambassadeur ». Jamais sur votre téléphone.'],
-    ['cam', 'De bonnes photos', 'L’article seul, à la lumière du jour, fond simple. 5 articles avec photo au moins : c’est le niveau 1.'],
-    ['eye', 'Ouvrir la vitrine', 'Réglages → « Ma vitrine en ligne » → Ouverte. Envoyez le lien de la vitrine à ses clientes sur WhatsApp et dans son statut.'],
-    ['ask', 'Les premières commandes', 'Montrez-lui « Nouvelle commande » et « Demander l’adresse ». Niveau 2 : 3 commandes de 3 clientes différentes, dont 1 livrée, en 30 jours.'],
-    ['ban', 'Ce qui est interdit', 'Commander soi-même ou avec des proches, créer des boutiques fictives, promettre des ventes ou de l’argent, garder les numéros des clientes. Sanction : gains annulés, exclusion.']];
+    { t: 'Fii La, c’est quoi ?', say: 'Une boutique en ligne gratuite pour le commerçant. Ses clientes voient ses articles, commandent, et il reçoit leur adresse exacte en une photo.', keep: 'Gratuit pour le commerçant, simple pour ses clientes.' },
+    { t: 'On crée la boutique ensemble', say: 'Toujours sur le téléphone du commerçant, jamais sur le vôtre. Il choisit le nom et le type de commerce, puis tape votre code.', keep: 'Votre code va dans « Code ambassadeur », au plus tard 7 jours après.' },
+    { t: 'Des photos qui donnent envie', say: 'L’article seul, à la lumière du jour, sur un fond simple. L’application recadre chaque photo au bon format.', keep: '5 articles avec photo : c’est le début du niveau 1.' },
+    { t: 'On ouvre la vitrine', say: 'Dans les réglages, la vitrine passe à « Ouverte ». Le commerçant envoie le lien à ses clientes sur WhatsApp et dans son statut.', keep: 'Type de commerce + 5 photos + vitrine ouverte = niveau 1.' },
+    { t: 'Les premières commandes', say: 'Montrez-lui « Nouvelle commande » et « Demander l’adresse ». Ensuite, ce sont ses vraies clientes qui commandent.', keep: 'Niveau 2 : 3 clientes différentes, dont 1 commande livrée, en 30 jours.' },
+    { t: 'Ce qui ne se fait jamais', say: 'Commander soi-même ou par des proches, inventer une boutique, promettre des ventes, garder les numéros des clientes.', keep: 'Une fraude, et les gains sont annulés : exclusion du programme.' }];
+  // Questions du test (l'ordre des réponses suit la correction gardée par le serveur, qui n'est jamais envoyée d'avance).
   var AMB_QUIZ = [
     ['Quand êtes-vous payé pour un commerçant ?', ['Dès qu’il crée sa boutique', 'Quand il atteint un niveau vérifié par Fii La', 'Quand il vous paie']],
     ['Combien d’articles avec photo pour le niveau 1 ?', ['3', '5', '10']],
     ['Le niveau 2 demande :', ['3 commandes de 3 clientes différentes, dont 1 livrée', '1 commande', '10 visites de la vitrine']],
-    ['Pouvez-vous passer des commandes vous-même pour aider ?', ['Oui, ça l’aide à démarrer', 'Non : elles ne comptent pas et peuvent vous faire exclure']],
+    ['Pouvez-vous passer des commandes vous-même pour l’aider ?', ['Oui, ça l’aide à démarrer', 'Non : elles ne comptent pas et peuvent vous faire exclure']],
     ['Où le commerçant tape-t-il votre code ?', ['Dans « Code ambassadeur », en créant sa boutique', 'Dans WhatsApp', 'Nulle part']],
-    ['Une bonne photo d’article :', ['Prise de nuit, au flash', 'L’article seul, bien éclairé, fond simple', 'Avec le prix écrit à la main']],
+    ['Une bonne photo d’article, c’est :', ['Prise de nuit, au flash', 'L’article seul, bien éclairé, fond simple', 'Avec le prix écrit à la main']],
     ['Que pouvez-vous promettre à un commerçant ?', ['Des ventes garanties', 'Ce que Fii La offre vraiment : boutique, vitrine et adresses gratuites', 'Un prêt']],
-    ['Vos gains sont versés :', ['Immédiatement', 'Après 30 jours de vérification, une fois par mois', 'Jamais']],
+    ['Vos gains sont versés :', ['Tout de suite', 'Après 30 jours de vérification, une fois par mois', 'Jamais']],
     ['Les numéros des clientes du commerçant :', ['Vous pouvez les garder', 'Restent confidentiels : vous ne les copiez pas', 'Vous pouvez les revendre']],
     ['Un commerçant arrête après une semaine :', ['Vous gardez les niveaux déjà validés, pas les suivants', 'Vous perdez tout', 'Vous êtes exclu']]];
   var GRADES = { ambassadeur: 'Ambassadeur', confirme: 'Ambassadeur confirmé', certifie: 'Ambassadeur certifié Fii La' };
@@ -5663,7 +5666,11 @@
       if (!f.charter) return errBox(err, new ApiError('charter_required'));
       btn.disabled = true;
       api('fiila_ambassador_register', { p: { name: f.name.trim(), phone: f.phone.trim(), zone: f.zone.trim() || null, payout_method: f.method, payout_phone: f.payout.trim() || null, charter: true } })
-        .then(function () { toast('Inscription enregistrée. Place à la formation.'); render(); }, function (e) { btn.disabled = false; errBox(err, e); });
+        .then(function () {
+          render();
+          celebrate({ icon: 'user', kicker: 'Inscription réussie', title: 'Bienvenue, ' + (f.name.trim().split(/\s+/)[0] || 'ambassadeur'),
+            sub: 'Six fiches courtes, puis un test de 10 questions. Comptez un quart d’heure.', cta: 'Commencer la formation' });
+        }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'check', 'M’inscrire');
     return page(backBtn(), intro, ambPath(0), ambLevels(null),
       h('section', { class: 'card stack', id: 'amb-form' }, h('h2', null, 'Inscription'),
@@ -5684,9 +5691,230 @@
         err, btn),
       footer());
   }
+  /* ----- Fii La Carrière : démonstrations animées des fiches (un mini-écran qui montre le geste, en boucle).
+     Chaque élément porte data-at : l'étape à laquelle il apparaît. Mouvement réduit : l'écran final, sans boucle. */
+  function dmPop(at, kids, cls) { return h('div', { class: 'pop ' + (cls || ''), 'data-at': String(at) }, kids); }
+  function ambDemo(i, code) {
+    var screen, steps;
+    if (i === 0) {
+      steps = 5;
+      var tones = ['#E9C8A8,#C98E62', '#BFD8C4,#6FA585', '#E7D9A4,#C4A243', '#D4C4E2,#9277B5', '#F1C5C0,#D47F76', '#C8D6E8,#6E8DB8'];
+      screen = [h('div', { class: 'dm-h' }, 'Boutique Awa', h('span', { class: 'dm-chip' }, 'Ouverte')),
+        h('div', { class: 'dm-grid' }, tones.map(function (c, k) {
+          return dmPop(1 + Math.floor(k / 2), [h('div', { class: 'dm-img', style: 'background:linear-gradient(160deg,' + c + ')' }), h('i')], 'dm-tile');
+        })),
+        h('div', { class: 'dm-toast', 'data-at': '4' }, icon('pin', 16), h('span', null, 'Adresse reçue : Yoff, porte verte'))];
+    } else if (i === 1) {
+      steps = 7;
+      screen = [h('div', { class: 'dm-h' }, 'Créer ma boutique'),
+        h('div', { class: 'dm-field' }, h('small', null, 'Nom de la boutique'), h('span', { class: 'dm-in', 'data-at': '1', 'data-type': 'Boutique Awa' })),
+        h('div', { class: 'dm-field' }, h('small', null, 'Type de commerce'), h('span', { class: 'dm-in', 'data-at': '3', 'data-type': 'Mode et beauté' })),
+        h('div', { class: 'dm-field dm-hl', 'data-at': '4' }, h('small', null, 'Code ambassadeur ', h('em', null, 'votre code')), h('span', { class: 'dm-in', 'data-at': '4', 'data-type': code || 'K7M2QD' })),
+        h('div', { class: 'dm-btn', 'data-at': '6' }, 'Créer la boutique')];
+    } else if (i === 2) {
+      steps = 9;
+      screen = [h('div', { class: 'dm-h' }, 'Photo de l’article'),
+        h('div', { class: 'dm-shots' },
+          dmPop(1, [h('div', { class: 'dm-shot good' }, h('b', { class: 'dm-obj' }), h('span', { class: 'dm-mark ok' }, icon('check', 12))), h('small', null, 'Oui')]),
+          dmPop(2, [h('div', { class: 'dm-shot flash' }, h('b', { class: 'dm-obj' }), h('span', { class: 'dm-mark no' }, '×')), h('small', null, 'Flash')]),
+          dmPop(3, [h('div', { class: 'dm-shot busy' }, h('b', { class: 'dm-obj' }), h('span', { class: 'dm-mark no' }, '×')), h('small', null, 'Fond chargé')])),
+        h('div', { class: 'dm-count' }, h('small', null, 'Articles avec photo'),
+          h('div', { class: 'dm-dots' }, [4, 5, 6, 7, 8].map(function (n) { return h('i', { 'data-at': String(n) }); }))),
+        dmPop(8, h('span', { class: 'dm-chip big' }, '5 sur 5'), 'dm-center')];
+    } else if (i === 3) {
+      steps = 6;
+      screen = [h('div', { class: 'dm-h' }, 'Réglages'),
+        h('div', { class: 'dm-row' }, h('span', null, 'Ma vitrine en ligne'),
+          h('span', { class: 'dm-st', 'data-at': '1' }, h('small', { class: 'no' }, 'Fermée'), h('small', { class: 'yes' }, 'Ouverte'), h('span', { class: 'dm-sw' }))),
+        h('div', { class: 'dm-chat' },
+          dmPop(2, ['Ma boutique est en ligne ! Regardez :', h('span', { class: 'dm-link' }, icon('link', 12), 'Voir la vitrine')], 'dm-bub me'),
+          dmPop(4, 'J’aime la robe bleue. Je commande !', 'dm-bub'),
+          dmPop(5, 'Elle arrive demain à votre porte.', 'dm-bub me'))];
+    } else if (i === 4) {
+      steps = 7;
+      var cl = [['F', 'Fatou', '8 500', '#C98E62'], ['A', 'Aminata', '12 000', '#6FA585'], ['K', 'Khady', '5 000', '#9277B5']];
+      screen = [h('div', { class: 'dm-h' }, 'Commandes'),
+        cl.map(function (c, k) {
+          return dmPop(k + 1, [h('span', { class: 'dm-av', style: 'background:' + c[3] }, c[0]), h('span', { class: 'dm-on' }, h('b', null, c[1]), h('small', null, c[2] + ' FCFA')),
+            k === 0 ? h('span', { class: 'dm-stat', 'data-at': '5' }, h('small', { class: 'no' }, 'En route'), h('small', { class: 'yes' }, 'Livrée')) : h('span', { class: 'dm-stat' }, h('small', { class: 'no' }, 'Nouvelle'))], 'dm-order');
+        }),
+        dmPop(6, [icon('star', 14), 'Niveau 2 atteint'], 'dm-badge')];
+    } else {
+      steps = 7;
+      screen = [h('div', { class: 'dm-h' }, 'Jamais'),
+        ['Commander soi-même', 'Une boutique inventée', 'Promettre des ventes', 'Garder les numéros'].map(function (x, k) {
+          return h('div', { class: 'dm-ban', 'data-at': String(k + 1) }, h('span', null, x), h('b', { class: 'dm-x' }, '×'));
+        }),
+        dmPop(6, [icon('lock', 14), 'Payé pour un vrai commerçant actif'], 'dm-foot')];
+    }
+    var root = h('div', { class: 'dm', 'aria-hidden': 'true' }, h('div', { class: 'dm-phone' }, h('div', { class: 'dm-screen' }, screen)));
+    ambDemoRun(root, steps);
+    return root;
+  }
+  function ambDemoRun(root, steps) {
+    var items = [].slice.call(root.querySelectorAll('[data-at]'));
+    function typeIn(el, on) {
+      var full = el.getAttribute('data-type'), n = 0;
+      if (!on) { el.textContent = ''; return; }
+      if (REDUCED) { el.textContent = full; return; }
+      (function next() { if (!el.classList.contains('on')) return; el.textContent = full.slice(0, ++n); if (n < full.length) setTimeout(next, 75); })();
+    }
+    function set(s) {
+      items.forEach(function (el) {
+        var on = s >= Number(el.getAttribute('data-at'));
+        if (el.classList.contains('on') === on) return;
+        el.classList.toggle('on', on);
+        if (el.hasAttribute('data-type')) typeIn(el, on);
+      });
+    }
+    if (REDUCED) { set(steps); return; }
+    var s = 0, seen = false, born = Date.now();
+    var timer = setInterval(function () {
+      if (!root.isConnected) { if (seen || Date.now() - born > 15000) clearInterval(timer); return; }
+      seen = true; s = s >= steps + 3 ? 0 : s + 1; set(s);
+    }, 850);
+  }
+
+  /* ----- chiffres qui montent, anneau de progression, confettis, carte de félicitations */
+  function countUp(el, to, fmt) {
+    fmt = fmt || String;
+    if (REDUCED || !to) { el.textContent = fmt(to || 0); return el; }
+    var t0 = null;
+    el.textContent = fmt(0);
+    requestAnimationFrame(function f(t) { if (!t0) t0 = t; var k = Math.min(1, (t - t0) / 1000); el.textContent = fmt(Math.round(to * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(f); });
+    return el;
+  }
+  function svgEl(tag, attrs) { var el = document.createElementNS('http://www.w3.org/2000/svg', tag); for (var k in attrs) el.setAttribute(k, attrs[k]); return el; }
+  function ring(value, max, size, label) {
+    var r = (size - 12) / 2, c = 2 * Math.PI * r, k = max ? Math.min(1, value / max) : 0;
+    var svg = svgEl('svg', { width: size, height: size, viewBox: '0 0 ' + size + ' ' + size, class: 'ring', role: 'img', 'aria-label': label || (value + ' sur ' + max) });
+    svg.appendChild(svgEl('circle', { cx: size / 2, cy: size / 2, r: r, fill: 'none', 'stroke-width': 10, class: 'ring-bg' }));
+    var fg = svgEl('circle', { cx: size / 2, cy: size / 2, r: r, fill: 'none', 'stroke-width': 10, 'stroke-linecap': 'round', class: 'ring-fg',
+      'stroke-dasharray': c, 'stroke-dashoffset': REDUCED ? c * (1 - k) : c, transform: 'rotate(-90 ' + size / 2 + ' ' + size / 2 + ')' });
+    svg.appendChild(fg);
+    var t = svgEl('text', { x: '50%', y: '50%', 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'ring-t', 'font-size': Math.round(size / 4.2) });
+    t.textContent = value + '/' + max;
+    svg.appendChild(t);
+    if (!REDUCED) setTimeout(function () { fg.setAttribute('stroke-dashoffset', c * (1 - k)); }, 120);
+    return svg;
+  }
+  function confetti(canvas) {
+    if (REDUCED || !canvas.getContext) return;
+    var ctx = canvas.getContext('2d'), W, H, dpr = Math.min(2, window.devicePixelRatio || 1), t0 = null;
+    function size() { W = canvas.clientWidth; H = canvas.clientHeight; canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    size();
+    var colors = ['#CFE7A6', '#7ECC9A', '#F6F4EE', '#E8B95E', '#2E7D55', '#F1C5C0'];
+    var ps = [];
+    for (var i = 0; i < 150; i++) {
+      var left = i % 2 === 0;
+      ps.push({ x: left ? -10 : W + 10, y: H * (0.55 + Math.random() * 0.3), vx: (left ? 1 : -1) * (4 + Math.random() * 7), vy: -(9 + Math.random() * 9),
+        w: 6 + Math.random() * 6, h: 8 + Math.random() * 8, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3, c: colors[i % colors.length], d: Math.random() * 300 });
+    }
+    requestAnimationFrame(function f(t) {
+      if (!canvas.isConnected) return;
+      if (!t0) t0 = t;
+      var el = t - t0;
+      ctx.clearRect(0, 0, W, H);
+      ps.forEach(function (p) {
+        if (el < p.d) return;
+        p.vy += 0.32; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.globalAlpha = Math.max(0, 1 - el / 3600);
+        ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.r * 2))); ctx.restore();
+      });
+      if (el < 3600) requestAnimationFrame(f); else ctx.clearRect(0, 0, W, H);
+    });
+  }
+  // Félicitations : carte en plein écran, confettis, une seule action. o : {icon, kicker, title, sub, gain, card, cta, onClose}
+  function celebrate(o) {
+    var prev = document.getElementById('cel'); if (prev) prev.remove();
+    var back = document.activeElement, done = false;
+    function close(silent) {
+      if (done) return; done = true;
+      window.removeEventListener('hashchange', onHash); document.removeEventListener('keydown', onKey);
+      ov.classList.add('out');
+      setTimeout(function () { ov.remove(); if (silent !== true && o.onClose) o.onClose(); else if (back && back.focus && back.isConnected) try { back.focus({ preventScroll: true }); } catch (e) { /* rien */ } }, REDUCED ? 0 : 200);
+    }
+    function onHash() { close(true); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    var btn = ivcBtn('button', { id: 'cel-close', onclick: function () { close(); } }, o.cta || 'Continuer');
+    var canvas = h('canvas', { class: 'cel-fx', 'aria-hidden': 'true' });
+    var inner = o.card
+      ? h('div', { class: 'cel-inner' }, h('div', { class: 'cel-head' }, h('p', { class: 'cel-kicker' }, o.kicker), h('h2', { id: 'cel-t' }, o.title), o.sub ? h('p', null, o.sub) : null), o.card, btn)
+      : h('div', { class: 'cel-inner' }, h('div', { class: 'ivc cel-card' },
+          h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
+          h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')), h('span', { class: 'ivc-kind' }, o.kicker || 'Bravo')),
+          h('div', { class: 'cel-badge', 'aria-hidden': 'true' }, h('span', null, icon(o.icon || 'star', 38))),
+          h('h2', { class: 'ivc-title', id: 'cel-t' }, o.title),
+          o.gain ? h('p', { class: 'cel-gain' }, o.gain) : null,
+          o.sub ? h('p', { class: 'ivc-sub' }, o.sub) : null,
+          h('div', { class: 'ivc-cta' }, btn)));
+    var ov = h('div', { class: 'cel', id: 'cel', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cel-t' }, canvas, inner);
+    document.body.appendChild(ov);
+    window.addEventListener('hashchange', onHash); document.addEventListener('keydown', onKey);
+    try { btn.focus({ preventScroll: true }); } catch (e) { /* rien */ }
+    confetti(canvas);
+    return close;
+  }
+
+  // Carte ambassadeur : photo, nom, grade, code, et les chiffres qui comptent. opts.cta : bouton d'envoi du code.
+  function ambAgentCard(a, opts) {
+    opts = opts || {};
+    var shops = a.shops || [];
+    var ph = h('span', { class: 'agc-ph' }, avatarEl(ME, 66));
+    var addPhoto = opts.cta && !(ME && ME.avatar) ? h('a', { class: 'agc-photo-link', href: '#/compte', id: 'amb-photo' }, 'Ajouter ma photo') : null;
+    if (!ME) account.me().then(function (me) { if (me) { setKids(ph, avatarEl(me, 66)); if (me.avatar && addPhoto) addPhoto.remove(); } }, function () {});
+    var stat = function (n, label, fmt) { return h('div', null, countUp(h('b'), n, fmt), h('small', null, label)); };
+    return h('section', { class: 'ivc agc', id: opts.id || null },
+      h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
+      h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')), h('span', { class: 'ivc-kind' }, 'Carte ambassadeur')),
+      h('div', { class: 'agc-id' }, ph,
+        h('div', { class: 'agc-who' }, h('strong', { class: 'wrapword' }, a.name),
+          h('span', { class: 'agc-grade', id: opts.cta ? 'amb-grade' : null }, icon('star', 12), GRADES[a.grade] || 'Ambassadeur'),
+          a.zone ? h('span', { class: 'agc-zone' }, a.zone) : null, addPhoto)),
+      h('div', { class: 'agc-code' }, h('small', null, 'Code ambassadeur'), h('p', { class: 'amb-codev2' }, a.code)),
+      h('div', { class: 'agc-stats' },
+        stat(shops.length, 'commerçants'),
+        stat(shops.filter(function (s) { return s.level >= 2; }).length, 'actifs'),
+        stat((a.rewards && a.rewards.paid) || 0, 'FCFA reçus', function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); })),
+      opts.cta || null);
+  }
+
+  // Moments à fêter depuis la dernière visite : profil validé, nouveau grade, commerçant qui passe un niveau, versement reçu.
+  var GRADE_RANK = { ambassadeur: 0, confirme: 1, certifie: 2 };
+  function ambMoments(a) {
+    var key = 'fiila.amb.seen.' + a.code, seen = null;
+    try { seen = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { seen = null; }
+    var hist = (a.history || []).filter(function (x) { return x.status !== 'cancelled'; });
+    var now = { active: true, grade: a.grade, paid: (a.rewards && a.rewards.paid) || 0, levels: hist.map(function (x) { return x.shop + '|' + x.level; }) };
+    // Première visite sur ce téléphone : on fête la validation, pas l'historique déjà connu.
+    if (!seen || typeof seen !== 'object') seen = { active: false, grade: now.grade, paid: now.paid, levels: now.levels };
+    var q = [];
+    if (!seen.active) q.push({ kind: 'validated' });
+    if ((GRADE_RANK[now.grade] || 0) > (GRADE_RANK[seen.grade] || 0)) q.push({ kind: 'grade' });
+    hist.filter(function (x) { return (seen.levels || []).indexOf(x.shop + '|' + x.level) < 0; }).reverse().forEach(function (x) { q.push({ kind: 'level', x: x }); });
+    if (now.paid > (seen.paid || 0)) q.push({ kind: 'paid', amount: now.paid - (seen.paid || 0) });
+    try { localStorage.setItem(key, JSON.stringify(now)); } catch (e) { /* rien */ }
+    return q.slice(0, 4);
+  }
+  function ambCelebrate(a, q) {
+    var hash = location.hash;
+    (function next() {
+      var m = q.shift();
+      if (!m || location.hash !== hash) return;
+      var o = { onClose: function () { setTimeout(next, 250); } };
+      if (m.kind === 'validated') Object.assign(o, { kicker: 'Profil validé', title: 'Bienvenue dans l’équipe Fii La', sub: 'Voici votre carte. Envoyez votre code au premier commerçant.',
+        card: ambAgentCard(a, {}), cta: 'Ouvrir mon tableau de bord' });
+      else if (m.kind === 'grade') Object.assign(o, { icon: 'star', kicker: 'Nouveau grade', title: GRADES[a.grade], sub: 'Vos commerçants actifs vous ont fait monter d’un grade. Bravo.' });
+      else if (m.kind === 'level') Object.assign(o, { icon: 'shop', kicker: 'Niveau ' + m.x.level + ' atteint', title: m.x.shop + ' passe au niveau ' + m.x.level, gain: '+ ' + fcfa(m.x.amount),
+        sub: 'Gain en vérification pendant 30 jours, puis versé avec le mois.' });
+      else Object.assign(o, { icon: 'cash', kicker: 'Versement reçu', title: fcfa(m.amount) + ' versés', sub: 'Sur ' + (PAYOUT[a.payout_method] || '') + ' ' + a.payout_phone + '. Merci pour votre travail.' });
+      celebrate(o);
+    })();
+  }
+
   function ambTraining(a) {
     var root = h('div', { class: 'stack' });
-    var i = 0, answers = [];
+    var i = 0;
     function lesson() {
       var l = AMB_LESSONS[i];
       var last = i === AMB_LESSONS.length - 1;
@@ -5697,37 +5925,99 @@
           h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-kind', style: 'text-align:left' }, 'Formation · ' + (i + 1) + ' sur ' + AMB_LESSONS.length),
             h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La'))),
           h('div', { class: 'amb-prog', 'aria-hidden': 'true' }, AMB_LESSONS.map(function (x, k) { return h('i', { class: k < i ? 'on' : k === i ? 'now' : '' }); })),
-          h('span', { class: 'amb-lic2', 'aria-hidden': 'true' }, icon(l[0], 34)),
-          h('h2', { class: 'ivc-title' }, l[1]),
-          h('p', { class: 'ivc-sub amb-ltext' }, l[2]),
+          ambDemo(i, a.code),
+          h('h2', { class: 'ivc-title' }, l.t),
+          h('p', { class: 'ivc-sub amb-ltext' }, l.say),
+          h('p', { class: 'amb-keep' }, icon('star', 16), h('span', null, h('b', null, 'À retenir : '), l.keep)),
           h('div', { class: 'ivc-cta' }, ivcBtn('button', { id: 'amb-next', onclick: function () { if (!last) { i++; lesson(); } else quiz(); window.scrollTo(0, 0); } },
             last ? 'Passer le test' : 'Fiche suivante')),
           i > 0 ? h('button', { class: 'ivc-link', type: 'button', style: 'background:none;border:0;font:inherit;cursor:pointer', onclick: function () { i--; lesson(); } }, 'Fiche précédente') : null));
     }
+    // Test : une question par écran, « Vérifier », la correction tout de suite, puis « Continuer ».
+    var GOOD_FB = ['Exactement.', 'Bien vu.', 'C’est ça.', 'Parfait.', 'Juste.'];
+    var BAD_FB = ['Pas tout à fait.', 'Presque.', 'Ce n’est pas ça.'];
     function quiz() {
-      answers = AMB_QUIZ.map(function () { return null; });
-      var err = h('div', { role: 'alert' });
-      var send = iconBtn('button', { class: 'btn big', type: 'button', id: 'amb-quiz-send', onclick: function () {
-        setKids(err);
-        if (answers.some(function (x) { return x === null; })) return errBox(err, new ApiError('quiz_incomplete'));
-        send.disabled = true;
-        api('fiila_ambassador_quiz', { p_answers: answers }).then(function (r) {
-          if (r.passed) { toast('Test réussi : ' + r.score + '/10.'); render(); return; }
-          setKids(root, stateCard('!', 'Score : ' + r.score + '/10', 'Il faut 8 bonnes réponses. Relisez les fiches, puis réessayez (2 essais par jour).',
-            h('button', { class: 'btn', type: 'button', onclick: function () { i = 0; lesson(); } }, 'Relire les fiches')));
-        }, function (e) { send.disabled = false; errBox(err, e); });
-      } }, 'check', 'Envoyer mes réponses');
-      var done = h('span', { id: 'amb-quiz-count' }, '0');
-      var bar = h('i', { style: 'width:0%' });
-      function progress() { var c = answers.filter(function (x) { return x !== null; }).length; done.textContent = String(c); bar.style.width = (c * 10) + '%'; }
-      setKids(root, ambPath(2), h('h1', null, 'Test de passage'), h('p', { class: 'muted' }, '10 questions. 8 bonnes réponses pour réussir.' + (a.attempts_today ? ' Essais aujourd’hui : ' + a.attempts_today + ' sur 2.' : '')),
-        h('div', { class: 'amb-qbar', 'aria-live': 'polite' }, h('span', { class: 'small' }, done, ' sur 10 répondues'), h('div', { class: 'amb-bar' }, bar)),
-        AMB_QUIZ.map(function (q, n) {
-          return h('fieldset', { class: 'card stack tight amb-q', id: 'q' + n }, h('legend', null, h('span', { class: 'amb-qn' }, String(n + 1)), q[0]),
-            h('div', { class: 'amb-opts' }, q[1].map(function (opt, k) {
-              return h('label', { class: 'amb-opt' }, h('input', { type: 'radio', name: 'q' + n, value: String(k), onchange: function () { answers[n] = k; progress(); } }), h('span', null, opt));
-            })));
-        }), err, send);
+      var run = null, q = 0, picked = null, streak = 0, res = {}, attempts = 0;
+      setKids(root, h('div', { class: 'qz-load', role: 'status' }, 'Préparation du test…'));
+      api('fiila_ambassador_quiz_start', {}).then(function (r) {
+        run = r.run; attempts = r.attempts_today || 0;
+        (r.answered || []).forEach(function (x) { res[x.q] = x; });
+        q = 0; while (res[q] && q < 9) q++;
+        draw();
+      }, function (e) {
+        setKids(root, stateCard(e && e.code === 'quiz_wait' ? '⌛' : '!', e && e.code === 'quiz_wait' ? 'Deux essais par jour' : 'Test indisponible', errText(e),
+          h('button', { class: 'btn', type: 'button', onclick: function () { i = 0; lesson(); } }, 'Relire les fiches')));
+      });
+      function answeredCount() { return Object.keys(res).length; }
+      function draw() {
+        picked = null;
+        var item = AMB_QUIZ[q];
+        var bar = h('i', { style: 'width:' + (answeredCount() * 10) + '%' });
+        var check = h('button', { class: 'qz-cta', type: 'button', id: 'qz-check', disabled: true, onclick: verify }, 'Vérifier');
+        var foot = h('div', { class: 'qz-foot', id: 'qz-foot' }, h('div', { class: 'qz-foot-in' }, check));
+        var tiles = item[1].map(function (opt, k) {
+          return h('button', { type: 'button', class: 'qz-opt', id: 'qz-opt-' + k, role: 'radio', 'aria-checked': 'false', onclick: function () {
+            if (check.hasAttribute('data-done')) return;
+            picked = k;
+            tiles.forEach(function (t, n) { t.setAttribute('aria-checked', String(n === k)); });
+            check.disabled = false;
+          } }, h('span', { class: 'qz-key', 'aria-hidden': 'true' }, 'ABCD'.charAt(k)), h('span', null, opt));
+        });
+        function verify() {
+          if (picked === null) return;
+          check.disabled = true; check.setAttribute('data-done', '');
+          tiles.forEach(function (t) { t.disabled = true; });
+          api('fiila_ambassador_quiz_answer', { p_run: run, p_q: q, p_answer: picked }).then(function (r) {
+            res[q] = r;
+            streak = r.correct ? streak + 1 : 0;
+            bar.style.width = (answeredCount() * 10) + '%';
+            if (tiles[r.right]) tiles[r.right].classList.add('right');
+            if (!r.correct && tiles[r.answer]) tiles[r.answer].classList.add('wrong');
+            var nextBtn = h('button', { class: 'qz-cta', type: 'button', id: 'qz-next', onclick: function () {
+              if (r.done) return finish(r);
+              q = q + 1; while (res[q] && q < 9) q++;
+              draw(); window.scrollTo(0, 0);
+            } }, r.done ? 'Voir mon résultat' : 'Continuer');
+            foot.className = 'qz-foot ' + (r.correct ? 'good' : 'bad');
+            setKids(foot, h('div', { class: 'qz-foot-in' },
+              h('div', { class: 'qz-fb', role: 'status' },
+                h('span', { class: 'qz-fb-ic', 'aria-hidden': 'true' }, r.correct ? icon('check', 22) : icon('close', 20)),
+                h('div', null, h('h2', null, (r.correct ? GOOD_FB : BAD_FB)[q % (r.correct ? GOOD_FB.length : BAD_FB.length)]),
+                  h('p', null, r.why))),
+              nextBtn));
+            try { nextBtn.focus({ preventScroll: true }); } catch (e) { /* rien */ }
+          }, function (e) {
+            check.disabled = false; check.removeAttribute('data-done');
+            tiles.forEach(function (t) { t.disabled = false; });
+            toast(errText(e));
+          });
+        }
+        setKids(root, h('section', { class: 'qz', id: 'qz' },
+          h('div', { class: 'qz-top' },
+            h('button', { class: 'qz-quit', type: 'button', 'aria-label': 'Quitter le test et revoir les fiches', onclick: function () { i = 0; lesson(); window.scrollTo(0, 0); } }, icon('close', 18)),
+            h('div', { class: 'qz-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '10', 'aria-valuenow': String(answeredCount()), 'aria-label': 'Questions répondues' }, bar),
+            streak >= 2 ? h('span', { class: 'qz-streak', title: 'Bonnes réponses d’affilée' }, icon('star', 14), String(streak)) : null),
+          h('p', { class: 'qz-n' }, 'Question ' + (q + 1) + ' sur 10'),
+          h('h1', { class: 'qz-q', id: 'qz-q' }, item[0]),
+          h('div', { class: 'qz-opts', role: 'radiogroup', 'aria-labelledby': 'qz-q' }, tiles),
+          foot));
+      }
+      function finish(r) {
+        if (r.passed) {
+          render();
+          celebrate({ icon: 'check', kicker: 'Test réussi', title: 'Test réussi : ' + r.score + '/10', sub: 'Bravo ! L’équipe Fii La valide votre profil, en général sous 48 heures. Vous recevrez alors votre carte et votre code.', cta: 'Continuer' });
+          return;
+        }
+        var missed = Object.keys(res).map(Number).filter(function (n) { return !res[n].correct; }).sort(function (x, y) { return x - y; });
+        var left = Math.max(0, 2 - (attempts + 1));
+        setKids(root, h('section', { class: 'card stack qz-res', id: 'qz-result' },
+          ring(r.score, 10, 132, 'Score : ' + r.score + ' sur 10'),
+          h('h1', null, 'Score : ' + r.score + '/10'),
+          h('p', { class: 'muted' }, 'Il faut 8 bonnes réponses. ' + (left ? 'Relisez les fiches, il vous reste ' + left + ' essai aujourd’hui.' : 'Relisez les fiches : prochain essai demain.')),
+          missed.length ? h('details', { class: 'more-details' }, h('summary', null, 'Revoir mes erreurs (' + missed.length + ')'),
+            h('ul', { class: 'qz-miss' }, missed.map(function (n) { return h('li', null, h('b', null, AMB_QUIZ[n][0]), h('span', null, res[n].why)); }))) : null,
+          h('button', { class: 'btn big', type: 'button', id: 'qz-reread', onclick: function () { i = 0; lesson(); window.scrollTo(0, 0); } }, 'Relire les fiches')));
+      }
     }
     lesson();
     return page(backBtn(), root, footer());
@@ -5735,74 +6025,97 @@
   function ambWaiting(a) {
     return page(backBtn(), ambPath(3),
       inviteCard({ id: 'amb-waiting', kind: 'Fii La Carrière', title: 'Test réussi : ' + (a.quiz_score || 8) + '/10',
-        sub: 'L’équipe Fii La valide votre inscription, en général sous 48 heures.',
-        points: [['key', 'Vous recevrez alors votre code ambassadeur'], ['shop', 'Repérez déjà 3 commerçants de votre quartier'], ['cam', 'Préparez-les : 5 articles à photographier']] }),
+        sub: 'L’équipe Fii La valide votre profil, en général sous 48 heures. Vous recevrez alors votre carte ambassadeur et votre code.',
+        points: [['key', 'Votre code : ' + a.code + ' (actif après la validation)'], ['shop', 'Repérez déjà 3 commerçants de votre quartier'], ['cam', 'Préparez-les : 5 articles à photographier']] }),
       footer());
   }
   function ambDashboard(a) {
     var codeMsg = 'Bonjour ! Je vous aide à ouvrir votre boutique en ligne gratuite avec Fii La : vitrine, commandes, factures et l’adresse exacte de vos clientes. ' +
       'Ouvrez ' + baseUrl() + '#/boutique et, à « Code ambassadeur », tapez : ' + a.code;
     var shops = a.shops || [];
+    var amounts = a.amounts || [2000, 5000, 10000];
     var next = a.grade === 'ambassadeur' ? ['Ambassadeur confirmé', a.l2 || 0, 10, 'commerçants actifs (niveau 2)']
       : a.grade === 'confirme' ? ['Ambassadeur certifié Fii La', a.l3 || 0, 25, 'commerçants autonomes (niveau 3)'] : null;
-    function shopRow(s) {
-      var miss = s.level === 0 ? [!s.typed ? 'type de commerce' : null, s.photos < 5 ? (5 - s.photos) + ' article(s) avec photo' : null, !s.public ? 'vitrine à ouvrir' : null].filter(Boolean)
-        : s.level === 1 ? [s.clients < 3 ? (3 - s.clients) + ' cliente(s) de plus' : null, !s.delivered ? '1 commande livrée' : null].filter(Boolean)
-        : s.level === 2 ? ['commandes ' + Math.max(0, 4 - (s.active_weeks || 0)) + ' semaine(s) de plus, après 60 jours'] : [];
-      return h('div', { class: 'item amb-shop' },
-        h('div', { class: 'stack tight', style: 'flex:1;min-width:0' },
-          h('div', { class: 't wrapword' }, s.shop),
-          h('div', { class: 'amb-dots', 'aria-label': 'Niveau ' + s.level + ' sur 3' }, [1, 2, 3].map(function (n) { return h('i', { class: n <= s.level ? 'on' : '' }); })),
-          h('div', { class: 'small muted' }, s.expired ? 'Délai dépassé pour le niveau suivant.' : s.level === 3 ? 'Tous les niveaux atteints.' : 'Il manque : ' + miss.join(', ') + '.')),
-        h('span', { class: 'chip ' + (s.level === 3 ? 'ok' : s.expired ? 'off' : 'wait') }, 'Niveau ' + s.level));
+    function todoList(s) {
+      return s.level === 0 ? [['Type de commerce choisi', !!s.typed], [s.photos >= 5 ? '5 articles avec photo' : (5 - (s.photos || 0)) + ' article(s) avec photo à ajouter', s.photos >= 5], ['Vitrine ouverte', !!s.public]]
+        : s.level === 1 ? [[s.clients >= 3 ? '3 clientes différentes' : (3 - (s.clients || 0)) + ' cliente(s) de plus', s.clients >= 3], ['1 commande livrée', !!s.delivered]]
+        : s.level === 2 ? [['Des commandes 4 semaines sur 8 (' + Math.min(4, s.active_weeks || 0) + ' sur 4)', (s.active_weeks || 0) >= 4]] : [];
+    }
+    function shopCard(s) {
+      var todo = todoList(s), doneN = todo.filter(function (x) { return x[1]; }).length;
+      return h('article', { class: 'card shp' },
+        h('div', { class: 'shp-head' }, h('span', { class: 'shp-av', 'aria-hidden': 'true' }, String(s.shop || '?').trim().charAt(0).toUpperCase()),
+          h('div', { class: 'stack tight', style: 'flex:1;min-width:0' }, h('b', { class: 'wrapword' }, s.shop),
+            h('span', { class: 'small muted' }, s.expired ? 'Délai dépassé pour le niveau suivant' : s.level === 3 ? 'Tous les niveaux atteints' : 'Niveau ' + s.level + ' sur 3')),
+          s.level < 3 && !s.expired ? h('span', { class: 'shp-gain' }, '+ ' + fcfa(amounts[s.level])) : null),
+        h('div', { class: 'shp-track', 'aria-label': 'Niveau ' + s.level + ' sur 3' }, ['Installé', 'Actif', 'Autonome'].map(function (n, k) {
+          var on = k < s.level, now = k === s.level && !s.expired;
+          return h('div', { class: 'shp-step' + (on ? ' on' : now ? ' now' : '') }, h('i', null, now && todo.length ? h('b', { style: 'width:' + Math.round(doneN / todo.length * 100) + '%' }) : null), h('span', null, n));
+        })),
+        todo.length && !s.expired ? h('ul', { class: 'shp-todo' }, todo.map(function (x) {
+          return h('li', { class: x[1] ? 'ok' : '' }, h('span', { class: 'ck', 'aria-hidden': 'true' }, x[1] ? icon('check', 12) : null), h('span', null, x[0]));
+        })) : null);
     }
     var board = h('section', { class: 'card stack tight', id: 'amb-board', hidden: true });
     api('fiila_ambassador_board', {}).then(function (l) {
       if (!l.length) return;
-      setKids(board, h('h2', null, 'Classement (90 jours)'), h('ol', { class: 'amb-board' }, l.map(function (x) {
-        return h('li', null, h('b', null, x.name), x.zone ? h('span', { class: 'small muted' }, ' · ' + x.zone) : null, h('span', { class: 'amb-score' }, x.score));
-      })));
+      var top = l.slice(0, 3), rest = l.slice(3);
+      var order = [top[1], top[0], top[2]];
+      setKids(board, h('h2', null, 'Classement (90 jours)'),
+        h('div', { class: 'pod' }, order.map(function (x, k) {
+          if (!x) return h('div');
+          var p = k === 1 ? 1 : k === 0 ? 2 : 3;
+          return h('div', { class: 'pod-c p' + p }, h('span', { class: 'pod-av' }, String(x.name || '?').charAt(0).toUpperCase()),
+            h('span', { class: 'pod-name' }, x.name), x.zone ? h('span', { class: 'pod-s' }, x.zone) : null,
+            h('div', { class: 'pod-blk' }, h('span', null, String(p)), h('small', null, x.score + ' pts')));
+        })),
+        rest.length ? h('ol', { class: 'amb-board', start: '4' }, rest.map(function (x) {
+          return h('li', null, h('b', null, x.name), x.zone ? h('span', { class: 'small muted' }, ' · ' + x.zone) : null, h('span', { class: 'amb-score' }, x.score));
+        })) : null);
       board.hidden = false;
     }, function () {});
     // La prochaine action utile, en une carte : premier commerçant à trouver, ou ce qui manque au plus avancé.
-    var todo = shops.filter(function (s) { return s.level < 3 && !s.expired; }).sort(function (x, y) { return y.level - x.level; })[0];
+    var todoShop = shops.filter(function (s) { return s.level < 3 && !s.expired; }).sort(function (x, y) { return y.level - x.level; })[0];
     var mission = !shops.length ? ['Trouver votre premier commerçant', 'Envoyez-lui votre code sur WhatsApp, puis installez sa boutique avec lui, sur son téléphone.']
-      : todo ? ['Aider ' + todo.shop + ' à passer au niveau ' + (todo.level + 1), todo.level === 0 ? 'Il manque : ' + [!todo.typed ? 'le type de commerce' : null, todo.photos < 5 ? (5 - todo.photos) + ' article(s) avec photo' : null, !todo.public ? 'la vitrine à ouvrir' : null].filter(Boolean).join(', ') + '.'
-          : todo.level === 1 ? 'Objectif : 3 clientes différentes et 1 commande livrée en 30 jours.' : 'Objectif : des commandes 4 semaines sur 8.']
+      : todoShop ? ['Aider ' + todoShop.shop + ' à passer au niveau ' + (todoShop.level + 1), 'Encore : ' + todoList(todoShop).filter(function (x) { return !x[1]; }).map(function (x) { return x[0].toLowerCase(); }).join(', ') + '.']
       : ['Trouver un nouveau commerçant', 'Tous vos commerçants sont au plus haut niveau atteignable. Envoyez votre code à un nouveau.'];
+    // Portefeuille : le total gagné qui monte, une barre en trois couleurs, la légende.
+    var rw = a.rewards || { pending: 0, validated: 0, paid: 0 };
+    var total = rw.pending + rw.validated + rw.paid;
+    var segs = [['paid', 'Déjà reçu', rw.paid], ['ok2', 'À verser', rw.validated], ['wait', 'En vérification', rw.pending]];
+    var bars = segs.map(function (x) { return h('i', { class: x[0], style: 'width:0' }); });
+    if (total) setTimeout(function () { bars.forEach(function (b, k) { b.style.width = (segs[k][2] / total * 100) + '%'; }); }, REDUCED ? 0 : 150);
+    var wallet = h('section', { class: 'card stack', id: 'amb-wallet' },
+      h('h2', null, 'Mes gains'),
+      h('div', { class: 'wal-total' }, countUp(h('b'), total, fcfa), h('span', null, 'gagnés au total')),
+      total ? h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, bars) : h('p', { class: 'small muted' }, 'Votre premier gain arrive quand votre premier commerçant atteint le niveau 1 : ' + fcfa(amounts[0]) + '.'),
+      h('ul', { class: 'wal-leg' }, segs.map(function (x) { return h('li', null, h('span', { class: 'dot ' + x[0], 'aria-hidden': 'true' }), h('span', null, x[1]), h('b', null, fcfa(x[2]))); })),
+      h('p', { class: 'small muted' }, 'Versements une fois par mois sur ' + (PAYOUT[a.payout_method] || '') + ' ' + a.payout_phone + '.'),
+      (a.history || []).length ? h('details', { class: 'more-details' }, h('summary', null, 'Historique'),
+        h('div', { class: 'stack tight' }, a.history.map(function (x) {
+          var st = { pending: 'en vérification jusqu’au ' + shortDate(x.validate_after), validated: 'à verser', paid: 'versé', cancelled: 'annulé' + (x.reason ? ' : ' + x.reason : '') }[x.status];
+          return h('div', { class: 'total-row' }, h('span', { class: 'wrapword' }, x.shop + ' · niveau ' + x.level + ' · ' + st), h('span', null, fcfa(x.amount)));
+        }))) : null);
+    var moments = ambMoments(a);
+    if (moments.length) setTimeout(function () { ambCelebrate(a, moments); }, REDUCED ? 50 : 500);
     return page(backBtn(),
-      h('header', { class: 'stack tight' }, h('h1', null, 'Mes missions'),
-        h('span', { class: 'chip ok', style: 'align-self:flex-start', id: 'amb-grade' }, icon('star', 12), GRADES[a.grade] || 'Ambassadeur')),
+      h('h1', null, 'Mon espace ambassadeur'),
       a.status === 'suspended' ? h('div', { class: 'notice' }, 'Compte suspendu : vos nouveaux gains sont en pause.' + (a.note ? ' Motif : ' + a.note : '')) : null,
-      h('section', { class: 'ivc', id: 'amb-code' },
-        h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
-        h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')), h('span', { class: 'ivc-kind' }, 'Votre code ambassadeur')),
-        h('p', { class: 'amb-codev2' }, a.code),
-        h('p', { class: 'ivc-sub' }, 'Le commerçant le tape en créant sa boutique, sur son téléphone, au plus tard 7 jours après.'),
+      ambAgentCard(a, { id: 'amb-code', cta: h('div', { class: 'stack tight' },
         h('div', { class: 'ivc-cta' }, ivcBtn('a', { href: waLink(codeMsg), target: '_blank', rel: 'noopener noreferrer', id: 'amb-send' }, 'Envoyer mon code')),
-        h('button', { class: 'ivc-link', type: 'button', style: 'background:none;border:0;font:inherit;cursor:pointer', onclick: function () { copy(a.code, 'Code'); } }, 'Copier le code')),
+        h('button', { class: 'ivc-link', type: 'button', style: 'background:none;border:0;font:inherit;cursor:pointer', onclick: function () { copy(a.code, 'Code'); } }, 'Copier le code')) }),
       h('section', { class: 'card amb-mission', id: 'amb-mission' },
         h('span', { class: 'amb-mission-ic', 'aria-hidden': 'true' }, icon('nav', 20)),
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Prochaine mission'), h('h2', { class: 'wrapword' }, mission[0]), h('p', { class: 'small muted' }, mission[1]))),
-      h('section', { class: 'card stack tight', id: 'amb-wallet' }, h('h2', null, 'Mon portefeuille'),
-        h('div', { class: 'amb-wal' },
-          h('div', null, h('small', null, 'En vérification'), h('b', null, fcfa(a.rewards.pending))),
-          h('div', null, h('small', null, 'À verser'), h('b', null, fcfa(a.rewards.validated))),
-          h('div', null, h('small', null, 'Déjà reçu'), h('b', null, fcfa(a.rewards.paid)))),
-        h('p', { class: 'small muted' }, 'Versements une fois par mois sur ' + (PAYOUT[a.payout_method] || '') + ' ' + a.payout_phone + '.'),
-        (a.history || []).length ? h('details', { class: 'more-details' }, h('summary', null, 'Historique'),
-          h('div', { class: 'stack tight' }, a.history.map(function (x) {
-            var st = { pending: 'en vérification jusqu’au ' + shortDate(x.validate_after), validated: 'à verser', paid: 'versé', cancelled: 'annulé' + (x.reason ? ' : ' + x.reason : '') }[x.status];
-            return h('div', { class: 'total-row' }, h('span', { class: 'wrapword' }, x.shop + ' · niveau ' + x.level + ' · ' + st), h('span', null, fcfa(x.amount)));
-          }))) : null),
-      next ? h('section', { class: 'card stack tight', id: 'amb-next-grade' }, h('h2', null, 'Prochain grade : ' + next[0]),
-        h('div', { class: 'amb-bar' }, h('i', { style: 'width:' + Math.min(100, Math.round(next[1] / next[2] * 100)) + '%' })),
-        h('p', { class: 'small muted' }, next[1] + ' sur ' + next[2] + ' ' + next[3] + '.')) : null,
+      wallet,
+      next ? h('section', { class: 'card grd', id: 'amb-next-grade' }, ring(Math.min(next[1], next[2]), next[2], 92, next[1] + ' sur ' + next[2]),
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Prochain grade'), h('h2', null, next[0]),
+          h('p', { class: 'small muted' }, next[1] >= next[2] ? 'Objectif atteint : le grade arrive à la prochaine mise à jour.' : 'Encore ' + (next[2] - next[1]) + ' ' + next[3] + '.'))) : null,
       h('section', { class: 'stack tight', id: 'amb-shops' }, h('h2', null, 'Mes commerçants (' + shops.length + ')'),
-        shops.length ? h('div', { class: 'list' }, shops.map(shopRow))
+        shops.length ? h('div', { class: 'stack tight' }, shops.map(shopCard))
           : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun commerçant pour l’instant. Envoyez votre code au premier !'))),
       board,
-      ambLevels(a.amounts),
+      h('details', { class: 'card more-sec' }, h('summary', null, 'Comment je suis payé'), ambLevels(a.amounts)),
       footer());
   }
   // Boutique : rattacher son ambassadeur (7 jours au plus après la création).
@@ -5867,6 +6180,19 @@
               a.status === 'active' ? h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { decide(a, 'suspend'); } }, 'Suspendre')
                 : a.status === 'suspended' ? h('button', { class: 'btn ghost small', type: 'button', onclick: function () { decide(a, 'reactivate'); } }, 'Réactiver') : null);
           })),
+        // Test de passage : les questions les plus manquées disent quelle fiche de formation clarifier.
+        (function () {
+          var qs = (d.quiz_stats || []).slice().sort(function (x, y) { return y.wrong - x.wrong; });
+          var runs = qs.length ? qs[0].answered : 0;
+          return h('details', { class: 'card more-sec', id: 'adm-quiz' }, h('summary', null, 'Test de passage : questions manquées'),
+            !runs ? h('p', { class: 'muted' }, 'Aucun test terminé pour l’instant.') : h('div', { class: 'stack tight', style: 'margin-top:10px' },
+              h('p', { class: 'small muted' }, runs + ' test(s) terminé(s). Une question souvent manquée : la fiche correspondante est à clarifier.'),
+              qs.map(function (x) {
+                var pct = Math.round(x.wrong / runs * 100);
+                return h('div', { class: 'stack tight' }, h('div', { class: 'total-row' }, h('span', { class: 'small wrapword' }, (x.q + 1) + '. ' + AMB_QUIZ[x.q][0]), h('b', { class: 'small' }, pct + ' %')),
+                  h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, h('i', { class: pct >= 40 ? 'wait' : 'paid', style: 'width:' + pct + '%' })));
+              })));
+        })(),
         footer());
     }, function (e) { return page(backBtn(), stateCard('!', 'Accès réservé', errText(e)), footer()); });
   }

@@ -41,7 +41,7 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 | Comptes | Recherche par nom ou e-mail, fiche (boutique possédée ou dont il est membre, numéro confirmé par SMS, ambassadeur, rôle, activité) |
 | Modération | Commentaires masqués ou signalés : rétablir ou supprimer |
 | Vide-dressing | Articles à vérifier, commandes, reversements |
-| Ambassadeurs | Validations, gains, versements |
+| Ambassadeurs | Validations, gains, versements ; « Test de passage : questions manquées » (taux d'erreur par question sur les tests terminés, pour savoir quelle fiche de formation clarifier) |
 | Fil | Les 25 places gratuites et la liste d'attente |
 | Finances | 6 derniers mois, gains d'ambassadeurs à verser et versés, ventes de vide-dressing à reverser |
 | Croissance | Origine des arrivées, parrainages |
