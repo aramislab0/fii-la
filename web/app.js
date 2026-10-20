@@ -255,6 +255,7 @@
     ambassador_self: 'Un ambassadeur ne peut pas être accompagné par lui-même.',
     ambassador_cap: 'Cet ambassadeur a atteint son nombre de commerçants pour ce mois.',
     invalid_state: 'Action impossible dans cet état.',
+    ambassador_has_payouts: 'Cet ambassadeur a déjà reçu un versement : la trace doit rester. Excluez-le plutôt.',
     reason_required: 'Indiquez un motif.',
     vd_photo_rule: 'Confirmez qu’aucun enfant n’est reconnaissable sur la photo.',
     vd_photo_required: 'Ajoutez une photo du vêtement.',
@@ -6293,20 +6294,21 @@
     support: 'Lecture des boutiques, commandes et comptes pour aider les utilisateurs.',
     finance: 'Commandes, finances, versements des ambassadeurs et du vide-dressing.' };
   // [chemin, icône, libellé, droit, file d'attente du tableau de bord]
+  // [chemin, icône, libellé, droit, file d'attente du tableau de bord, groupe]
   var BO_NAV = [
-    ['', 'home', 'Tableau de bord', 'dashboard'],
-    ['boutiques', 'shop', 'Boutiques', 'shops', 'suspended'],
-    ['commandes', 'box', 'Commandes', 'orders'],
-    ['comptes', 'user', 'Comptes', 'accounts'],
-    ['moderation', 'flag', 'Modération', 'moderation', 'comments'],
-    ['vide-dressing', 'users', 'Vide-dressing', ['vide_dressing', 'finance'], 'vide_dressing'],
-    ['ambassadeurs', 'gift', 'Ambassadeurs', 'ambassadors', 'ambassadors'],
-    ['fil', 'heart', 'Fil (25 places)', 'feed'],
-    ['finances', 'cash', 'Finances', 'finance'],
-    ['croissance', 'star', 'Croissance', 'dashboard'],
-    ['equipe', 'key', 'Équipe', 'team'],
-    ['journal', 'clock', 'Journal', 'audit'],
-    ['reglages', 'settings', 'Réglages', 'settings']];
+    ['', 'home', 'Tableau de bord', 'dashboard', null, 'Pilotage'],
+    ['croissance', 'star', 'Croissance', 'dashboard', null, 'Pilotage'],
+    ['finances', 'cash', 'Finances', 'finance', null, 'Pilotage'],
+    ['boutiques', 'shop', 'Boutiques', 'shops', 'suspended', 'Opérations'],
+    ['commandes', 'box', 'Commandes', 'orders', null, 'Opérations'],
+    ['comptes', 'user', 'Comptes', 'accounts', null, 'Opérations'],
+    ['fil', 'heart', 'Fil (25 places)', 'feed', null, 'Opérations'],
+    ['ambassadeurs', 'gift', 'Ambassadeurs', 'ambassadors', 'ambassadors', 'Programmes'],
+    ['vide-dressing', 'users', 'Vide-dressing', ['vide_dressing', 'finance'], 'vide_dressing', 'Programmes'],
+    ['moderation', 'flag', 'Modération', 'moderation', 'comments', 'Programmes'],
+    ['equipe', 'key', 'Équipe', 'team', null, 'Administration'],
+    ['journal', 'clock', 'Journal', 'audit', null, 'Administration'],
+    ['reglages', 'settings', 'Réglages', 'settings', null, 'Administration']];
   function boCan(perm) {
     if (Array.isArray(perm)) return perm.some(boCan);
     return !!(BO.me && BO.me.perms && BO.me.perms.indexOf(perm) >= 0);
@@ -6322,6 +6324,19 @@
     return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) + (time ? ' · ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '');
   }
   function boBadge(kind, text) { return h('span', { class: 'bo-badge ' + kind }, text); }
+  // Indicateur : pastille d'icône, chiffre, libellé, détail ; tone = couleur de la pastille.
+  function boKpi(id, ic, value, label, sub, tone) {
+    return h('div', { class: 'bo-kpi' + (tone ? ' ' + tone : ''), id: id ? 'kpi-' + id : null },
+      h('span', { class: 'bo-kpi-ic', 'aria-hidden': 'true' }, icon(ic, 18)),
+      h('strong', null, value), h('span', null, label), sub ? h('small', { class: 'muted' }, sub) : null);
+  }
+  // Initiale dans une pastille (boutiques, comptes, ambassadeurs).
+  function boAv(name, cls) { return h('span', { class: 'bo-av' + (cls ? ' ' + cls : ''), 'aria-hidden': 'true' }, String(name || '?').trim().charAt(0).toUpperCase() || '?'); }
+  // En-tête de fiche : pastille, nom, badges, une ligne d'informations.
+  function boHero(name, badges, line, id) {
+    return h('section', { class: 'bo-hero', id: id || null }, boAv(name, 'big'),
+      h('div', { class: 'bo-hero-t' }, h('div', { class: 'bo-hero-b' }, badges), line ? h('p', { class: 'small muted wrapword' }, line) : null));
+  }
   function boNum(n) { return String(n || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
   // Tableau : lignes de cellules ; sur téléphone, chaque ligne devient une carte (libellé à gauche, valeur à droite).
   function boTable(cols, rows, o) {
@@ -6412,17 +6427,21 @@
   function boShell(sec, title, body, o) {
     o = o || {};
     var me = BO.me, q = (BO.overview && BO.overview.queues) || {};
+    var lastGroup = null, cur = BO_NAV.filter(function (n) { return n[0] === sec; })[0];
     var nav = h('nav', { class: 'bo-nav', 'aria-label': 'Back-office' }, BO_NAV.filter(function (n) { return boCan(n[3]); }).map(function (n) {
       var count = n[4] ? q[n[4]] : 0;
-      return h('a', { href: '#/bo' + (n[0] ? '/' + n[0] : ''), class: 'bo-link' + (sec === n[0] ? ' on' : ''), 'aria-current': sec === n[0] ? 'page' : null, id: 'bo-nav-' + (n[0] || 'accueil') },
-        icon(n[1], 20), h('span', null, n[2]), count ? h('span', { class: 'bo-count', 'aria-label': count + ' à traiter' }, String(count)) : null);
+      var head = n[5] !== lastGroup ? h('p', { class: 'bo-group' }, n[5]) : null;
+      lastGroup = n[5];
+      return [head, h('a', { href: '#/bo' + (n[0] ? '/' + n[0] : ''), class: 'bo-link' + (sec === n[0] ? ' on' : ''), 'aria-current': sec === n[0] ? 'page' : null, id: 'bo-nav-' + (n[0] || 'accueil') },
+        icon(n[1], 20), h('span', null, n[2]), count ? h('span', { class: 'bo-count', 'aria-label': count + ' à traiter' }, String(count)) : null)];
     }));
     var shell = h('div', { class: 'bo-shell' });
     var side = h('aside', { class: 'bo-side', id: 'bo-side' },
       h('div', { class: 'bo-brand' }, h('span', { class: 'mark small' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
       nav,
       h('div', { class: 'bo-user' },
-        h('div', null, h('b', { class: 'wrapword' }, (me.name || me.email || '').split(' ')[0] || 'Membre'), h('span', { class: 'small muted' }, BO_ROLES[me.role] || me.role)),
+        h('div', { class: 'bo-user-id' }, h('span', { class: 'bo-av', 'aria-hidden': 'true' }, ((me.name || me.email || 'M').trim().charAt(0) || 'M').toUpperCase()),
+          h('div', null, h('b', { class: 'wrapword' }, (me.name || me.email || '').split(' ')[0] || 'Membre'), h('span', { class: 'small muted' }, BO_ROLES[me.role] || me.role))),
         h('a', { class: 'btn link small', href: '#/' }, 'Voir le site'),
         h('button', { class: 'btn link small', type: 'button', id: 'bo-logout', onclick: function () { account.signOut().then(function () { BO.me = null; go('#/bo'); }); } }, 'Se déconnecter')));
     var top = h('header', { class: 'bo-top' },
@@ -6433,7 +6452,8 @@
     var scrim = h('div', { class: 'bo-scrim', onclick: function () { shell.classList.remove('menu-open'); } });
     var main = h('main', { class: 'bo-main', id: 'bo-main' },
       o.back ? h('a', { class: 'btn back', href: o.back[0] }, '← ' + o.back[1]) : null,
-      h('div', { class: 'bo-head' }, h('div', { class: 'stack tight' }, o.eyebrow ? h('p', { class: 'eyebrow' }, o.eyebrow) : null, h('h1', { class: 'wrapword' }, title)), o.action || null),
+      h('div', { class: 'bo-head' }, h('div', { class: 'stack tight' }, h('p', { class: 'bo-eyebrow' }, o.eyebrow || (cur && cur[5]) || 'Back-office'), h('h1', { class: 'wrapword' }, title),
+        o.sub ? h('p', { class: 'bo-sub' }, o.sub) : null), o.action || null),
       body);
     add(shell, [top, side, scrim, main]);
     return shell;
@@ -6462,7 +6482,7 @@
           case 'comptes': return id ? boAccount(id) : boAccounts(q);
           case 'moderation': return boEmbed(viewAdminComments).then(function (b) { return boShell(sec, 'Modération', b); });
           case 'vide-dressing': return boEmbed(viewAdminVd).then(function (b) { return boShell(sec, 'Vide-dressing', b); });
-          case 'ambassadeurs': return boEmbed(viewAdminAmbassadors).then(function (b) { return boShell(sec, 'Ambassadeurs', b); });
+          case 'ambassadeurs': return id ? boAmbassador(id) : boAmbassadors(q);
           case 'croissance': return boEmbed(viewStats).then(function (b) { return boShell(sec, 'Croissance', b); });
           case 'fil': return boFeed();
           case 'finances': return boFinance();
@@ -6590,38 +6610,43 @@
   // ----- Tableau de bord
   function boDashboard() {
     var o = BO.overview || { kpis: {}, queues: {}, days: [] }, k = o.kpis;
-    function kpi(id, n, label, sub) { return h('div', { class: 'bo-kpi', id: 'kpi-' + id }, h('strong', null, n), h('span', null, label), sub ? h('small', { class: 'muted' }, sub) : null); }
-    var QUEUE = [['comments', 'Commentaires signalés', '#/bo/moderation'], ['vide_dressing', 'Articles de vide-dressing à vérifier', '#/bo/vide-dressing'],
-      ['ambassadors', 'Ambassadeurs à valider', '#/bo/ambassadeurs'], ['rewards', 'Gains d’ambassadeurs à verser', '#/bo/ambassadeurs'], ['suspended', 'Boutiques suspendues', '#/bo/boutiques?f=suspended']];
+    var QUEUE = [['comments', 'flag', 'Commentaires signalés', '#/bo/moderation'], ['vide_dressing', 'users', 'Articles de vide-dressing à vérifier', '#/bo/vide-dressing'],
+      ['ambassadors', 'gift', 'Ambassadeurs à valider', '#/bo/ambassadeurs'], ['rewards', 'cash', 'Gains d’ambassadeurs à verser', '#/bo/ambassadeurs'], ['suspended', 'ban', 'Boutiques suspendues', '#/bo/boutiques?f=suspended']];
     var queues = QUEUE.filter(function (x) { return o.queues[x[0]] != null; });
+    var todo = queues.reduce(function (n, x) { return n + (x[0] === 'suspended' ? 0 : (o.queues[x[0]] || 0)); }, 0);
     var max = Math.max.apply(null, [1].concat(o.days.map(function (d) { return d.orders; })));
-    var dayLine = h('p', { class: 'small', id: 'bo-day', 'aria-live': 'polite' });
+    var total14 = o.days.reduce(function (n, d) { return n + d.orders; }, 0);
+    var dayLine = h('p', { class: 'small', id: 'bo-day', 'aria-live': 'polite' }, total14 + ' commande(s) sur 14 jours. Touchez une barre pour le détail du jour.');
     var chart = h('div', { class: 'bo-bars', role: 'img', 'aria-label': 'Commandes par jour sur 14 jours : ' + o.days.map(function (d) { return d.orders; }).join(', ') },
-      o.days.map(function (d) {
+      o.days.map(function (d, i) {
         var dt = new Date(d.day + 'T12:00:00Z');
         var txt = dt.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + ' : ' + d.orders + ' commande(s), ' + d.shops + ' boutique(s), ' + d.accounts + ' compte(s)';
-        return h('button', { class: 'bo-bar', type: 'button', title: txt, 'aria-label': txt, onclick: function () { dayLine.textContent = txt; } },
-          h('i', { style: 'height:' + Math.round(d.orders / max * 100) + '%' }), h('span', null, dt.getDate()));
+        return h('button', { class: 'bo-bar' + (i === o.days.length - 1 ? ' today' : ''), type: 'button', title: txt, 'aria-label': txt, onclick: function () { dayLine.textContent = txt; } },
+          d.orders ? h('b', null, String(d.orders)) : null, h('i', { style: 'height:' + Math.max(2, Math.round(d.orders / max * 100)) + '%' }), h('span', null, dt.getDate()));
       }));
+    var me = BO.me || {}, first = (me.name || me.email || '').split(' ')[0];
+    var today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    function mini(id, ic, value, label) { return h('div', { class: 'bo-mini', id: 'kpi-' + id }, h('span', { class: 'bo-mini-ic', 'aria-hidden': 'true' }, icon(ic, 16)), h('b', null, value), h('span', null, label)); }
     return boShell('', 'Tableau de bord', [
       h('section', { class: 'bo-kpis', id: 'bo-kpis' },
-        kpi('shops', boNum(k.shops_open) + ' / ' + boNum(k.shops), 'boutiques ouvertes', '+' + (k.shops_7d || 0) + ' en 7 jours'),
-        kpi('orders', boNum(k.orders_30d), 'commandes (30 j)', boNum(k.delivered_30d) + ' livrées'),
-        kpi('gmv', fcfa(k.gmv_30d || 0), 'volume livré (30 j)'),
-        kpi('accounts', boNum(k.accounts), 'comptes', '+' + (k.accounts_7d || 0) + ' en 7 jours'),
-        kpi('addresses', boNum(k.addresses), 'adresses actives', boNum(k.meetings) + ' événements'),
-        kpi('couriers', boNum(k.couriers), 'livreurs', boNum(k.ambassadors) + ' ambassadeurs actifs'),
-        kpi('members', boNum(k.shop_members || 0), 'membres d’équipe de boutiques', boNum(k.phones_verified || 0) + ' numéros confirmés par SMS'),
-        kpi('photos', boNum(k.multi_photos || 0), 'articles à plusieurs photos', (k.off_format ? boNum(k.off_format) + ' photo(s) principale(s) hors format 4:5' : 'toutes au format 4:5')),
-        kpi('feed', boNum(k.feed_left), 'places gratuites restantes', 'sur 25 dans le fil')),
+        boKpi('shops', 'shop', boNum(k.shops_open) + ' / ' + boNum(k.shops), 'boutiques ouvertes', '+' + (k.shops_7d || 0) + ' en 7 jours', 'green'),
+        boKpi('orders', 'box', boNum(k.orders_30d), 'commandes (30 j)', boNum(k.delivered_30d) + ' livrées', 'blue'),
+        boKpi('gmv', 'cash', fcfa(k.gmv_30d || 0), 'volume livré (30 j)', null, 'amber'),
+        boKpi('accounts', 'user', boNum(k.accounts), 'comptes', '+' + (k.accounts_7d || 0) + ' en 7 jours', 'violet')),
+      h('section', { class: 'bo-minis', 'aria-label': 'Autres indicateurs' },
+        mini('addresses', 'pin', boNum(k.addresses), 'adresses actives · ' + boNum(k.meetings) + ' événements'),
+        mini('couriers', 'moto', boNum(k.couriers), 'livreurs · ' + boNum(k.ambassadors) + ' ambassadeurs actifs'),
+        mini('members', 'users', boNum(k.shop_members || 0), 'membres d’équipe · ' + boNum(k.phones_verified || 0) + ' numéros confirmés'),
+        mini('photos', 'cam', boNum(k.multi_photos || 0), 'articles à plusieurs photos · ' + (k.off_format ? boNum(k.off_format) + ' hors format 4:5' : 'toutes au format 4:5')),
+        mini('feed', 'heart', boNum(k.feed_left), 'places gratuites restantes sur 25 dans le fil')),
       h('div', { class: 'bo-grid2' },
-        h('section', { class: 'card stack tight', id: 'bo-queues' }, h('h2', null, 'À traiter'),
+        h('section', { class: 'card stack tight bo-panel', id: 'bo-queues' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'À traiter'), todo ? boBadge('danger', todo + ' en attente') : boBadge('ok', 'Tout est à jour')),
           queues.length ? queues.map(function (x) {
             var n = o.queues[x[0]];
-            return h('a', { class: 'bo-queue' + (n ? '' : ' zero'), href: x[2] }, h('span', null, x[1]), h('b', null, String(n)), icon('chev', 16));
+            return h('a', { class: 'bo-queue' + (n ? '' : ' zero'), href: x[3] }, h('span', { class: 'bo-queue-ic', 'aria-hidden': 'true' }, icon(x[1], 16)), h('span', null, x[2]), h('b', null, String(n)), icon('chev', 16));
           }) : h('p', { class: 'muted small' }, 'Rien pour votre rôle.')),
-        h('section', { class: 'card stack tight' }, h('h2', null, 'Commandes par jour (14 jours)'), chart,
-          dayLine, h('p', { class: 'small muted' }, 'Hors boutiques de démonstration. Touchez une barre pour le détail du jour.')))]);
+        h('section', { class: 'card stack tight bo-panel' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'Commandes par jour'), h('span', { class: 'small muted' }, '14 jours')), chart,
+          dayLine, h('p', { class: 'small muted' }, 'Hors boutiques de démonstration.')))], { eyebrow: today.charAt(0).toUpperCase() + today.slice(1), sub: 'Bonjour' + (first ? ' ' + first : '') + '. ' + (todo ? todo + ' élément(s) à traiter.' : 'Rien en attente pour le moment.') });
   }
 
   // ----- Boutiques
@@ -6645,7 +6670,8 @@
         // Réponse périmée (recherche plus récente) ou écran quitté : on ne touche ni à la liste ni à l'adresse.
         if (mine !== seq || !box.isConnected) return;
         rows = rows.concat(r[key]);
-        setKids(box, boTable(cols, rows, { href: href, id: 'bo-table', emptyId: 'bo-empty', empty: st.q || st.f ? 'Aucun résultat pour cette recherche.' : 'Rien pour le moment.' }));
+        setKids(box, rows.length ? h('p', { class: 'bo-count-line', id: 'bo-count-line' }, rows.length + (r[key].length === 50 ? '+' : '') + ' résultat' + (rows.length > 1 ? 's' : '')) : null,
+          boTable(cols, rows, { href: href, id: 'bo-table', emptyId: 'bo-empty', empty: st.q || st.f ? 'Aucun résultat pour cette recherche.' : 'Rien pour le moment.' }));
         setKids(more, r[key].length === 50 ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { st.page++; load(false); } }, 'Voir plus') : null);
         try { history.replaceState(null, '', location.pathname + location.search + '#/bo/' + sec + qs({ q: st.q || undefined, f: st.f || undefined })); } catch (e) { /* rien */ }
       }, function (e) { if (mine === seq && box.isConnected) errBox(box, e); });
@@ -6657,7 +6683,7 @@
   }
   function boShops(q) {
     return boList('boutiques', 'Boutiques', 'fiila_bo_shops', function (st) { return { p_q: st.q || null, p_filter: st.f || null }; }, 'shops', [
-      { label: 'Boutique', get: function (s) { return s.name; } },
+      { label: 'Boutique', get: function (s) { return h('span', { class: 'bo-cell' }, boAv(s.name), h('span', null, s.name)); } },
       { label: 'Type', get: function (s) { return typeLabel(s.type) || '—'; }, cls: 'hide-s' },
       { label: 'État', get: boShopState },
       { label: 'Fil', get: function (s) { return s.rank ? 'Place ' + s.rank : '—'; } },
@@ -6691,7 +6717,8 @@
             function () { sel.value = s.type || ''; });
         } }, h('option', { value: '' }, '—'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: s.type === t[0] || null }, t[1]); })) : (typeLabel(s.type) || '—');
       return boShell('boutiques', s.name, [
-        h('p', null, boShopState(s), ' ', s.rank ? boBadge('info', 'Fil · place ' + s.rank + (s.feed ? '' : ' (masquée)')) : null),
+        boHero(s.name, [boShopState(s), s.rank ? boBadge('info', 'Fil · place ' + s.rank + (s.feed ? '' : ' (masquée)')) : null, s.type ? boBadge('muted', typeLabel(s.type)) : null],
+          [s.slug ? '/b/' + s.slug : 'Vitrine sans lien', s.phone, 'créée le ' + boDate(s.created_at)].filter(Boolean).join(' · ')),
         h('div', { class: 'bo-kpis small' },
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.products)), h('span', null, 'articles'), st.multi_photos ? h('small', { class: 'muted' }, boNum(st.multi_photos) + ' à plusieurs photos') : null,
             st.off_format ? h('small', { class: 'bo-warn', id: 'bo-shop-off-format' }, boNum(st.off_format) + ' hors format 4:5 (recadrées à la prochaine modification)') : null),
@@ -6737,7 +6764,7 @@
     return api('fiila_bo_order', { p_id: id }).then(function (o) {
       function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
       return boShell('commandes', 'Commande n° ' + String(o.number).padStart(4, '0'), [
-        h('p', null, boOrderState(o)),
+        boHero(o.customer || 'Client', [boOrderState(o), h('b', { class: 'bo-amount' }, fcfa(o.total))], o.shop.name + ' · ' + boDate(o.created_at, true)),
         h('div', { class: 'bo-grid2' },
           h('section', { class: 'card stack tight', id: 'bo-order-info' }, h('h2', null, 'Commande'),
             row('Boutique', h('a', { href: '#/bo/boutiques/' + o.shop.id }, o.shop.name)),
@@ -6759,7 +6786,7 @@
   // ----- Comptes
   function boAccounts(q) {
     return boList('comptes', 'Comptes', 'fiila_bo_accounts', function (st) { return { p_q: st.q || null }; }, 'accounts', [
-      { label: 'Nom', get: function (a) { return a.name || '—'; } },
+      { label: 'Nom', get: function (a) { return h('span', { class: 'bo-cell' }, boAv(a.name || a.email), h('span', null, a.name || '—')); } },
       { label: 'E-mail', get: function (a) { return a.email; } },
       { label: 'Boutique', get: function (a) { return a.shop || '—'; }, cls: 'hide-s' },
       { label: 'Rôle', get: function (a) { return a.role ? boBadge('info', BO_ROLES[a.role]) : a.ambassador ? boBadge('muted', 'Ambassadeur') : '—'; } },
@@ -6790,6 +6817,8 @@
       function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
       var AMB = { training: 'En formation', review: 'À valider', active: 'Actif', suspended: 'Suspendu', excluded: 'Exclu' };
       return boShell('comptes', a.name || a.email, [
+        boHero(a.name || a.email, [a.role ? boBadge('info', BO_ROLES[a.role]) : null, a.ambassador ? boBadge('muted', 'Ambassadeur') : null, a.shop ? boBadge('ok', 'Commerçant') : null, a.phone_verified ? boBadge('ok', 'Numéro confirmé') : null],
+          a.email + ' · inscrit le ' + boDate(a.created_at)),
         h('section', { class: 'card stack tight', id: 'bo-account-info' },
           row('E-mail', a.email), row('Téléphone', a.phone || '—'), row('Créé', boDate(a.created_at, true)),
           row('Équipe', a.role ? BO_ROLES[a.role] : '—'),
@@ -6801,6 +6830,138 @@
         a.role && boCan('team') ? h('a', { class: 'btn ghost', href: '#/bo/equipe' }, 'Gérer son rôle dans l’équipe') : null
       ], { back: ['#/bo/comptes', 'Comptes'] });
     }, function (e) { return boShell('comptes', 'Compte', stateCard('!', 'Compte introuvable', errText(e)), { back: ['#/bo/comptes', 'Comptes'] }); });
+  }
+
+  // ----- Ambassadeurs (Fii La Carrière) : files « à valider » et « à verser », liste filtrable, fiche avec toutes les actions.
+  var AMB_ST = { training: ['muted', 'En formation'], review: ['warn', 'À valider'], active: ['ok', 'Actif'], suspended: ['danger', 'Suspendu'], excluded: ['muted', 'Exclu'] };
+  function boAmbState(a) { var x = AMB_ST[a.status] || ['muted', a.status]; return boBadge(x[0], x[1]); }
+  function boAmbDecide(a, decision, note, btn, okText, after) {
+    return boAct(function () { return api('fiila_admin_ambassador_decide', { p_id: a.id, p_decision: decision, p_note: note || null }); }, okText || 'Enregistré.', after || null, null, btn);
+  }
+  function boAmbassadors(q) {
+    return api('fiila_admin_ambassadors', {}).then(function (d) {
+      var st = { q: (q && q.q) || '', f: (q && q.f) || '' };
+      var all = d.ambassadors, review = all.filter(function (a) { return a.status === 'review'; });
+      var toPay = d.to_pay.reduce(function (n, r) { return n + r.amount; }, 0);
+      var paid = all.reduce(function (n, a) { return n + (a.paid || 0); }, 0);
+      var byAmb = {}; d.to_pay.forEach(function (r) { var k = r.ambassador + '|' + r.payout_method + '|' + r.payout_phone; (byAmb[k] = byAmb[k] || []).push(r); });
+      var FILTERS = [['', 'Tous'], ['active', 'Actifs'], ['review', 'À valider'], ['training', 'En formation'], ['suspended', 'Suspendus'], ['excluded', 'Exclus']];
+      var listBox = h('div', { class: 'stack tight' }), chips = h('div');
+      function draw() {
+        var t = st.q.toLowerCase();
+        var rows = all.filter(function (a) { return (!st.f || a.status === st.f) && (!t || [a.name, a.code, a.phone, a.email, a.zone].join(' ').toLowerCase().indexOf(t) >= 0); });
+        setKids(chips, boChips(FILTERS, st.f, function (v) { st.f = v; draw(); }, 'bo-amb-filters'));
+        setKids(listBox, rows.length ? h('p', { class: 'bo-count-line' }, rows.length + ' ambassadeur' + (rows.length > 1 ? 's' : '')) : null,
+          boTable([
+            { label: 'Ambassadeur', get: function (a) { return h('span', { class: 'bo-cell' }, boAv(a.name), h('span', { class: 'stack tight', style: 'gap:0' }, h('span', null, a.name), h('small', { class: 'muted' }, a.code))); } },
+            { label: 'Statut', get: boAmbState },
+            { label: 'Grade', get: function (a) { return GRADES[a.grade] || '—'; }, cls: 'hide-s' },
+            { label: 'Commerçants', get: function (a) { return a.shops + (a.active_shops ? ' · ' + a.active_shops + ' actifs' : ''); }, cls: 'num' },
+            { label: 'Gains', get: function (a) { return fcfa(a.earned || 0); }, cls: 'num' },
+            { label: 'Inscrit', get: function (a) { return boDate(a.created_at); } }],
+            rows, { href: function (a) { return '#/bo/ambassadeurs/' + a.id; }, id: 'bo-amb-table', empty: st.q || st.f ? 'Aucun ambassadeur pour cette recherche.' : 'Aucun ambassadeur pour le moment.' }));
+        try { history.replaceState(null, '', location.pathname + location.search + '#/bo/ambassadeurs' + qs({ q: st.q || undefined, f: st.f || undefined })); } catch (e) { /* rien */ }
+      }
+      draw();
+      var qs10 = (d.quiz_stats || []).slice().sort(function (x, y) { return y.wrong - x.wrong; }), runs = qs10.length ? qs10[0].answered : 0;
+      return boShell('ambassadeurs', 'Ambassadeurs', [
+        h('section', { class: 'bo-kpis' },
+          boKpi('amb-active', 'star', boNum(all.filter(function (a) { return a.status === 'active'; }).length), 'ambassadeurs actifs', boNum(all.filter(function (a) { return a.status === 'training'; }).length) + ' en formation', 'green'),
+          boKpi('amb-review', 'clock', boNum(review.length), 'à valider', review.length ? 'test réussi, en attente' : 'aucune attente', review.length ? 'amber' : 'blue'),
+          boKpi('amb-topay', 'cash', fcfa(toPay), 'à verser', d.pending.length + ' gain(s) en vérification', 'violet'),
+          boKpi('amb-paid', 'check', fcfa(paid), 'déjà versés', null, 'blue')),
+        review.length ? h('section', { class: 'card stack tight bo-panel', id: 'adm-review' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'À valider'), boBadge('warn', String(review.length))),
+          review.map(function (a) {
+            var note = h('input', { type: 'text', id: 'note-' + a.id, placeholder: 'Note (facultatif)', maxlength: 200 });
+            return h('div', { class: 'bo-req' }, boAv(a.name),
+              h('div', { class: 'stack tight', style: 'flex:1;min-width:0' }, h('b', { class: 'wrapword' }, a.name),
+                h('span', { class: 'small muted wrapword' }, [a.phone, a.zone, 'test ' + a.quiz_score + '/10', a.email].filter(Boolean).join(' · ')), note,
+                h('div', { class: 'row' },
+                  h('button', { class: 'btn small', type: 'button', onclick: function () { boAmbDecide(a, 'approve', note.value, this, a.name + ' validé.'); } }, 'Valider'),
+                  h('button', { class: 'btn quiet danger-text small', type: 'button', onclick: function () { if (!window.confirm || window.confirm('Refuser ' + a.name + ' ? Son profil sera exclu du programme.')) boAmbDecide(a, 'exclude', note.value || 'Inscription refusée', this, 'Inscription refusée.'); } }, 'Refuser'),
+                  h('a', { class: 'btn link small', href: '#/bo/ambassadeurs/' + a.id }, 'Voir la fiche'))));
+          })) : null,
+        Object.keys(byAmb).length ? h('section', { class: 'card stack tight bo-panel', id: 'adm-pay' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'À verser'), h('b', null, fcfa(toPay))),
+          Object.keys(byAmb).map(function (k) {
+            var l = byAmb[k], p = k.split('|'), sum = l.reduce(function (n, r) { return n + r.amount; }, 0);
+            return h('div', { class: 'bo-req' }, boAv(p[0]),
+              h('div', { class: 'stack tight', style: 'flex:1;min-width:0' }, h('b', null, p[0] + ' · ' + fcfa(sum)), h('span', { class: 'small muted' }, (PAYOUT[p[1]] || p[1]) + ' ' + p[2]),
+                l.map(function (r) { return h('span', { class: 'small' }, r.shop + ' · niveau ' + r.level + ' · ' + fcfa(r.amount)); }),
+                h('button', { class: 'btn small', type: 'button', style: 'align-self:flex-start', onclick: function () {
+                  if (window.confirm && !window.confirm('Confirmer le versement de ' + fcfa(sum) + ' à ' + p[0] + ' sur ' + (PAYOUT[p[1]] || p[1]) + ' ' + p[2] + ' ?')) return;
+                  boAct(function () { return api('fiila_admin_reward', { p_ids: l.map(function (r) { return r.id; }), p_action: 'paid', p_reason: null }); }, 'Marqué versé.', null, null, this);
+                } }, 'J’ai versé ' + fcfa(sum))));
+          })) : null,
+        h('div', { class: 'bo-tools' }, boSearch(st.q, 'Nom, code, téléphone ou e-mail', function (v) { st.q = v; draw(); }), chips),
+        listBox,
+        h('details', { class: 'card more-sec', id: 'adm-pending' }, h('summary', null, 'Gains en vérification (' + d.pending.length + ')'),
+          h('div', { class: 'stack tight', style: 'margin-top:10px' }, d.pending.length ? d.pending.map(function (r) {
+            var reason = h('input', { type: 'text', placeholder: 'Motif', maxlength: 200, style: 'max-width:160px' });
+            return h('div', { class: 'item' }, h('span', { class: 'small wrapword', style: 'flex:1' }, r.ambassador + ' · ' + r.shop + ' · niveau ' + r.level + ' · ' + fcfa(r.amount) + ' · le ' + shortDate(r.validate_after)), reason,
+              h('button', { class: 'btn quiet danger-text small', type: 'button', onclick: function () {
+                if (!reason.value.trim()) { toast('Indiquez un motif.'); reason.focus(); return; }
+                boAct(function () { return api('fiila_admin_reward', { p_ids: [r.id], p_action: 'cancel', p_reason: reason.value }); }, 'Gain annulé.', null, null, this);
+              } }, 'Annuler'));
+          }) : h('p', { class: 'muted small' }, 'Aucun gain en vérification.'))),
+        h('details', { class: 'card more-sec', id: 'adm-quiz' }, h('summary', null, 'Test de passage : questions manquées'),
+          !runs ? h('p', { class: 'muted', style: 'margin-top:10px' }, 'Aucun test terminé pour l’instant.') : h('div', { class: 'stack tight', style: 'margin-top:10px' },
+            h('p', { class: 'small muted' }, runs + ' test(s) terminé(s). Une question souvent manquée : la fiche correspondante est à clarifier.'),
+            qs10.map(function (x) {
+              var pct = Math.round(x.wrong / runs * 100);
+              return h('div', { class: 'stack tight' }, h('div', { class: 'total-row' }, h('span', { class: 'small wrapword' }, (x.q + 1) + '. ' + AMB_QUIZ[x.q][0]), h('b', { class: 'small' }, pct + ' %')),
+                h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, h('i', { class: pct >= 40 ? 'wait' : 'paid', style: 'width:' + pct + '%' })));
+            }))),
+        h('p', { class: 'small muted' }, 'Gains : ' + d.settings.rewards.map(fcfa).join(' · ') + ' par niveau. Plafond : ' + d.settings.monthly_cap + ' commerçants par mois et par ambassadeur (Réglages).')
+      ], { sub: 'Inscriptions, gains et versements de Fii La Carrière.' });
+    }, function (e) { return boShell('ambassadeurs', 'Ambassadeurs', stateCard('!', 'Chargement impossible', errText(e))); });
+  }
+  function boAmbassador(id) {
+    var back = ['#/bo/ambassadeurs', 'Ambassadeurs'];
+    return api('fiila_admin_ambassadors', {}).then(function (d) {
+      var a = d.ambassadors.filter(function (x) { return x.id === id; })[0];
+      if (!a) return boShell('ambassadeurs', 'Ambassadeur', stateCard('?', 'Profil introuvable', 'Ce profil a peut-être été supprimé.'), { back: back });
+      function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
+      var note = h('input', { type: 'text', id: 'bo-amb-note', maxlength: 200, placeholder: 'Motif ou note (visible par l’ambassadeur)' });
+      function btn(decision, label, cls, ask, okText, idx) {
+        return h('button', { class: 'btn ' + cls, type: 'button', id: 'bo-amb-' + (idx || decision), onclick: function () {
+          if (ask && window.confirm && !window.confirm(ask)) return;
+          boAmbDecide(a, decision, note.value, this, okText);
+        } }, label);
+      }
+      var acts = [];
+      if (a.status === 'review') acts.push(btn('approve', 'Valider le profil', '', null, 'Profil validé.'), btn('exclude', 'Refuser', 'quiet danger-text', 'Refuser ' + a.name + ' ? Son profil sera exclu.', 'Inscription refusée.'));
+      if (a.status === 'active') acts.push(btn('suspend', 'Suspendre', 'ghost', 'Suspendre ' + a.name + ' ? Ses nouveaux gains sont mis en pause.', 'Ambassadeur suspendu.'));
+      if (a.status === 'suspended') acts.push(btn('reactivate', 'Réactiver', '', null, 'Ambassadeur réactivé.'));
+      if (['review', 'active', 'suspended'].indexOf(a.status) >= 0) acts.push(btn('training', 'Renvoyer en formation', 'ghost', a.name + ' devra refaire la formation et le test. Continuer ?', 'Renvoyé en formation.'));
+      if (a.status === 'active' || a.status === 'suspended') acts.push(btn('exclude', 'Exclure', 'quiet danger-text', 'Exclure ' + a.name + ' ? Les gains non versés seront annulés.', 'Ambassadeur exclu.', 'exclude2'));
+      var canDelete = !(a.paid > 0);
+      var del = h('section', { class: 'card stack tight bo-danger', id: 'bo-amb-danger' }, h('h2', null, 'Zone sensible'),
+        canDelete ? [h('p', { class: 'small' }, 'Supprimer le profil efface l’inscription, les tests, les liens avec les commerçants et les gains non versés. Le compte de la personne reste : elle pourra recommencer l’inscription.'),
+          h('button', { class: 'btn danger', type: 'button', id: 'bo-amb-delete', onclick: function () {
+            if (window.confirm && !window.confirm('Supprimer définitivement le profil ambassadeur de ' + a.name + ' (code ' + a.code + ') ?')) return;
+            boAmbDecide(a, 'delete', null, this, 'Profil ambassadeur supprimé.', function () { go('#/bo/ambassadeurs'); });
+          } }, 'Supprimer le profil ambassadeur')]
+          : h('p', { class: 'small' }, 'Ce profil a déjà reçu ' + fcfa(a.paid) + ' de versements : il ne peut pas être supprimé (trace financière). Excluez-le si besoin.'));
+      return boShell('ambassadeurs', a.name, [
+        boHero(a.name, [boAmbState(a), boBadge('info', GRADES[a.grade] || 'Ambassadeur'), h('span', { class: 'bo-code-tag' }, a.code)], [a.email, a.phone, a.zone].filter(Boolean).join(' · ')),
+        h('div', { class: 'bo-kpis' },
+          boKpi(null, 'shop', boNum(a.shops), 'commerçants', boNum(a.month) + ' ce mois-ci', 'green'),
+          boKpi(null, 'star', boNum(a.active_shops || 0), 'commerçants actifs', 'niveau 2 atteint', 'blue'),
+          boKpi(null, 'cash', fcfa(a.earned || 0), 'gains', a.cancelled ? a.cancelled + ' annulé(s)' : null, 'amber'),
+          boKpi(null, 'check', fcfa(a.paid || 0), 'déjà versés', null, 'violet')),
+        h('div', { class: 'bo-grid2' },
+          h('section', { class: 'card stack tight', id: 'bo-amb-info' }, h('h2', null, 'Profil'),
+            row('Code', a.code), row('E-mail du compte', a.email || '—'), row('Téléphone', a.phone), row('Quartier', a.zone || '—'),
+            row('Versements', (PAYOUT[a.payout_method] || a.payout_method) + ' ' + a.payout_phone),
+            row('Inscrit', boDate(a.created_at, true)), row('Validé', a.approved_at ? boDate(a.approved_at, true) : '—'),
+            row('Test', a.quiz_score != null ? a.quiz_score + '/10 · ' + (a.attempts || 0) + ' essai(s)' : (a.attempts ? a.attempts + ' essai(s), pas encore réussi' : 'pas encore passé')),
+            a.note ? row('Note', a.note) : null),
+          h('section', { class: 'card stack tight', id: 'bo-amb-actions' }, h('h2', null, 'Actions'),
+            acts.length ? [h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif ou note'), note), h('div', { class: 'row wrap' }, acts)]
+              : h('p', { class: 'small muted' }, a.status === 'training' ? 'En formation : rien à décider tant que le test n’est pas réussi.' : 'Profil exclu : aucune action possible.'))),
+        del
+      ], { back: back });
+    }, function (e) { return boShell('ambassadeurs', 'Ambassadeur', stateCard('!', 'Chargement impossible', errText(e)), { back: back }); });
   }
 
   // ----- Fil
@@ -6902,7 +7063,7 @@
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’ambassadeur versé',
     reward_cancelled: 'a annulé un gain d’ambassadeur', reward_validated: 'a validé un gain d’ambassadeur', ambassador_active: 'a activé un ambassadeur',
-    ambassador_suspended: 'a suspendu un ambassadeur', ambassador_excluded: 'a exclu un ambassadeur', ambassador_training: 'a renvoyé un ambassadeur en formation',
+    ambassador_suspended: 'a suspendu un ambassadeur', ambassador_excluded: 'a exclu un ambassadeur', ambassador_training: 'a renvoyé un ambassadeur en formation', ambassador_deleted: 'a supprimé le profil ambassadeur de',
     view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain ambassadeur, niveau 1', 'FCFA'], amb_reward_2: ['Gain ambassadeur, niveau 2', 'FCFA'],
     amb_reward_3: ['Gain ambassadeur, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par ambassadeur et par mois', ''],

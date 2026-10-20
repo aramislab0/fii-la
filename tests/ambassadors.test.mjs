@@ -137,8 +137,26 @@ await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async ()
   // Back-office : taux d'erreur par question du test (Moussa a manqué la question 4).
   await F.locator('#adm-quiz summary').click();
   assert.match((await F.locator('#adm-quiz').textContent()).replace(/\s/g, ' '), /1 test\(s\) terminé\(s\)[\s\S]*4\. Pouvez-vous passer des commandes[^%]*100 %/);
+  await shot(F, '06-bo-ambassadeurs');
   await F.locator('#adm-review').getByRole('button', { name: 'Valider' }).click();
-  await F.getByText('Enregistré.').waitFor();
+  await F.getByText('Moussa Diop validé.').waitFor();
+  // Fiche : actions selon l'état, zone sensible pour supprimer le profil.
+  await F.locator('#bo-amb-table tbody tr').filter({ hasText: 'Moussa Diop' }).locator('td').nth(1).click();
+  await F.locator('#bo-amb-actions').getByRole('button', { name: 'Suspendre' }).waitFor();
+  await F.locator('#bo-amb-delete').waitFor();
+  await shot(F, '07-bo-fiche-ambassadeur');
+  // Supprimer un profil (synthétique) depuis sa fiche : confirmation, puis retour à la liste ; la personne peut recommencer.
+  const sid = (await local.db.query(`insert into auth.users (id, email) values (gen_random_uuid(), 'suppr.amb@example.invalid') returning id`)).rows[0].id;
+  await local.db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Essai Suppr')`, [sid]);
+  const reg = await rpc(local.db, 'fiila_ambassador_register', { p: { name: 'Essai Suppr', phone: '77 500 00 06', payout_method: 'wave', charter: true } }, { uid: sid });
+  assert.equal(reg.status, 200, JSON.stringify(reg.body));
+  await F.goto(URL0 + '#/bo/ambassadeurs?f=training');
+  await F.locator('#bo-amb-table tbody tr').filter({ hasText: 'Essai Suppr' }).locator('td').nth(1).click();
+  F.once('dialog', (d) => d.accept());
+  await F.click('#bo-amb-delete');
+  await F.getByText('Profil ambassadeur supprimé.').waitFor();
+  assert.equal((await local.db.query(`select count(*)::int n from fiila.ambassadors where name = 'Essai Suppr'`)).rows[0].n, 0);
+  await local.db.query(`delete from auth.users where id = $1`, [sid]);
   CODE = (await local.db.query(`select code from fiila.ambassadors`)).rows[0].code;
 });
 
@@ -182,6 +200,7 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   await local.db.query(`update fiila.ambassador_rewards set validate_after = now() - interval '1 minute'`);
   await F.goto(URL0 + '#/'); await F.goto(URL0 + '#/admin/ambassadeurs');
   await F.locator('#adm-pay').getByText('Wave 77 500 00 01').waitFor();
+  F.once('dialog', (d) => d.accept());
   await F.locator('#adm-pay').getByRole('button', { name: /J’ai versé 2 000/ }).click();
   await F.getByText('Marqué versé.').waitFor();
   await A.goto(URL0 + '#/'); await A.goto(URL0 + '#/ambassadeur');

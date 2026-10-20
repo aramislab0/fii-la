@@ -184,6 +184,27 @@ await t('plafond mensuel ; classement : prénom et zone seulement ; exclusion : 
   await ko('fiila_ambassador_register', { p: { name: 'Moussa', phone: '77 500 00 01', payout_method: 'wave', charter: true } }, 'not_allowed', A);
 });
 
+await t('back-office : renvoyer en formation ; supprimer un profil (connexion récente, tracé) ; jamais s’il a déjà reçu un versement', async () => {
+  const E = await user('essai.amb@example.test');
+  await ok('fiila_ambassador_register', { p: { name: 'Essai Amb', phone: '77 500 00 07', payout_method: 'wave', charter: true } }, E);
+  await ok('fiila_ambassador_quiz', { p_answers: GOOD }, E);
+  const id = (await one(`select id from fiila.ambassadors where name = 'Essai Amb'`)).id;
+  const list = await ok('fiila_admin_ambassadors', {}, ADMIN);
+  const row = list.ambassadors.find((x) => x.id === id);
+  assert.equal(row.email, 'essai.amb@example.test'); assert.equal(row.attempts, 1); assert.equal(row.earned, 0);
+  await ok('fiila_admin_ambassador_decide', { p_id: id, p_decision: 'training', p_note: null }, ADMIN);
+  const me = (await ok('fiila_ambassador_me', {}, E)).ambassador;
+  assert.equal(me.status, 'training'); assert.equal(me.quiz_passed, false); assert.equal(me.attempts_today, 0);
+  await ko('fiila_admin_ambassador_decide', { p_id: id, p_decision: 'delete', p_note: null }, 'not_allowed', E);
+  await ko('fiila_admin_ambassador_decide', { p_id: id, p_decision: 'delete', p_note: null }, 'reauth_required', { ...ADMIN, loginAt: Math.floor(Date.now() / 1000) - 3600 });
+  const del = await ok('fiila_admin_ambassador_decide', { p_id: id, p_decision: 'delete', p_note: null }, ADMIN);
+  assert.equal(del.deleted, true);
+  assert.equal((await ok('fiila_ambassador_me', {}, E)).ambassador, null, 'il peut recommencer l’inscription');
+  assert.equal((await one(`select count(*)::int n from fiila.admin_log where action = 'ambassador_deleted' and detail ->> 'name' = 'Essai Amb'`)).n, 1);
+  // Moussa a reçu un versement : on ne l'efface pas (trace financière), il reste exclu.
+  await ko('fiila_admin_ambassador_decide', { p_id: AMB_ID, p_decision: 'delete', p_note: null }, 'ambassador_has_payouts', ADMIN);
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL ambassadeurs réussis`);
 process.exit(passed === results.length ? 0 : 1);

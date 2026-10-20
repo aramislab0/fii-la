@@ -192,7 +192,7 @@ await t('équipe : inviter un membre (lien à usage unique), il s’inscrit avec
   await M.click('#bo-menu');
   await M.waitForTimeout(300);
   const labels = (await M.locator('.bo-nav .bo-link').allTextContents()).map((s) => s.replace(/\d+$/, '').trim());
-  assert.deepEqual(labels, ['Tableau de bord', 'Boutiques', 'Modération', 'Vide-dressing', 'Croissance']);
+  assert.deepEqual(labels, ['Tableau de bord', 'Croissance', 'Boutiques', 'Vide-dressing', 'Modération']);
   await shot(M, '09-mobile-menu-moderation');
   await M.click('#bo-nav-moderation');
   await M.waitForFunction(() => document.querySelector('#bo-main h1').textContent === 'Modération');

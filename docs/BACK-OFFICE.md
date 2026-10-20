@@ -41,7 +41,7 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 | Comptes | Recherche par nom ou e-mail, fiche (boutique possédée ou dont il est membre, numéro confirmé par SMS, ambassadeur, rôle, activité) |
 | Modération | Commentaires masqués ou signalés : rétablir ou supprimer |
 | Vide-dressing | Articles à vérifier, commandes, reversements |
-| Ambassadeurs | Validations, gains, versements ; « Test de passage : questions manquées » (taux d'erreur par question sur les tests terminés, pour savoir quelle fiche de formation clarifier) |
+| Ambassadeurs | Rubrique native (20/10) : indicateurs (actifs, à valider, à verser, versés), file « À valider » (valider, refuser), file « À verser » (confirmation avant de marquer versé), liste avec recherche et filtres par état, fiche ambassadeur (profil, test, gains, actions selon l'état : valider, suspendre, réactiver, renvoyer en formation, exclure ; zone sensible « Supprimer le profil », connexion récente exigée, refusée si un versement a déjà été fait), gains en vérification (annulation avec motif), questions manquées du test |
 | Fil | Les 25 places gratuites et la liste d'attente |
 | Finances | 6 derniers mois, gains d'ambassadeurs à verser et versés, ventes de vide-dressing à reverser |
 | Croissance | Origine des arrivées, parrainages |
@@ -58,6 +58,10 @@ Actions possibles sur la fiche d'une boutique :
 - retirer un membre de l'équipe de la boutique (son accès s'arrête aussitôt ; le nom du membre est gardé au journal).
 
 Les anciennes adresses `#/stats` et `#/admin/…` ouvrent la section correspondante du back-office.
+
+## Présentation (v2, 20/10)
+
+Barre latérale sombre groupée (Pilotage, Opérations, Programmes, Administration), en-tête de page (rubrique, titre, phrase d'état), indicateurs à pastille d'icône, ligne d'indicateurs secondaires, panneau « À traiter » avec compteurs, fiches avec en-tête (pastille, badges, ligne d'informations), recherche avec icône et nombre de résultats.
 
 ## Règle : chaque nouvelle fonction arrive avec son back-office
 

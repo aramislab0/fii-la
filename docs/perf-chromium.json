@@ -1,7 +1,7 @@
 {
   "profil": "3G lente simulée : 750 kbit/s, 300 ms de latence",
-  "total_ko": 223,
-  "affichage_complet_ms": 4066,
+  "total_ko": 229,
+  "affichage_complet_ms": 4137,
   "leaflet_charge": false,
   "qr_charge": false
 }
