@@ -198,6 +198,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 20/10 05:20 | Entrée Fii La Carrière dans le compte et flèche retour du portail back-office en production (run 39366908327, tout vert, Chrome + Safari) | GitHub Actions |
 | 20/10 04:55 | Compte : entrée « Fii La Carrière » avec l'état de l'ambassadeur (`ambEntry`) ; portail du back-office (connexion, code, accès refusé, invitation) : flèche retour en haut à gauche ; tests back-office 10/10, ambassadeurs 7/7 ; vérification complète : 38 suites (SQL + navigateur) vertes | ce commit |
 | 20/10 04:30 | Portail Fii La Carrière en production (run 39363049005, tout vert) ; test du parcours par le fondateur en attente | GitHub Actions |
 | 20/10 04:00 | Portail Fii La Carrière (`ambAccess`, alias `#/carriere`, retour après confirmation e-mail via `pkce.after`) ; test ambassadeurs 7/7 ; guide de test envoyé au fondateur | ce commit |
