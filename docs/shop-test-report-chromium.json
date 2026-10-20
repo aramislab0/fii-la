@@ -1,13 +1,13 @@
 {
   "moteur": "chromium",
   "version": "141.0.7390.37",
-  "date": "2026-10-20T23:10:10.179Z",
+  "date": "2026-10-20T23:50:32.123Z",
   "reussis": 26,
   "total": 26,
   "results": [
     {
       "ok": true,
-      "name": "accueil sans compte : aucun appel à se connecter en haut ; « Ma boutique » visible ; connexion discrète en pied de page"
+      "name": "accueil sans compte : aucun appel à se connecter en haut ; la boutique dans « Découvrir les services » ; connexion discrète en pied de page"
     },
     {
       "ok": true,

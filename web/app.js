@@ -607,7 +607,8 @@
     meeting_joined: ['guest'],
     visual_exported: ['download_address', 'download_meeting', 'download_request', 'share_address', 'share_meeting', 'share_request'],
     owned_reopened: ['address', 'meeting', 'request'],
-    nudge: []
+    nudge: [],
+    onboarding: []
   };
   /* ----- Découverte progressive (fondateur, 20/10 06:59 : « la personne ne doit pas sentir l'onboarding ; elle découvre au fur et
      à mesure tout le potentiel de l'app selon ses usages ; des appels à l'action incitatifs sans être agressifs »).
@@ -620,7 +621,7 @@
     var c = LS.get('fiila.flags', null);
     if (c && Date.now() - c.at < 6 * 3600e3) NUDGE_FLAGS = c.v;
     if (!c || Date.now() - c.at >= 6 * 3600e3) api('fiila_app_flags', {}).then(function (v) { NUDGE_FLAGS = v; LS.set('fiila.flags', { at: Date.now(), v: v }); }, function () {});
-    return NUDGE_FLAGS || { nudges: true };
+    return NUDGE_FLAGS || { nudges: true, onboarding: true };
   }
   function nudgeState() {
     var st = LS.get('fiila.nudges', null) || {};
@@ -655,6 +656,123 @@
   function homeNudge() {
     if (CFG.shop === false || shopKey() || (ME && ME.shop) || (LS.get('fiila.tx', 0) || 0) < 1) return null;
     return nudge('home_shop', { icon: 'shop', title: 'Vous vendez quelque chose ?', text: 'Votre boutique en ligne est gratuite : commandes, factures et adresse exacte de vos clientes.', cta: 'Créer ma boutique', href: '#/boutique' });
+  }
+  /* ----- Parcours d'accueil v2 (proposition validée par le fondateur le 20/10 23:36, docs/PROPOSITION-ONBOARDING.md).
+     Rien ne s'« installe » : chaque service est disponible ; son premier usage ajoute son raccourci dans « Mes activités ».
+     Action principale : « Reprendre… » si une adresse est en cours, sinon l'activité la plus utilisée sur 14 jours, sinon
+     « Créer mon adresse ». Retirer un raccourci ne retire aucun accès. Réglage du back-office onboarding_v2 (0 = ancien accueil). */
+  var SERVICES = [
+    { id: 'boutique', icon: 'shop', label: 'Boutique', hero: 'Ma boutique', sub: 'Commandes, articles, vitrine', href: '#/boutique',
+      text: 'Vendez en ligne : vitrine, commandes, factures et adresse exacte de vos clientes.' },
+    { id: 'demander', icon: 'ask', label: 'Demander', hero: 'Demander une adresse', sub: 'Un lien, l’adresse exacte en retour', href: '#/demande/nouvelle',
+      text: 'Recevez l’adresse exacte d’un client en lui envoyant un lien.' },
+    { id: 'evenement', icon: 'cal', label: 'Événement', hero: 'Créer un événement', sub: 'Un lien pour tous vos invités', href: '#/rdv/nouveau',
+      text: 'Mariage, baptême, réunion : un seul lien pour que tous vos invités trouvent le lieu.' },
+    { id: 'livreur', icon: 'moto', label: 'Livreur', hero: 'Espace livreur', sub: 'Vos courses avec l’adresse exacte', href: '#/livreur',
+      text: 'Recevez les courses de vos commerçants, avec l’adresse exacte et le chemin.' },
+    { id: 'vide_dressing', icon: 'users', label: 'Vide-dressing', hero: 'Vide-dressing', sub: 'Vendre ou acheter d’occasion', href: '#/vide-dressing',
+      text: 'Proposez vos articles d’occasion à Fii La, ou achetez près de chez vous.' },
+    { id: 'ambassadeur', icon: 'cash', label: 'Ambassadeur', hero: 'Fii La Carrière', sub: 'Missions, gains, classement', href: '#/ambassadeur',
+      text: 'Gagnez de l’argent en installant Fii La chez les commerçants, après une formation et une validation.' }];
+  var ACT_LS = 'fiila.acts';
+  ['hero_reprendre', 'hero_adresse', 'services'].concat(SERVICES.map(function (x) { return 'hero_' + x.id; })).forEach(function (k) { TRACKABLE.onboarding.push(k === 'services' ? 'services:open' : k + ':click'); });
+  SERVICES.forEach(function (x) { TRACKABLE.onboarding.push('act_' + x.id + ':click', 'svc_' + x.id + ':click', 'svc_' + x.id + ':hide'); });
+  function onboardingOn() { var f = nudgeFlags(); return f.onboarding !== false; }
+  function svcOf(id) { for (var i = 0; i < SERVICES.length; i++) if (SERVICES[i].id === id) return SERVICES[i]; return null; }
+  function actState() { var st = LS.get(ACT_LS, null) || {}; st.log = st.log || {}; st.hidden = st.hidden || {}; st.used = st.used || {}; return st; }
+  // Écran ouvert → activité utilisée (une fois toutes les 10 minutes au plus).
+  function noteActivity(p) {
+    var id = !p.length ? null : p[0] === 'new' ? 'adresse' : p[0] === 'boutique' ? 'boutique' : p[0] === 'livreur' ? 'livreur'
+      : p[0] === 'rdv' && p[1] === 'nouveau' ? 'evenement' : p[0] === 'demande' ? 'demander' : p[0] === 'vide-dressing' ? 'vide_dressing'
+      : p[0] === 'ambassadeur' ? 'ambassadeur' : null;
+    if (!id) return;
+    var st = actState(), now = Date.now(), log = (st.log[id] || []).filter(function (t) { return now - t < 14 * 864e5; });
+    if (log.length && now - log[log.length - 1] < 10 * 60e3) return;
+    log.push(now); st.log[id] = log.slice(-60); st.used[id] = 1; delete st.hidden[id];
+    LS.set(ACT_LS, st);
+  }
+  // Activités de cette personne : ce qu'elle a utilisé, et ce qui existe déjà sur ce téléphone ou dans son compte.
+  function myActivities() {
+    var st = actState(), has = {};
+    Object.keys(st.used).forEach(function (k) { has[k] = 1; });
+    if (shopKey() || (ME && ME.shop)) has.boutique = 1;
+    if (LS.get(COURIER_LS, null)) has.livreur = 1;
+    owned.all().forEach(function (r) { if (r.type === 'request') has.demander = 1; else if (r.kind === 'meeting') has.evenement = 1; });
+    return SERVICES.filter(function (s) { return has[s.id] && !st.hidden[s.id] && !(s.id === 'boutique' && CFG.shop === false); });
+  }
+  function topActivity() {
+    var st = actState(), now = Date.now(), best = null, n = 0;
+    Object.keys(st.log).forEach(function (k) {
+      var c = st.log[k].filter(function (t) { return now - t < 14 * 864e5; }).length;
+      if (c > n || (c === n && best === 'adresse')) { best = k; n = c; }
+    });
+    return n >= 2 ? best : null;
+  }
+  function addressDraftStarted() {
+    var d = LS.get(DRAFT_KEY, null);
+    return !!(d && (d.entry || d.photo || (d.label || '').trim() || (d.instruction || '').trim()));
+  }
+  function homeHero() {
+    if (addressDraftStarted()) return h('a', { class: 'hero', href: '#/new', id: 'create-address', 'data-hero': 'reprendre',
+      onclick: function () { track('onboarding', 'hero_reprendre:click'); } },
+      h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon('cam', 32)),
+      h('span', null, h('b', null, 'Reprendre mon adresse'), h('small', null, 'Là où vous vous étiez arrêté')));
+    var top = topActivity(), s = top && top !== 'adresse' ? svcOf(top) : null;
+    if (s && myActivities().indexOf(s) >= 0) return h('a', { class: 'hero', href: s.href, id: 'home-hero', 'data-hero': s.id,
+      onclick: function () { track('onboarding', 'hero_' + s.id + ':click'); } },
+      h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon(s.icon, 32)),
+      h('span', null, h('b', null, s.hero), h('small', null, s.sub)));
+    return h('a', { class: 'hero', href: '#/new', id: 'create-address', 'data-hero': 'adresse', 'aria-label': 'Créer mon adresse',
+      onclick: function () { track('onboarding', 'hero_adresse:click'); } },
+      h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon('cam', 32)),
+      h('span', null, h('b', null, 'Créer mon adresse'), h('small', null, 'Photo de la porte · repère · lien')));
+  }
+  function homeActivities(hero) {
+    var heroId = hero.getAttribute('data-hero');
+    var acts = myActivities().filter(function (s) { return s.id !== heroId; });
+    var tiles = acts.map(function (s) {
+      return h('a', { class: 'ttile', href: s.href, id: 'act-' + s.id, onclick: function () { track('onboarding', 'act_' + s.id + ':click'); } },
+        h('span', { class: 'ttile-ic', 'aria-hidden': 'true' }, icon(s.icon, 26)), h('span', { class: 'pro-name' }, s.label));
+    });
+    // L'adresse reste à portée quand l'action principale est une autre activité.
+    if (heroId !== 'adresse' && heroId !== 'reprendre') tiles.unshift(h('a', { class: 'ttile', href: '#/new', id: 'create-address' },
+      h('span', { class: 'ttile-ic', 'aria-hidden': 'true' }, icon('cam', 26)), h('span', { class: 'pro-name' }, 'Mon adresse')));
+    return tiles.length ? h('section', { class: 'stack tight', id: 'my-acts', 'aria-labelledby': 'h-acts' },
+      h('h2', { id: 'h-acts', class: 'acts-h' }, 'Mes activités'), h('nav', { class: 'tiles4 acts', 'aria-label': 'Mes activités' }, tiles)) : null;
+  }
+  function servicesButton() {
+    return h('button', { class: 'svc-open', type: 'button', id: 'services-open', onclick: function () { servicesSheet(); } },
+      h('span', { class: 'svc-open-ic', 'aria-hidden': 'true' }, icon('plus', 20)), h('span', null, 'Découvrir les services'));
+  }
+  function servicesSheet() {
+    track('onboarding', 'services:open');
+    var mine = myActivities();
+    var back = h('div', { class: 'sheet-back', id: 'services-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'services-h',
+      onclick: function (e) { if (e.target === back) close(); } });
+    var list = SERVICES.filter(function (s) { return !(s.id === 'boutique' && CFG.shop === false); });
+    var close;
+    back.append(h('div', { class: 'sheet svc-sheet' },
+      h('div', { class: 'svc-head' }, h('h2', { id: 'services-h' }, 'Les services Fii La'),
+        h('button', { class: 'svc-x', type: 'button', 'aria-label': 'Fermer', id: 'services-close', onclick: function () { close(); } }, icon('close', 18))),
+      h('div', { class: 'svc-list' }, list.map(function (s) {
+        var on = mine.indexOf(s) >= 0;
+        return h('div', { class: 'svc-card', id: 'svc-' + s.id },
+          h('span', { class: 'svc-ic', 'aria-hidden': 'true' }, icon(s.icon, 24)),
+          h('div', { class: 'svc-t' }, h('b', null, s.hero), h('span', null, s.text),
+            on ? h('button', { class: 'svc-hide', type: 'button', onclick: function () {
+              var st = actState(); st.hidden[s.id] = 1; LS.set(ACT_LS, st); track('onboarding', 'svc_' + s.id + ':hide'); close(); toast('Retiré de l’accueil. Le service reste ici.'); render();
+            } }, 'Retirer de l’accueil') : null),
+          h('a', { class: 'btn small svc-go', id: 'svc-' + s.id + '-go', href: s.href, onclick: function () { track('onboarding', 'svc_' + s.id + ':click'); close(); } }, 'Ouvrir'));
+      })),
+      h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer', onclick: function () { close(); } }, icon('gift', 24), h('span', null, 'Inviter un proche'),
+        h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))));
+    close = openSheet(back);
+  }
+  // « Installer l'app » : à partir de la deuxième visite (une visite = une session du navigateur).
+  function visitCount() {
+    var n = Number(LS.get('fiila.visits', 0)) || 0;
+    try { if (!sessionStorage.getItem('fiila.v')) { sessionStorage.setItem('fiila.v', '1'); n++; LS.set('fiila.visits', n); } } catch (e) { /* rien */ }
+    return n;
   }
   // Tableau de bord de la boutique : la prochaine fonction utile selon l'avancement, une seule à la fois.
   function shopNudge(shop, st) {
@@ -2531,6 +2649,7 @@
     staleToast();
     var r = parseHash(), p = r.parts, view;
     noteTouch(p);
+    try { noteActivity(p); } catch (e) { /* stockage indisponible */ }
     try {
       if (!p.length) view = viewHome();
       else if (p[0] === 'r' && p[1]) { try { history.replaceState(null, '', location.pathname + location.search + '#/'); } catch (e) { /* rien */ } checkTouchCode(); view = viewHome(); }
@@ -2712,7 +2831,7 @@
       }
       setKids(listBox, 
         offlineMsg ? h('p', { class: 'alert' }, offlineMsg) : null,
-        h('section', { class: 'stack', id: 'mes-adresses', 'aria-labelledby': 'h-adr' },
+        !addrs.length && onboardingOn() ? null : h('section', { class: 'stack', id: 'mes-adresses', 'aria-labelledby': 'h-adr' },
           h('h2', { id: 'h-adr' }, 'Mes adresses'),
           addrs.length ? h('div', { class: 'list' }, addrs.map(addrCard)) : h('div', { class: 'card' },
             h('p', null, authed() ? 'Aucune adresse pour l’instant.' : 'Aucune adresse sur ce téléphone.'),
@@ -2744,6 +2863,28 @@
       return h('a', Object.assign({ class: 'ttile', href: href }, attrs || {}), h('span', { class: 'ttile-ic', 'aria-hidden': 'true' }, icon(name, 26)), h('span', { class: 'pro-name' }, label));
     }
     var shopBtn = CFG.shop === false ? null : tile4('#/boutique', 'shop', 'Boutique', { id: 'shop-link', 'aria-label': 'Ma boutique' });
+    var visits = visitCount();
+    if (onboardingOn()) {
+      // Accueil léger (v2) : l'action principale, mes activités, « Découvrir les services », mes listes, puis le fil en bas.
+      var hero = homeHero();
+      return page(
+        h('header', { class: 'stack tight' },
+          h('div', { class: 'brand-row' },
+            h('div', { class: 'brand' }, h('span', { class: 'mark', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La'))),
+            who),
+          hello,
+          h('p', { class: 'promise' + (hello ? ' small-promise' : '') }, 'Votre adresse, en une photo.')),
+        inviteBanner(),
+        hero,
+        homeActivities(hero),
+        servicesButton(),
+        accountNudge() || homeNudge(),
+        demoBanner(),
+        visits >= 2 ? installCta() : null,
+        listBox,
+        feedSection(3, { id: 'home-feed' }),
+        footer());
+    }
     return page(
       h('header', { class: 'stack tight' },
         h('div', { class: 'brand-row' },
@@ -6690,7 +6831,7 @@
           case 'vide-dressing': return boEmbed(viewAdminVd).then(function (b) { return boShell(sec, 'Vide-dressing', b); });
           case 'ambassadeurs': return id ? boAmbassador(id) : boAmbassadors(q);
           case 'carriere': return id ? boCareerThread(id) : boCareer();
-          case 'croissance': return Promise.all([boEmbed(viewStats), api('fiila_bo_nudges', {}).then(null, function () { return null; })]).then(function (rr) { return boShell(sec, 'Croissance', [boNudgePanel(rr[1]), rr[0]]); });
+          case 'croissance': return Promise.all([boEmbed(viewStats), api('fiila_bo_nudges', {}).then(null, function () { return null; }), api('fiila_bo_onboarding', {}).then(null, function () { return null; })]).then(function (rr) { return boShell(sec, 'Croissance', [boOnboardingPanel(rr[2]), boNudgePanel(rr[1]), rr[0]]); });
           case 'fil': return boFeed();
           case 'finances': return boFinance();
           case 'equipe': return boTeam();
@@ -7314,6 +7455,31 @@
     }, function (e) { return boShell('carriere', 'Conversation', stateCard('!', 'Introuvable', errText(e)), { back: back }); });
   }
 
+  // Croissance : parcours d'accueil v2 — gestes de découverte et tâches réussies (30 jours, compteurs anonymes et agrégés).
+  function boOnboardingPanel(d) {
+    if (!d) return null;
+    var g = d.gestures || {}, t = d.tasks || {};
+    function n(k) { return Number(g[k] || 0); }
+    var rows = SERVICES.map(function (s) {
+      return { id: s.id, label: s.hero, hero: n('hero_' + s.id + ':click'), act: n('act_' + s.id + ':click'), svc: n('svc_' + s.id + ':click'), hide: n('svc_' + s.id + ':hide') };
+    });
+    var tasks = [['Adresses créées', t.address], ['Événements créés', t.meeting], ['Demandes d’adresse', t.request], ['Boutiques créées', t.shop],
+      ['Articles ajoutés', t.product], ['Commandes', t.order], ['Livreurs inscrits', t.courier]];
+    return h('section', { class: 'card stack tight bo-panel', id: 'bo-onboarding' },
+      h('div', { class: 'bo-panel-h' }, h('h2', null, 'Parcours d’accueil'), d.on ? boBadge('ok', 'Nouvel accueil actif') : boBadge('muted', 'Ancien accueil (Réglages)')),
+      h('p', { class: 'small muted' }, 'Compteurs anonymes et agrégés, 30 derniers jours. « Services » ouverts : ' + boNum(n('services:open')) +
+        ' · « Créer mon adresse » touché : ' + boNum(n('hero_adresse:click')) + ' · « Reprendre » touché : ' + boNum(n('hero_reprendre:click')) + '.'),
+      boTable([
+        { label: 'Service', get: function (x) { return x.label; } },
+        { label: 'Découvert (feuille)', get: function (x) { return boNum(x.svc); }, cls: 'num' },
+        { label: 'Raccourci touché', get: function (x) { return boNum(x.act + x.hero); }, cls: 'num' },
+        { label: 'Retiré de l’accueil', get: function (x) { return boNum(x.hide); }, cls: 'num' }], rows, { id: 'bo-onboarding-table' }),
+      h('p', { class: 'small muted' }, 'Tâches réussies sur la même période (tous parcours confondus) :'),
+      h('div', { class: 'bo-type-chips' }, tasks.map(function (x) { return h('span', { class: 'chip' }, x[0] + ' : ' + boNum(x[1] || 0)); })),
+      h('div', { class: 'row' },
+        h('a', { class: 'btn ghost small', href: '#/bo/reglages', id: 'bo-onboarding-setting' }, 'Réglage : nouvel ou ancien accueil'),
+        h('a', { class: 'btn ghost small', href: '#/', target: '_blank', rel: 'noopener', id: 'bo-onboarding-preview' }, 'Voir l’accueil')));
+  }
   // Croissance : la découverte progressive (suggestions dans l'application), taux de suivi sur 30 jours.
   var NUDGE_LABEL = { home_shop: 'Accueil → créer sa boutique', shop_more_products: 'Boutique → ajouter des articles', shop_share_vitrine: 'Boutique → partager la vitrine',
     shop_courier: 'Boutique → inviter un livreur', shop_team: 'Boutique → ajouter un membre', shop_photos: 'Boutique → plusieurs photos' };
@@ -7434,7 +7600,8 @@
     amb_reward_3: ['Gain ambassadeur, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par ambassadeur et par mois', ''],
     sms_verify: ['Code SMS obligatoire pour rejoindre une équipe de boutique', '0 = non, 1 = oui'],
     amb_manager_llm: ['Manager Fii La Carrière avec IA (clé d’API à saisir dans Supabase)', '0 = non, 1 = oui'],
-    nudges: ['Suggestions discrètes dans l’application (découverte progressive)', '0 = non, 1 = oui'] };
+    nudges: ['Suggestions discrètes dans l’application (découverte progressive)', '0 = non, 1 = oui'],
+    onboarding_v2: ['Nouvel accueil (mes activités, « Découvrir les services »)', '1 = nouvel accueil, 0 = ancien'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

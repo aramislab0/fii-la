@@ -63,7 +63,7 @@ async function makeAddress(P, label, typed) {
   await P.getByRole('heading', { name: 'Partager' }).waitFor();
 }
 // Recharge réelle de l'espace (aller à la même adresse ne relance pas l'affichage).
-async function openRef(P, pour) { await P.goto(URL0 + '#/'); await P.locator('#invite-link').waitFor({ state: 'attached' }); await P.goto(URL0 + '#/parrainer' + (pour ? '?pour=' + pour : '')); }
+async function openRef(P, pour) { await P.goto(URL0 + '#/'); await P.locator('#services-open').waitFor(); await P.goto(URL0 + '#/parrainer' + (pour ? '?pour=' + pour : '')); }
 async function refStats(P, pour) {
   await openRef(P, pour);
   await P.locator('#ref-code').waitFor();
@@ -128,7 +128,7 @@ let PCODE;
 await t('particulier : « Inviter un proche », fiche de parrainage, un proche arrive par son lien', async () => {
   const D = await newPhone();
   await D.goto(URL0 + '#/');
-  await D.click('#home-more summary');
+  await D.click('#services-open');
   await D.click('#invite-link');
   await D.fill('#ref-name', 'Khady Ndiaye (test)');
   await D.fill('#ref-phone', '78 555 55 55');

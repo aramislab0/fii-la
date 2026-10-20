@@ -101,7 +101,7 @@ await t('lien de parrainage : ramène à l’accueil avec le bandeau', async () 
 
 await t('parcours enchaîné : accueil → boutique → article → retour → retour', async () => {
   await P.goto(URL0 + '#/'); await P.locator('.hero').waitFor();
-  await P.locator('#shop-link').click(); await P.locator('#shop-title').waitFor();
+  await P.locator('#act-boutique, #home-hero[data-hero="boutique"]').first().click(); await P.locator('#shop-title').waitFor();
   await P.locator('#tab-products').click(); await P.getByRole('heading', { name: 'Mes articles' }).waitFor();
   await P.locator('#products a').first().click(); await P.getByRole('heading', { name: 'Modifier l’article' }).waitFor();
   await P.locator('.back').first().click(); await P.getByRole('heading', { name: 'Mes articles' }).waitFor();
@@ -129,11 +129,11 @@ await t('page reçue ouverte directement (depuis WhatsApp) : pas de flèche, log
   await C.locator('.hero').waitFor();
 });
 
-await t('« Événement » : tuile et exemples sur l’accueil ; un toucher sur un type remplit le nom', async () => {
+await t('« Événement » : expliqué dans « Découvrir les services » ; un toucher sur un type remplit le nom', async () => {
   await P.goto(URL0 + '#/');
-  await P.getByRole('link', { name: 'Créer un événement' }).waitFor();
-  assert.match(await P.locator('#event-hint').textContent(), /mariage, baptême/);
-  await P.getByRole('link', { name: 'Créer un événement' }).click();
+  await P.locator('#services-open').click();
+  assert.match(await P.locator('#svc-evenement').textContent(), /mariage, baptême/i);
+  await P.locator('#svc-evenement-go').click();
   await P.getByRole('heading', { name: 'Créer un événement' }).waitFor();
   await P.locator('#ev-types').getByText('Baptême').click();
   assert.equal(await P.locator('#m-label').inputValue(), 'Baptême de ');
@@ -144,12 +144,13 @@ await t('« Événement » : tuile et exemples sur l’accueil ; un toucher sur 
   await P.evaluate(() => localStorage.removeItem('fiila.draft.meeting'));
 });
 
-await t('« Installer l’app » : visible sur l’accueil, explique les étapes, se masque', async () => {
+await t('« Installer l’app » : visible sur l’accueil dès la 2ᵉ visite, explique les étapes, se masque', async () => {
+  await P.evaluate(() => localStorage.setItem('fiila.visits', '5'));
   await P.goto(URL0 + '#/');
   await P.locator('#install-app').waitFor();
   await P.locator('#mes-adresses').waitFor();
-  const order = await P.evaluate(() => [...document.querySelectorAll('#create-address, #install-cta, #mes-adresses')].map((e) => e.id));
-  assert.deepEqual(order, ['create-address', 'install-cta', 'mes-adresses']);
+  const order = await P.evaluate(() => [...document.querySelectorAll('.hero, #install-cta, #mes-adresses')].map((e) => e.className.indexOf('hero') >= 0 ? 'hero' : e.id));
+  assert.deepEqual(order, ['hero', 'install-cta', 'mes-adresses']);
   await P.locator('#install-app').click();
   await P.locator('#install-sheet').waitFor();
   assert.equal(await P.locator('#install-sheet .spic').count(), 3);
@@ -163,6 +164,7 @@ await t('« Installer l’app » : visible sur l’accueil, explique les étapes
   // iPhone (Safari) : les 3 étapes de l’écran d’accueil
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: ENGINE === 'chromium', hasTouch: true, locale: 'fr-FR', serviceWorkers: 'block',
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+  await ctx.addInitScript(() => localStorage.setItem('fiila.visits', '2'));
   const I = await ctx.newPage();
   await I.goto(URL0 + '#/');
   await I.locator('#install-app').click();

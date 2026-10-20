@@ -1590,3 +1590,22 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
 @media (prefers-reduced-motion: reduce){.nudge2{animation:none}}
 .card.bo-wa{display:flex;flex-direction:row;align-items:center;gap:12px}
 .mgr-wa .ico path{stroke:#128C4B}
+
+/* Parcours d'accueil v2 (20/10) : mes activités, « Découvrir les services », feuille des services. */
+.acts-h{font-size:15px;font-weight:700;color:var(--muted);margin:0}
+.svc-open{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:56px;border-radius:18px;border:1.5px dashed color-mix(in srgb,var(--muted) 45%,transparent);background:transparent;color:var(--ink);font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.svc-open:active{background:var(--surface-2)}
+.svc-open:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.svc-open-ic{width:30px;height:30px;border-radius:10px;background:var(--green);color:var(--lime);display:flex;align-items:center;justify-content:center}
+.svc-sheet{gap:14px;max-height:88vh;overflow-y:auto}
+.svc-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.svc-head h2{margin:0}
+.svc-x{width:44px;height:44px;border-radius:12px;border:0;background:var(--surface-2);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.svc-list{display:flex;flex-direction:column;gap:10px}
+.svc-card{display:grid;grid-template-columns:48px 1fr auto;align-items:center;gap:12px;padding:14px;border-radius:18px;background:var(--surface);border:1px solid var(--line)}
+.svc-ic{width:48px;height:48px;border-radius:15px;background:var(--surface-2);color:var(--green);display:flex;align-items:center;justify-content:center}
+.svc-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.svc-t b{font-size:15.5px;line-height:1.25}
+.svc-t>span{font-size:13px;color:var(--muted);line-height:1.35}
+.svc-hide{align-self:flex-start;margin-top:2px;padding:6px 0;border:0;background:none;color:var(--muted);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer}
+.svc-go{white-space:nowrap}

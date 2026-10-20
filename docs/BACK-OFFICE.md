@@ -45,10 +45,10 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 | Manager Carrière (20/10) | Cap du mois (objectifs de commerçants actifs et nouveaux, types et quartiers prioritaires, phrase lue par chaque ambassadeur) fixé par le Head of Stratégie ; propositions du Manager (formation, missions, constats) à accepter ou écarter ; analyse IA à la demande (si activée) ; canal WhatsApp du Manager (numéro, réglé par le Head of Stratégie ; API branchée ou lien direct) ; conversations avec chaque ambassadeur (messages classés et canal application ou WhatsApp, problèmes en tête, bouton WhatsApp vers l'ambassadeur, réponse au nom de l'équipe envoyée aussi sur WhatsApp si la fenêtre de 24 h est ouverte), missions récentes et retours ; catalogue des missions (créer, retirer, taux de réalisation) |
 | Fil | Les 25 places gratuites et la liste d'attente |
 | Finances | 6 derniers mois, gains d'ambassadeurs à verser et versés, ventes de vide-dressing à reverser |
-| Croissance | Origine des arrivées, parrainages ; découverte progressive : chaque suggestion vue, suivie, écartée (30 jours) |
+| Croissance | Parcours d'accueil (20/10) : « Découvrir les services » ouvert, chaque service découvert, raccourci touché, retiré de l'accueil, et tâches réussies (adresses, événements, demandes, boutiques, articles, commandes, livreurs) sur 30 jours, compteurs anonymes ; origine des arrivées, parrainages ; découverte progressive : chaque suggestion vue, suivie, écartée (30 jours) |
 | Équipe | Membres, rôles (dont Head of Stratégie et Développement : cap de Fii La Carrière, propositions du Manager, missions), invitations |
 | Journal | Toutes les actions de l'équipe (qui, quoi, quand), non modifiables depuis le back-office |
-| Réglages | Commission du vide-dressing, gains des 3 niveaux d'ambassadeur, plafond mensuel, code SMS obligatoire pour rejoindre une équipe de boutique, Manager avec IA (0/1), suggestions de découverte (0/1), API WhatsApp du Manager (0/1) ; bornes contrôlées |
+| Réglages | Nouvel accueil (`onboarding_v2` : 1 = nouvel accueil, 0 = ancien, sans redéploiement), commission du vide-dressing, gains des 3 niveaux d'ambassadeur, plafond mensuel, code SMS obligatoire pour rejoindre une équipe de boutique, Manager avec IA (0/1), suggestions de découverte (0/1), API WhatsApp du Manager (0/1) ; bornes contrôlées |
 
 Actions possibles sur la fiche d'une boutique :
 - suspendre, avec un motif obligatoire. La vitrine est fermée, la boutique sort du fil et ne peut pas rouvrir sa vitrine elle-même ;

@@ -77,8 +77,9 @@ await t('accueil : bloc « Boutiques à découvrir » après les adresses, 3 bou
   const txt = await A.locator('#home-feed').textContent();
   assert.ok(!/fermée/.test(txt), 'boutique fermée absente');
   assert.ok(!/77 300/.test(txt), 'aucun numéro');
-  const order = await A.evaluate(() => [...document.querySelectorAll('#create-address, #mes-adresses, #home-feed')].map((e) => e.id));
-  assert.deepEqual(order, ['create-address', 'mes-adresses', 'home-feed'], 'l’action principale reste en premier');
+  const order = await A.evaluate(() => [...document.querySelectorAll('.hero, #mes-adresses, #home-feed')].map((e) => e.id));
+  assert.equal(order[0], 'create-address', 'l’action principale reste en premier');
+  assert.equal(order[order.length - 1], 'home-feed', 'le fil reste en bas');
   const over = await A.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.ok(over <= 1, 'débordement horizontal ' + over);
   await A.locator('#home-feed').scrollIntoViewIfNeeded();

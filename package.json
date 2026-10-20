@@ -47,6 +47,7 @@
     "test:manager-sql": "node tests/manager.sql.test.mjs",
     "test:managerfn": "node tests/managerfn.sql.test.mjs",
     "test:nudges": "node tests/nudges.test.mjs",
+    "test:onboarding": "node tests/onboarding.test.mjs",
     "test:whatsapp": "node tests/whatsapp.sql.test.mjs",
     "test:all": "scripts/run-suites.sh sql && scripts/run-suites.sh browser"
   },

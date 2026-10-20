@@ -71,11 +71,11 @@ const clientPlace = await ok('fiila_create_place', { p: { kind: 'address', label
 const A = await newPhone({ owned: [{ type: 'place', kind: 'address', id: before.id, owner: before.owner_token, share: before.share_token, label: 'Atelier (test)' }] });
 const M = A.page;
 
-await t('accueil sans compte : aucun appel à se connecter en haut ; « Ma boutique » visible ; connexion discrète en pied de page', async () => {
+await t('accueil sans compte : aucun appel à se connecter en haut ; la boutique dans « Découvrir les services » ; connexion discrète en pied de page', async () => {
   await M.goto(URL0);
   assert.equal(await M.locator('#account-link').count(), 0);
   await M.locator('#foot-account').getByText('Se connecter').waitFor();
-  await M.getByRole('link', { name: 'Ma boutique' }).waitFor();
+  await M.locator('#services-open').waitFor();
   await M.getByRole('link', { name: 'Créer mon adresse' }).waitFor();
 });
 
@@ -297,7 +297,8 @@ await t('boutique sans compte : créée en un geste, le compte est proposé, pas
   const S = await newPhone();
   globalThis.SP = S.page;
   await S.page.goto(URL0);
-  await S.page.click('#shop-link');
+  await S.page.click('#services-open');
+  await S.page.click('#svc-boutique-go');
   await S.page.fill('#shop-name', 'Boutique Binta (test)');
   await S.page.selectOption('#shop-type', 'mode');
   await S.page.click('#shop-save');

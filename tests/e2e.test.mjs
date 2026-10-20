@@ -113,16 +113,19 @@ globalThis.__shotOnFail = async (n) => {
 };
 let shareUrl, placeId, createBody;
 
-await t('accueil : une action principale (création), deux secondaires, puis mes adresses', async () => {
+await t('accueil (nouveau visiteur) : une action principale, « Découvrir les services », rien d’autre', async () => {
   await A.goto(URL0);
   await A.getByText('Votre adresse, en une photo.').waitFor();
-  for (const n of ['Créer mon adresse', 'Demander une adresse', 'Créer un événement', 'Ma boutique', 'Espace livreur']) await byText(A, n).waitFor();
-  await A.getByRole('heading', { name: 'Mes adresses' }).waitFor();
-  // Une seule grande action, avant les raccourcis à pictogramme.
   assert.equal(await A.locator('a.hero').count(), 1);
   assert.equal(await A.locator('a.hero').getAttribute('href'), '#/new');
-  assert.equal(await A.locator('.tiles4 .ttile svg').count(), 4, 'chaque raccourci a son pictogramme');
+  assert.equal(await A.locator('#my-acts').count(), 0, 'aucune activité avant le premier usage');
+  assert.equal(await A.locator('#mes-adresses').count(), 0, 'pas de liste vide');
+  await A.locator('#services-open').waitFor();
   await shot(A, '01-accueil');
+  await A.locator('#services-open').click();
+  for (const n of ['Ma boutique', 'Demander une adresse', 'Créer un événement', 'Espace livreur', 'Vide-dressing', 'Fii La Carrière']) await A.locator('#services-sheet').getByText(n, { exact: true }).waitFor();
+  assert.equal(await A.locator('#services-sheet .svc-ic svg').count(), 6, 'chaque service a son pictogramme');
+  await A.locator('#services-close').click();
 });
 
 await t('création : géolocalisation après action explicite, précision affichée, point validé', async () => {

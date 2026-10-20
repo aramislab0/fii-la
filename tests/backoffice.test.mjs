@@ -113,6 +113,14 @@ await t('ordinateur : barre latérale avec les 14 sections du super admin, chacu
   await D.locator('#bo-settings').waitFor();
   await shot(D, '03-reglages');
 });
+await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ; réglage du nouvel accueil dans Réglages', async () => {
+  await D.click('#bo-nav-croissance');
+  await D.locator('#bo-onboarding').waitFor();
+  await D.locator('#bo-onboarding-table').waitFor();
+  assert.match(await D.locator('#bo-onboarding').textContent(), /Nouvel accueil actif/);
+  await D.click('#bo-nav-reglages');
+  await D.locator('#bo-settings').getByText('Nouvel accueil', { exact: false }).waitFor();
+});
 
 await t('boutiques : recherche, filtre, fiche ; suspension (motif) qui ferme la vitrine ; réactivation ; journal', async () => {
   await D.click('#bo-nav-boutiques');
