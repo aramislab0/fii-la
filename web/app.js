@@ -631,8 +631,67 @@
     tracking_shared: ['courier', 'guest'],
     meeting_joined: ['guest'],
     visual_exported: ['download_address', 'download_meeting', 'download_request', 'share_address', 'share_meeting', 'share_request'],
-    owned_reopened: ['address', 'meeting', 'request']
+    owned_reopened: ['address', 'meeting', 'request'],
+    nudge: []
   };
+  /* ----- Découverte progressive (fondateur, 20/10 06:59 : « la personne ne doit pas sentir l'onboarding ; elle découvre au fur et
+     à mesure tout le potentiel de l'app selon ses usages ; des appels à l'action incitatifs sans être agressifs »).
+     Règles : une seule suggestion par écran, jamais au premier geste ; 3 au plus par jour ; « Plus tard » = 7 jours de silence,
+     deux fois = plus jamais ; suggestion suivie = plus jamais. Réglable dans le back-office (nudges = 0 coupe tout). */
+  var NUDGE_IDS = ['home_shop', 'shop_more_products', 'shop_share_vitrine', 'shop_courier', 'shop_team', 'shop_photos'];
+  NUDGE_IDS.forEach(function (id) { ['shown', 'click', 'dismiss'].forEach(function (a) { TRACKABLE.nudge.push(id + ':' + a); }); });
+  var NUDGE_SEQ = -1, NUDGE_FLAGS = null;
+  function nudgeFlags() {
+    var c = LS.get('fiila.flags', null);
+    if (c && Date.now() - c.at < 6 * 3600e3) NUDGE_FLAGS = c.v;
+    if (!c || Date.now() - c.at >= 6 * 3600e3) api('fiila_app_flags', {}).then(function (v) { NUDGE_FLAGS = v; LS.set('fiila.flags', { at: Date.now(), v: v }); }, function () {});
+    return NUDGE_FLAGS || { nudges: true };
+  }
+  function nudgeState() {
+    var st = LS.get('fiila.nudges', null) || {};
+    var today = new Date().toISOString().slice(0, 10);
+    if (st.day !== today) { st.day = today; st.n = 0; st.seen = {}; }
+    st.ids = st.ids || {};
+    return st;
+  }
+  // o : { icon, title, text, cta, href, external }
+  function nudge(id, o) {
+    if (!nudgeFlags().nudges || NUDGE_SEQ === renderSeq) return null;
+    var st = nudgeState(), me = st.ids[id] || {};
+    if (me.done || (me.d || 0) >= 2 || (me.until && Date.now() < me.until)) return null;
+    if (!st.seen[id] && st.n >= 3) return null;
+    NUDGE_SEQ = renderSeq;
+    if (!st.seen[id]) { st.seen[id] = 1; st.n++; track('nudge', id + ':shown'); }
+    LS.set('fiila.nudges', st);
+    function save(fn) { var x = nudgeState(); x.ids[id] = fn(x.ids[id] || {}); LS.set('fiila.nudges', x); }
+    var card = h('aside', { class: 'nudge2', id: 'nudge-' + id, 'aria-label': 'Suggestion' },
+      h('span', { class: 'nudge2-ic', 'aria-hidden': 'true' }, icon(o.icon || 'star', 18)),
+      h('div', { class: 'nudge2-t' }, h('b', null, o.title), o.text ? h('span', null, o.text) : null,
+        h('a', { class: 'nudge2-cta', href: o.href, id: 'nudge-' + id + '-go', target: o.external ? '_blank' : null, rel: o.external ? 'noopener noreferrer' : null, onclick: function () {
+          track('nudge', id + ':click'); save(function (m) { m.done = true; return m; }); if (o.external) card.remove();
+        } }, o.cta, icon('chev', 14))),
+      h('button', { class: 'nudge2-x', type: 'button', 'aria-label': 'Plus tard', id: 'nudge-' + id + '-later', onclick: function () {
+        track('nudge', id + ':dismiss'); save(function (m) { m.d = (m.d || 0) + 1; m.until = Date.now() + 7 * 864e5; return m; });
+        card.classList.add('out'); setTimeout(function () { card.remove(); }, REDUCED ? 0 : 200);
+      } }, icon('close', 16)));
+    return card;
+  }
+  // Accueil : quelqu'un qui a déjà créé une adresse et qui n'a pas de boutique découvre la boutique gratuite.
+  function homeNudge() {
+    if (CFG.shop === false || shopKey() || (ME && ME.shop) || (LS.get('fiila.tx', 0) || 0) < 1) return null;
+    return nudge('home_shop', { icon: 'shop', title: 'Vous vendez quelque chose ?', text: 'Votre boutique en ligne est gratuite : commandes, factures et adresse exacte de vos clientes.', cta: 'Créer ma boutique', href: '#/boutique' });
+  }
+  // Tableau de bord de la boutique : la prochaine fonction utile selon l'avancement, une seule à la fois.
+  function shopNudge(shop, st) {
+    var p = st.products || 0, o = st.orders || 0;
+    if (p >= 1 && p < 3) return nudge('shop_more_products', { icon: 'cam', title: 'Encore 2 ou 3 articles', text: 'Une vitrine bien remplie inspire confiance à vos clientes.', cta: 'Ajouter un article', href: '#/boutique/article/nouveau' });
+    if (p >= 3 && shop.public && shop.slug && o === 0) return nudge('shop_share_vitrine', { icon: 'share', title: 'Faites connaître votre vitrine', text: 'Un lien dans votre statut WhatsApp suffit pour recevoir vos premières commandes.', cta: 'Partager sur WhatsApp',
+      href: waLink('Découvrez ma boutique ' + shop.name + ' : ' + baseUrl() + '#/b/' + shop.slug), external: true });
+    if (o >= 2 && !shop.courier && !shop.courier_invite && SHOP_ROLE !== 'editor') return nudge('shop_courier', { icon: 'moto', title: 'Un livreur de confiance ?', text: 'Invitez-le : il reçoit l’adresse exacte et le chemin à chaque course.', cta: 'Inviter mon livreur', href: '#/boutique/reglages' });
+    if (p >= 3 && o >= 1) return nudge('shop_photos', { icon: 'cam', title: 'Plusieurs photos par article', text: 'Jusqu’à 5 photos qui défilent : vos articles se vendent mieux.', cta: 'Voir mes articles', href: '#/boutique/articles' });
+    if (o >= 10 && SHOP_ROLE === 'owner') return nudge('shop_team', { icon: 'users', title: 'Vous travaillez à plusieurs ?', text: 'Ajoutez un membre d’équipe : chacun avec son rôle, sans partager de mot de passe.', cta: 'Ajouter un membre', href: '#/boutique/reglages' });
+    return null;
+  }
   function privacyOptOut() {
     try { return navigator.globalPrivacyControl === true || navigator.doNotTrack === '1' || window.doNotTrack === '1'; }
     catch (e) { return false; }
@@ -2729,7 +2788,7 @@
         tile4('#/livreur', 'moto', 'Livreur', { id: 'courier-link', 'aria-label': 'Espace livreur' })),
       h('p', { class: 'small muted home-hint', id: 'event-hint' }, h('b', null, 'Événement'), ' : mariage, baptême, réunion… un seul lien pour que tous vos invités trouvent le lieu.'),
       installCta(),
-      accountNudge(),
+      accountNudge() || homeNudge(),
       demoBanner(),
       listBox,
       feedSection(3, { id: 'home-feed' }),
@@ -4849,7 +4908,7 @@
         iconBtn('a', { class: 'btn', href: '#/boutique/article/nouveau' }, 'cam', 'Ajouter un article')) : null,
       iconBtn('a', { class: !st.orders && !st.products ? 'btn ghost full' : 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'plus', 'Nouvelle commande'),
       // Compte proposé quand la boutique tourne (3 commandes), pas dès sa création.
-      shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard(),
+      (shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard()) || shopNudge(shop, st),
       // Les compteurs sont dans les onglets (plus de tuiles qui répètent la même chose).
       st.orders ? segField({ name: 'vue', id: 'orders-filter', value: vue,
         options: [['open', 'En cours' + (st.open ? ' · ' + st.open : '')], ['unpaid', 'À encaisser' + (st.unpaid ? ' · ' + st.unpaid : '')], ['done', 'Terminées'], ['all', 'Toutes']],
@@ -6029,7 +6088,96 @@
       inviteCard({ id: 'amb-waiting', kind: 'Fii La Carrière', title: 'Test réussi : ' + (a.quiz_score || 8) + '/10',
         sub: 'L’équipe Fii La valide votre profil, en général sous 48 heures. Vous recevrez alors votre carte ambassadeur et votre code.',
         points: [['key', 'Votre code : ' + a.code + ' (actif après la validation)'], ['shop', 'Repérez déjà 3 commerçants de votre quartier'], ['cam', 'Préparez-les : 5 articles à photographier']] }),
+      ambManagerCard(a),
       footer());
+  }
+  /* ----- Manager Fii La Carrière : missions du jour, cap du mois, conversation (réponse sans IA immédiate ; avec IA, la fonction
+     fiila-manager rédige ; si elle ne répond pas, la base répond à la lecture suivante, une minute après). */
+  function ambManagerCall(id) {
+    if (!API_URL || !SESSION || !SESSION.access_token) return Promise.reject(new Error('offline'));
+    return freshToken().then(function () {
+      return fetch(API_URL + '/functions/v1/fiila-manager', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ action: 'reply', message: id }) });
+    }).then(function (r) { if (!r.ok) throw new Error('manager ' + r.status); return r.json(); });
+  }
+  function ambMgrAv(size) { return h('span', { class: 'mgr-av', style: size ? 'width:' + size + 'px;height:' + size + 'px' : null, 'aria-hidden': 'true' }, icon('star', Math.round((size || 40) * 0.45))); }
+  function ambChat(onClose) {
+    var list = h('div', { class: 'mgr-thread', id: 'mgr-thread', 'aria-live': 'polite' }, h('p', { class: 'mgr-sys' }, 'Chargement…'));
+    var input = h('textarea', { id: 'mgr-input', rows: 1, maxlength: 1000, placeholder: 'Écrire à votre Manager…', 'aria-label': 'Votre message' });
+    var send = h('button', { class: 'mgr-send', type: 'button', id: 'mgr-send', 'aria-label': 'Envoyer', disabled: true }, icon('send', 20));
+    var typing = false, retry = null;
+    var SUGG = ['Comment convaincre un commerçant ?', 'Quand suis-je payé ?', 'J’ai un problème dans l’application'];
+    function bubble(m) {
+      return h('div', { class: 'mgr-msg ' + (m.author === 'agent' ? 'me' : m.author) },
+        m.author === 'staff' ? h('small', null, 'Équipe Fii La') : null, h('p', null, m.body),
+        h('time', null, m.at ? new Date(m.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''));
+    }
+    function draw(msgs) {
+      var waiting = msgs.length && msgs[msgs.length - 1].author === 'agent';
+      setKids(list, msgs.map(bubble), (typing || waiting) ? h('div', { class: 'mgr-msg manager typing', 'aria-label': 'Le Manager écrit' }, h('i'), h('i'), h('i')) : null,
+        msgs.length <= 1 ? h('div', { class: 'mgr-sugg' }, SUGG.map(function (x) { return h('button', { type: 'button', class: 'opt', onclick: function () { input.value = x; send.disabled = false; post(); } }, x); })) : null);
+      list.scrollTop = list.scrollHeight;
+      clearTimeout(retry);
+      if (waiting && back.isConnected) retry = setTimeout(load, 65000);
+    }
+    function load() { return api('fiila_amb_messages', {}).then(draw, function (e) { setKids(list, h('p', { class: 'mgr-sys' }, errText(e))); }); }
+    function post() {
+      var body = input.value.trim();
+      if (!body || send.disabled) return;
+      send.disabled = true; input.value = ''; typing = true;
+      list.insertBefore(bubble({ author: 'agent', body: body, at: new Date().toISOString() }), list.querySelector('.mgr-sugg') || null);
+      list.scrollTop = list.scrollHeight;
+      api('fiila_amb_message_send', { p_body: body }).then(function (r) {
+        if (!r.pending) { typing = false; return load(); }
+        return ambManagerCall(r.id).then(function () { typing = false; return load(); }, function () { typing = false; return load(); });
+      }, function (e) { typing = false; toast(errText(e)); input.value = body; load(); });
+    }
+    input.addEventListener('input', function () { send.disabled = !input.value.trim(); input.style.height = 'auto'; input.style.height = Math.min(120, input.scrollHeight) + 'px'; });
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); post(); } });
+    send.addEventListener('click', post);
+    var back = h('div', { class: 'sheet-back', id: 'mgr-chat', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mgr-h' },
+      h('div', { class: 'sheet mgr-sheet' },
+        h('header', { class: 'mgr-head' }, ambMgrAv(40), h('div', { class: 'stack tight', style: 'gap:0;flex:1' }, h('b', { id: 'mgr-h' }, 'Votre Manager'), h('small', { class: 'muted' }, 'Fii La Carrière · répond tout de suite')),
+          h('button', { class: 'qz-quit', type: 'button', 'aria-label': 'Fermer', id: 'mgr-close', onclick: function () { close(); } }, icon('close', 18))),
+        list, h('div', { class: 'mgr-compose' }, input, send)));
+    var close = openSheet(back, { onClose: function () { clearTimeout(retry); if (onClose) onClose(); } });
+    load();
+  }
+  function ambManagerCard(a, compact) {
+    var box = h('section', { class: 'card mgr-card', id: 'amb-manager' }, h('div', { class: 'bo-skel', style: 'border:0;padding:0' }, h('div', { class: 'bo-skel-row' }, h('i', { class: 'av' }), h('i', { class: 'l1' }))));
+    function draw(d) {
+      var done = d.tasks.filter(function (t) { return t.done; }).length;
+      var unread = h('span', { class: 'mgr-badge', hidden: !d.unread }, String(d.unread || ''));
+      setKids(box,
+        h('div', { class: 'mgr-top' }, ambMgrAv(44),
+          h('div', { class: 'stack tight', style: 'gap:0;flex:1;min-width:0' }, h('p', { class: 'eyebrow' }, 'Votre Manager'), h('h2', null, done === d.tasks.length && d.tasks.length ? 'Missions du jour faites. Bravo !' : 'Vos missions du jour')),
+          d.tasks.length ? ring(done, d.tasks.length, 52, done + ' missions faites sur ' + d.tasks.length) : null),
+        d.objective && d.objective.brief ? h('p', { class: 'mgr-brief' }, icon('flag', 14), h('span', null, h('b', null, 'Cap du mois : '), d.objective.brief)) : null,
+        h('ul', { class: 'mgr-tasks' }, d.tasks.map(function (t) {
+          return h('li', { class: t.done ? 'done' : '' },
+            h('button', { type: 'button', class: 'mgr-check', 'aria-pressed': String(!!t.done), 'aria-label': (t.done ? 'Faite : ' : 'Marquer comme faite : ') + t.title, disabled: t.done || null, onclick: function () { finish(t); } }, t.done ? icon('check', 14) : null),
+            h('div', { class: 'stack tight', style: 'gap:2px;min-width:0' }, h('b', { class: 'wrapword' }, t.title), t.body ? h('span', { class: 'small muted' }, t.body) : null));
+        })),
+        h('div', { class: 'mgr-foot' },
+          d.streak ? h('span', { class: 'small muted' }, icon('star', 12), ' ' + d.streak + ' jour' + (d.streak > 1 ? 's' : '') + ' actif' + (d.streak > 1 ? 's' : '') + ' ce mois-ci') : h('span'),
+          h('button', { class: 'btn ghost small', type: 'button', id: 'amb-chat-open', onclick: function () { ambChat(load); } }, icon('chat', 16), ' Écrire à mon Manager', unread)));
+    }
+    function finish(t) {
+      var fb = h('textarea', { id: 'mgr-feedback', rows: 3, maxlength: 500, placeholder: 'Facultatif : ce qui s’est passé, ce qui a bloqué, une idée…' });
+      var back = h('div', { class: 'sheet-back', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mgr-done-h', id: 'mgr-done' },
+        h('div', { class: 'sheet stack' }, h('h2', { id: 'mgr-done-h' }, 'Mission faite'), h('p', { class: 'small muted wrapword' }, t.title),
+          h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Un retour du terrain ?'), fb),
+          h('button', { class: 'btn', type: 'button', id: 'mgr-done-ok', onclick: function () {
+            this.disabled = true;
+            api('fiila_amb_task_done', { p_id: t.id, p_feedback: fb.value.trim() || null }).then(function (r) {
+              close(); toast(r.left ? 'Bien joué. Encore ' + r.left + ' mission' + (r.left > 1 ? 's' : '') + ' aujourd’hui.' : 'Toutes vos missions du jour sont faites. Bravo !'); load();
+            }, function (e) { toast(errText(e)); close(); });
+          } }, 'Valider'),
+          h('button', { class: 'btn ghost', type: 'button', onclick: function () { close(); } }, 'Annuler')));
+      var close = openSheet(back);
+    }
+    function load() { return api('fiila_amb_today', {}).then(draw, function () { box.hidden = true; }); }
+    load();
+    return box;
   }
   function ambDashboard(a) {
     var codeMsg = 'Bonjour ! Je vous aide à ouvrir votre boutique en ligne gratuite avec Fii La : vitrine, commandes, factures et l’adresse exacte de vos clientes. ' +
@@ -6077,10 +6225,6 @@
       board.hidden = false;
     }, function () {});
     // La prochaine action utile, en une carte : premier commerçant à trouver, ou ce qui manque au plus avancé.
-    var todoShop = shops.filter(function (s) { return s.level < 3 && !s.expired; }).sort(function (x, y) { return y.level - x.level; })[0];
-    var mission = !shops.length ? ['Trouver votre premier commerçant', 'Envoyez-lui votre code sur WhatsApp, puis installez sa boutique avec lui, sur son téléphone.']
-      : todoShop ? ['Aider ' + todoShop.shop + ' à passer au niveau ' + (todoShop.level + 1), 'Encore : ' + todoList(todoShop).filter(function (x) { return !x[1]; }).map(function (x) { return x[0].toLowerCase(); }).join(', ') + '.']
-      : ['Trouver un nouveau commerçant', 'Tous vos commerçants sont au plus haut niveau atteignable. Envoyez votre code à un nouveau.'];
     // Portefeuille : le total gagné qui monte, une barre en trois couleurs, la légende.
     var rw = a.rewards || { pending: 0, validated: 0, paid: 0 };
     var total = rw.pending + rw.validated + rw.paid;
@@ -6106,9 +6250,7 @@
       ambAgentCard(a, { id: 'amb-code', cta: h('div', { class: 'stack tight' },
         h('div', { class: 'ivc-cta' }, ivcBtn('a', { href: waLink(codeMsg), target: '_blank', rel: 'noopener noreferrer', id: 'amb-send' }, 'Envoyer mon code')),
         h('button', { class: 'ivc-link', type: 'button', style: 'background:none;border:0;font:inherit;cursor:pointer', onclick: function () { copy(a.code, 'Code'); } }, 'Copier le code')) }),
-      h('section', { class: 'card amb-mission', id: 'amb-mission' },
-        h('span', { class: 'amb-mission-ic', 'aria-hidden': 'true' }, icon('nav', 20)),
-        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Prochaine mission'), h('h2', { class: 'wrapword' }, mission[0]), h('p', { class: 'small muted' }, mission[1]))),
+      ambManagerCard(a),
       wallet,
       next ? h('section', { class: 'card grd', id: 'amb-next-grade' }, ring(Math.min(next[1], next[2]), next[2], 92, next[1] + ' sur ' + next[2]),
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Prochain grade'), h('h2', null, next[0]),
@@ -6287,9 +6429,10 @@
      Ordinateur : barre latérale ; téléphone : barre du haut et menu. Règle « simple et intuitif » : une action principale
      et une seule rangée de filtres par écran. */
   var BO = { me: null, at: 0 };
-  var BO_ROLES = { super_admin: 'Super admin', operations: 'Opérations', moderation: 'Modération', support: 'Support', finance: 'Finances' };
+  var BO_ROLES = { super_admin: 'Super admin', strategy: 'Head of Stratégie', operations: 'Opérations', moderation: 'Modération', support: 'Support', finance: 'Finances' };
   var BO_ROLE_HELP = {
     super_admin: 'Tout, y compris l’équipe, les réglages et le journal.',
+    strategy: 'Head of Stratégie et Développement : fixe le cap de Fii La Carrière, décide des propositions du Manager, crée les missions.',
     operations: 'Boutiques, commandes, comptes, fil, modération, vide-dressing, ambassadeurs, finances.',
     moderation: 'Modération des commentaires, vérification du vide-dressing, suspension des boutiques.',
     support: 'Lecture des boutiques, commandes et comptes pour aider les utilisateurs.',
@@ -6305,6 +6448,7 @@
     ['comptes', 'user', 'Comptes', 'accounts', null, 'Opérations'],
     ['fil', 'heart', 'Fil (25 places)', 'feed', null, 'Opérations'],
     ['ambassadeurs', 'gift', 'Ambassadeurs', 'ambassadors', 'ambassadors', 'Programmes'],
+    ['carriere', 'chat', 'Manager Carrière', 'ambassadors', 'career', 'Programmes'],
     ['vide-dressing', 'users', 'Vide-dressing', ['vide_dressing', 'finance'], 'vide_dressing', 'Programmes'],
     ['moderation', 'flag', 'Modération', 'moderation', 'comments', 'Programmes'],
     ['equipe', 'key', 'Équipe', 'team', null, 'Administration'],
@@ -6461,7 +6605,7 @@
     }
     function search() {
       var raw = input.value.trim(), t = raw.toLowerCase(), mine = ++seq;
-      var nav = navGroup(t).slice(0, t ? 4 : 13);
+      var nav = navGroup(t).slice(0, t ? 4 : BO_NAV.length);
       if (t.length < 2) { draw([['Aller à', nav]]); return; }
       draw([['Aller à', nav]], true);
       var calls = [];
@@ -6567,7 +6711,8 @@
           case 'moderation': return boEmbed(viewAdminComments).then(function (b) { return boShell(sec, 'Modération', b); });
           case 'vide-dressing': return boEmbed(viewAdminVd).then(function (b) { return boShell(sec, 'Vide-dressing', b); });
           case 'ambassadeurs': return id ? boAmbassador(id) : boAmbassadors(q);
-          case 'croissance': return boEmbed(viewStats).then(function (b) { return boShell(sec, 'Croissance', b); });
+          case 'carriere': return id ? boCareerThread(id) : boCareer();
+          case 'croissance': return Promise.all([boEmbed(viewStats), api('fiila_bo_nudges', {}).then(null, function () { return null; })]).then(function (rr) { return boShell(sec, 'Croissance', [boNudgePanel(rr[1]), rr[0]]); });
           case 'fil': return boFeed();
           case 'finances': return boFinance();
           case 'equipe': return boTeam();
@@ -6695,7 +6840,7 @@
   function boDashboard() {
     var o = BO.overview || { kpis: {}, queues: {}, days: [] }, k = o.kpis;
     var QUEUE = [['comments', 'flag', 'Commentaires signalés', '#/bo/moderation'], ['vide_dressing', 'users', 'Articles de vide-dressing à vérifier', '#/bo/vide-dressing'],
-      ['ambassadors', 'gift', 'Ambassadeurs à valider', '#/bo/ambassadeurs'], ['rewards', 'cash', 'Gains d’ambassadeurs à verser', '#/bo/ambassadeurs'], ['suspended', 'ban', 'Boutiques suspendues', '#/bo/boutiques?f=suspended']];
+      ['ambassadors', 'gift', 'Ambassadeurs à valider', '#/bo/ambassadeurs'], ['career', 'chat', 'Messages d’ambassadeurs à lire', '#/bo/carriere'], ['proposals', 'star', 'Propositions du Manager à décider', '#/bo/carriere'], ['rewards', 'cash', 'Gains d’ambassadeurs à verser', '#/bo/ambassadeurs'], ['suspended', 'ban', 'Boutiques suspendues', '#/bo/boutiques?f=suspended']];
     var queues = QUEUE.filter(function (x) { return o.queues[x[0]] != null; });
     var todo = queues.reduce(function (n, x) { return n + (x[0] === 'suspended' ? 0 : (o.queues[x[0]] || 0)); }, 0);
     var max = Math.max.apply(null, [1].concat(o.days.map(function (d) { return d.orders; })));
@@ -7048,6 +7193,148 @@
     }, function (e) { return boShell('ambassadeurs', 'Ambassadeur', stateCard('!', 'Chargement impossible', errText(e)), { back: back }); });
   }
 
+  // ----- Manager Fii La Carrière (back-office) : cap du mois, propositions, conversations, missions.
+  var NOTE_KIND = { training: ['info', 'Formation'], mission: ['ok', 'Mission'], insight: ['muted', 'Constat'] };
+  function boCareer() {
+    return api('fiila_bo_career', {}).then(function (d) {
+      var o = d.objective, rep = (d.report && d.report.data) || {};
+      function pct(n, t) { return t ? Math.min(100, Math.round(n / t * 100)) + ' %' : '—'; }
+      function objectiveSheet() {
+        var f = { target_active: o ? o.target_active : 0, target_new: o ? o.target_new : 0, types: (o && o.focus_types) || [], zones: ((o && o.focus_zones) || []).join(', '), brief: (o && o.brief) || '' };
+        var back = h('div', { class: 'sheet-back', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bo-obj-h', id: 'bo-obj-sheet' },
+          h('form', { class: 'sheet stack bo-sheet', onsubmit: function (e) {
+            e.preventDefault();
+            boAct(function () { return api('fiila_bo_objective_set', { p: { target_active: parseInt(f.target_active, 10) || 0, target_new: parseInt(f.target_new, 10) || 0, focus_types: f.types,
+              focus_zones: f.zones.split(',').map(function (z) { return z.trim(); }).filter(Boolean), brief: f.brief } }); }, 'Cap du mois enregistré.', function () { close(); render(); }, null, e.submitter);
+          } }, h('h2', { id: 'bo-obj-h' }, 'Cap du mois'),
+            h('p', { class: 'small muted' }, 'Le Manager oriente chaque jour les missions des ambassadeurs selon ce cap. Chacun lit la phrase du cap dans son espace.'),
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Le cap, en une phrase'), h('textarea', { id: 'bo-obj-brief', rows: 2, maxlength: 300, placeholder: 'Ex. : priorité aux restaurants de Yoff et Ouakam.', oninput: function (e) { f.brief = e.target.value; } }, f.brief)),
+            h('div', { class: 'duo' },
+              h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Commerçants actifs visés'), h('input', { type: 'number', min: 0, id: 'bo-obj-active', value: f.target_active, oninput: function (e) { f.target_active = e.target.value; } })),
+              h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Nouveaux commerçants visés'), h('input', { type: 'number', min: 0, id: 'bo-obj-new', value: f.target_new, oninput: function (e) { f.target_new = e.target.value; } }))),
+            h('fieldset', { class: 'bo-fs' }, h('legend', { class: 'lbl' }, 'Types de commerce prioritaires (6 au plus)'),
+              h('div', { class: 'bo-type-chips' }, BUSINESS_TYPES.map(function (t) {
+                var b = h('button', { type: 'button', class: 'opt' + (f.types.indexOf(t[0]) >= 0 ? ' on' : ''), 'aria-pressed': String(f.types.indexOf(t[0]) >= 0), onclick: function () {
+                  var i = f.types.indexOf(t[0]); if (i >= 0) f.types.splice(i, 1); else if (f.types.length < 6) f.types.push(t[0]);
+                  b.classList.toggle('on', f.types.indexOf(t[0]) >= 0); b.setAttribute('aria-pressed', String(f.types.indexOf(t[0]) >= 0));
+                } }, t[1]);
+                return b;
+              }))),
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Quartiers prioritaires (séparés par des virgules)'), h('input', { type: 'text', id: 'bo-obj-zones', value: f.zones, maxlength: 200, oninput: function (e) { f.zones = e.target.value; } })),
+            h('button', { class: 'btn', type: 'submit', id: 'bo-obj-save' }, 'Enregistrer le cap'),
+            h('button', { class: 'btn ghost', type: 'button', onclick: function () { close(); } }, 'Annuler')));
+        var close = openSheet(back);
+      }
+      function missionSheet() {
+        var f = { kind: 'daily', audience: 'active', title: '', body: '' };
+        var back = h('div', { class: 'sheet-back', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bo-mis-h', id: 'bo-mis-sheet' },
+          h('form', { class: 'sheet stack bo-sheet', onsubmit: function (e) {
+            e.preventDefault();
+            boAct(function () { return api('fiila_bo_mission_save', { p: f }); }, 'Mission ajoutée.', function () { close(); render(); }, null, e.submitter);
+          } }, h('h2', { id: 'bo-mis-h' }, 'Nouvelle mission'),
+            segField({ name: 'bo-mis-kind', id: 'bo-mis-kind', legend: 'Type', value: f.kind, options: [['daily', 'Terrain'], ['training', 'Formation']], onChange: function (v) { f.kind = v; } }),
+            textField({ id: 'bo-mis-title', label: 'Mission, en une phrase d’action', max: 120, onInput: function (v) { f.title = v; } }),
+            textField({ id: 'bo-mis-body', label: 'Précision', optional: true, max: 400, onInput: function (v) { f.body = v; } }),
+            segField({ name: 'bo-mis-aud', id: 'bo-mis-aud', legend: 'Pour', value: f.audience, options: [['active', 'Ambassadeurs actifs'], ['all', 'Tous']], onChange: function (v) { f.audience = v; } }),
+            h('button', { class: 'btn', type: 'submit', id: 'bo-mis-save' }, 'Ajouter'),
+            h('button', { class: 'btn ghost', type: 'button', onclick: function () { close(); } }, 'Annuler')));
+        var close = openSheet(back);
+      }
+      var open = d.notes.filter(function (n) { return n.status === 'open'; }), infos = d.notes.filter(function (n) { return n.status === 'info'; });
+      var analyse = d.can_strategy && d.llm ? h('button', { class: 'btn ghost small', type: 'button', id: 'bo-career-ai', onclick: function () {
+        var b = this; b.disabled = true; b.textContent = 'Analyse en cours…';
+        freshToken().then(function () { return fetch(API_URL + '/functions/v1/fiila-manager', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ action: 'digest' }) }); })
+          .then(function (r) { return r.json(); }).then(function (r) { toast(r.items ? r.items + ' proposition(s) du Manager.' : 'Analyse faite : rien de nouveau.'); render(); }, function () { b.disabled = false; b.textContent = 'Analyser avec l’IA'; toast('Analyse indisponible pour le moment.'); });
+      } }, icon('star', 14), ' Analyser avec l’IA') : null;
+      return boShell('carriere', 'Manager Carrière', [
+        h('section', { class: 'bo-kpis' },
+          boKpi('car-active', 'star', (d.progress.active || 0) + (o && o.target_active ? ' / ' + o.target_active : ''), 'commerçants actifs ce mois', o && o.target_active ? pct(d.progress.active, o.target_active) + ' de l’objectif' : 'objectif à fixer', 'green'),
+          boKpi('car-new', 'shop', (d.progress.new || 0) + (o && o.target_new ? ' / ' + o.target_new : ''), 'nouveaux commerçants', o && o.target_new ? pct(d.progress.new, o.target_new) + ' de l’objectif' : null, 'blue'),
+          boKpi('car-tasks', 'check', (rep.done_7d || 0) + ' / ' + (rep.tasks_7d || 0), 'missions faites (7 j)', rep.tasks_7d ? pct(rep.done_7d, rep.tasks_7d) : null, 'amber'),
+          boKpi('car-msg', 'chat', boNum(rep.messages_7d || 0), 'messages d’ambassadeurs (7 j)', Object.keys(rep.tags_7d || {}).length ? Object.keys(rep.tags_7d).map(function (k) { return k + ' ' + rep.tags_7d[k]; }).join(' · ') : null, 'violet')),
+        h('div', { class: 'bo-grid2' },
+          h('section', { class: 'card stack tight bo-panel', id: 'bo-objective' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'Cap du mois'),
+              d.can_strategy ? h('button', { class: 'btn ghost small', type: 'button', id: 'bo-obj-open', onclick: objectiveSheet }, o ? 'Modifier' : 'Fixer le cap') : null),
+            o ? [h('p', { class: 'mgr-brief' }, icon('flag', 14), h('span', null, o.brief || 'Sans phrase de cap.')),
+                h('p', { class: 'small muted' }, [o.focus_types.length ? 'Types : ' + o.focus_types.map(typeLabel).join(', ') : null, o.focus_zones.length ? 'Quartiers : ' + o.focus_zones.join(', ') : null, 'fixé le ' + boDate(o.at)].filter(Boolean).join(' · '))]
+              : h('p', { class: 'muted small' }, d.can_strategy ? 'Aucun cap ce mois-ci : le Manager oriente vers les commerçants déjà accompagnés et la prospection libre.' : 'Le Head of Stratégie n’a pas encore fixé le cap du mois.')),
+          h('section', { class: 'card stack tight bo-panel', id: 'bo-proposals' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'Propositions du Manager'), open.length ? boBadge('warn', String(open.length)) : boBadge('ok', 'À jour')),
+            open.length ? open.map(function (n) {
+              var k = NOTE_KIND[n.kind] || ['muted', n.kind];
+              return h('div', { class: 'bo-req', style: 'flex-direction:column' },
+                h('div', { class: 'bo-hero-b' }, boBadge(k[0], k[1]), n.ia ? boBadge('info', 'IA') : null, h('span', { class: 'small muted' }, boDate(n.at))),
+                h('b', { class: 'wrapword' }, n.title), n.body ? h('p', { class: 'small', style: 'margin:0' }, n.body) : null,
+                d.can_strategy ? h('div', { class: 'row' },
+                  h('button', { class: 'btn small', type: 'button', onclick: function () { boAct(function () { return api('fiila_bo_note_decide', { p_id: n.id, p_decision: 'accepted' }); }, n.kind === 'mission' ? 'Mission créée.' : 'Proposition acceptée.', null, null, this); } }, n.kind === 'mission' ? 'Créer la mission' : 'Accepter'),
+                  h('button', { class: 'btn quiet small', type: 'button', onclick: function () { boAct(function () { return api('fiila_bo_note_decide', { p_id: n.id, p_decision: 'rejected' }); }, 'Proposition écartée.', null, null, this); } }, 'Écarter')) : null);
+            }) : h('p', { class: 'muted small' }, 'Aucune proposition en attente. Le Manager analyse chaque jour les retours du terrain et les résultats du test.'),
+            infos.length ? h('details', { class: 'more-details' }, h('summary', null, 'Constats récents (' + infos.length + ')'),
+              infos.map(function (n) { return h('p', { class: 'small' }, h('b', null, n.title + ' : '), n.body || ''); })) : null,
+            analyse)),
+        h('section', { class: 'stack tight', id: 'bo-threads' }, h('h2', null, 'Conversations'),
+          boTable([
+            { label: 'Ambassadeur', get: function (x) { return h('span', { class: 'bo-cell' }, boAv(x.name), h('span', { class: 'stack tight', style: 'gap:0;min-width:0' }, h('span', null, x.name), h('small', { class: 'muted wrapword' }, x.last || ''))); } },
+            { label: 'À lire', get: function (x) { return x.escalated ? boBadge('danger', x.escalated + ' à traiter') : x.waiting ? boBadge('warn', String(x.waiting)) : boBadge('muted', 'Lu'); } },
+            { label: 'Missions (7 j)', get: function (x) { return String(x.done_7d); }, cls: 'num hide-s' },
+            { label: 'Dernier message', get: function (x) { return boDate(x.last_at, true); } }],
+            d.threads, { href: function (x) { return '#/bo/carriere/' + x.id; }, id: 'bo-threads-table', empty: 'Aucune conversation pour le moment.' })),
+        h('details', { class: 'card more-sec', id: 'bo-missions' }, h('summary', null, 'Missions du catalogue (' + d.missions.filter(function (m) { return m.status === 'active'; }).length + ' actives)'),
+          h('div', { class: 'stack tight', style: 'margin-top:10px' },
+            d.can_strategy ? h('button', { class: 'btn ghost small', type: 'button', id: 'bo-mis-open', style: 'align-self:flex-start', onclick: missionSheet }, icon('plus', 14), ' Nouvelle mission') : null,
+            boTable([
+              { label: 'Mission', get: function (m) { return h('span', { class: 'stack tight', style: 'gap:0' }, h('span', null, m.title), m.body ? h('small', { class: 'muted' }, m.body) : null); } },
+              { label: 'Type', get: function (m) { return boBadge(m.kind === 'training' ? 'info' : 'ok', m.kind === 'training' ? 'Formation' : 'Terrain'); } },
+              { label: 'Faites', get: function (m) { return m.done + ' / ' + m.given; }, cls: 'num' },
+              { label: '', get: function (m) { return d.can_strategy && m.status === 'active' ? h('button', { class: 'btn quiet small', type: 'button', onclick: function () { boAct(function () { return api('fiila_bo_mission_save', { p: { id: m.id, status: 'retired' } }); }, 'Mission retirée.', null, null, this); } }, 'Retirer') : m.status === 'retired' ? boBadge('muted', 'Retirée') : ''; } }],
+              d.missions, { id: 'bo-missions-table', empty: 'Aucune mission.' }))),
+        h('p', { class: 'small muted' }, d.llm ? 'IA activée : le Manager rédige ses réponses avec le modèle (Réglages).' : 'IA désactivée : le Manager répond selon les règles du programme. Pour l’activer : la clé d’API dans Supabase, puis « Manager avec IA » dans Réglages.')
+      ], { sub: 'Le Manager encadre chaque ambassadeur au quotidien. Le Head of Stratégie fixe le cap et décide de ses propositions.' });
+    }, function (e) { return boShell('carriere', 'Manager Carrière', stateCard('!', 'Chargement impossible', errText(e))); });
+  }
+  function boCareerThread(id) {
+    var back = ['#/bo/carriere', 'Manager Carrière'];
+    return api('fiila_bo_career_thread', { p_amb: id }).then(function (t) {
+      var a = t.ambassador, body = '';
+      var input = h('textarea', { id: 'bo-career-input', rows: 2, maxlength: 1500, placeholder: 'Répondre au nom de l’équipe Fii La…', oninput: function (e) { body = e.target.value; } });
+      var TAGL = { question: 'question', objection: 'objection', probleme: 'problème', gains: 'gains', idee: 'idée', positif: 'positif', retour: 'retour de mission', formation: 'formation', motivation: 'motivation' };
+      return boShell('carriere', a.name, [
+        boHero(a.name, [boAmbState(a), h('span', { class: 'bo-code-tag' }, a.code)], [a.zone, h('a', { href: '#/bo/ambassadeurs/' + a.id }, 'Fiche ambassadeur')].filter(Boolean).map(function (x, i) { return [i ? ' · ' : '', x]; })),
+        h('div', { class: 'bo-grid2' },
+          h('section', { class: 'card stack tight bo-panel', id: 'bo-career-thread' }, h('h2', null, 'Conversation'),
+            h('div', { class: 'mgr-thread', style: 'max-height:520px;border-radius:14px' }, t.messages.map(function (m) {
+              return h('div', { class: 'mgr-msg ' + (m.author === 'agent' ? 'staff-in' : m.author === 'staff' ? 'me' : 'manager') },
+                h('small', null, m.author === 'agent' ? a.name : m.author === 'staff' ? 'Équipe Fii La' : 'Manager'),
+                h('p', null, m.body),
+                m.tags && m.tags.length ? h('div', { class: 'bo-hero-b' }, m.tags.map(function (x) { return boBadge(x === 'probleme' ? 'danger' : x === 'objection' ? 'warn' : 'muted', TAGL[x] || x); })) : null,
+                h('time', null, boDate(m.at, true)));
+            })),
+            h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Répondre'), input),
+            h('button', { class: 'btn', type: 'button', id: 'bo-career-send', style: 'align-self:flex-start', onclick: function () {
+              if (!body.trim()) { toast('Écrivez un message.'); return; }
+              boAct(function () { return api('fiila_bo_career_reply', { p_amb: a.id, p_body: body }); }, 'Message envoyé.', null, null, this);
+            } }, 'Envoyer')),
+          h('section', { class: 'card stack tight bo-panel', id: 'bo-career-tasks' }, h('h2', null, 'Missions récentes'),
+            t.tasks.length ? t.tasks.map(function (x) {
+              return h('div', { class: 'bo-dl' }, h('span', { class: 'wrapword' }, (x.done ? '✓ ' : '○ ') + x.title + (x.feedback ? ' — « ' + x.feedback + ' »' : '')), h('span', { class: 'muted' }, boDate(x.day)));
+            }) : h('p', { class: 'muted small' }, 'Aucune mission pour le moment.')))
+      ], { back: back });
+    }, function (e) { return boShell('carriere', 'Conversation', stateCard('!', 'Introuvable', errText(e)), { back: back }); });
+  }
+
+  // Croissance : la découverte progressive (suggestions dans l'application), taux de suivi sur 30 jours.
+  var NUDGE_LABEL = { home_shop: 'Accueil → créer sa boutique', shop_more_products: 'Boutique → ajouter des articles', shop_share_vitrine: 'Boutique → partager la vitrine',
+    shop_courier: 'Boutique → inviter un livreur', shop_team: 'Boutique → ajouter un membre', shop_photos: 'Boutique → plusieurs photos' };
+  function boNudgePanel(d) {
+    if (!d) return null;
+    return h('section', { class: 'card stack tight bo-panel', id: 'bo-nudges' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'Découverte progressive'), d.on ? boBadge('ok', 'Active') : boBadge('muted', 'Coupée (Réglages)')),
+      h('p', { class: 'small muted' }, 'Une suggestion à la fois, selon l’usage ; 3 au plus par jour ; « Plus tard » = 7 jours de silence. 30 derniers jours :'),
+      d.items.length ? boTable([
+        { label: 'Suggestion', get: function (x) { return NUDGE_LABEL[x.id] || x.id; } },
+        { label: 'Vue', get: function (x) { return boNum(x.shown); }, cls: 'num' },
+        { label: 'Suivie', get: function (x) { return boNum(x.click) + ' · ' + (x.shown ? Math.round(x.click / x.shown * 100) : 0) + ' %'; }, cls: 'num' },
+        { label: 'Plus tard', get: function (x) { return boNum(x.dismiss); }, cls: 'num' }], d.items, { id: 'bo-nudges-table' })
+        : h('p', { class: 'muted small' }, 'Aucune suggestion vue pour le moment.'));
+  }
   // ----- Fil
   function boFeed() {
     return api('fiila_bo_feed', {}).then(function (d) {
@@ -7148,10 +7435,13 @@
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’ambassadeur versé',
     reward_cancelled: 'a annulé un gain d’ambassadeur', reward_validated: 'a validé un gain d’ambassadeur', ambassador_active: 'a activé un ambassadeur',
     ambassador_suspended: 'a suspendu un ambassadeur', ambassador_excluded: 'a exclu un ambassadeur', ambassador_training: 'a renvoyé un ambassadeur en formation', ambassador_deleted: 'a supprimé le profil ambassadeur de',
-    view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique' };
+    view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique',
+    career_reply: 'a répondu à l’ambassadeur', career_objective: 'a fixé le cap du mois :', career_mission: 'a modifié la mission', career_note_accepted: 'a accepté la proposition du Manager', career_note_rejected: 'a écarté la proposition du Manager' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain ambassadeur, niveau 1', 'FCFA'], amb_reward_2: ['Gain ambassadeur, niveau 2', 'FCFA'],
     amb_reward_3: ['Gain ambassadeur, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par ambassadeur et par mois', ''],
-    sms_verify: ['Code SMS obligatoire pour rejoindre une équipe de boutique', '0 = non, 1 = oui'] };
+    sms_verify: ['Code SMS obligatoire pour rejoindre une équipe de boutique', '0 = non, 1 = oui'],
+    amb_manager_llm: ['Manager Fii La Carrière avec IA (clé d’API à saisir dans Supabase)', '0 = non, 1 = oui'],
+    nudges: ['Suggestions discrètes dans l’application (découverte progressive)', '0 = non, 1 = oui'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

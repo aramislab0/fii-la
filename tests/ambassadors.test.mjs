@@ -170,6 +170,22 @@ await t('ambassadeur : code, portefeuille, aucun commerçant ; un commerçant ta
   await A.locator('#cel').waitFor({ state: 'detached' });
   await A.locator('#amb-code').getByText(CODE).waitFor();
   await A.getByText('Aucun commerçant pour l’instant').waitFor();
+  // Le Manager : missions du jour, conversation (réponse immédiate selon les règles), mission faite avec un retour.
+  await A.locator('#amb-manager').getByText('Vos missions du jour').waitFor();
+  await A.locator('#amb-manager .mgr-tasks li').first().waitFor();
+  await A.click('#amb-chat-open');
+  await A.locator('#mgr-thread').getByText(/profil est validé/).waitFor();
+  await A.fill('#mgr-input', 'Quand suis-je payé ?');
+  await A.click('#mgr-send');
+  await A.locator('#mgr-thread').getByText(/vérifié 30 jours/).waitFor();
+  await shot(A, '04c-manager-conversation');
+  await A.click('#mgr-close');
+  await A.locator('#amb-manager .mgr-check').first().click();
+  await A.fill('#mgr-feedback', 'Le commerçant hésite, il veut voir une vraie vitrine');
+  await A.click('#mgr-done-ok');
+  await A.getByText(/Bien joué|Toutes vos missions/).first().waitFor();
+  await A.locator('#amb-manager .mgr-tasks li.done').first().waitFor();
+  await shot(A, '04d-manager-missions');
   await A.reload(); await A.locator('#amb-code').waitFor(); await A.waitForTimeout(900);
   assert.equal(await A.locator('#cel').count(), 0, 'la carte de validation ne revient pas');
   const M = await newPhone();
@@ -214,6 +230,30 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   await A.click('#amb-entry');
   await A.locator('#amb-code').waitFor();
   await shot(A, '05-portefeuille');
+});
+
+await t('back-office : Manager Carrière — cap du mois, conversation de l’ambassadeur, réponse de l’équipe', async () => {
+  await F.goto(URL0 + '#/bo/carriere');
+  await F.locator('#bo-objective').waitFor();
+  await F.click('#bo-obj-open');
+  await F.fill('#bo-obj-brief', 'Priorité aux restaurants de Yoff.');
+  await F.locator('#bo-obj-sheet').getByRole('button', { name: 'Restaurant, traiteur' }).click();
+  await F.fill('#bo-obj-active', '10');
+  await F.click('#bo-obj-save');
+  await F.getByText('Cap du mois enregistré.').waitFor();
+  await F.locator('#bo-objective').getByText('Priorité aux restaurants de Yoff.').waitFor();
+  await F.locator('#bo-threads-table tbody tr').filter({ hasText: 'Moussa Diop' }).locator('td').nth(1).click();
+  await F.locator('#bo-career-thread').getByText('Quand suis-je payé ?').waitFor();
+  await F.locator('#bo-career-thread').getByText(/vraie vitrine/).waitFor();
+  await F.fill('#bo-career-input', 'Bravo Moussa, continuez !');
+  await F.click('#bo-career-send');
+  await F.getByText('Message envoyé.').waitFor();
+  await shot(F, '08-bo-manager');
+  await A.goto(URL0 + '#/'); await A.goto(URL0 + '#/ambassadeur');
+  await A.locator('#amb-manager').getByText('Priorité aux restaurants de Yoff.').waitFor();
+  await A.click('#amb-chat-open');
+  await A.locator('#mgr-thread').getByText('Bravo Moussa, continuez !').waitFor();
+  await A.click('#mgr-close');
 });
 
 await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors), []); });

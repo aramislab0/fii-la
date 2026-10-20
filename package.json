@@ -44,6 +44,9 @@
     "test:smshook": "node tests/smshook.sql.test.mjs",
     "test:photos-sql": "node tests/photos.sql.test.mjs",
     "test:photos": "node tests/photos.test.mjs",
+    "test:manager-sql": "node tests/manager.sql.test.mjs",
+    "test:managerfn": "node tests/managerfn.sql.test.mjs",
+    "test:nudges": "node tests/nudges.test.mjs",
     "test:all": "scripts/run-suites.sh sql && scripts/run-suites.sh browser"
   },
   "devDependencies": {

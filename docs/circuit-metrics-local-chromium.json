@@ -15,6 +15,11 @@
     "n": 1
   },
   {
+    "event": "nudge",
+    "variant": "home_shop:shown",
+    "n": 1
+  },
+  {
     "event": "owned_reopened",
     "variant": "meeting",
     "n": 1

@@ -97,10 +97,10 @@ await t('portail : connexion de l’équipe ; un compte hors équipe est refusé
 });
 
 const SECTIONS = [['', 'Tableau de bord'], ['boutiques', 'Boutiques'], ['commandes', 'Commandes'], ['comptes', 'Comptes'], ['moderation', 'Modération'],
-  ['vide-dressing', 'Vide-dressing'], ['ambassadeurs', 'Ambassadeurs'], ['fil', 'Fil (25 places gratuites)'], ['finances', 'Finances'], ['croissance', 'Croissance'],
+  ['vide-dressing', 'Vide-dressing'], ['ambassadeurs', 'Ambassadeurs'], ['carriere', 'Manager Carrière'], ['fil', 'Fil (25 places gratuites)'], ['finances', 'Finances'], ['croissance', 'Croissance'],
   ['equipe', 'Équipe'], ['journal', 'Journal'], ['reglages', 'Réglages de la plateforme']];
-await t('ordinateur : barre latérale avec les 13 sections du super admin, chacune s’ouvre sans erreur', async () => {
-  assert.equal(await D.locator('.bo-nav .bo-link').count(), 13);
+await t('ordinateur : barre latérale avec les 14 sections du super admin, chacune s’ouvre sans erreur', async () => {
+  assert.equal(await D.locator('.bo-nav .bo-link').count(), 14);
   assert.ok(await D.locator('#bo-side').isVisible());
   assert.equal(await D.locator('#bo-menu').isVisible(), false, 'pas de bouton menu sur ordinateur');
   await shot(D, '02-tableau-de-bord');

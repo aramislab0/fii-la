@@ -1533,3 +1533,70 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
   .bo-table tr.link td:last-child::after{content:'›';position:absolute;right:14px;top:50%;transform:translateY(-52%);font-size:20px;color:var(--line-strong);transition:transform .15s}
   .bo-table tr.link:hover td:last-child::after{transform:translate(3px,-52%);color:var(--green)}}
 @media (prefers-reduced-motion: reduce){.bo-skel i,.bo-pal,.bo-pal-back{animation:none}}
+
+/* Manager Fii La Carrière : carte des missions du jour et conversation */
+.mgr-av{flex:none;width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(150deg,#16301F,#2E7D55);color:#CFE7A6;
+  box-shadow:0 6px 16px -8px rgba(30,74,52,.8)}
+.mgr-av .ico path{stroke:#CFE7A6}
+.mgr-card{display:flex;flex-direction:column;gap:12px;border:1px solid var(--line);box-shadow:inset 3px 0 0 var(--green),var(--shadow-card)}
+.mgr-top{display:flex;align-items:center;gap:12px}
+.mgr-top h2{margin:0;font-size:18px}
+.mgr-brief{margin:0;display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--green) 8%,var(--surface));font-size:14px}
+.mgr-brief .ico{flex:none;margin-top:3px;color:var(--green)}
+.mgr-brief .ico path{stroke:currentColor}
+.mgr-tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.mgr-tasks li{display:flex;gap:12px;align-items:flex-start}
+.mgr-tasks li.done b{color:var(--muted);text-decoration:line-through}
+.mgr-check{flex:0 0 28px;width:28px;height:28px;margin-top:1px;border-radius:50%;border:2px solid var(--line-strong);background:var(--surface);display:grid;place-items:center;cursor:pointer;transition:transform .15s,background .2s,border-color .2s}
+.mgr-check:hover:not([disabled]){border-color:var(--green);transform:scale(1.06)}
+.mgr-check[aria-pressed="true"]{background:var(--green);border-color:var(--green);animation:qz-pop .4s}
+.mgr-check .ico path{stroke:var(--on-green);stroke-width:2.6}
+.mgr-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.mgr-foot .btn{position:relative}
+.mgr-badge{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--danger);color:var(--on-danger);font-size:11px;font-weight:800;display:grid;place-items:center}
+.mgr-badge[hidden]{display:none}
+.mgr-sheet{display:flex;flex-direction:column;gap:0;padding:0!important;height:min(86vh,720px);max-height:86vh;overflow:hidden}
+.mgr-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.mgr-thread{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.mgr-msg{max-width:84%;display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:16px 16px 16px 4px;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.06);animation:qz-in .25s both}
+.mgr-msg p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.4}
+.mgr-msg time{align-self:flex-end;font-size:10.5px;color:var(--muted)}
+.mgr-msg small{font-size:11px;font-weight:800;color:var(--green)}
+.mgr-msg.me{align-self:flex-end;border-radius:16px 16px 4px 16px;background:color-mix(in srgb,var(--green) 16%,var(--surface))}
+.mgr-msg.staff{border:1px solid color-mix(in srgb,var(--green) 40%,var(--line))}
+.mgr-msg.typing{flex-direction:row;gap:4px;padding:12px 14px}
+.mgr-msg.typing i{width:7px;height:7px;border-radius:50%;background:var(--muted);animation:mgr-dot 1.2s infinite}
+.mgr-msg.typing i:nth-child(2){animation-delay:.15s}.mgr-msg.typing i:nth-child(3){animation-delay:.3s}
+@keyframes mgr-dot{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-3px)}}
+.mgr-sys{margin:auto;color:var(--muted)}
+.mgr-sugg{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.mgr-compose{display:flex;align-items:flex-end;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--surface)}
+.mgr-compose textarea{flex:1;min-height:46px;max-height:120px;resize:none;border-radius:22px;padding:11px 16px}
+.mgr-send{flex:0 0 46px;width:46px;height:46px;border:0;border-radius:50%;background:var(--green);color:var(--on-green);display:grid;place-items:center;cursor:pointer}
+.mgr-send[disabled]{background:var(--surface-3);color:var(--muted);cursor:default}
+.mgr-send .ico path{stroke:currentColor}
+@media (prefers-reduced-motion: reduce){.mgr-msg,.mgr-msg.typing i,.mgr-check[aria-pressed="true"]{animation:none}}
+.opt-row.wrap{flex-wrap:wrap;overflow:visible}
+.mgr-msg.staff-in{align-self:flex-start;border:1px solid var(--line)}
+.mgr-msg.staff-in small{color:var(--ink)}
+.sheet.bo-sheet{max-height:92vh;overflow-y:auto;overscroll-behavior:contain}
+.bo-fs{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+.bo-type-chips{display:flex;flex-wrap:wrap;gap:6px}
+.bo-type-chips .opt{min-height:36px;padding:0 12px;font-size:13.5px}
+.mgr-tasks .mgr-check{min-height:0;height:28px;padding:0}
+
+/* Découverte progressive : une suggestion discrète, une à la fois */
+.nudge2{position:relative;display:flex;gap:12px;align-items:flex-start;padding:14px 44px 14px 14px;border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--green) 9%,var(--surface)),var(--surface) 70%);
+  border:1px solid color-mix(in srgb,var(--green) 22%,var(--line));animation:qz-in .45s .2s both}
+.nudge2.out{opacity:0;transform:translateY(-6px);transition:opacity .2s,transform .2s}
+.nudge2-ic{flex:0 0 36px;height:36px;border-radius:12px;display:grid;place-items:center;background:var(--surface);color:var(--green);box-shadow:0 2px 8px -4px rgba(0,0,0,.2)}
+.nudge2-ic .ico path{stroke:currentColor}
+.nudge2-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.nudge2-t b{font-size:15px}
+.nudge2-t span{font-size:13.5px;color:var(--muted);line-height:1.4}
+.nudge2-cta{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-weight:800;font-size:14px;color:var(--green);text-decoration:none;min-height:32px}
+.nudge2-cta .ico path{stroke:currentColor}
+.nudge2-cta:hover .ico{transform:translateX(2px)}
+.nudge2-x{position:absolute;top:8px;right:8px;width:32px;height:32px;min-height:0;padding:0;border:0;border-radius:10px;background:none;color:var(--muted);display:grid;place-items:center;cursor:pointer}
+.nudge2-x:hover{background:var(--surface-2)}
+@media (prefers-reduced-motion: reduce){.nudge2{animation:none}}
