@@ -3100,6 +3100,7 @@
     settings: 'M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M12 2.5v3M12 18.5v3M4.2 6.5l2.6 1.5M17.2 16l2.6 1.5M4.2 17.5l2.6-1.5M17.2 8l2.6-1.5',
     back: 'M15 6l-6 6 6 6',
     close: 'M6 6l12 12M18 6 6 18',
+    search: 'M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M20 20l-4-4',
     down: 'M6 9l6 6 6-6'
   };
   function icon(name, size) {
@@ -6424,6 +6425,77 @@
       return box;
     });
   }
+  // Squelette de chargement : quelques lignes qui scintillent, à la place d'un simple « Chargement… ».
+  function boSkel(n) {
+    return h('div', { class: 'bo-skel', role: 'status', 'aria-label': 'Chargement' }, Array.apply(null, Array(n || 5)).map(function () {
+      return h('div', { class: 'bo-skel-row' }, h('i', { class: 'av' }), h('i', { class: 'l1' }), h('i', { class: 'l2' }));
+    }));
+  }
+  /* Recherche globale (⌘K, Ctrl+K ou « / ») : rubriques, boutiques, comptes, commandes, ambassadeurs, selon les droits. */
+  function boPalette() {
+    if (document.getElementById('bo-pal')) return;
+    var input = h('input', { type: 'search', id: 'bo-pal-q', 'data-autofocus': '1', placeholder: 'Boutique, compte, commande, rubrique…', 'aria-label': 'Rechercher dans le back-office', autocomplete: 'off',
+      role: 'combobox', 'aria-expanded': 'true', 'aria-controls': 'bo-pal-list' });
+    var list = h('div', { class: 'bo-pal-list', id: 'bo-pal-list', role: 'listbox' });
+    var items = [], sel = 0, seq = 0, ambs = null, timer = null;
+    function pick(i) { var it = items[i]; if (it) { close(); go(it.href); } }
+    function mark() { items.forEach(function (it, i) { it.el.setAttribute('aria-selected', String(i === sel)); if (i === sel) it.el.scrollIntoView({ block: 'nearest' }); }); }
+    function draw(groups, pending) {
+      items = []; sel = 0;
+      var kids = groups.filter(function (g) { return g[1].length; }).map(function (g) {
+        return h('div', { class: 'bo-pal-g' }, h('p', { class: 'bo-pal-gt' }, g[0]), g[1].map(function (r) {
+          var idx = items.length;
+          var el = h('a', { class: 'bo-pal-it', href: r.href, role: 'option', 'aria-selected': 'false', onclick: function (e) { e.preventDefault(); pick(idx); }, onmousemove: function () { if (sel !== idx) { sel = idx; mark(); } } },
+            h('span', { class: 'bo-pal-ic', 'aria-hidden': 'true' }, icon(r.icon, 16)),
+            h('span', { class: 'bo-pal-t' }, h('b', { class: 'wrapword' }, r.title), r.sub ? h('small', null, r.sub) : null), icon('chev', 14));
+          items.push({ el: el, href: r.href });
+          return el;
+        }));
+      });
+      setKids(list, kids.length ? kids : h('p', { class: 'bo-pal-empty' }, pending ? 'Recherche…' : 'Aucun résultat.'), pending && kids.length ? h('p', { class: 'bo-pal-empty' }, 'Recherche…') : null);
+      mark();
+    }
+    function navGroup(t) {
+      return BO_NAV.filter(function (n) { return boCan(n[3]) && (!t || (n[2] + ' ' + n[5]).toLowerCase().indexOf(t) >= 0); })
+        .map(function (n) { return { icon: n[1], title: n[2], sub: n[5], href: '#/bo' + (n[0] ? '/' + n[0] : '') }; });
+    }
+    function search() {
+      var raw = input.value.trim(), t = raw.toLowerCase(), mine = ++seq;
+      var nav = navGroup(t).slice(0, t ? 4 : 13);
+      if (t.length < 2) { draw([['Aller à', nav]]); return; }
+      draw([['Aller à', nav]], true);
+      var calls = [];
+      if (boCan('shops')) calls.push(api('fiila_bo_shops', { p_q: raw, p_filter: null, p_page: 0 }).then(function (r) { return ['Boutiques', r.shops.slice(0, 5).map(function (x) { return { icon: 'shop', title: x.name, sub: [typeLabel(x.type), x.public ? 'ouverte' : 'fermée'].filter(Boolean).join(' · '), href: '#/bo/boutiques/' + x.id }; })]; }, function () { return ['Boutiques', []]; }));
+      if (boCan('accounts')) calls.push(api('fiila_bo_accounts', { p_q: raw, p_page: 0 }).then(function (r) { return ['Comptes', r.accounts.slice(0, 5).map(function (x) { return { icon: 'user', title: x.name || x.email, sub: x.email, href: '#/bo/comptes/' + x.id }; })]; }, function () { return ['Comptes', []]; }));
+      if (boCan('orders')) calls.push(api('fiila_bo_orders', { p_q: raw, p_status: null, p_page: 0 }).then(function (r) { return ['Commandes', r.orders.slice(0, 5).map(function (x) { return { icon: 'box', title: 'N° ' + String(x.number).padStart(4, '0') + ' · ' + x.customer, sub: x.shop + ' · ' + fcfa(x.total), href: '#/bo/commandes/' + x.id }; })]; }, function () { return ['Commandes', []]; }));
+      if (boCan('ambassadors')) calls.push((ambs || (ambs = api('fiila_admin_ambassadors', {}).then(function (d) { return d.ambassadors; }, function () { return []; }))).then(function (l) {
+        return ['Ambassadeurs', l.filter(function (a) { return [a.name, a.code, a.phone, a.email].join(' ').toLowerCase().indexOf(t) >= 0; }).slice(0, 5)
+          .map(function (a) { return { icon: 'gift', title: a.name, sub: a.code + ' · ' + ((AMB_ST[a.status] || [])[1] || a.status), href: '#/bo/ambassadeurs/' + a.id }; })];
+      }));
+      Promise.all(calls).then(function (gs) { if (mine === seq && list.isConnected) draw([['Aller à', nav]].concat(gs)); });
+    }
+    input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(search, 220); });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (items.length) { sel = (sel + 1) % items.length; mark(); } }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (items.length) { sel = (sel - 1 + items.length) % items.length; mark(); } }
+      else if (e.key === 'Enter') { e.preventDefault(); pick(sel); }
+    });
+    var back = h('div', { class: 'bo-pal-back', id: 'bo-pal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Recherche', onclick: function (e) { if (e.target === back) close(); } },
+      h('div', { class: 'bo-pal' }, h('div', { class: 'bo-pal-in' }, icon('search', 18), input, h('kbd', null, 'Échap')), list,
+        h('p', { class: 'bo-pal-foot' }, h('span', null, h('kbd', null, '↑'), h('kbd', null, '↓'), ' choisir'), h('span', null, h('kbd', null, '↵'), ' ouvrir'))));
+    var close = openSheet(back);
+    search();
+  }
+  // Raccourcis clavier du back-office (posés une seule fois) : ⌘K / Ctrl+K / « / » ouvrent la recherche.
+  var BO_KEYS = false;
+  function boKeys() {
+    if (BO_KEYS) return; BO_KEYS = true;
+    document.addEventListener('keydown', function (e) {
+      if (!/^#\/bo(\/|$)/.test(location.hash) || !document.querySelector('.bo-shell')) return;
+      var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '');
+      if (((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) || (e.key === '/' && !typing)) { e.preventDefault(); boPalette(); }
+    });
+  }
   function boShell(sec, title, body, o) {
     o = o || {};
     var me = BO.me, q = (BO.overview && BO.overview.queues) || {};
@@ -6448,14 +6520,26 @@
       h('button', { class: 'bo-menu-btn', type: 'button', id: 'bo-menu', 'aria-label': 'Menu', 'aria-expanded': 'false', 'aria-controls': 'bo-side', onclick: function () {
         var open = !shell.classList.contains('menu-open'); shell.classList.toggle('menu-open', open); this.setAttribute('aria-expanded', open ? 'true' : 'false');
       } }, h('span', { class: 'bo-burger', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'))),
-      h('span', { class: 'mark small' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office'));
+      h('span', { class: 'mark small' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office'),
+      h('button', { class: 'bo-top-search', type: 'button', 'aria-label': 'Rechercher', onclick: boPalette }, icon('search', 20)));
     var scrim = h('div', { class: 'bo-scrim', onclick: function () { shell.classList.remove('menu-open'); } });
+    boKeys();
+    var crumbs = h('nav', { class: 'bo-crumbs', 'aria-label': 'Fil d’Ariane' }, h('span', null, (cur && cur[5]) || 'Back-office'),
+      o.back ? [icon('chev', 12), h('a', { href: o.back[0] }, o.back[1])] : null, icon('chev', 12), h('b', { class: 'wrapword' }, title));
+    var glass = h('div', { class: 'bo-glass' }, crumbs,
+      h('button', { class: 'bo-find', type: 'button', id: 'bo-find', onclick: boPalette }, icon('search', 16), h('span', null, 'Rechercher'), h('kbd', null, /Mac|iPhone|iPad/.test(navigator.platform || '') ? '⌘K' : 'Ctrl K')));
+    var tabs = h('nav', { class: 'bo-tabs', 'aria-label': 'Raccourcis' }, [['', 'home', 'Accueil', 'dashboard'], ['boutiques', 'shop', 'Boutiques', 'shops'], ['commandes', 'box', 'Commandes', 'orders'], ['ambassadeurs', 'gift', 'Ambassad.', 'ambassadors']]
+      .filter(function (n) { return boCan(n[3]); }).slice(0, 3).map(function (n) {
+        var count = n[0] === 'ambassadeurs' ? (q.ambassadors || 0) + (q.rewards || 0) : n[0] === 'boutiques' ? 0 : 0;
+        return h('a', { href: '#/bo' + (n[0] ? '/' + n[0] : ''), class: 'bo-tab' + (sec === n[0] ? ' on' : ''), 'aria-current': sec === n[0] ? 'page' : null }, icon(n[1], 20), h('span', null, n[2]), count ? h('i', { class: 'bo-tab-dot' }) : null);
+      }), h('button', { class: 'bo-tab', type: 'button', onclick: boPalette }, icon('search', 20), h('span', null, 'Chercher')));
     var main = h('main', { class: 'bo-main', id: 'bo-main' },
+      glass,
       o.back ? h('a', { class: 'btn back', href: o.back[0] }, '← ' + o.back[1]) : null,
       h('div', { class: 'bo-head' }, h('div', { class: 'stack tight' }, h('p', { class: 'bo-eyebrow' }, o.eyebrow || (cur && cur[5]) || 'Back-office'), h('h1', { class: 'wrapword' }, title),
         o.sub ? h('p', { class: 'bo-sub' }, o.sub) : null), o.action || null),
       body);
-    add(shell, [top, side, scrim, main]);
+    add(shell, [top, side, scrim, main, tabs]);
     return shell;
   }
   function viewBo(parts, q) {
@@ -6659,12 +6743,12 @@
   }
   function boList(sec, title, fn, args, key, cols, href, filters, q, placeholder) {
     var st = { q: (q && q.q) || '', f: (q && q.f) || '', page: 0 };
-    var box = h('div', { class: 'stack', id: 'bo-list' }, loading());
+    var box = h('div', { class: 'stack', id: 'bo-list' }, boSkel(6));
     var more = h('div');
     var rows = [];
     var seq = 0;
     function load(reset) {
-      if (reset) { st.page = 0; rows = []; setKids(box, loading()); }
+      if (reset) { st.page = 0; rows = []; setKids(box, boSkel(6)); }
       var a = Object.assign({}, args(st), { p_page: st.page }), mine = ++seq;
       api(fn, a).then(function (r) {
         // Réponse périmée (recherche plus récente) ou écran quitté : on ne touche ni à la liste ni à l'adresse.

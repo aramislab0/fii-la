@@ -52,6 +52,9 @@ declare s uuid; p uuid; o uuid; n int;
 begin
   if exists (select 1 from fiila.shops where demo) then raise exception 'Des boutiques de démonstration existent déjà : lancer scripts/demo-clear.sql d’abord.'; end if;
 `;
+// Photos des articles au format 4:5 (règle du 20/10) ; la migration 20261020900000 remet au format les boutiques déjà semées.
+let fix = `-- Généré par scripts/demo-seed.mjs : photos des articles de DÉMONSTRATION au format 4:5 (320 × 400), règle du 20/10/2026.
+-- Ne touche que les boutiques marquées demo = true (fictives).`;
 SHOPS.forEach(([name, cat, accent, color, about, items, ratings], i) => {
   const slug = 'demo-' + name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const cover = i % 3 === 0 ? `, cover = decode(${S(png(color, 1, 640, 360))}, 'base64'), cover_type = 'image/png'` : '';
@@ -66,7 +69,10 @@ SHOPS.forEach(([name, cat, accent, color, about, items, ratings], i) => {
     const tint = j === 0 ? color : accentHex[['foret', 'nuit', 'indigo', 'prune', 'bordeaux', 'terre'][(i + j) % 6]];
     sql += `
   insert into fiila.products (shop_id, name, price, category, sizes, colors, stock, photo, photo_type, updated_at)
-  values (s, ${S(pn)}, ${price}, ${S(cat)}, ${arr(sizes)}, ${arr(colors)}, ${stock === null ? 'null' : stock}, decode(${S(png(tint, j % 3))}, 'base64'), 'image/png', now() - interval '${j} minutes') returning id into p;`;
+  values (s, ${S(pn)}, ${price}, ${S(cat)}, ${arr(sizes)}, ${arr(colors)}, ${stock === null ? 'null' : stock}, decode(${S(png(tint, j % 3, 320, 400))}, 'base64'), 'image/png', now() - interval '${j} minutes') returning id into p;`;
+    fix += `
+update fiila.products p set photo = decode(${S(png(tint, j % 3, 320, 400))}, 'base64'), photo_type = 'image/png'
+  from fiila.shops s where s.id = p.shop_id and s.demo and s.name = ${S(name + ' (démo)')} and p.name = ${S(pn)};`;
     if (j === 0) ratings.forEach((r, k) => {
       sql += `
   ${k === 0 ? '' : `insert into fiila.orders (shop_id, number, customer_name, items, total, status, share_token, delivered_at) select s, coalesce(max(number), 0) + 1, 'Cliente démo', '[]'::jsonb, 0, 'delivered', encode(extensions.gen_random_bytes(16), 'hex'), now() from fiila.orders where shop_id = s returning id into o;`}
@@ -79,6 +85,7 @@ end $$;
 select count(*) as boutiques_demo from fiila.shops where demo;
 `;
 writeFileSync('scripts/demo-seed.sql', sql);
+writeFileSync('supabase/migrations/20261020900000_fiila_demo_photos_4x5.sql', fix + '\n');
 writeFileSync('scripts/demo-clear.sql', `-- Efface toutes les boutiques de démonstration (articles, commandes, notes, clients suivent en cascade).
 delete from fiila.shops where demo;
 select count(*) as boutiques_demo_restantes from fiila.shops where demo;

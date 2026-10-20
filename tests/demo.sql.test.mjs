@@ -23,6 +23,10 @@ await t('chargement : 14 boutiques de démonstration, toutes catégories, sans p
   assert.equal((await one(`select count(*)::int n from fiila.shops where demo`)).n, 14);
   assert.equal((await one(`select count(*)::int n from fiila.shops where demo and featured_rank is not null`)).n, 0);
   assert.equal((await one(`select count(distinct category)::int n from fiila.products p join fiila.shops s on s.id = p.shop_id where s.demo`)).n, 9);
+  assert.equal((await one(`select count(*)::int n from fiila.products p join fiila.shops s on s.id = p.shop_id where s.demo and not fiila.ratio_ok(p.photo)`)).n, 0, 'photos au format 4:5');
+  // La migration de remise au format est rejouable sur des boutiques déjà semées.
+  await db.exec(readFileSync('supabase/migrations/20261020900000_fiila_demo_photos_4x5.sql', 'utf8'));
+  assert.equal((await one(`select count(*)::int n from fiila.products p join fiila.shops s on s.id = p.shop_id where s.demo and not fiila.ratio_ok(p.photo)`)).n, 0);
   assert.equal((await ok('fiila_shop_feed', { p_key: REAL, p_on: null })).free_left, 24, 'les 25 places restent aux vraies boutiques');
 });
 

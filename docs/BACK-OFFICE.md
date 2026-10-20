@@ -63,6 +63,10 @@ Les anciennes adresses `#/stats` et `#/admin/…` ouvrent la section corresponda
 
 Barre latérale sombre groupée (Pilotage, Opérations, Programmes, Administration), en-tête de page (rubrique, titre, phrase d'état), indicateurs à pastille d'icône, ligne d'indicateurs secondaires, panneau « À traiter » avec compteurs, fiches avec en-tête (pastille, badges, ligne d'informations), recherche avec icône et nombre de résultats.
 
+## Navigation (v3, 20/10)
+
+Barre vitrée en haut (ordinateur) : fil d'Ariane et « Rechercher ». Recherche globale (⌘K, Ctrl+K ou « / ») : rubriques, boutiques, comptes, commandes, ambassadeurs, selon les droits ; flèches et Entrée. Téléphone : onglets du bas (Accueil, Boutiques, Commandes, Chercher) et loupe dans la barre du haut. Listes : squelette de chargement, flèche sur les lignes cliquables.
+
 ## Règle : chaque nouvelle fonction arrive avec son back-office
 
 Décision du fondateur (20/10/2026) : toute fonction livrée dans l'application est, dans la même livraison, visible et pilotable dans le back-office.

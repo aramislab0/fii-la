@@ -128,7 +128,7 @@ await t('boutiques : recherche, filtre, fiche ; suspension (motif) qui ferme la 
   await D.locator('#bo-table tbody tr').filter({ hasText: 'Couture Awa (test)' }).locator('td').nth(2).click();
   await D.locator('#bo-shop-info').waitFor();
   assert.equal(await heading(D).textContent(), 'Couture Awa (test)');
-  await D.locator('#bo-main .back').getByText('Boutiques').waitFor();
+  await D.locator('#bo-main .bo-crumbs').getByRole('link', { name: 'Boutiques' }).waitFor(); // ordinateur : le fil d’Ariane remplace le bouton retour
   await D.click('#bo-suspend');
   await D.getByText('Indiquez un motif.').waitFor();
   await D.fill('#bo-suspend-reason', 'Photos trompeuses (test)');
@@ -142,6 +142,25 @@ await t('boutiques : recherche, filtre, fiche ; suspension (motif) qui ferme la 
   await D.click('#bo-unsuspend');
   await D.getByText('Boutique réactivée.').waitFor();
   await D.locator('#bo-suspend').waitFor();
+});
+
+await t('recherche globale (Ctrl+K) : rubriques, boutiques, commandes ; clavier jusqu’à la fiche', async () => {
+  await D.click('#bo-nav-accueil'); await D.locator('#bo-kpis').waitFor();
+  await D.keyboard.press('Control+k');
+  await D.locator('#bo-pal-q').waitFor();
+  await D.locator('#bo-pal').getByText('Réglages').waitFor(); // sans saisie : les rubriques
+  await D.fill('#bo-pal-q', 'Couture');
+  await D.locator('#bo-pal').getByText('Boutiques', { exact: true }).waitFor();
+  await D.locator('#bo-pal .bo-pal-it').filter({ hasText: 'Couture Awa (test)' }).first().waitFor();
+  await shot(D, '04b-recherche');
+  // Premier résultat utile : la boutique ; flèche bas jusqu'à elle puis Entrée.
+  const idx = await D.evaluate(() => [...document.querySelectorAll('#bo-pal .bo-pal-it')].findIndex((x) => /Couture Awa/.test(x.textContent) && /\/boutiques\//.test(x.getAttribute('href'))));
+  for (let i = 0; i < idx; i++) await D.keyboard.press('ArrowDown');
+  await D.keyboard.press('Enter');
+  await D.locator('#bo-shop-info').waitFor();
+  assert.equal(await D.locator('#bo-pal').count(), 0, 'la recherche se ferme');
+  await D.click('#bo-find'); await D.locator('#bo-pal-q').waitFor();
+  await D.keyboard.press('Escape'); await D.locator('#bo-pal').waitFor({ state: 'detached' });
 });
 
 await t('commandes et comptes : liste, recherche par téléphone, fiche ; lien vers la boutique', async () => {
