@@ -213,6 +213,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 20/10 20:00 | Branchement WhatsApp : secrets WA_* présents (diagnostic de la fonction), webhook vérifié par Meta (18:35, 200) et abonné à « messages » ; numéro du Manager réglé sur le numéro de test Meta (+1 555 650 6044) et réglage `amb_whatsapp` = 1, à la demande du fondateur (tracé au journal) ; publication de l'application Meta en cours (Claude dans Chrome) | MCP + conversation |
 | 20/10 08:18 | Guide de branchement de l'API WhatsApp envoyé au fondateur (numéro de test Meta, jeton permanent, secrets, webhook) ; secrets à saisir par le fondateur ; vérification par les journaux de la fonction après son test | conversation |
 | 20/10 08:12 | Manager sur WhatsApp en production (run 39390019239) ; `fiila-whatsapp` v1 et `fiila-manager` v2 déployées par MCP | GitHub Actions + MCP |
 | 20/10 07:57 | Manager sur WhatsApp : migration `20261021200000_fiila_amb_whatsapp` (canal des messages, numéro du Manager, réception et envoi par la fonction), fonction `fiila-whatsapp` (webhook Meta signé, réponses, envoi de l'équipe), espace ambassadeur et back-office ; module de réponse du Manager partagé (`draftReply`) ; 42 suites vertes | ce commit |
