@@ -190,6 +190,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 20/10 02:15 | Run 39348923274 entièrement vert (Chrome + Safari, production) : test vitrine stabilisé | GitHub Actions |
 | 20/10 01:45 | Fii La Carrière en ligne (run 39347584456). Étape 3 : test vitrine encore instable sous WebKit (choix de couleur) ; le test touche maintenant la pastille comme une vraie utilisatrice au lieu de cocher le bouton radio masqué | ce commit |
 | 20/10 01:10 | Fii La Carrière en cartes premium (`ambPath`, fiches `.amb-lesson-card`, test `.amb-opt`, code `#amb-code`, `#amb-mission`) ; carte d'invitation : monogramme seulement s'il y a un expéditeur | ce commit |
 | 20/10 00:45 | Cartes d'invitation premium (`inviteCard`, `ivcBtn`, styles `.ivc`) appliquées aux 4 invitations ; tests adaptés (titres), toutes suites relancées | ce commit |
