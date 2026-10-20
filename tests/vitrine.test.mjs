@@ -113,7 +113,8 @@ await t('personnalisation : modèle Magazine, couleur Prune, couverture ; la vit
   await S.getByText('Modèle « Magazine » appliqué.').waitFor();
   // L'écran se redessine après chaque réglage : on retente si le choix tombe pendant le redessin (vu sous WebKit).
   for (let i = 0; i < 3; i++) {
-    await S.getByRole('radio', { name: 'Prune' }).check({ force: true }).catch(() => {});
+    // geste réel : toucher la pastille (le bouton radio est masqué derrière)
+    await S.locator('#vitrine-accent label[title="Prune"]').click().catch(() => {});
     if (await S.getByText('Couleur « Prune » appliquée.').waitFor({ timeout: 4000 }).then(() => true, () => false)) break;
   }
   await S.getByText('Couleur « Prune » appliquée.').waitFor();
