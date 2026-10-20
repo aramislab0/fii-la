@@ -34,7 +34,7 @@ async function newPhone() {
   pages.push(page);
   return page;
 }
-const shot = (page, name) => page.screenshot({ path: `${SHOTS}/${ENGINE}-${name}.png`, fullPage: true });
+const shot = async (page, name) => { await page.waitForTimeout(1200); return page.screenshot({ path: `${SHOTS}/${ENGINE}-${name}.png`, fullPage: true }); }; // après les animations d'entrée
 async function signup(p, name, email, retour) {
   await p.goto(URL0 + '#/compte?mode=inscription' + (retour ? '&retour=' + retour : ''));
   await p.getByRole('tab', { name: 'Créer un compte' }).click().catch(() => {});

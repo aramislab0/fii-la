@@ -1094,3 +1094,43 @@ input[type=number]{font:inherit;font-size:16px;padding:12px 14px;border-radius:1
 @keyframes ivc-spin{to{transform:rotate(360deg)}}
 @keyframes ivc-sheen{0%{left:-60%}55%,100%{left:130%}}
 @media (prefers-reduced-motion: reduce){.ivc,.ivc-points li{animation:none;opacity:1}.ivc-glow,.ivc-mono,.ivc-mono span,.ivc-btn::after{animation:none}}
+
+/* Fii La Carrière : parcours, fiches de formation, test, mission */
+.amb-path{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;position:relative}
+.amb-path li{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;position:relative;min-width:0}
+.amb-path li::before{content:'';position:absolute;top:17px;left:-50%;width:100%;height:2px;background:var(--line);z-index:0}
+.amb-path li:first-child::before{display:none}
+.amb-path li.done::before,.amb-path li.now::before{background:var(--green)}
+.amb-path-dot{position:relative;z-index:1;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--surface);border:2px solid var(--line);color:var(--muted)}
+.amb-path li.done .amb-path-dot{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.amb-path li.done .amb-path-dot .ico path{stroke:var(--on-green)}
+.amb-path li.now .amb-path-dot{border-color:var(--green);color:var(--green);box-shadow:0 0 0 5px color-mix(in srgb,var(--green) 18%,transparent);animation:amb-pulse 2.4s ease-in-out infinite}
+.amb-path-l{font-size:11.5px;font-weight:600;color:var(--muted);overflow-wrap:anywhere}
+.amb-path li.now .amb-path-l{color:var(--ink)}
+@keyframes amb-pulse{0%,100%{box-shadow:0 0 0 5px color-mix(in srgb,var(--green) 18%,transparent)}50%{box-shadow:0 0 0 9px color-mix(in srgb,var(--green) 6%,transparent)}}
+.amb-prog{display:flex;gap:5px}
+.amb-prog i{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.18);position:relative;overflow:hidden}
+.amb-prog i.on{background:#CFE7A6}
+.amb-prog i.now::after{content:'';position:absolute;inset:0;background:#CFE7A6;transform-origin:left;animation:amb-fill .9s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes amb-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.amb-lic2{width:64px;height:64px;border-radius:20px;display:grid;place-items:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);margin-top:6px}
+.amb-lic2 .ico path,.amb-lic2 .ico circle,.amb-lic2 .ico rect{stroke:#CFE7A6}
+.amb-lesson-card .ivc-title{font-size:clamp(24px,6.6vw,30px)}
+.amb-ltext{font-size:16.5px;color:rgba(246,244,238,.88)}
+.amb-qbar{position:sticky;top:8px;z-index:5;display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-radius:16px;background:var(--surface);box-shadow:var(--shadow-card)}
+.amb-q legend{display:flex;gap:10px;align-items:flex-start;font-weight:700;line-height:1.35}
+.amb-qn{flex:0 0 26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:var(--on-green);font-size:13px}
+.amb-opts{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.amb-opt{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 14px;border:1.5px solid var(--line);border-radius:14px;cursor:pointer;transition:border-color .15s,background .15s}
+.amb-opt input{accent-color:var(--green);width:20px;height:20px;flex:0 0 20px}
+.amb-opt:has(input:checked){border-color:var(--green);background:color-mix(in srgb,var(--green) 8%,var(--surface))}
+.amb-opt:focus-within{outline:3px solid var(--focus);outline-offset:2px}
+.amb-codev2{margin:4px 0 0;font-size:clamp(34px,10vw,44px);font-weight:800;letter-spacing:.14em;color:#F6F4EE;font-variant-numeric:tabular-nums}
+.amb-mission{display:flex;gap:14px;align-items:flex-start;box-shadow:inset 3px 0 0 var(--green),var(--shadow-card)}
+.amb-mission h2{margin:0;font-size:18px}
+.amb-mission-ic{flex:0 0 40px;height:40px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--green) 12%,var(--surface));color:var(--green)}
+@media (prefers-reduced-motion: reduce){.amb-path li.now .amb-path-dot,.amb-prog i.now::after{animation:none}}
+
+.amb-q legend{float:left;width:100%;padding:0 0 6px}
+.amb-q legend + *{clear:both}
+.card.amb-mission{flex-direction:row}

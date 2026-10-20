@@ -4490,9 +4490,9 @@
       h('div', { class: 'ivc-top' },
         h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')),
         h('span', { class: 'ivc-kind' }, o.kind || 'Invitation')),
-      h('div', { class: 'ivc-from' },
+      o.from ? h('div', { class: 'ivc-from' },
         h('span', { class: 'ivc-mono', 'aria-hidden': 'true' }, h('span', null, initial)),
-        o.from ? h('span', { class: 'ivc-who' }, h('span', { class: 'ivc-who-l' }, 'De la part de'), h('strong', { class: 'wrapword' }, o.from)) : null),
+        h('span', { class: 'ivc-who' }, h('span', { class: 'ivc-who-l' }, 'De la part de'), h('strong', { class: 'wrapword' }, o.from))) : null,
       h(o.compact ? 'p' : 'h1', { class: 'ivc-title wrapword' }, o.title),
       o.sub ? h('p', { class: 'ivc-sub', id: o.subId || null }, o.sub) : null,
       o.points && o.points.length ? h('ul', { class: 'ivc-points' }, o.points.map(function (pt) {
@@ -5441,16 +5441,28 @@
   var GRADES = { ambassadeur: 'Ambassadeur', confirme: 'Ambassadeur confirmé', certifie: 'Ambassadeur certifié Fii La' };
   var PAYOUT = { wave: 'Wave', orange_money: 'Orange Money' };
 
+  // Le parcours en 5 étapes, l'étape en cours mise en avant (inscription → formation → test → validation → missions).
+  var AMB_PATH = [['user', 'Inscription'], ['book', 'Formation'], ['check', 'Test'], ['clock', 'Validation'], ['star', 'Missions']];
+  function ambPath(step) {
+    return h('ol', { class: 'amb-path', id: 'amb-path', 'aria-label': 'Votre parcours : étape ' + (step + 1) + ' sur ' + AMB_PATH.length },
+      AMB_PATH.map(function (x, k) {
+        return h('li', { class: k < step ? 'done' : k === step ? 'now' : '', 'aria-current': k === step ? 'step' : null },
+          h('span', { class: 'amb-path-dot', 'aria-hidden': 'true' }, icon(k < step ? 'check' : x[0] === 'book' ? 'edit' : x[0], 16)), h('span', { class: 'amb-path-l' }, x[1]));
+      }));
+  }
   function viewAmbassador() {
-    var intro = h('section', { class: 'card stack tight amb-hero' },
-      h('p', { class: 'eyebrow' }, 'Fii La Carrière'),
-      h('h1', null, 'Devenez ambassadeur Fii La'),
-      h('p', null, 'Aidez les commerçants de votre quartier à ouvrir leur boutique Fii La. Vous êtes payé quand ils vendent vraiment.'));
+    function hero(cta) {
+      return inviteCard({ id: 'amb-hero', kind: 'Fii La Carrière', title: 'Devenez ambassadeur Fii La',
+        sub: 'Aidez les commerçants de votre quartier à ouvrir leur boutique. Vous êtes payé quand ils vendent vraiment.',
+        points: [['shop', 'Vous les installez sur leur téléphone, en 20 minutes'], ['cash', 'Payé à chaque niveau atteint par vos commerçants'], ['star', 'Trois grades : ambassadeur, confirmé, certifié']],
+        cta: cta || null });
+    }
     if (!authed()) {
-      return page(backBtn(), intro, ambLevels(null),
-        iconBtn('a', { class: 'btn big', id: 'amb-login', href: '#/compte' + qs({ mode: 'inscription', retour: 'ambassadeur' }) }, 'user', 'Créer mon compte pour commencer'),
+      return page(backBtn(), hero(ivcBtn('a', { id: 'amb-login', href: '#/compte' + qs({ mode: 'inscription', retour: 'ambassadeur' }) }, 'Créer mon compte')),
+        ambPath(0), ambLevels(null),
         h('p', { class: 'hint' }, 'Un compte est obligatoire : vos gains y sont rattachés.'), footer());
     }
+    var intro = hero(ivcBtn('a', { href: '#amb-form', id: 'amb-start', onclick: function (e) { e.preventDefault(); var el = document.getElementById('amb-form'); if (el) el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' }); } }, 'Commencer l’inscription'));
     return api('fiila_ambassador_me', {}).then(function (r) {
       var a = r.ambassador;
       if (!a) return ambRegister(intro);
@@ -5492,8 +5504,8 @@
       api('fiila_ambassador_register', { p: { name: f.name.trim(), phone: f.phone.trim(), zone: f.zone.trim() || null, payout_method: f.method, payout_phone: f.payout.trim() || null, charter: true } })
         .then(function () { toast('Inscription enregistrée. Place à la formation.'); render(); }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'check', 'M’inscrire');
-    return page(backBtn(), intro, ambLevels(null),
-      h('section', { class: 'card stack' }, h('h2', null, 'Inscription'),
+    return page(backBtn(), intro, ambPath(0), ambLevels(null),
+      h('section', { class: 'card stack', id: 'amb-form' }, h('h2', null, 'Inscription'),
         textField({ id: 'amb-name', label: 'Nom complet', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
         textField({ id: 'amb-phone', label: 'Téléphone', type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
         textField({ id: 'amb-zone', label: 'Quartier ou ville', optional: true, max: 60, value: f.zone, placeholder: 'Ex. : Yoff, Thiès', onInput: function (v) { f.zone = v; } }),
@@ -5516,14 +5528,20 @@
     var i = 0, answers = [];
     function lesson() {
       var l = AMB_LESSONS[i];
+      var last = i === AMB_LESSONS.length - 1;
       setKids(root,
-        h('p', { class: 'eyebrow step' }, 'Formation · ' + (i + 1) + ' sur ' + AMB_LESSONS.length),
-        h('div', { class: 'steps', 'aria-hidden': 'true' }, AMB_LESSONS.map(function (x, k) { return h('i', { class: k <= i ? 'on' : '' }); })),
-        h('section', { class: 'card stack amb-lesson' }, h('span', { class: 'amb-lic', 'aria-hidden': 'true' }, icon(l[0], 32)), h('h2', null, l[1]), h('p', null, l[2])),
-        h('div', { class: 'duo' },
-          i > 0 ? h('button', { class: 'btn ghost', type: 'button', onclick: function () { i--; lesson(); } }, 'Précédent') : h('span'),
-          h('button', { class: 'btn', type: 'button', id: 'amb-next', onclick: function () { if (i < AMB_LESSONS.length - 1) { i++; lesson(); } else quiz(); window.scrollTo(0, 0); } },
-            i < AMB_LESSONS.length - 1 ? 'Suivant' : 'Passer le test')));
+        ambPath(1),
+        h('section', { class: 'ivc amb-lesson-card', id: 'amb-lesson', 'aria-live': 'polite' },
+          h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
+          h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-kind', style: 'text-align:left' }, 'Formation · ' + (i + 1) + ' sur ' + AMB_LESSONS.length),
+            h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La'))),
+          h('div', { class: 'amb-prog', 'aria-hidden': 'true' }, AMB_LESSONS.map(function (x, k) { return h('i', { class: k < i ? 'on' : k === i ? 'now' : '' }); })),
+          h('span', { class: 'amb-lic2', 'aria-hidden': 'true' }, icon(l[0], 34)),
+          h('h2', { class: 'ivc-title' }, l[1]),
+          h('p', { class: 'ivc-sub amb-ltext' }, l[2]),
+          h('div', { class: 'ivc-cta' }, ivcBtn('button', { id: 'amb-next', onclick: function () { if (!last) { i++; lesson(); } else quiz(); window.scrollTo(0, 0); } },
+            last ? 'Passer le test' : 'Fiche suivante')),
+          i > 0 ? h('button', { class: 'ivc-link', type: 'button', style: 'background:none;border:0;font:inherit;cursor:pointer', onclick: function () { i--; lesson(); } }, 'Fiche précédente') : null));
     }
     function quiz() {
       answers = AMB_QUIZ.map(function () { return null; });
@@ -5538,19 +5556,27 @@
             h('button', { class: 'btn', type: 'button', onclick: function () { i = 0; lesson(); } }, 'Relire les fiches')));
         }, function (e) { send.disabled = false; errBox(err, e); });
       } }, 'check', 'Envoyer mes réponses');
-      setKids(root, h('h1', null, 'Test de passage'), h('p', { class: 'muted' }, '10 questions. 8 bonnes réponses pour réussir.' + (a.attempts_today ? ' Essais aujourd’hui : ' + a.attempts_today + ' sur 2.' : '')),
+      var done = h('span', { id: 'amb-quiz-count' }, '0');
+      var bar = h('i', { style: 'width:0%' });
+      function progress() { var c = answers.filter(function (x) { return x !== null; }).length; done.textContent = String(c); bar.style.width = (c * 10) + '%'; }
+      setKids(root, ambPath(2), h('h1', null, 'Test de passage'), h('p', { class: 'muted' }, '10 questions. 8 bonnes réponses pour réussir.' + (a.attempts_today ? ' Essais aujourd’hui : ' + a.attempts_today + ' sur 2.' : '')),
+        h('div', { class: 'amb-qbar', 'aria-live': 'polite' }, h('span', { class: 'small' }, done, ' sur 10 répondues'), h('div', { class: 'amb-bar' }, bar)),
         AMB_QUIZ.map(function (q, n) {
-          return h('fieldset', { class: 'card stack tight amb-q', id: 'q' + n }, h('legend', null, (n + 1) + '. ' + q[0]),
-            q[1].map(function (opt, k) {
-              return h('label', { class: 'check-line' }, h('input', { type: 'radio', name: 'q' + n, value: String(k), onchange: function () { answers[n] = k; } }), opt);
-            }));
+          return h('fieldset', { class: 'card stack tight amb-q', id: 'q' + n }, h('legend', null, h('span', { class: 'amb-qn' }, String(n + 1)), q[0]),
+            h('div', { class: 'amb-opts' }, q[1].map(function (opt, k) {
+              return h('label', { class: 'amb-opt' }, h('input', { type: 'radio', name: 'q' + n, value: String(k), onchange: function () { answers[n] = k; progress(); } }), h('span', null, opt));
+            })));
         }), err, send);
     }
     lesson();
     return page(backBtn(), root, footer());
   }
   function ambWaiting(a) {
-    return page(backBtn(), stateCard('⌛', 'Test réussi : ' + (a.quiz_score || 8) + '/10', 'L’équipe Fii La valide votre inscription, en général sous 48 heures. Vous pourrez alors recevoir votre code et commencer.'), footer());
+    return page(backBtn(), ambPath(3),
+      inviteCard({ id: 'amb-waiting', kind: 'Fii La Carrière', title: 'Test réussi : ' + (a.quiz_score || 8) + '/10',
+        sub: 'L’équipe Fii La valide votre inscription, en général sous 48 heures.',
+        points: [['key', 'Vous recevrez alors votre code ambassadeur'], ['shop', 'Repérez déjà 3 commerçants de votre quartier'], ['cam', 'Préparez-les : 5 articles à photographier']] }),
+      footer());
   }
   function ambDashboard(a) {
     var codeMsg = 'Bonjour ! Je vous aide à ouvrir votre boutique en ligne gratuite avec Fii La : vitrine, commandes, factures et l’adresse exacte de vos clientes. ' +
@@ -5577,16 +5603,26 @@
       })));
       board.hidden = false;
     }, function () {});
+    // La prochaine action utile, en une carte : premier commerçant à trouver, ou ce qui manque au plus avancé.
+    var todo = shops.filter(function (s) { return s.level < 3 && !s.expired; }).sort(function (x, y) { return y.level - x.level; })[0];
+    var mission = !shops.length ? ['Trouver votre premier commerçant', 'Envoyez-lui votre code sur WhatsApp, puis installez sa boutique avec lui, sur son téléphone.']
+      : todo ? ['Aider ' + todo.shop + ' à passer au niveau ' + (todo.level + 1), todo.level === 0 ? 'Il manque : ' + [!todo.typed ? 'le type de commerce' : null, todo.photos < 5 ? (5 - todo.photos) + ' article(s) avec photo' : null, !todo.public ? 'la vitrine à ouvrir' : null].filter(Boolean).join(', ') + '.'
+          : todo.level === 1 ? 'Objectif : 3 clientes différentes et 1 commande livrée en 30 jours.' : 'Objectif : des commandes 4 semaines sur 8.']
+      : ['Trouver un nouveau commerçant', 'Tous vos commerçants sont au plus haut niveau atteignable. Envoyez votre code à un nouveau.'];
     return page(backBtn(),
-      h('header', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Fii La Carrière'), h('h1', null, 'Mes missions'),
+      h('header', { class: 'stack tight' }, h('h1', null, 'Mes missions'),
         h('span', { class: 'chip ok', style: 'align-self:flex-start', id: 'amb-grade' }, icon('star', 12), GRADES[a.grade] || 'Ambassadeur')),
       a.status === 'suspended' ? h('div', { class: 'notice' }, 'Compte suspendu : vos nouveaux gains sont en pause.' + (a.note ? ' Motif : ' + a.note : '')) : null,
-      h('section', { class: 'card stack tight', id: 'amb-code' }, h('p', { class: 'small muted' }, 'Votre code ambassadeur'),
-        h('p', { class: 'amb-codev' }, a.code),
-        h('div', { class: 'duo' },
-          iconBtn('a', { class: 'btn mid', href: waLink(codeMsg), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer'),
-          iconBtn('button', { class: 'btn ghost mid', type: 'button', onclick: function () { copy(a.code, 'Code'); } }, 'link', 'Copier')),
-        h('p', { class: 'hint' }, 'Le commerçant tape ce code en créant sa boutique, sur son téléphone, au plus tard 7 jours après.')),
+      h('section', { class: 'ivc', id: 'amb-code' },
+        h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
+        h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')), h('span', { class: 'ivc-kind' }, 'Votre code ambassadeur')),
+        h('p', { class: 'amb-codev2' }, a.code),
+        h('p', { class: 'ivc-sub' }, 'Le commerçant le tape en créant sa boutique, sur son téléphone, au plus tard 7 jours après.'),
+        h('div', { class: 'ivc-cta' }, ivcBtn('a', { href: waLink(codeMsg), target: '_blank', rel: 'noopener noreferrer', id: 'amb-send' }, 'Envoyer mon code')),
+        h('button', { class: 'ivc-link', type: 'button', style: 'background:none;border:0;font:inherit;cursor:pointer', onclick: function () { copy(a.code, 'Code'); } }, 'Copier le code')),
+      h('section', { class: 'card amb-mission', id: 'amb-mission' },
+        h('span', { class: 'amb-mission-ic', 'aria-hidden': 'true' }, icon('nav', 20)),
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Prochaine mission'), h('h2', { class: 'wrapword' }, mission[0]), h('p', { class: 'small muted' }, mission[1]))),
       h('section', { class: 'card stack tight', id: 'amb-wallet' }, h('h2', null, 'Mon portefeuille'),
         h('div', { class: 'amb-wal' },
           h('div', null, h('small', null, 'En vérification'), h('b', null, fcfa(a.rewards.pending))),
