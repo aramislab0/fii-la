@@ -88,3 +88,29 @@ Ces chiffres doivent être identiques après la migration du lot 2 (contrôle à
 | CONSTRUIT | Lots 1 à 4 (Studio excepté : `BLOCKED_DEPENDENCY`) |
 | DÉPLOYÉ | Lots 2-3 : run GitHub Actions 39547594882 (en cours au moment de la rédaction) ; lot 4 : à venir |
 | TESTÉ | Suites locales Chromium ; WebKit dans la chaîne de mise en ligne ; **téléphones physiques Android et iPhone : `NOT_RUN`** |
+
+## Mise en ligne — preuves (21/10/2026)
+
+| Lot | Commit | Exécution GitHub Actions | Résultat |
+|---|---|---|---|
+| Mandat enregistré | `39e5730` | (documentation) | — |
+| Lot 1 (inventaire) | `83614d7` | (documentation) | — |
+| Lots 2-3 | `ac7b863` | 39547594882 | Tests, migrations, mise en ligne : réussis. Tests en production : **échec WebKit isolé** (`videdressing.test.mjs`, « aucune erreur JavaScript ») ; non reproduit à l'exécution suivante (même suite, même navigateur, code inchangé sur ce parcours) → instabilité ; annotations CI rendues plus détaillées pour la prochaine occurrence. |
+| Lot 4 | `b5ca2ac` | 39549577355 | **Tout réussi** : tests, migrations, mise en ligne, tests en production Chrome + Safari (WebKit). |
+
+**Base de production après migration** (lecture seule, MCP, 21/10 ~07:45) : `ambassadors` 1, `ambassador_shops` 0, `ambassador_rewards` 0, `ambassador_quiz_runs` 1, `amb_messages` 4, `amb_missions` 3 — **identiques à la référence du lot 1** ; `partner_packs` 0, `partner_invites` 0, `partner_trials` 0 (aucune donnée réelle créée) ; 3 migrations du mandat appliquées (`20261021700000`, `20261021800000`, `20261021900000`).
+
+**Fonctions Edge redéployées** (MCP) : `fiila-manager` v8, `fiila-whatsapp` v10 (vocabulaire « agent » ; le contexte agent / boutique est décidé par la base).
+
+**Non fait (`NOT_RUN`)** : essais sur Android et iPhone physiques (partage WhatsApp, reprise) ; message WhatsApp réel d'une marque (aucune marque invitée en production).
+
+## Retour arrière
+
+1. Application : redéployer le commit précédent (`git revert` des commits du mandat puis mise en ligne) — les adresses `#/ambassadeur`, `#/carriere`, `#/bo/ambassadeurs/<id>` restent valides dans les deux sens.
+2. Base : les migrations sont additives. Pour neutraliser sans perte : ne pas créer de version de pack (le bouton « Inviter une marque » reste désactivé) ; `update fiila.partner_invites set status = 'revoked'` arrête toute invitation ; les tables `partner_*`, `wa_context` et la colonne `ambassador_shops.l1_at` peuvent rester en place sans effet sur l'existant. Le correctif des gains (date d'éligibilité) ne retire aucun gain acquis.
+3. Fonctions Edge : redéployer les versions précédentes depuis le dépôt (`git show <commit>:supabase/functions/...`).
+
+## Reste à faire (dépendances)
+
+- **Fondateur** : contenu de la version 1 du pack (action #56) ; décision Studio (fournisseur, clé, budget) → sinon `BLOCKED_DEPENDENCY` ; essais sur téléphones physiques ; complément CDP (#40 : programme Ambassadeurs).
+- **Builder, dès que les dépendances sont levées** : Studio (travaux idempotents, réservation atomique, comparaison, approbation, partage) ; nom affiché du numéro WhatsApp à aligner si le fondateur le souhaite.
