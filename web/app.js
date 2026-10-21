@@ -237,6 +237,7 @@
     pack_none: 'Aucun pack défini. Créez d’abord une version du pack.',
     pack_benefits_required: 'Indiquez au moins un avantage du pack.',
     brand_required: 'Indiquez le nom de la marque.',
+    message_required: 'Écrivez votre message.',
     ambassador_already: 'Cette boutique a déjà un agent.',
     ambassador_too_late: 'Le code agent se tape dans les 7 jours qui suivent la création de la boutique.',
     ambassador_self: 'Un agent ne peut pas être accompagné par lui-même.',
@@ -4968,6 +4969,35 @@
         footer(true));
     }, function (e) { return page(brandBar('Invitation'), stateCard('!', 'Impossible d’ouvrir l’invitation', errText(e), retryBtn()), footer(true)); });
   }
+  // Conversation de la boutique partenaire avec le Manager (et l'équipe). Réponses sans IA ; escalade visible.
+  function partnerChatSheet() {
+    var list = h('div', { class: 'pmsg-list', id: 'pmsg-list', 'aria-live': 'polite' }, loading());
+    var body = '', err = h('div', { role: 'alert' });
+    function draw(msgs) {
+      setKids(list, msgs.length ? msgs.map(function (m) {
+        return h('div', { class: 'pmsg pmsg-' + m.author },
+          h('span', { class: 'pmsg-who' }, m.author === 'brand' ? 'Vous' : m.author === 'staff' ? 'Équipe Fii La' : 'Manager'),
+          h('p', { class: 'wrapword' }, m.body),
+          m.escalate ? h('span', { class: 'small muted' }, 'Transmis à l’équipe') : null);
+      }) : h('p', { class: 'small muted' }, 'Posez votre question : configuration, articles, vitrine, commandes ou suite de l’essai.'));
+      list.scrollTop = list.scrollHeight;
+    }
+    sapi('fiila_partner_messages', {}).then(function (r) { draw(r.messages); }, function (e) { errBox(err, e); });
+    var input = h('textarea', { id: 'pmsg-input', rows: 2, maxlength: 1000, placeholder: 'Votre message', oninput: function (e) { body = e.target.value; } });
+    var back = h('div', { class: 'sheet-back', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pmsg-h', id: 'pmsg-sheet' });
+    var close;
+    back.append(h('form', { class: 'sheet stack pmsg-sheet', onsubmit: function (e) {
+      e.preventDefault(); setKids(err);
+      if (!body.trim()) return;
+      var b = e.submitter; if (b) b.disabled = true;
+      sapi('fiila_partner_message_send', { p_body: body.trim() }).then(function (r) { body = ''; input.value = ''; draw(r.messages); if (b) b.disabled = false; },
+        function (x) { if (b) b.disabled = false; errBox(err, x); });
+    } },
+      h('div', { class: 'svc-head' }, h('h2', { id: 'pmsg-h' }, 'Le Manager Fii La'),
+        h('button', { class: 'svc-x', type: 'button', 'aria-label': 'Fermer', onclick: function () { close(); } }, icon('close', 18))),
+      list, err, input, h('button', { class: 'btn', type: 'submit', id: 'pmsg-send' }, 'Envoyer')));
+    close = openSheet(back);
+  }
   // Carte de l'essai dans le tableau de bord de la boutique (rien si la boutique n'est pas partenaire).
   function partnerSlot() {
     var box = h('div', { id: 'partner-slot' });
@@ -4999,6 +5029,7 @@
           r.manager ? iconBtn('a', { class: 'btn ghost', id: 'trial-next', href: 'https://wa.me/' + r.manager + '?text=' + encodeURIComponent('Bonjour, mon essai Ambassadeur Fii La est terminé. J’aimerais connaître la suite.'), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Demander la suite au Manager')
             : h('p', { class: 'small' }, 'Pour la suite, écrivez à l’équipe Fii La.'));
       }
+      if (t.status !== 'revoked') body.push(h('button', { class: 'ptn-chat', type: 'button', id: 'partner-chat', onclick: partnerChatSheet }, icon('chat', 16), 'Écrire au Manager'));
       setKids(box, h('section', { class: 'card stack tight ptn ptn-' + t.status, id: 'partner-card' }, head, body, err));
     }, function () {});
     return box;
@@ -7831,6 +7862,30 @@
         return boAct(function () { return api('fiila_bo_partner_action', { p_id: x.id, p_action: action, p_reason: reason }); }, action === 'regenerate' ? null : label + ' : fait.',
           action === 'regenerate' ? function (r) { shareSheet({ token: r.token, brand: x.brand, months: x.months, whatsapp: x.whatsapp }); } : null, null, btn);
       }
+      // Conversation de la marque avec le Manager : lecture (marquée lue) et réponse de l'équipe, tracée.
+      function threadSheet(x) {
+        var list = h('div', { class: 'pmsg-list', id: 'bo-pmsg-list' }, loading()), body = '';
+        function draw(msgs) {
+          setKids(list, msgs.map(function (m) {
+            return h('div', { class: 'pmsg pmsg-' + (m.author === 'brand' ? 'staff' : 'brand') },
+              h('span', { class: 'pmsg-who' }, m.author === 'brand' ? x.brand : m.author === 'staff' ? 'Équipe' : 'Manager (règles)'),
+              h('p', { class: 'wrapword' }, m.body), m.escalate ? h('span', { class: 'chip wait' }, 'À traiter') : null);
+          }));
+        }
+        api('fiila_bo_partner_thread', { p_invite: x.id }).then(function (r) { draw(r.messages); }, function (e) { errBox(list, e); });
+        var back = h('div', { class: 'sheet-back', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bo-pmsg-h', id: 'bo-pmsg-sheet' });
+        var close;
+        back.append(h('form', { class: 'sheet stack bo-sheet', onsubmit: function (e) {
+          e.preventDefault(); if (!body.trim()) return;
+          boAct(function () { return api('fiila_bo_partner_reply', { p_invite: x.id, p_body: body.trim() }); }, 'Réponse envoyée.', function (r) { body = ''; ta.value = ''; draw(r.messages); }, null, e.submitter);
+        } }, h('h2', { id: 'bo-pmsg-h' }, x.brand), list,
+          h('p', { class: 'small muted' }, 'Le Manager ne fixe ni prix, ni prolongation, ni quota : ces questions vous sont transmises.'),
+          ta = h('textarea', { id: 'bo-pmsg-input', rows: 3, maxlength: 1500, placeholder: 'Réponse de l’équipe', oninput: function (e) { body = e.target.value; } }),
+          h('button', { class: 'btn', type: 'submit', id: 'bo-pmsg-send' }, 'Répondre'),
+          h('button', { class: 'btn ghost', type: 'button', id: 'bo-pmsg-close', onclick: function () { close(); render(); } }, 'Fermer')));
+        var ta;
+        close = openSheet(back);
+      }
       // Motif obligatoire (retrait, suspension) : demandé dans une feuille, gardé au journal.
       function act(x, action, label, needReason) {
         return h('button', { class: 'btn ghost small', type: 'button', 'data-act': action, onclick: function () {
@@ -7849,6 +7904,8 @@
       var rows = (d.invites || []).map(function (x) {
         var st = x.trial ? TRIAL_STATE[x.trial.status] : PTN_STATE[x.state];
         var tools = [];
+        var ms = x.trial && x.trial.milestones;
+        if (x.trial) tools.push(h('button', { class: 'btn ghost small', type: 'button', 'data-act': 'thread', onclick: function () { threadSheet(x); } }, 'Conversation' + (ms && ms.to_read ? ' · ' + ms.to_read : '')));
         if (x.state === 'valid') tools.push(act(x, 'regenerate', 'Nouveau lien'));
         if (d.can_admin) {
           if (x.trial && (x.trial.status === 'active' || x.trial.status === 'ended')) tools.push(act(x, 'extend', 'Prolonger d’un mois'));
@@ -7860,6 +7917,10 @@
           h('div', { class: 'stack tight', style: 'flex:1;min-width:0' },
             h('div', { class: 't wrapword' }, x.brand, x.shop ? h('span', { class: 'small muted' }, ' · ' + x.shop) : null),
             h('div', { class: 'small muted' }, [x.activity, x.months + ' mois', x.pack, x.trial && x.trial.ends_on ? 'jusqu’au ' + x.trial.ends_on : null].filter(Boolean).join(' · ')),
+            ms ? h('div', { class: 'bo-ms', 'aria-label': 'Jalons' }, [['configured', 'Boutique'], ['first_product', '1er article'], ['storefront', 'Vitrine ouverte'], ['orders', 'Commande'], ['delivered', 'Livrée'], ['returned', 'Retour']].map(function (k) {
+              var v = ms[k[0]], on = v === true || v > 0;
+              return h('span', { class: 'chip ' + (on ? 'ok' : 'off') }, k[1] + (typeof v === 'number' && v > 1 ? ' · ' + v : ''));
+            }), ms.escalated ? h('span', { class: 'chip wait' }, 'À traiter · ' + ms.escalated) : null) : null,
             tools.length ? h('details', { class: 'more-details' }, h('summary', null, 'Actions'), h('div', { class: 'row', style: 'flex-wrap:wrap;margin-top:8px' }, tools)) : null),
           st ? boBadge(st[0], st[1]) : null);
       });
@@ -7969,7 +8030,7 @@
     });
   }
   // ----- Journal
-  var BO_ACTIONS = { partner_invite: 'a invité la marque', partner_regenerate: 'a renouvelé le lien d’invitation de', partner_revoke: 'a retiré l’invitation de', partner_extend: 'a prolongé l’essai de',
+  var BO_ACTIONS = { partner_reply: 'a répondu à la marque', partner_invite: 'a invité la marque', partner_regenerate: 'a renouvelé le lien d’invitation de', partner_revoke: 'a retiré l’invitation de', partner_extend: 'a prolongé l’essai de',
     partner_suspend: 'a suspendu l’essai de', partner_resume: 'a repris l’essai de', pack_saved: 'a enregistré une version du pack', shop_suspend: 'a suspendu la boutique', shop_unsuspend: 'a réactivé la boutique', shop_feed_off: 'a retiré la boutique du fil',
     shop_feed_on: 'a remis la boutique dans le fil', shop_free_place: 'a libéré la place du fil', shop_set_type: 'a changé le type de la boutique',
     team_invite: 'a invité', team_invite_revoke: 'a annulé l’invitation de', team_join: 'a rejoint l’équipe', team_role: 'a changé le rôle de',

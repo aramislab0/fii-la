@@ -130,6 +130,24 @@ await t('Ambassadeurs (marques) : nouvelle version du pack, « Inviter une marqu
   await shot(D, '20-invitation-marque');
   await D.click('#inv-done');
   await D.locator('#bo-partners').getByText('Maison Test (test)').waitFor();
+  // Une marque partenaire écrit au Manager : l'équipe voit les jalons, lit et répond.
+  const pid = (await local.db.query(`select id from fiila.partner_invites where brand = 'Maison Test (test)'`)).rows[0].id;
+  const shop = (await rpc(local.db, 'fiila_shop_save', { p_key: null, p: { name: 'Maison Test (test)', business_type: 'mode' } })).body;
+  await local.db.query(`insert into fiila.partner_trials (invite_id, shop_id, pack_code, pack_version, months) select id, $2, pack_code, pack_version, months from fiila.partner_invites where id = $1`, [pid, shop.shop.id]);
+  await local.db.query(`update fiila.partner_invites set status = 'accepted', accepted_shop = $2 where id = $1`, [pid, shop.shop.id]);
+  await rpc(local.db, 'fiila_partner_message_send', { p_key: shop.key, p_body: 'Combien coûte la suite ?' });
+  await D.reload();
+  const item = D.locator('#ptn-' + pid);
+  await item.getByText('À traiter · 1').waitFor();
+  await item.locator('summary').click();
+  await item.locator('[data-act="thread"]').click();
+  await D.locator('#bo-pmsg-list').getByText('Combien coûte la suite ?').waitFor();
+  await D.fill('#bo-pmsg-input', 'Bonjour, nous vous appelons demain.');
+  await D.click('#bo-pmsg-send');
+  await D.locator('#bo-pmsg-list').getByText('Bonjour, nous vous appelons demain.').waitFor();
+  await shot(D, '21-conversation-marque');
+  await D.click('#bo-pmsg-close');
+  await D.locator('#bo-pmsg-sheet').waitFor({ state: 'detached' });
 });
 await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ; réglage du nouvel accueil dans Réglages', async () => {
   await D.click('#bo-nav-croissance');

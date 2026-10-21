@@ -18,7 +18,8 @@ for f in "${files[@]}"; do
   echo "$out" | tail -1
   if [ $code -ne 0 ]; then
     fail=1
-    echo "$out" | grep -E '^(FAIL|    )' | head -12 | while IFS= read -r l; do
+    # La ligne FAIL et les 15 lignes suivantes (le détail d'une comparaison, par ex. l'erreur JavaScript exacte).
+    echo "$out" | awk '/^FAIL/{c=16} c&&c--' | grep -v '^[[:space:]]*$' | head -40 | while IFS= read -r l; do
       if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::error title=$(basename "$f")${ENGINE:+ ($ENGINE)}::$l"; else echo "  $l"; fi
     done
   fi

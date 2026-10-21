@@ -69,3 +69,22 @@ Ces chiffres doivent être identiques après la migration du lot 2 (contrôle à
 - Le contenu du « pack complet » n'est pas défini (action #56). Les tests utilisent des packs synthétiques. Sans version de pack, « Inviter une marque » est désactivé.
 - Seul le quota « retouches Studio » est un droit chiffré appliqué par le serveur ; il ne sert qu'au lot 4 (Studio), lui-même en `BLOCKED_DEPENDENCY`. Les autres avantages sont affichés tels que rédigés par le fondateur et appliqués par l'équipe tant qu'ils ne correspondent pas à une fonction mesurable.
 - « Partager sur WhatsApp » ouvre WhatsApp : ce n'est pas une preuve d'envoi.
+
+## Lot 4 — Manager des deux programmes, jalons, Studio (21/10/2026)
+
+**CONSTRUIT**
+- Migration `20261021900000_fiila_partner_manager.sql` : conversation de la boutique partenaire (`partner_messages`) ; réponses du Manager sans IA selon l'état réel de l'essai (à activer, premier article, vitrine, premières commandes) ; prix, suite, prolongation et quotas **transmis à l'équipe** (escalade visible), jamais décidés par le Manager ; lecture et réponse de l'équipe (droit `partners`, journal) ; jalons réels par essai (boutique configurée, premier article, vitrine ouverte, commandes et livraisons depuis l'activation, retour de la marque, messages à lire, sujets à traiter) lus dans les données ; **WhatsApp** : contexte vérifié par le serveur (`fiila_wa_inbound`) — numéro d'une marque invitée → conversation de sa boutique ; numéro à la fois agent et marque → question « 1. Agent / 2. Boutique », choix gardé 24 heures (`wa_context`) ; numéro d'agent seul : inchangé.
+- Application : « Écrire au Manager » dans la carte de l'essai ; back-office Ambassadeurs : jalons de chaque marque, « À traiter », conversation (lecture, réponse).
+- Correctif transversal trouvé par ce lot : les feuilles (fenêtres du bas) et la carte de félicitations s'affichaient **sous** la barre d'onglets de la boutique (z-index 50 et 200 contre 900) ; relevées à 950 et 960.
+- Tests : `tests/partnermgr.sql.test.mjs` (4), `tests/partners.test.mjs` (+ conversation), `tests/backoffice.test.mjs` (+ jalons, conversation, réponse).
+
+**Studio (retouche photo) : `BLOCKED_DEPENDENCY`**
+- Rien n'est simulé : aucun parcours « Améliorer la photo » n'est proposé tant qu'aucune génération réelle n'est possible.
+- Ce qui existe déjà et s'appliquera : le quota « retouches Studio » de chaque version de pack (`limits.studio_credits`), compteur `partner_trials.studio_used`, réglage `studio_ready` (0) qui bloque l'activation de tout pack incluant le Studio.
+- Ce qui manque, à fournir par le fondateur (action #48 / #56) : 1) fournisseur confirmé (fal.ai retenu le 19/10) ; 2) compte et clé d'API saisis dans Supabase → Edge Functions → Secrets (jamais dans le dépôt ni la conversation) ; 3) plafond de dépense mensuel (50 USD évoqué le 19/10) ; 4) quota par pack. Ensuite : travaux idempotents, réservation atomique du crédit, rendu du crédit en cas d'échec, comparaison original / résultat, approbation explicite, format 4:5, original conservé — puis `studio_ready = 1` seulement après une génération réelle vérifiée.
+
+| | Statut |
+|---|---|
+| CONSTRUIT | Lots 1 à 4 (Studio excepté : `BLOCKED_DEPENDENCY`) |
+| DÉPLOYÉ | Lots 2-3 : run GitHub Actions 39547594882 (en cours au moment de la rédaction) ; lot 4 : à venir |
+| TESTÉ | Suites locales Chromium ; WebKit dans la chaîne de mise en ligne ; **téléphones physiques Android et iPhone : `NOT_RUN`** |

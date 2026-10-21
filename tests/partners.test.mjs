@@ -72,6 +72,14 @@ await t('accepter sans boutique : création guidée, invitation acceptée ; l’
   await P.click('#cel-close');
   await P.locator('#partner-card').getByText(/Essai en cours jusqu’au/).waitFor();
   await shot(P, '03-essai-en-cours');
+  await P.click('#partner-chat');
+  await P.fill('#pmsg-input', 'Je commence par quoi ?');
+  await P.click('#pmsg-send');
+  await P.locator('#pmsg-list').getByText(/premier article/).waitFor();
+  await P.fill('#pmsg-input', 'Et après, combien ça coûte ?');
+  await P.click('#pmsg-send');
+  await P.locator('#pmsg-list').getByText('Transmis à l’équipe').waitFor();
+  await shot(P, '03b-manager');
 });
 
 await t('pack bloqué (Studio non prêt) : rien ne s’active, message clair', async () => {

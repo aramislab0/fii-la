@@ -229,6 +229,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 21/10 07:20 | Mandat, lot 4 : Manager des Ambassadeurs (conversation de la boutique, règles, escalade, réponse de l'équipe), WhatsApp à contexte vérifié (question 1/2 si numéro ambigu), jalons réels au back-office ; Studio `BLOCKED_DEPENDENCY` documenté ; correctif : feuilles et carte de félicitations au-dessus de la barre d'onglets | ce commit |
 | 21/10 06:30 | Mandat, lots 2-3 : Agents (libellés, adresses, gains à la date d'éligibilité, test de migration avant/après) ; Ambassadeurs (invitations, packs versionnés, essai exact, droits partners/partners_admin, back-office) ; docs BACK-OFFICE, CDP, rapport | ce commit |
 | 21/10 04:55 | Mandat, lot 1 : inventaire (tables, fonctions, libellés, adresses), comptages de production de référence, écart trouvé (gains calculés à l'ouverture de l'espace au lieu de la date d'éligibilité), garde-fous | ce commit |
 | 21/10 04:40 | Mandat AGENTS-AMBASSADEURS-001 enregistré (document, décision, actions #55-#56, entrée en tête de REVUE-VP) ; exécution non commencée | ce commit |
