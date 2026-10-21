@@ -49,3 +49,23 @@ Ces chiffres doivent être identiques après la migration du lot 2 (contrôle à
 | CONSTRUIT | Ce document (inventaire, référence, garde-fous) |
 | DÉPLOYÉ | Sans objet (documentation) |
 | TESTÉ | Comptages de production lus (lecture seule) |
+
+## Lot 2 — Migration des Agents (21/10/2026)
+
+**CONSTRUIT**
+- Migration `20261021700000_fiila_agents_eligibility.sql` (additive) : colonne `ambassador_shops.l1_at` ; fonction `fiila.amb_stamp` et 3 déclencheurs (articles, boutique, rattachement) qui enregistrent la date d'éligibilité au niveau 1 quand elle est atteinte ; `fiila.amb_eval` corrigée : niveau 1 dû si l'éligibilité est datée dans les 7 jours (quel que soit le jour du calcul), niveau 2 sans condition sur le jour du calcul (commandes déjà limitées aux 30 premiers jours), niveau 3 par fenêtre glissante entre le 60e et le 120e jour. Montants, seuils et délais inchangés. Libellés serveur « Code ambassadeur » → « Code agent ».
+- Application : libellés visibles « Ambassadeur(s) » → « Agent(s) » (espace, inscription, charte, formation, test, grades « Agent / Agent confirmé / Agent certifié Fii La », missions, gains, Manager, back-office, journal, réglages, confidentialité). Nouvelles adresses `#/agent` et `#/bo/agents` ; anciennes adresses `#/ambassadeur`, `#/carriere`, `#/bo/ambassadeurs/<id>` toujours valides. Marque du programme « Fii La Carrière » conservée (nom affiché du numéro WhatsApp du Manager).
+- Fonctions Edge (dépôt) : consignes du Manager et message aux numéros inconnus disent « agent ». Redéploiement manuel (MCP) après la mise en ligne du lot.
+- Tests : `tests/agents.sql.test.mjs` (5) — éligible jour 6 / calcul jour 8 → gain dû ; éligible jour 8 → pas de gain ; niveau 2 calculé au jour 40 → dû ; auto-rémunération et double attribution refusées, aucun gain recréé ; **migration** : agent, code, rattachement, gain versé et message créés avec les migrations antérieures, puis migration appliquée → comptages et code identiques, gain versé intact. `tests/db.mjs` sait maintenant créer une base « avant migration » (`createDb({ before })`, `applyMigrations`).
+
+## Lot 3 — Programme Ambassadeurs (marques invitées), packs, essai (21/10/2026)
+
+**CONSTRUIT**
+- Migration `20261021800000_fiila_partners.sql` : droits `partners` (super admin, Head of Stratégie, Opérations) et `partners_admin` (super admin) ; tables `partner_packs` (versions immuables une fois utilisées), `partner_invites` (empreinte du jeton seulement, expiration 30 jours, révocable, régénérable), `partner_trials` (une par invitation, une par boutique) ; réglage `studio_ready` (0) ; fonctions publiques `fiila_partner_invite` (lecture seule), `fiila_partner_accept` (preuve : clé ou compte propriétaire ; idempotente pour la même boutique ; refus pour une autre, révoquée, expirée, boutique désignée différente, essai déjà eu), `fiila_partner_activate` (seulement si le pack est prêt ; `pack_blocked_dependency` sinon ; idempotente), `fiila_partner_mine` ; back-office `fiila_bo_partners`, `fiila_bo_pack_save`, `fiila_bo_partner_invite`, `fiila_bo_partner_action` (nouveau lien, retirer, prolonger, suspendre, reprendre ; motif obligatoire pour retirer et suspendre ; journal). Dates : `fiila.trial_end` = minuit (Dakar) après N mois calendaires (31 janvier + 1 mois → 28/29 février inclus). Une boutique partenaire ne génère jamais de gain d'agent (`amb_eval`).
+- Application : page `#/invitation/<jeton>` (carte de la marque, contenu exact du pack, « Accepter avec ma boutique » ou « Accepter et créer ma boutique » → démarrage guidé, acceptation automatique après l'étape 1) ; carte de l'essai dans le tableau de bord normal de la boutique (à activer / en cours jusqu'au… / pack en préparation / terminé + « Demander la suite au Manager ») ; back-office : rubrique **Ambassadeurs** (Programmes) distincte de **Agents** — « Inviter une marque », aperçu personnalisé, lien privé montré une fois, partage WhatsApp, liste et actions, packs en versions.
+- Tests : `tests/partners.sql.test.mjs` (9), `tests/partners.test.mjs` (5, navigateur), `tests/backoffice.test.mjs` (+1 : pack, invitation, lien WhatsApp ; 15 rubriques).
+
+**Limites assumées (non masquées)**
+- Le contenu du « pack complet » n'est pas défini (action #56). Les tests utilisent des packs synthétiques. Sans version de pack, « Inviter une marque » est désactivé.
+- Seul le quota « retouches Studio » est un droit chiffré appliqué par le serveur ; il ne sert qu'au lot 4 (Studio), lui-même en `BLOCKED_DEPENDENCY`. Les autres avantages sont affichés tels que rédigés par le fondateur et appliqués par l'équipe tant qu'ils ne correspondent pas à une fonction mesurable.
+- « Partager sur WhatsApp » ouvre WhatsApp : ce n'est pas une preuve d'envoi.

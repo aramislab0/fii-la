@@ -1,9 +1,9 @@
 // Fii La — le Manager Fii La Carrière sur WhatsApp (API WhatsApp Business de Meta, « Cloud API »).
 //   GET  ?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…  vérification du webhook par Meta ;
-//   POST (Meta, signé X-Hub-Signature-256)  messages reçus des ambassadeurs : même conversation que dans l'application ; le Manager
+//   POST (Meta, signé X-Hub-Signature-256)  messages reçus des agents : même conversation que dans l'application ; le Manager
 //        répond sur WhatsApp (règles, ou IA si activée) ; un numéro inconnu reçoit le lien d'inscription ;
 //   POST { action: 'push', ambassador }  (membre de l'équipe connecté) : envoie sur WhatsApp la dernière réponse de l'équipe, si
-//        l'ambassadeur a écrit sur WhatsApp dans les dernières 24 heures (règle de Meta).
+//        l'agent a écrit sur WhatsApp dans les dernières 24 heures (règle de Meta).
 // Rien ne part si le réglage amb_whatsapp vaut 0. Toujours 200 à Meta (sinon Meta renvoie le même message en boucle).
 // Secrets (Supabase → Edge Functions → Secrets, saisis par le fondateur) :
 //   WA_TOKEN          jeton d'accès permanent (utilisateur système du Business Manager)
@@ -15,7 +15,7 @@
 import { draftReply } from './manager.mjs';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
-export const UNKNOWN_TEXT = (url) => `Bonjour ! Ici le Manager de Fii La Carrière. Ce numéro n’est pas encore celui d’un ambassadeur Fii La. Pour nous rejoindre : ${url}#/carriere`;
+export const UNKNOWN_TEXT = (url) => `Bonjour ! Ici le Manager de Fii La Carrière. Ce numéro n’est pas encore celui d’un agent Fii La. Pour nous rejoindre : ${url}#/carriere`;
 
 async function hmacHex(secret, raw) {
   const enc = new TextEncoder();

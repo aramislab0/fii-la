@@ -146,7 +146,7 @@ await t('back-office : conversation (lue, réponse de l’équipe), missions (cr
   await ko('fiila_bo_mission_save', { p: { title: 'x' } }, 'not_allowed', A);
   const ov = await ok('fiila_bo_overview', {}, HEAD);
   assert.ok('proposals' in ov.queues && 'career' in ov.queues);
-  assert.deepEqual((await ok('fiila_bo_me', {}, HEAD)).perms.sort(), ['ambassadors', 'dashboard', 'shops', 'strategy']);
+  assert.deepEqual((await ok('fiila_bo_me', {}, HEAD)).perms.sort(), ['ambassadors', 'dashboard', 'partners', 'shops', 'strategy']);
   // Le super admin peut inviter un Head of Stratégie.
   const inv = await ok('fiila_bo_invite', { p_email: 'head2@example.test', p_role: 'strategy' }, ADMIN);
   assert.ok(inv.token);

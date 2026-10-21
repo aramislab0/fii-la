@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-export async function createDb() {
+// opts.before : n'applique que les migrations antérieures (test de migration : données créées avant, vérifiées après).
+export async function createDb(opts = {}) {
   const db = new PGlite({ extensions: { pgcrypto } });
   await db.exec(`
     create schema if not exists extensions;
@@ -28,11 +29,17 @@ export async function createDb() {
     grant usage on schema auth to anon, authenticated;
     grant execute on function auth.uid() to anon, authenticated;
   `);
+  await applyMigrations(db, null, opts.before || null);
+  return db;
+}
+export async function applyMigrations(db, from, before) {
   const dir = join(root, 'supabase', 'migrations');
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) {
+    const v = f.split('_')[0];
+    if (from && v < from) continue;
+    if (before && v >= before) continue;
     await db.exec(readFileSync(join(dir, f), 'utf8'));
   }
-  return db;
 }
 
 // Crée un utilisateur de test (équivalent d'une inscription GoTrue) et renvoie son identifiant.

@@ -50,6 +50,9 @@
     "test:onboarding": "node tests/onboarding.test.mjs",
     "test:shopsetup": "node tests/shopsetup.test.mjs",
     "test:aftertask": "node tests/aftertask.test.mjs",
+    "test:agents-sql": "node tests/agents.sql.test.mjs",
+    "test:partners-sql": "node tests/partners.sql.test.mjs",
+    "test:partners": "node tests/partners.test.mjs",
     "test:whatsapp": "node tests/whatsapp.sql.test.mjs",
     "test:all": "scripts/run-suites.sh sql && scripts/run-suites.sh browser"
   },

@@ -97,10 +97,10 @@ await t('portail : connexion de l’équipe ; un compte hors équipe est refusé
 });
 
 const SECTIONS = [['', 'Tableau de bord'], ['boutiques', 'Boutiques'], ['commandes', 'Commandes'], ['comptes', 'Comptes'], ['moderation', 'Modération'],
-  ['vide-dressing', 'Vide-dressing'], ['ambassadeurs', 'Ambassadeurs'], ['carriere', 'Manager Carrière'], ['fil', 'Fil (25 places gratuites)'], ['finances', 'Finances'], ['croissance', 'Croissance'],
+  ['vide-dressing', 'Vide-dressing'], ['ambassadeurs', 'Ambassadeurs'], ['agents', 'Agents'], ['carriere', 'Manager Carrière'], ['fil', 'Fil (25 places gratuites)'], ['finances', 'Finances'], ['croissance', 'Croissance'],
   ['equipe', 'Équipe'], ['journal', 'Journal'], ['reglages', 'Réglages de la plateforme']];
-await t('ordinateur : barre latérale avec les 14 sections du super admin, chacune s’ouvre sans erreur', async () => {
-  assert.equal(await D.locator('.bo-nav .bo-link').count(), 14);
+await t('ordinateur : barre latérale avec les 15 sections du super admin, chacune s’ouvre sans erreur', async () => {
+  assert.equal(await D.locator('.bo-nav .bo-link').count(), 15);
   assert.ok(await D.locator('#bo-side').isVisible());
   assert.equal(await D.locator('#bo-menu').isVisible(), false, 'pas de bouton menu sur ordinateur');
   await shot(D, '02-tableau-de-bord');
@@ -112,6 +112,24 @@ await t('ordinateur : barre latérale avec les 14 sections du super admin, chacu
   }
   await D.locator('#bo-settings').waitFor();
   await shot(D, '03-reglages');
+});
+await t('Ambassadeurs (marques) : nouvelle version du pack, « Inviter une marque », aperçu et lien WhatsApp, invitation listée', async () => {
+  await D.click('#bo-nav-ambassadeurs');
+  await D.locator('#bo-packs summary').click();
+  await D.click('#bo-pack-new');
+  await D.fill('#pack-name', 'Pack complet (test)');
+  await D.fill('#pack-benefits', 'Vitrine mise en avant\nAccompagnement du Manager');
+  await D.click('#pack-save');
+  await D.locator('#bo-packs').getByText('Pack complet (test) · v1').waitFor({ state: 'attached' });
+  await D.click('#bo-invite-brand');
+  await D.fill('#inv-brand', 'Maison Test (test)');
+  await D.fill('#inv-wa', '77 700 00 01');
+  await D.click('#inv-create');
+  await D.locator('#bo-share-sheet').waitFor();
+  assert.match(await D.locator('#inv-wa-go').getAttribute('href'), /^https:\/\/wa\.me\/221777000001\?text=.*invitation/);
+  await shot(D, '20-invitation-marque');
+  await D.click('#inv-done');
+  await D.locator('#bo-partners').getByText('Maison Test (test)').waitFor();
 });
 await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ; réglage du nouvel accueil dans Réglages', async () => {
   await D.click('#bo-nav-croissance');

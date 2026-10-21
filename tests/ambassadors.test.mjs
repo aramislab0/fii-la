@@ -150,11 +150,11 @@ await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async ()
   await local.db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Essai Suppr')`, [sid]);
   const reg = await rpc(local.db, 'fiila_ambassador_register', { p: { name: 'Essai Suppr', phone: '77 500 00 06', payout_method: 'wave', charter: true } }, { uid: sid });
   assert.equal(reg.status, 200, JSON.stringify(reg.body));
-  await F.goto(URL0 + '#/bo/ambassadeurs?f=training');
+  await F.goto(URL0 + '#/bo/agents?f=training');
   await F.locator('#bo-amb-table tbody tr').filter({ hasText: 'Essai Suppr' }).locator('td').nth(1).click();
   F.once('dialog', (d) => d.accept());
   await F.click('#bo-amb-delete');
-  await F.getByText('Profil ambassadeur supprimé.').waitFor();
+  await F.getByText('Profil agent supprimé.').waitFor();
   assert.equal((await local.db.query(`select count(*)::int n from fiila.ambassadors where name = 'Essai Suppr'`)).rows[0].n, 0);
   await local.db.query(`delete from auth.users where id = $1`, [sid]);
   CODE = (await local.db.query(`select code from fiila.ambassadors`)).rows[0].code;
@@ -227,7 +227,7 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   assert.match(w, /Déjà reçu\s*2 000 FCFA/);
   // Depuis le compte : l'entrée « Fii La Carrière » montre l'état de l'ambassadeur
   await A.goto(URL0 + '#/compte');
-  await A.locator('#amb-entry').getByText('Fii La Carrière · ambassadeur actif').waitFor();
+  await A.locator('#amb-entry').getByText('Fii La Carrière · agent actif').waitFor();
   await A.click('#amb-entry');
   await A.locator('#amb-code').waitFor();
   await shot(A, '05-portefeuille');
