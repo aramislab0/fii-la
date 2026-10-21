@@ -51,7 +51,7 @@ await t('boutique : 3 photos ajoutées en une fois, la 3e devient principale, en
   await S.fill('#shop-name', 'Boutique Photos (test)');
   await S.selectOption('#shop-type', 'mode');
   await S.click('#shop-save');
-  await S.getByText('Boutique créée.').waitFor();
+  await S.locator('#shop-setup[data-step="2"]').waitFor();
   await S.goto(URL0 + '#/boutique/article/nouveau');
   await S.locator('#product-photo-add').waitFor();
   await S.setInputFiles('#product-photo', [pngFile('rouge.png', RED), pngFile('vert.png', GREEN), pngFile('bleu.png', BLUE)]);

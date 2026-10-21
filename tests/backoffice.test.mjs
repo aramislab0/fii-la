@@ -118,6 +118,7 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   await D.locator('#bo-onboarding').waitFor();
   await D.locator('#bo-onboarding-table').waitFor();
   assert.match(await D.locator('#bo-onboarding').textContent(), /Nouvel accueil actif/);
+  await D.locator('#bo-setup').getByText('Démarrage guidé de la boutique').waitFor();
   await D.click('#bo-nav-reglages');
   await D.locator('#bo-settings').getByText('Nouvel accueil', { exact: false }).waitFor();
 });

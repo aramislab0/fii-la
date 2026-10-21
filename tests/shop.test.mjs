@@ -160,8 +160,10 @@ await t('boutique : création, tableau de bord vide', async () => {
   await M.goto(URL0 + '#/boutique');
   await M.fill('#shop-name', 'Boutique Awa (test)');
   await M.selectOption('#shop-type', 'mode');
+  if (!(await M.locator('#shop-more').evaluate((d) => d.open))) await M.locator('#shop-more > summary').click();
   await M.fill('#shop-phone', '33 800 00 00');
   await M.click('#shop-save');
+  await M.locator('#setup-later').click();
   await M.locator('#shop-title').getByText('Boutique Awa (test)').waitFor();
   await M.locator('#first-product').waitFor(); // boutique neuve : une seule première étape
   assert.equal(await M.locator('.tiles').count(), 0, 'pas de compteurs à zéro');
@@ -302,6 +304,7 @@ await t('boutique sans compte : créée en un geste, le compte est proposé, pas
   await S.page.fill('#shop-name', 'Boutique Binta (test)');
   await S.page.selectOption('#shop-type', 'mode');
   await S.page.click('#shop-save');
+  await S.page.locator('#setup-later').click();
   await S.page.locator('#shop-title').getByText('Boutique Binta (test)').waitFor();
   const key = await S.page.evaluate(() => JSON.parse(localStorage.getItem('fiila.shop')).key);
   assert.ok(key && key.length > 40);

@@ -1609,3 +1609,24 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
 .svc-t>span{font-size:13px;color:var(--muted);line-height:1.35}
 .svc-hide{align-self:flex-start;margin-top:2px;padding:6px 0;border:0;background:none;color:var(--muted);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer}
 .svc-go{white-space:nowrap}
+
+/* Démarrage guidé de la boutique (lot 2, 21/10) : une carte par étape, progression, un bouton principal. */
+.setup{display:flex;flex-direction:column;gap:14px}
+.setup h1{margin:0}
+.setup-prog{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.setup-prog i{height:6px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line)}
+.setup-prog i.on{background:var(--green);border-color:var(--green)}
+.setup-step{margin:0;font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.02em}
+.setup-later{align-self:center;padding:10px 14px;color:var(--muted);font-size:14px;text-decoration:underline}
+.setup-preview{border-radius:22px;background:var(--surface);border:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-card)}
+.setup-pv-head{display:flex;align-items:center;gap:10px}
+.setup-pv-head .vavatar{width:40px;height:40px;font-size:17px}
+.setup-pv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.setup-pv-card{display:flex;flex-direction:column;gap:4px;font-size:13.5px;min-width:0}
+.setup-pv-card img,.setup-pv-ph{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:14px;background:var(--surface-2)}
+.setup-pv-ph{display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.setup-ok{align-items:center;text-align:center;padding-top:24px}
+.setup-ok-ic{width:76px;height:76px;border-radius:24px;background:var(--green);color:var(--lime);display:flex;align-items:center;justify-content:center;animation:setup-pop .45s cubic-bezier(.22,.61,.36,1)}
+.setup-ok .btn{align-self:stretch}
+@keyframes setup-pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion: reduce){.setup-ok-ic{animation:none}}

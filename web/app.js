@@ -718,6 +718,10 @@
       onclick: function () { track('onboarding', 'hero_reprendre:click'); } },
       h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon('cam', 32)),
       h('span', null, h('b', null, 'Reprendre mon adresse'), h('small', null, 'Là où vous vous étiez arrêté')));
+    if (setupPending()) return h('a', { class: 'hero', href: '#/boutique/demarrer', id: 'home-hero', 'data-hero': 'boutique',
+      onclick: function () { track('onboarding', 'hero_boutique:click'); track('shop_setup', 'resume:open'); } },
+      h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon('shop', 32)),
+      h('span', null, h('b', null, 'Reprendre ma boutique'), h('small', null, 'Encore quelques secondes pour l’ouvrir')));
     var top = topActivity(), s = top && top !== 'adresse' ? svcOf(top) : null;
     if (s && myActivities().indexOf(s) >= 0) return h('a', { class: 'hero', href: s.href, id: 'home-hero', 'data-hero': s.id,
       onclick: function () { track('onboarding', 'hero_' + s.id + ':click'); } },
@@ -2681,6 +2685,7 @@
       else if (p[0] === 'vide-dressing' && !p[1]) view = viewVideDressing();
       else if (p[0] === 'vide-dressing' && p[1] === 'vendre') view = viewVdSell(r.q);
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
+      else if (p[0] === 'boutique' && p[1] === 'demarrer') view = viewShopSetup();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
       else if (p[0] === 'livreur' && p[1] === 'invitation' && p[2]) view = viewCourierInvite(p[2]);
@@ -4667,7 +4672,7 @@
   function viewShop(q) {
     return sapi('fiila_shop_get', {}).then(function (r) {
       SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null;
-      return r.shop ? shopDashboard(r, q || {}) : shopForm(null);
+      return r.shop ? shopDashboard(r, q || {}) : onboardingOn() ? setupStepName() : shopForm(null);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
   // Types de commerce (19/10) : choisis à la création, ils serviront aux outils propres à chaque métier.
@@ -4722,6 +4727,128 @@
     return shop ? shopTabs(pg, 'settings') : pg;
   }
 
+  /* ----- Démarrage guidé de la boutique (accueil v2, lot 2 ; proposition validée le 20/10 23:36).
+     1. Nom et type → 2. Premier article (nom, prix, photo facultative ; « Plus tard » possible) → 3. Aperçu, ouverture
+     explicite de la vitrine, puis partage. Une boutique sans article n'est pas proposée au partage. Chaque étape est
+     enregistrée sur le serveur ; l'étape suivante se déduit de l'état réel (reprise après interruption). */
+  var SETUP_LS = 'fiila.shop.setup';
+  ['name:done', 'product:done', 'product:skip', 'vitrine:open', 'share:click', 'resume:open'].forEach(function (v) { (TRACKABLE.shop_setup = TRACKABLE.shop_setup || []).push(v); });
+  function setupState() { return LS.get(SETUP_LS, null) || {}; }
+  function setupPending() { var st = setupState(); return !!(st.started && !st.done && (shopKey() || (ME && ME.shop))); }
+  function setupFrame(n, title, text, body) {
+    return page(backBtn(n === 1 ? 'Accueil' : 'Ma boutique', n === 1 ? '#/' : '#/boutique'),
+      h('section', { class: 'setup', id: 'shop-setup', 'data-step': String(n) },
+        h('div', { class: 'setup-prog', role: 'progressbar', 'aria-valuemin': '1', 'aria-valuemax': '3', 'aria-valuenow': String(n), 'aria-label': 'Étape ' + n + ' sur 3' },
+          [1, 2, 3].map(function (i) { return h('i', { class: i <= n ? 'on' : null }); })),
+        h('p', { class: 'setup-step' }, 'Étape ' + n + ' sur 3'),
+        h('h1', null, title), text ? h('p', { class: 'muted' }, text) : null,
+        body),
+      footer(true));
+  }
+  function setupStepName() {
+    var f = { name: '', phone: '', type: '' }, ambCode = '';
+    var ask = referralAsk('shop-ref');
+    var err = h('div', { role: 'alert' });
+    var btn = h('button', { class: 'btn big', type: 'button', id: 'shop-save', onclick: function () {
+      setKids(err);
+      if (!f.name.trim()) return errBox(err, new ApiError('shop_name_required'));
+      if (!f.type) return errBox(err, new ApiError('business_type_required'));
+      btn.disabled = true;
+      sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: null, business_type: f.type } }).then(function (r) {
+        if (r && r.key) LS.set(SHOP_LS, { id: r.shop.id, key: r.key, linked: authed() || undefined });
+        track('shop_created', authed() ? 'account' : 'no_account'); bumpTx(); attribute('shop', null, r.key || shopKey(), ask.value());
+        track('shop_setup', 'name:done'); LS.set(SETUP_LS, { started: Date.now() });
+        if (ambCode.trim()) api('fiila_ambassador_link', { p_key: r.key || shopKey(), p_code: ambCode.trim() }).then(function (x) { toast('Boutique créée, accompagnée par ' + x.ambassador + '.'); }, function (e) { toast('Boutique créée. Code ambassadeur : ' + errText(e)); });
+        ME = null; go('#/boutique/demarrer');
+      }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, 'Continuer');
+    return setupFrame(1, 'Votre boutique', 'Son nom apparaît sur votre vitrine et vos factures.', h('div', { class: 'stack' },
+      textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
+      h('div', { class: 'field' }, h('label', { for: 'shop-type' }, 'Type de commerce'),
+        h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
+          h('option', { value: '' }, 'Choisir…'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0] }, t[1]); }))),
+      h('details', { class: 'more-details', id: 'shop-more' }, h('summary', null, 'Téléphone, code ambassadeur (facultatif)'),
+        h('div', { class: 'stack', style: 'margin-top:12px' },
+          textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', onInput: function (v) { f.phone = v; } }),
+          textField({ id: 'shop-amb', label: 'Code ambassadeur', optional: true, max: 10, placeholder: 'Si un ambassadeur Fii La vous aide', onInput: function (v) { ambCode = v; } }),
+          ask ? ask.el : null)),
+      err, btn));
+  }
+  function viewShopSetup() {
+    return Promise.all([sapi('fiila_shop_get', {}), sapi('fiila_products', { p_all: true })]).then(function (rr) {
+      var shop = rr[0].shop, prods = rr[1] || [];
+      if (!shop) return onboardingOn() ? setupStepName() : shopForm(null);
+      SHOP_ROLE = shop.role || 'owner';
+      if (SHOP_ROLE === 'editor') { redirect('#/boutique'); return page(); }
+      if (!prods.length) return setupStepProduct(shop);
+      return setupStepVitrine(shop, prods);
+    }, failPage('Impossible de charger la boutique', 'boutique'));
+  }
+  function setupStepProduct(shop) {
+    var f = { name: '', price: '' };
+    var photos = productPhotos(null);
+    var err = h('div', { role: 'alert' });
+    var btn = h('button', { class: 'btn big', type: 'button', id: 'setup-product-save', onclick: function () {
+      setKids(err);
+      var price = parseInt(String(f.price).replace(/\D/g, ''), 10);
+      if (!f.name.trim()) return errBox(err, new ApiError('item_label_required'));
+      if (!(price >= 0)) return errBox(err, new ApiError('invalid_price'));
+      var p = { name: f.name.trim(), price: price, active: true };
+      btn.disabled = true;
+      photos.payload().then(function (pp) {
+        if (pp) { p.photo = pp.photo; p.photos = pp.photos; }
+        return sapi('fiila_product_save', { p: p });
+      }).then(function () {
+        track('product_created', photos.count() ? 'photo' : 'no_photo'); track('shop_setup', 'product:done');
+        render();
+      }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, 'Continuer');
+    return setupFrame(2, 'Votre premier article', 'Une photo, un nom, un prix. Vous en ajouterez d’autres ensuite.', h('div', { class: 'stack' },
+      photos.el,
+      textField({ id: 'product-name', label: 'Nom de l’article', max: 80, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; } }),
+      textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; } }),
+      err, btn,
+      h('a', { class: 'setup-later', id: 'setup-later', href: '#/boutique', onclick: function () { track('shop_setup', 'product:skip'); } }, 'Plus tard')));
+  }
+  function setupStepVitrine(shop, prods) {
+    var err = h('div', { role: 'alert' });
+    if (shop.public && shop.slug) return setupDone(shop);
+    var first = prods[0];
+    var btn = h('button', { class: 'btn big', type: 'button', id: 'setup-open', onclick: function () {
+      setKids(err); btn.disabled = true;
+      sapi('fiila_shop_vitrine', { p: { public: true } }).then(function (r) {
+        FEED_CACHE = null; track('shop_setup', 'vitrine:open');
+        shop.public = true; shop.slug = r.slug;
+        render();
+      }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, 'Ouvrir ma vitrine');
+    return setupFrame(3, 'Votre vitrine', 'Voici ce que verront vos clientes. Elles commandent sans compte et donnent leur adresse à la fin.', h('div', { class: 'stack' },
+      h('div', { class: 'setup-preview', id: 'setup-preview' },
+        h('div', { class: 'setup-pv-head' }, h('span', { class: 'vavatar', 'aria-hidden': 'true' }, (shop.name || '?').trim().charAt(0).toUpperCase()), h('b', { class: 'wrapword' }, shop.name)),
+        h('div', { class: 'setup-pv-grid' }, prods.slice(0, 2).map(function (x) {
+          return h('div', { class: 'setup-pv-card' },
+            x.photo ? h('img', { src: x.photo, alt: '' }) : h('span', { class: 'setup-pv-ph', 'aria-hidden': 'true' }, icon('cam', 26)),
+            h('span', { class: 'wrapword' }, x.name), h('b', null, fcfa(x.price)));
+        }))),
+      first && !first.photo ? h('p', { class: 'small muted' }, 'Astuce : un article avec photo se vend mieux. Vous pourrez en ajouter une dans « Mes articles ».') : null,
+      err, btn,
+      h('a', { class: 'setup-later', id: 'setup-later', href: '#/boutique' }, 'Plus tard')));
+  }
+  function setupDone(shop) {
+    var url = vitrineUrl(shop.slug);
+    function finish() { var st = setupState(); st.done = Date.now(); LS.set(SETUP_LS, st); }
+    finish();
+    return page(
+      h('section', { class: 'setup setup-ok', id: 'setup-done' },
+        h('span', { class: 'setup-ok-ic', 'aria-hidden': 'true' }, icon('check', 34)),
+        h('h1', null, 'Votre boutique est prête'),
+        h('p', { class: 'muted' }, 'Envoyez le lien de votre vitrine à vos clientes, ou mettez-le dans votre statut WhatsApp.'),
+        h('p', { class: 'sharelink', id: 'setup-url' }, url),
+        iconBtn('a', { class: 'btn big', id: 'setup-share', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
+          onclick: function () { track('shop_setup', 'share:click'); } }, 'chat', 'Partager sur WhatsApp'),
+        h('a', { class: 'setup-later', id: 'setup-to-shop', href: '#/boutique' }, 'Aller à ma boutique')),
+      footer(true));
+  }
   // Livreur attitré : invitation par WhatsApp, acceptation par le livreur, envoi automatique des courses.
   var VEHICLES = { moto: 'Moto', voiture: 'Voiture', velo: 'Vélo', pied: 'À pied' };
   function courierSection(shop) {
@@ -7486,6 +7613,19 @@
         { label: 'Découvert (feuille)', get: function (x) { return boNum(x.svc); }, cls: 'num' },
         { label: 'Raccourci touché', get: function (x) { return boNum(x.act + x.hero); }, cls: 'num' },
         { label: 'Retiré de l’accueil', get: function (x) { return boNum(x.hide); }, cls: 'num' }], rows, { id: 'bo-onboarding-table' }),
+      (function () {
+        var su = d.setup || {};
+        var steps = [['Nom et type', su['name:done']], ['Premier article', su['product:done']], ['Vitrine ouverte', su['vitrine:open']], ['Partage WhatsApp touché', su['share:click']]];
+        var top = Number(su['name:done'] || 0);
+        return h('div', { class: 'stack tight', id: 'bo-setup' },
+          h('h3', null, 'Démarrage guidé de la boutique'),
+          h('p', { class: 'small muted' }, '« Plus tard » à l’article : ' + boNum(su['product:skip'] || 0) + ' · « Reprendre ma boutique » touché : ' + boNum(su['resume:open'] || 0) + '. « Partage touché » ne prouve pas qu’un message est parti.'),
+          steps.map(function (x) {
+            var n = Number(x[1] || 0), pct = top ? Math.round(n / top * 100) : 0;
+            return h('div', { class: 'stack tight' }, h('div', { class: 'total-row' }, h('span', { class: 'small' }, x[0]), h('b', { class: 'small' }, boNum(n) + (top ? ' · ' + pct + ' %' : ''))),
+              h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, h('i', { class: 'paid', style: 'width:' + pct + '%' })));
+          }));
+      })(),
       h('p', { class: 'small muted' }, 'Tâches réussies sur la même période (tous parcours confondus) :'),
       h('div', { class: 'bo-type-chips' }, tasks.map(function (x) { return h('span', { class: 'chip' }, x[0] + ' : ' + boNum(x[1] || 0)); })),
       h('div', { class: 'row' },

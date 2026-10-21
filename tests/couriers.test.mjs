@@ -63,6 +63,7 @@ await t('commerçante : boutique sans compte, invitation du livreur sur son What
   await S.fill('#shop-name', 'Boutique Fatim (test)');
   await S.selectOption('#shop-type', 'mode');
   await S.click('#shop-save');
+  await S.locator('#setup-later').click();
   await S.locator('#shop-title').waitFor();
   await S.getByRole('link', { name: 'Réglages' }).click();
   if (!(await S.locator('#courier-section').evaluate((d) => d.open))) await S.locator('#courier-section summary').click();

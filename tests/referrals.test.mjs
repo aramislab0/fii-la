@@ -77,8 +77,10 @@ await t('boutique : « Parrainer une boutique », code, lien et message WhatsApp
   await A.goto(URL0 + '#/boutique');
   await A.fill('#shop-name', 'Boutique Awa (test)');
   await A.selectOption('#shop-type', 'mode');
+  if (!(await A.locator('#shop-more').evaluate((d) => d.open))) await A.locator('#shop-more > summary').click();
   await A.fill('#shop-phone', '77 100 00 01');
   await A.click('#shop-save');
+  await A.locator('#setup-later').click();
   await A.locator('#shop-title').waitFor();
   await A.click('#tab-settings');
   await A.click('#shop-referral');
@@ -106,6 +108,7 @@ await t('lien de parrainage : bandeau « Boutique Awa vous invite », boutique c
   await B.fill('#shop-name', 'Boutique Binta (test)');
   await B.selectOption('#shop-type', 'mode');
   await B.click('#shop-save');
+  await B.locator('#setup-later').click();
   await B.locator('#shop-title').waitFor();
   await B.goto(URL0 + '#/');
   assert.equal(await B.locator('#invite-banner').count(), 0, 'plus de bandeau une fois la boutique créée');

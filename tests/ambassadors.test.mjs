@@ -192,6 +192,7 @@ await t('ambassadeur : code, portefeuille, aucun commerçant ; un commerçant ta
   await M.goto(URL0 + '#/boutique');
   await M.fill('#shop-name', 'Boutique Awa (test)');
   await M.selectOption('#shop-type', 'mode');
+  if (!(await M.locator('#shop-more').evaluate((d) => d.open))) await M.locator('#shop-more > summary').click();
   await M.fill('#shop-amb', CODE);
   await M.click('#shop-save');
   await M.getByText('accompagnée par Moussa').waitFor();

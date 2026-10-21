@@ -48,8 +48,10 @@ await t('boutique : ouvre sa vitrine depuis les réglages, lien prêt à envoyer
   await S.goto(URL0 + '#/boutique');
   await S.fill('#shop-name', 'Boutique Awa (test)');
   await S.selectOption('#shop-type', 'mode');
+  if (!(await S.locator('#shop-more').evaluate((d) => d.open))) await S.locator('#shop-more > summary').click();
   await S.fill('#shop-phone', '77 100 00 01');
   await S.click('#shop-save');
+  await S.locator('#setup-later').click();
   await S.locator('#shop-title').waitFor();
   KEY = await S.evaluate(() => JSON.parse(localStorage.getItem('fiila.shop')).key);
   P1 = await ok('fiila_product_save', { p_key: KEY, p: { name: 'Robe wax (test)', price: 15000, description: 'Taille M ou L.', photo } });

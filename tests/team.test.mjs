@@ -56,7 +56,7 @@ await t('propriétaire : Réglages → Équipe (section repliée), invitation av
   await O.fill('#shop-name', 'Boutique Awa (test)');
   await O.selectOption('#shop-type', 'mode');
   await O.click('#shop-save');
-  await O.getByText('Boutique créée.').waitFor();
+  await O.locator('#shop-setup[data-step="2"]').waitFor();
   await O.goto(URL0 + '#/boutique/reglages');
   const sec = O.locator('#team-section');
   await sec.waitFor();
