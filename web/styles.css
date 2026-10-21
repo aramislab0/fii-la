@@ -1613,9 +1613,6 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
 /* Démarrage guidé de la boutique (lot 2, 21/10) : une carte par étape, progression, un bouton principal. */
 .setup{display:flex;flex-direction:column;gap:14px}
 .setup h1{margin:0}
-.setup-prog{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.setup-prog i{height:6px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line)}
-.setup-prog i.on{background:var(--green);border-color:var(--green)}
 .setup-step{margin:0;font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.02em}
 .setup-later{align-self:center;padding:10px 14px;color:var(--muted);font-size:14px;text-decoration:underline}
 .setup-preview{border-radius:22px;background:var(--surface);border:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--shadow-card)}
@@ -1630,3 +1627,37 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
 .setup-ok .btn{align-self:stretch}
 @keyframes setup-pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion: reduce){.setup-ok-ic{animation:none}}
+.setup-badges{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sb{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--muted)}
+.sb-ic{width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:var(--surface-2);border:1.5px solid var(--line);color:var(--muted);transition:transform .3s}
+.sb-now .sb-ic{background:var(--surface);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent)}
+.sb-now{color:var(--ink)}
+.sb-done .sb-ic{background:var(--green);border-color:var(--green);color:var(--lime);animation:setup-pop .45s cubic-bezier(.22,.61,.36,1)}
+.sb-done{color:var(--green)}
+.setup-win{position:relative;overflow:hidden;display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:20px;background:var(--green);color:var(--on-green);animation:setup-in .5s cubic-bezier(.22,.61,.36,1)}
+.setup-win>div{display:flex;flex-direction:column;gap:2px;min-width:0;position:relative;z-index:1}
+.setup-win b{font-size:16.5px;line-height:1.25}
+.setup-win span{font-size:13px;opacity:.9}
+.setup-win-k{margin:0;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--lime)}
+.setup-win-ic{flex:none;width:44px;height:44px;border-radius:14px;background:var(--lime);color:var(--green);display:flex;align-items:center;justify-content:center;position:relative;z-index:1;animation:setup-pop .5s .15s both cubic-bezier(.22,.61,.36,1)}
+.setup-win-spark{position:absolute;inset:0;pointer-events:none}
+.setup-win-spark i{position:absolute;width:7px;height:7px;border-radius:2px;background:var(--lime);opacity:0;animation:setup-spark 1.4s .2s ease-out forwards}
+.setup-win-spark i:nth-child(1){left:12%;top:70%}
+.setup-win-spark i:nth-child(2){left:38%;top:80%;animation-delay:.35s;background:#fff}
+.setup-win-spark i:nth-child(3){left:62%;top:75%;animation-delay:.25s}
+.setup-win-spark i:nth-child(4){left:80%;top:85%;animation-delay:.45s;background:#fff}
+.setup-win-spark i:nth-child(5){left:92%;top:65%;animation-delay:.3s}
+@keyframes setup-in{from{transform:translateY(10px) scale(.97);opacity:0}to{transform:none;opacity:1}}
+@keyframes setup-spark{0%{opacity:0;transform:translateY(0) rotate(0)}20%{opacity:1}100%{opacity:0;transform:translateY(-60px) rotate(160deg)}}
+@media (prefers-reduced-motion: reduce){.setup-win,.setup-win-ic,.sb-done .sb-ic{animation:none}.setup-win-spark{display:none}}
+
+/* Découverte après une action (lot 3, 21/10) : une ligne discrète sous la tâche, masquable. */
+.after{display:grid;grid-template-columns:40px 1fr auto;gap:12px;align-items:start;padding:14px;border-radius:18px;background:var(--surface);border:1px solid var(--line)}
+.after-ic{width:40px;height:40px;border-radius:13px;background:var(--surface-2);color:var(--green);display:flex;align-items:center;justify-content:center}
+.after-t{display:flex;flex-direction:column;gap:6px;min-width:0}
+.after-t b{font-size:15px}
+.after-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px}
+.after-cta{display:inline-flex;align-items:center;gap:4px;color:var(--green);font-weight:700;font-size:14px;text-decoration:none;min-height:32px}
+.after-all{border:0;background:none;padding:6px 0;color:var(--muted);font:inherit;font-size:13.5px;text-decoration:underline;cursor:pointer;align-self:flex-start}
+.after-x{width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.after-x:focus-visible,.after-all:focus-visible,.after-cta:focus-visible{outline:3px solid var(--focus);outline-offset:2px}

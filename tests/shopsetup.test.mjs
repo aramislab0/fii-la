@@ -50,6 +50,9 @@ await t('étape 1 : nom et type, un seul bouton ; les champs facultatifs replié
   await P.selectOption('#shop-type', 'mode');
   await P.click('#shop-save');
   await P.locator('#shop-setup[data-step="2"]').waitFor();
+  assert.match(await P.locator('#setup-win').textContent(), /Étape 1 réussie.*Boutique Coumba \(test\)/);
+  assert.equal(await P.locator('.sb-done').count(), 1, 'badge « Boutique » débloqué');
+  await shot(P, '01b-felicitations');
   assert.equal(await metric('name:done'), 1);
 });
 
@@ -59,6 +62,7 @@ await t('interruption : l’accueil propose « Reprendre ma boutique », qui ram
   assert.match(await P.locator('#home-hero').textContent(), /Reprendre ma boutique/);
   await P.click('#home-hero');
   await P.locator('#shop-setup[data-step="2"]').waitFor();
+  assert.equal(await P.locator('#setup-win').count(), 0, 'la carte de félicitations ne revient pas');
   await shot(P, '02-article');
 });
 
@@ -68,9 +72,15 @@ await t('étape 2 → 3 : premier article ; aperçu ; la vitrine ne s’ouvre qu
   await P.click('#setup-product-save');
   await P.locator('#shop-setup[data-step="3"]').waitFor();
   await P.locator('#setup-preview').getByText('Boubou brodé (test)').waitFor();
+  await P.locator('#setup-win').getByText('Votre premier article est prêt').waitFor();
+  assert.equal(await P.locator('.sb-done').count(), 2);
   assert.equal((await shopOf('Boutique Coumba (test)')).public, false, 'vitrine encore fermée');
   await shot(P, '03-vitrine');
   await P.click('#setup-open');
+  await P.locator('#cel').getByText('Bravo, Boutique Coumba (test) est en ligne !').waitFor();
+  assert.match(await P.locator('#cel').textContent(), /Place n° \d+ \/ 25/);
+  await shot(P, '03b-bravo');
+  await P.click('#cel-close');
   await P.locator('#setup-done').waitFor();
   assert.equal((await shopOf('Boutique Coumba (test)')).public, true);
   assert.match(await P.locator('#setup-url').textContent(), /#\/b\//);

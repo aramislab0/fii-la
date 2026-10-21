@@ -622,7 +622,7 @@
     var c = LS.get('fiila.flags', null);
     if (c && Date.now() - c.at < 6 * 3600e3) NUDGE_FLAGS = c.v;
     if (!c || Date.now() - c.at >= 6 * 3600e3) api('fiila_app_flags', {}).then(function (v) { NUDGE_FLAGS = v; LS.set('fiila.flags', { at: Date.now(), v: v }); }, function () {});
-    return NUDGE_FLAGS || { nudges: true, onboarding: true };
+    return NUDGE_FLAGS || { nudges: true, onboarding: true, discover: true };
   }
   function nudgeState() {
     var st = LS.get('fiila.nudges', null) || {};
@@ -772,6 +772,36 @@
       h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer', onclick: function () { close(); } }, icon('gift', 24), h('span', null, 'Inviter un proche'),
         h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))));
     close = openSheet(back);
+  }
+  /* ----- Découverte après une action (accueil v2, lot 3). La tâche du lien reste l'action principale ; dessous, une seule
+     proposition discrète et masquable, plus « Voir tous les services » (arbitrage A2 du fondateur, 20/10 23:36).
+     « × » = 7 jours de silence pour ce contexte, deux fois = plus jamais. Réglage du back-office discover_after (0 = rien). */
+  var AFTER_LS = 'fiila.after';
+  var AFTER_CTX = ['order', 'sent', 'course'];
+  TRACKABLE.discover = [];
+  AFTER_CTX.forEach(function (c) { ['shown', 'click', 'hide', 'all'].forEach(function (a) { TRACKABLE.discover.push(c + ':' + a); }); });
+  ['fiche', 'event'].forEach(function (c) { TRACKABLE.discover.push(c + ':all'); });
+  function afterOn() { var f = nudgeFlags(); return onboardingOn() && f.discover !== false; }
+  function servicesLink(ctx) {
+    return h('button', { class: 'after-all', type: 'button', id: 'after-all', onclick: function () { track('discover', ctx + ':all'); servicesSheet(); } }, 'Voir tous les services');
+  }
+  // o : { icon, title, cta, href }
+  function afterTask(ctx, o) {
+    if (!afterOn()) return null;
+    var st = LS.get(AFTER_LS, null) || {}, me = st[ctx] || {};
+    if ((me.d || 0) >= 2 || (me.until && Date.now() < me.until)) return null;
+    var box = h('aside', { class: 'after', id: 'after-' + ctx, 'aria-label': 'Suggestion' },
+      h('span', { class: 'after-ic', 'aria-hidden': 'true' }, icon(o.icon, 20)),
+      h('div', { class: 'after-t' }, h('b', null, o.title),
+        h('div', { class: 'after-row' },
+          h('a', { class: 'after-cta', id: 'after-' + ctx + '-go', href: o.href, onclick: function () { track('discover', ctx + ':click'); } }, o.cta, icon('chev', 14)),
+          servicesLink(ctx))),
+      h('button', { class: 'after-x', type: 'button', 'aria-label': 'Masquer', id: 'after-' + ctx + '-hide', onclick: function () {
+        var x = LS.get(AFTER_LS, null) || {}; var m = x[ctx] || {}; m.d = (m.d || 0) + 1; m.until = Date.now() + 7 * 864e5; x[ctx] = m; LS.set(AFTER_LS, x);
+        track('discover', ctx + ':hide'); box.remove();
+      } }, icon('close', 16)));
+    trackWhenVisible(box, 'discover', ctx + ':shown');
+    return box;
   }
   // « Installer l'app » : à partir de la deuxième visite (une visite = une session du navigateur).
   function visitCount() {
@@ -3820,7 +3850,9 @@
       if (r.state !== 'ok') return page(stateCard('⦸', 'Lien livreur indisponible', 'L’adresse a été désactivée ou le lien n’est pas valide.'), footer());
       var pg = page(courierKey() ? backBtn('Mes courses', '#/livreur') : null, h('p', { class: 'eyebrow' }, 'Livraison'),
         liveShare(token, r.place.entry, { kind: 'courier', title: 'Prêt à partir ?', startLabel: 'Démarrer la livraison', who: 'L’expéditeur et le client voient', initial: r.status }),
-        fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(voiceFrom(token, 'course'), r.place.voice_secs) : null }), footer(true));
+        fiche(r.place, { wide: true, voice: r.place.has_voice ? voicePlayer(voiceFrom(token, 'course'), r.place.voice_secs) : null }),
+        courierKey() ? null : afterTask('course', { icon: 'moto', title: 'Vous livrez souvent ?', cta: 'Mon espace livreur : toutes vos courses', href: '#/livreur' }),
+        footer(true));
       pg.classList.add('wide');
       return pg;
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la livraison', errText(e), retryBtn())); });
@@ -3935,7 +3967,8 @@
         : 'La porte, un repère, où se garer. Un lien à envoyer.'),
       h('a', { class: 'btn ghost discover-cta', id: 'discover-cta', href: (isMeeting ? '#/rdv/nouveau' : '#/new') + qs({ retour: token }),
         onclick: function () { track('discovery_cta', variant); } }, icon(isMeeting ? 'cal' : 'cam', 22), h('span', null, isMeeting ? 'Créer un événement' : 'Créer mon adresse')),
-      h('p', { class: 'hint' }, 'Gratuit. Sans compte.'));
+      h('p', { class: 'hint' }, 'Gratuit. Sans compte.'),
+      afterOn() ? servicesLink(isMeeting ? 'event' : 'fiche') : null);
     trackWhenVisible(block, 'discovery_shown', variant);
     return block;
   }
@@ -4048,6 +4081,8 @@
         iconBtn('a', { class: 'btn', id: 'share-relatives', href: waLink('Mon adresse, avec la photo de l’entrée : ' + url), target: '_blank', rel: 'noopener noreferrer',
           onclick: function () { track('share_initiated', 'whatsapp_address'); } }, 'chat', 'Envoyer sur WhatsApp'),
         h('a', { class: 'btn link', href: '#/m/' + placeId, style: 'align-self:flex-start' }, 'Voir mon adresse')) : null,
+      backInvoice ? (shopKey() || (ME && ME.shop) ? null : afterTask('order', { icon: 'shop', title: 'Vous vendez aussi ?', cta: 'Ouvrir ma boutique gratuite', href: '#/boutique' }))
+        : afterTask('sent', { icon: 'ask', title: 'Vous livrez ou vendez ?', cta: 'Demander l’adresse de vos clients', href: '#/demande/nouvelle' }),
       feedSection(2, { id: 'done-feed', title: 'Boutiques à découvrir', sub: 'Commandez sans compte, livré à la bonne porte.' }),
       !authed() && sent >= 2 ? nudgeCard('sent-nudge', 'Gardez vos adresses', 'Retrouvez-les même si vous changez de téléphone.',
         '#/compte' + qs({ mode: 'inscription', source: 'nudge' }), function () { LS.set('fiila.nudge.until', Date.now() + 14 * 864e5); }) : null,
@@ -4735,11 +4770,32 @@
   ['name:done', 'product:done', 'product:skip', 'vitrine:open', 'share:click', 'resume:open'].forEach(function (v) { (TRACKABLE.shop_setup = TRACKABLE.shop_setup || []).push(v); });
   function setupState() { return LS.get(SETUP_LS, null) || {}; }
   function setupPending() { var st = setupState(); return !!(st.started && !st.done && (shopKey() || (ME && ME.shop))); }
+  // Trois badges qui se débloquent (fondateur, 21/10 00:47 : « des cartes dynamiques gratifiantes… rendre ça amusant »).
+  var SETUP_BADGES = [['shop', 'Boutique'], ['cam', 'Article'], ['eye', 'Vitrine']];
+  function setupBadges(n) {
+    return h('ol', { class: 'setup-badges', role: 'progressbar', 'aria-valuemin': '1', 'aria-valuemax': '3', 'aria-valuenow': String(n), 'aria-label': 'Étape ' + n + ' sur 3' },
+      SETUP_BADGES.map(function (b, i) {
+        var st = i + 1 < n ? 'done' : i + 1 === n ? 'now' : 'next';
+        return h('li', { class: 'sb sb-' + st }, h('span', { class: 'sb-ic', 'aria-hidden': 'true' }, icon(st === 'done' ? 'check' : b[0], 20)), h('span', { class: 'sb-l' }, b[1]));
+      }));
+  }
+  // Carte de félicitations de l'étape qui vient d'être franchie (une seule fois).
+  function setupWin(n) {
+    var st = setupState();
+    if (!st.just || st.just.step !== n - 1) return null;
+    var j = st.just; delete st.just; LS.set(SETUP_LS, st);
+    var t = n === 2 ? ['Étape 1 réussie', '« ' + j.name + ' » est créée', 'Prochaine étape : votre premier article. Une photo et un prix suffisent.']
+      : ['Étape 2 réussie', 'Votre premier article est prêt', 'Dernière étape : ouvrir votre vitrine. Vos clientes pourront commander.'];
+    return h('section', { class: 'setup-win', id: 'setup-win', role: 'status' },
+      h('span', { class: 'setup-win-ic', 'aria-hidden': 'true' }, icon('check', 24)),
+      h('div', null, h('p', { class: 'setup-win-k' }, t[0]), h('b', { class: 'wrapword' }, t[1]), h('span', null, t[2])),
+      h('span', { class: 'setup-win-spark', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i'), h('i')));
+  }
   function setupFrame(n, title, text, body) {
     return page(backBtn(n === 1 ? 'Accueil' : 'Ma boutique', n === 1 ? '#/' : '#/boutique'),
       h('section', { class: 'setup', id: 'shop-setup', 'data-step': String(n) },
-        h('div', { class: 'setup-prog', role: 'progressbar', 'aria-valuemin': '1', 'aria-valuemax': '3', 'aria-valuenow': String(n), 'aria-label': 'Étape ' + n + ' sur 3' },
-          [1, 2, 3].map(function (i) { return h('i', { class: i <= n ? 'on' : null }); })),
+        setupBadges(n),
+        setupWin(n),
         h('p', { class: 'setup-step' }, 'Étape ' + n + ' sur 3'),
         h('h1', null, title), text ? h('p', { class: 'muted' }, text) : null,
         body),
@@ -4757,7 +4813,7 @@
       sapi('fiila_shop_save', { p: { name: f.name.trim(), phone: f.phone.trim() || null, ninea: null, business_type: f.type } }).then(function (r) {
         if (r && r.key) LS.set(SHOP_LS, { id: r.shop.id, key: r.key, linked: authed() || undefined });
         track('shop_created', authed() ? 'account' : 'no_account'); bumpTx(); attribute('shop', null, r.key || shopKey(), ask.value());
-        track('shop_setup', 'name:done'); LS.set(SETUP_LS, { started: Date.now() });
+        track('shop_setup', 'name:done'); LS.set(SETUP_LS, { started: Date.now(), just: { step: 1, name: f.name.trim() } });
         if (ambCode.trim()) api('fiila_ambassador_link', { p_key: r.key || shopKey(), p_code: ambCode.trim() }).then(function (x) { toast('Boutique créée, accompagnée par ' + x.ambassador + '.'); }, function (e) { toast('Boutique créée. Code ambassadeur : ' + errText(e)); });
         ME = null; go('#/boutique/demarrer');
       }, function (e) { btn.disabled = false; errBox(err, e); });
@@ -4800,6 +4856,7 @@
         return sapi('fiila_product_save', { p: p });
       }).then(function () {
         track('product_created', photos.count() ? 'photo' : 'no_photo'); track('shop_setup', 'product:done');
+        var st = setupState(); st.just = { step: 2 }; LS.set(SETUP_LS, st);
         render();
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'Continuer');
@@ -4819,7 +4876,13 @@
       sapi('fiila_shop_vitrine', { p: { public: true } }).then(function (r) {
         FEED_CACHE = null; track('shop_setup', 'vitrine:open');
         shop.public = true; shop.slug = r.slug;
-        render();
+        // Grande carte de félicitations, avec la place gratuite du fil si la boutique en obtient une.
+        sapi('fiila_shop_feed', { p_on: null }).then(null, function () { return null; }).then(function (fd) {
+          celebrate({ icon: 'star', kicker: 'Boutique ouverte', title: 'Bravo, ' + shop.name + ' est en ligne !',
+            gain: fd && fd.rank ? 'Place n° ' + fd.rank + ' / 25' : null,
+            sub: (fd && fd.rank ? 'Votre place offerte dans le fil Fii La. ' : '') + 'Vos clientes peuvent commander dès maintenant, sans compte, et vous donner leur adresse exacte.',
+            cta: 'Partager ma vitrine', onClose: function () { render(); } });
+        });
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'Ouvrir ma vitrine');
     return setupFrame(3, 'Votre vitrine', 'Voici ce que verront vos clientes. Elles commandent sans compte et donnent leur adresse à la fin.', h('div', { class: 'stack' },
@@ -5812,6 +5875,10 @@
           h('p', { class: 'saved-ok' }, icon('check', 18), 'Commande envoyée à ' + s.name + '.'),
           h('p', { class: 'small muted' }, o.address_state === 'pending' ? 'Dernière étape : donnez votre adresse de livraison.' : 'La boutique a votre commande.'),
           s.phone ? iconBtn('a', { class: 'btn ghost', id: 'notify-shop', href: waTo(s.phone, 'Bonjour, je viens de commander (N° ' + o.ref + ') : ' + invUrl), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Prévenir la boutique sur WhatsApp') : null));
+      }
+      if (q && q.nouvelle === '1' && o.address_state !== 'pending' && !shopKey() && !(ME && ME.shop)) {
+        var at = afterTask('order', { icon: 'shop', title: 'Vous vendez aussi ?', cta: 'Ouvrir ma boutique gratuite', href: '#/boutique' });
+        if (at) act.push(h('div', { class: 'no-print' }, at));
       }
       if (o.address_state === 'pending' && o.request_token && !delivered) {
         act.push(iconBtn('a', { class: 'btn big no-print', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'pin', 'Donner mon adresse de livraison'));
@@ -7626,6 +7693,20 @@
               h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, h('i', { class: 'paid', style: 'width:' + pct + '%' })));
           }));
       })(),
+      (function () {
+        var dv = d.discover || {};
+        var ctx = [['order', 'Après une commande → ouvrir sa boutique'], ['sent', 'Après une adresse envoyée → demander une adresse'], ['course', 'Après une course → espace livreur'],
+          ['fiche', 'Fiche reçue'], ['event', 'Événement reçu']];
+        function v(c, a) { return Number(dv[c + ':' + a] || 0); }
+        return h('div', { class: 'stack tight', id: 'bo-discover' },
+          h('div', { class: 'bo-panel-h' }, h('h3', null, 'Découverte après une action'), d.discover_on === false ? boBadge('muted', 'Coupée (Réglages)') : boBadge('ok', 'Active')),
+          boTable([
+            { label: 'Contexte', get: function (x) { return x[1]; } },
+            { label: 'Vue', get: function (x) { return x[0] === 'fiche' || x[0] === 'event' ? '—' : boNum(v(x[0], 'shown')); }, cls: 'num' },
+            { label: 'Suivie', get: function (x) { return x[0] === 'fiche' || x[0] === 'event' ? '—' : boNum(v(x[0], 'click')); }, cls: 'num' },
+            { label: 'Tous les services', get: function (x) { return boNum(v(x[0], 'all')); }, cls: 'num' },
+            { label: 'Masquée', get: function (x) { return x[0] === 'fiche' || x[0] === 'event' ? '—' : boNum(v(x[0], 'hide')); }, cls: 'num' }], ctx, { id: 'bo-discover-table' }));
+      })(),
       h('p', { class: 'small muted' }, 'Tâches réussies sur la même période (tous parcours confondus) :'),
       h('div', { class: 'bo-type-chips' }, tasks.map(function (x) { return h('span', { class: 'chip' }, x[0] + ' : ' + boNum(x[1] || 0)); })),
       h('div', { class: 'row' },
@@ -7753,7 +7834,8 @@
     sms_verify: ['Code SMS obligatoire pour rejoindre une équipe de boutique', '0 = non, 1 = oui'],
     amb_manager_llm: ['Manager Fii La Carrière avec IA (clé d’API à saisir dans Supabase)', '0 = non, 1 = oui'],
     nudges: ['Suggestions discrètes dans l’application (découverte progressive)', '0 = non, 1 = oui'],
-    onboarding_v2: ['Nouvel accueil (mes activités, « Découvrir les services »)', '1 = nouvel accueil, 0 = ancien'] };
+    onboarding_v2: ['Nouvel accueil (mes activités, « Découvrir les services »)', '1 = nouvel accueil, 0 = ancien'],
+    discover_after: ['Suggestion discrète après une action (commande, adresse envoyée, course)', '0 = non, 1 = oui'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {
