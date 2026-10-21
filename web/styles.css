@@ -1686,3 +1686,12 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
 #pmsg-input,#bo-pmsg-input{width:100%;font:inherit;padding:12px;border-radius:14px;border:1px solid var(--line);background:var(--surface);color:var(--ink);resize:vertical}
 .bo-ms{display:flex;flex-wrap:wrap;gap:4px}
 .pmsg-sheet{max-height:92vh;overflow-y:auto}
+/* Carte WhatsApp (WHATSAPP-001) : l'image qui part avec le message, puis une seule action. */
+.wa-card{display:block;width:100%;height:auto;aspect-ratio:3/2;border-radius:14px;background:var(--green);object-fit:cover}
+.wa-alt{margin:-4px 0 0;text-align:center}
+.wa-alt a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+/* Page d'arrivée depuis WhatsApp : entrée courte (240 ms), rien n'attend avant le clic ; coupée si « réduire les animations ». */
+@media (prefers-reduced-motion: no-preference){
+  .arrive{animation:fiila-arrive .24s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes fiila-arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+}

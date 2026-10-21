@@ -3386,8 +3386,49 @@
   var REQUEST_NOTICE = 'Seule la personne qui a ce lien peut vous répondre.';
 
   // o : { kind: 'address'|'meeting'|'request', url, msg, title, when, photo, ids: { url, copy, native } }
+  /* Cartes WhatsApp (mandat WHATSAPP-001) : image de marque rendue d'avance (scripts/render_wa_cards.py), partagée AVEC le texte
+     quand le téléphone sait partager un fichier ; sinon lien WhatsApp texte et « Télécharger l'image ». Aucune donnée personnelle
+     dans l'image ; le lien et le nom du demandeur restent dans le texte. Réglage du back-office wa_card_media (0 = texte seul). */
+  var WA_CARDS = { request: { src: 'media/wa/demande-adresse.jpg', file: 'fii-la-demande-adresse.jpg', alt: 'Carte Fii La « Livrer à la bonne porte » : une cliente ouvre son portail à un livreur' } };
+  TRACKABLE.wa_card = [];
+  Object.keys(WA_CARDS).forEach(function (k) { ['file', 'text', 'download', 'failed'].forEach(function (a) { TRACKABLE.wa_card.push(k + ':' + a); }); });
+  var WA_FILES = {};
+  function waCardFile(kind) {
+    var c = WA_CARDS[kind];
+    if (!c || typeof File !== 'function') return Promise.resolve(null);
+    if (WA_FILES[kind]) return Promise.resolve(WA_FILES[kind]);
+    return fetch(c.src).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
+      return b ? (WA_FILES[kind] = new File([b], c.file, { type: 'image/jpeg' })) : null;
+    }, function () { return null; });
+  }
+  function canShareFile(f) { try { return !!(f && navigator.share && navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } }
+  function waCardBlock(o) {
+    var c = WA_CARDS[o.card], ready = null;
+    var link = h('p', { class: 'small wa-alt', id: 'wa-card-alt' });
+    var main = iconBtn('a', { class: 'btn big', href: waLink(o.msg), target: '_blank', rel: 'noopener noreferrer', id: 'share-whatsapp',
+      onclick: function (e) {
+        track('share_initiated', 'whatsapp_' + o.kind);
+        if (!canShareFile(ready)) { track('wa_card', o.card + ':text'); return; }
+        e.preventDefault();
+        track('wa_card', o.card + ':file');
+        navigator.share({ files: [ready], text: o.msg }).catch(function (err) {
+          if (err && err.name === 'AbortError') return;
+          track('wa_card', o.card + ':failed');
+          toast('Envoi avec l’image impossible ici. Touchez « Envoyer le texte seul ».');
+        });
+      } }, 'chat', 'Envoyer sur WhatsApp');
+    function alt() {
+      setKids(link, canShareFile(ready)
+        ? h('a', { href: waLink(o.msg), target: '_blank', rel: 'noopener noreferrer', id: 'wa-text-only', onclick: function () { track('wa_card', o.card + ':text'); } }, 'Envoyer le texte seul')
+        : h('a', { href: c.src, download: c.file, id: 'wa-card-download', onclick: function () { track('wa_card', o.card + ':download'); } }, 'Télécharger l’image'));
+    }
+    alt();
+    waCardFile(o.card).then(function (f) { ready = f; alt(); });
+    return [h('img', { class: 'wa-card', id: 'wa-card', src: c.src, alt: c.alt, width: 1200, height: 800, decoding: 'async' }), main, link];
+  }
   function sharePanel(o) {
-    var text = o.msg.replace(o.url, '').trim().replace(/\s*:$/, '');
+    var text = o.text || o.msg.replace(o.url, '').trim().replace(/\s*:$/, '');
+    var withCard = !!(o.card && WA_CARDS[o.card] && nudgeFlags().wa_card !== false);
     var visualBox = h('div', { class: 'visual-box', id: 'visual-box', hidden: true });
     var fbHelp = h('p', { class: 'hint', id: 'fb-help', hidden: true },
       'Fii La n’est pas relié à Facebook : le lien est seulement copié. Ouvrez Facebook, créez une publication ou un message, puis collez le lien. Facebook affichera un aperçu générique de Fii La.');
@@ -3434,7 +3475,7 @@
     }
     var panel = h('section', { class: 'card share-panel', 'aria-labelledby': 'h-share' },
       h('h2', { id: 'h-share' }, o.kind === 'request' ? 'Envoyer la demande au client' : 'Partager'),
-      iconBtn('a', { class: 'btn big', href: waLink(o.msg), target: '_blank', rel: 'noopener noreferrer', id: 'share-whatsapp',
+      withCard ? waCardBlock(o) : iconBtn('a', { class: 'btn big', href: waLink(o.msg), target: '_blank', rel: 'noopener noreferrer', id: 'share-whatsapp',
         onclick: function () { track('share_initiated', 'whatsapp_' + o.kind); } }, 'chat', 'Envoyer sur WhatsApp'),
       h('div', { class: 'rnd-row' },
         roundBtn('button', { type: 'button', id: o.ids.copy, onclick: function () { copy(o.url, 'Lien', function () { track('link_copied', o.kind); }); } }, 'link', 'Copier'),
@@ -4031,7 +4072,10 @@
     if (!rec) return page(backBtn(), stateCard('?', 'Demande introuvable sur ce téléphone', 'Ouvrez sa clé de gestion pour la voir ici.'));
     return api('fiila_get_request_owner', { p_id: id, p_owner: rec.owner || null }).then(function (q) {
       var url = requestUrl(q.share_token);
-      var msg = q.requester_name + ' vous demande votre adresse pour : ' + q.purpose + (q.order_ref ? ' (réf. ' + q.order_ref + ')' : '') + '.\nRépondez ici : ' + url;
+      // Texte du modèle fiila_address_request_v1 (catalogue WHATSAPP-001) : le vrai demandeur, le motif, une seule action.
+      var lead = 'Bonjour,\n' + q.requester_name + ' vous demande votre adresse pour : ' + q.purpose + (q.order_ref ? ' (réf. ' + q.order_ref + ')' : '') +
+        '.\nIndiquez votre entrée et, si utile, ajoutez une photo ou un repère.';
+      var msg = lead + '\n\nIndiquer mon entrée :\n' + url + '\n\nVotre adresse sert uniquement à cette demande.';
       var zone = h('div', { class: 'stack' });
       var key = rec.owner ? keyUrl('request', q.id, rec.owner) : null;
       var head = h('div', { class: 'stack tight' },
@@ -4061,7 +4105,7 @@
           fiche(q.place, { voice: q.place && q.place.has_voice ? voicePlayer(voicePrivate('request', q.id, rec.owner), q.place.voice_secs) : null })];
       } else if (q.state === 'pending') {
         stateBlock = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de réponse'),
-          sharePanel({ kind: 'request', url: url, msg: msg, title: q.purpose, ids: { url: 'request-url', copy: 'copy-request', native: 'share-request' } }),
+          sharePanel({ kind: 'request', url: url, msg: msg, text: lead, title: q.purpose, card: 'request', ids: { url: 'request-url', copy: 'copy-request', native: 'share-request' } }),
           h('p', { class: 'hint' }, 'Le client voit votre nom et la raison de la demande, jamais d’autres réponses.'),
           h('button', { class: 'btn', type: 'button', id: 'refresh', onclick: render }, 'Vérifier si le client a répondu')];
       } else if (q.state === 'expired') {
@@ -4113,7 +4157,8 @@
 
       var fromInvoice = !!tokenParam(q && q.f);
       var showRef = r.order_ref && r.purpose.indexOf(r.order_ref.replace(/^N° /, '')) < 0;
-      var head = h('section', { class: 'card' },
+      var head = h('section', { class: 'card arrive', id: 'request-arrive' },
+        h('p', { class: 'eyebrow' }, 'Votre entrée'),
         h('h1', { class: 'wrapword', style: 'font-size:24px' }, r.requester_name + ' vous demande votre adresse'),
         h('p', { class: 'wrapword' }, (r.shop ? r.purpose.replace(/^Livraison de la commande/, 'Pour la commande') : 'Pour : ' + r.purpose) + (showRef ? ' · ' + r.order_ref : '')),
         h('p', { class: 'safe-line', id: 'request-safe' }, icon('lock', 18), 'Votre adresse ira uniquement à ' + r.requester_name + '. Vous pourrez la retirer à tout moment.'));
@@ -7101,7 +7146,8 @@
           // Anciennes fiches d'agent (#/bo/ambassadeurs/<id>) : toujours valides ; la rubrique devient celle des marques invitées.
           case 'ambassadeurs': return id ? boAmbassador(id) : q && q.f ? boAmbassadors(q) : boPartners();
           case 'carriere': return id ? boCareerThread(id) : boCareer();
-          case 'croissance': return Promise.all([boEmbed(viewStats), api('fiila_bo_nudges', {}).then(null, function () { return null; }), api('fiila_bo_onboarding', {}).then(null, function () { return null; })]).then(function (rr) { return boShell(sec, 'Croissance', [boOnboardingPanel(rr[2]), boNudgePanel(rr[1]), rr[0]]); });
+          case 'croissance': return Promise.all([boEmbed(viewStats), api('fiila_bo_nudges', {}).then(null, function () { return null; }), api('fiila_bo_onboarding', {}).then(null, function () { return null; }),
+            api('fiila_bo_wa', {}).then(null, function () { return null; })]).then(function (rr) { return boShell(sec, 'Croissance', [boOnboardingPanel(rr[2]), boWaPanel(rr[3]), boNudgePanel(rr[1]), rr[0]]); });
           case 'fil': return boFeed();
           case 'finances': return boFinance();
           case 'equipe': return boTeam();
@@ -7780,6 +7826,34 @@
   // Croissance : la découverte progressive (suggestions dans l'application), taux de suivi sur 30 jours.
   var NUDGE_LABEL = { home_shop: 'Accueil → créer sa boutique', shop_more_products: 'Boutique → ajouter des articles', shop_share_vitrine: 'Boutique → partager la vitrine',
     shop_courier: 'Boutique → inviter un livreur', shop_team: 'Boutique → ajouter un membre', shop_photos: 'Boutique → plusieurs photos' };
+  // Messages WhatsApp (mandat WHATSAPP-001) : registre des modèles, aperçu de la carte, mesures du partage, état Meta saisi à la main.
+  var WA_META = { NOT_SUBMITTED: 'Non soumis', SUBMITTED: 'Soumis à Meta', APPROVED: 'Approuvé', REJECTED: 'Refusé', PAUSED: 'En pause' };
+  var WA_INTEG = { TO_IMPLEMENT: 'À intégrer', MANUAL_PILOT: 'Pilote (partage manuel)', MANUAL: 'Partage manuel', API: 'API' };
+  function boWaPanel(d) {
+    if (!d) return null;
+    var sh = d.shares || {};
+    function n(k) { return Number(sh['request:' + k] || 0); }
+    var pilot = (d.templates || []).filter(function (t) { return t.media; })[0];
+    var canEdit = boCan('settings');
+    return h('section', { class: 'card stack tight bo-panel', id: 'bo-wa' },
+      h('div', { class: 'bo-panel-h' }, h('h2', null, 'Messages WhatsApp'), d.media_on ? boBadge('ok', 'Carte image active') : boBadge('muted', 'Texte seul (Réglages)')),
+      h('p', { class: 'small muted' }, 'Demande d’adresse, 30 derniers jours : ' + boNum(d.requests || 0) + ' demande(s) · image + texte ouverts : ' + boNum(n('file')) +
+        ' · texte seul : ' + boNum(n('text')) + ' · image téléchargée : ' + boNum(n('download')) + ' · échecs : ' + boNum(n('failed')) +
+        '. Un partage ouvert ne prouve pas qu’un message est parti ni qu’il a été lu. Aucun envoi par l’API : modèles non soumis à Meta.'),
+      pilot ? h('details', { id: 'bo-wa-preview' }, h('summary', null, 'Aperçu de la carte envoyée'),
+        h('img', { class: 'wa-card', src: pilot.media, alt: 'Carte « Livrer à la bonne porte »', width: 1200, height: 800, loading: 'lazy', style: 'margin-top:10px;max-width:420px' })) : null,
+      boTable([
+        { label: 'Message', get: function (t) { return t.usage; } },
+        { label: 'Action', get: function (t) { return t.cta; } },
+        { label: 'Intégration', get: function (t) { return WA_INTEG[t.integration] || t.integration; } },
+        { label: 'Meta', get: function (t) {
+          if (!canEdit) return WA_META[t.meta] || t.meta;
+          return h('select', { 'aria-label': 'État Meta : ' + t.usage, 'data-wa': t.id, onchange: function (e) {
+            var sel = e.target;
+            api('fiila_bo_wa_status', { p_id: t.id, p_meta: sel.value }).then(function () { toast('État Meta enregistré.'); }, function (err) { sel.value = t.meta; toast(errText(err)); });
+          } }, Object.keys(WA_META).map(function (k) { return h('option', { value: k, selected: k === t.meta }, WA_META[k]); }));
+        } }], d.templates || [], { id: 'bo-wa-table' }));
+  }
   function boNudgePanel(d) {
     if (!d) return null;
     return h('section', { class: 'card stack tight bo-panel', id: 'bo-nudges' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'Découverte progressive'), d.on ? boBadge('ok', 'Active') : boBadge('muted', 'Coupée (Réglages)')),
@@ -8047,7 +8121,8 @@
     amb_manager_llm: ['Manager Fii La Carrière avec IA (clé d’API à saisir dans Supabase)', '0 = non, 1 = oui'],
     nudges: ['Suggestions discrètes dans l’application (découverte progressive)', '0 = non, 1 = oui'],
     onboarding_v2: ['Nouvel accueil (mes activités, « Découvrir les services »)', '1 = nouvel accueil, 0 = ancien'],
-    discover_after: ['Suggestion discrète après une action (commande, adresse envoyée, course)', '0 = non, 1 = oui'] };
+    discover_after: ['Suggestion discrète après une action (commande, adresse envoyée, course)', '0 = non, 1 = oui'],
+    wa_card_media: ['Carte image avec la demande d’adresse sur WhatsApp', '0 = texte seul, 1 = image + texte'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

@@ -54,6 +54,8 @@
     "test:partners-sql": "node tests/partners.sql.test.mjs",
     "test:partners": "node tests/partners.test.mjs",
     "test:partnermgr-sql": "node tests/partnermgr.sql.test.mjs",
+    "test:wacards": "node tests/wacards.test.mjs",
+    "test:wacards-sql": "node tests/wacards.sql.test.mjs",
     "test:whatsapp": "node tests/whatsapp.sql.test.mjs",
     "test:all": "scripts/run-suites.sh sql && scripts/run-suites.sh browser"
   },

@@ -156,8 +156,20 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   assert.match(await D.locator('#bo-onboarding').textContent(), /Nouvel accueil actif/);
   await D.locator('#bo-setup').getByText('Démarrage guidé de la boutique').waitFor();
   await D.locator('#bo-discover-table').waitFor();
+  // Messages WhatsApp (WHATSAPP-001) : registre, aperçu, état Meta saisi à la main et journalisé.
+  await D.locator('#bo-wa-table').waitFor();
+  assert.equal(await D.locator('#bo-wa-table tbody tr').count(), 6);
+  assert.match(await D.locator('#bo-wa').textContent(), /Carte image active.*Aucun envoi par l’API/s);
+  await D.click('#bo-wa-preview summary');
+  await D.waitForFunction(() => document.querySelector('#bo-wa-preview img').naturalWidth === 1200);
+  await D.selectOption('select[data-wa="fiila_address_request_v1"]', 'SUBMITTED');
+  await D.getByText('État Meta enregistré.').waitFor();
+  assert.equal((await local.db.query(`select meta_status from fiila.wa_templates where id = 'fiila_address_request_v1'`)).rows[0].meta_status, 'SUBMITTED');
+  await D.selectOption('select[data-wa="fiila_address_request_v1"]', 'NOT_SUBMITTED');
+  await D.getByText('État Meta enregistré.').first().waitFor();
   await D.click('#bo-nav-reglages');
   await D.locator('#bo-settings').getByText('Nouvel accueil', { exact: false }).waitFor();
+  await D.locator('#bo-settings').getByText('Carte image avec la demande d’adresse', { exact: false }).waitFor();
 });
 
 await t('boutiques : recherche, filtre, fiche ; suspension (motif) qui ferme la vitrine ; réactivation ; journal', async () => {
