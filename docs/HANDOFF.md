@@ -225,6 +225,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 21/10 04:35 | Correctif signalé par le fondateur (04:23, superposition à l'étape 2) : les paillettes de la carte « Étape réussie » passaient sur le texte ; elles partent maintenant de l'icône seulement, et la carte découpe proprement son fond (Safari) | ce commit |
 | 21/10 02:15 | Compression du code à la mise en ligne (esbuild) et dans le serveur de test : page reçue 207 Ko / 250. Correctif : déclarations du vide-dressing retirées par erreur avec le code mort, restaurées (la vitrine ne s'affichait plus en local ; jamais en ligne) | ce commit |
 | 21/10 01:55 | Pages reçues par lien : les réglages de découverte sont lus sans rien écrire sur le téléphone (règle « rien sans action ») ; code mort retiré (ancienne page d'admin des ambassadeurs) : page reçue 249 Ko / 250 | ce commit |
 | 21/10 01:35 | Lot 3 (découverte après une action, réglage, mesures, tableau au back-office) et cartes de félicitations du démarrage de la boutique (badges, « Étape réussie », grande carte finale avec confettis et place du fil) | ce commit |

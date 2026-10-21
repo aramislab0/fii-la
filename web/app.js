@@ -4788,9 +4788,9 @@
     var t = n === 2 ? ['Étape 1 réussie', '« ' + j.name + ' » est créée', 'Prochaine étape : votre premier article. Une photo et un prix suffisent.']
       : ['Étape 2 réussie', 'Votre premier article est prêt', 'Dernière étape : ouvrir votre vitrine. Vos clientes pourront commander.'];
     return h('section', { class: 'setup-win', id: 'setup-win', role: 'status' },
-      h('span', { class: 'setup-win-ic', 'aria-hidden': 'true' }, icon('check', 24)),
-      h('div', null, h('p', { class: 'setup-win-k' }, t[0]), h('b', { class: 'wrapword' }, t[1]), h('span', null, t[2])),
-      h('span', { class: 'setup-win-spark', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i'), h('i')));
+      h('span', { class: 'setup-win-ic', 'aria-hidden': 'true' }, icon('check', 24),
+        h('span', { class: 'setup-win-spark' }, h('i'), h('i'), h('i'), h('i'), h('i'))),
+      h('div', null, h('p', { class: 'setup-win-k' }, t[0]), h('b', { class: 'wrapword' }, t[1]), h('span', null, t[2])));
   }
   function setupFrame(n, title, text, body) {
     return page(backBtn(n === 1 ? 'Accueil' : 'Ma boutique', n === 1 ? '#/' : '#/boutique'),
