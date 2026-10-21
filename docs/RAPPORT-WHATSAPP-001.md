@@ -39,7 +39,8 @@
 | Page d'arrivée : animation présente, absente en mouvement réduit, aucune écriture | PASS | `wacards` Chromium |
 | Registre, mesure, droits, journal, réglage | PASS | `wacards.sql` 4/4 |
 | Back-office : registre, aperçu, état Meta enregistré, réglage listé | PASS | `backoffice` 13/13 |
-| Mêmes parcours sous WebKit | voir CI | ajouté à la liste WebKit de `pages.yml` |
+| Mêmes parcours sous WebKit | PASS | run 39555592958 (job « Tests en production (Chrome + Safari) » vert ; `wacards` dans la liste WebKit) |
+| Mise en production | PASS | commits `0229299` + `3714234` ; run 39554631281 : migration appliquée, contrôle d'inventaire en échec (liste `verify-db` incomplète, corrigée) ; run 39555592958 : 4 jobs verts ; base : 6 modèles, 6 non soumis, `wa_card_media` = 1 (MCP, lecture seule) |
 | Partage réel image + texte vers WhatsApp sur Android et iPhone (le texte accompagne-t-il l'image ? compression ? aperçu du lien ?) | **NOT_RUN** | pas de téléphone physique ; à faire par le fondateur (liste plus bas) |
 
 ### Canaux
