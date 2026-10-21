@@ -238,6 +238,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 22/10 00:10 | Audit avant lancement (base de production en lecture, conseils Supabase sécurité et performance, actions ouvertes, performance) : prêt pour un pilote fermé de 20 boutiques, pas pour l'ouverture publique ; bloquants : CDP, recette 3 téléphones, domaine, e-mails ; chantier technique prioritaire : photos hors de la base | doc https://claude.ai/artifact/SghT4DWHsH6rXHJTcmCBgJ |
 | 21/10 23:50 | Décision paiements Wave + OM (comptes marchands) et étude du paiement client → boutique (Wave Checkout, OM Max it, cadre BCEAO) ; action #60 | conversation |
 | 21/10 23:40 | Proposition d'offres commerciales et de packs Studio, coûts d'infrastructure sourcés (Supabase, Meta WhatsApp 01/10/2026, SMS, Haiku 5.5, fal, mobile money, USD/XOF) ; action #59 | doc https://claude.ai/artifact/APVmdPcaWMzAD11aMbRkKp |
 | 21/10 10:20 | Nom « Fii » et logo sans fond en production : runs 39574747910 (nom, migration) et 39579874946 (logo, favicon) tout verts, tests en production Chrome + Safari compris | run 39579874946 |
