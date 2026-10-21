@@ -112,6 +112,11 @@ jobs:
           test -n "$SUPABASE_KEY" || { echo "Variable SUPABASE_PUBLISHABLE_KEY manquante"; exit 1; }
           node -e 'const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:process.env.PUBLIC_URL||"",facebookAppId:process.env.FACEBOOK_APP_ID||""};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
           echo "<!-- build ${GITHUB_SHA} -->" >> web/index.html
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - name: Compresser le code (app.js, styles.css, theme.js)
+        run: node scripts/minify.mjs web
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

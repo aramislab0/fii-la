@@ -6,9 +6,20 @@ import { join, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import { createDb, rpc } from './db.mjs';
+import { minifyJs, minifyCss } from '../scripts/minify.mjs';
 import { newSecret, totpOk } from './totp.mjs';
 
 const webRoot = fileURLToPath(new URL('../web/', import.meta.url));
+// Comme en production : app.js, styles.css et theme.js compressés (scripts/minify.mjs). FIILA_MIN=0 sert les sources (débogage).
+const MIN = process.env.FIILA_MIN !== '0';
+const minCache = new Map();
+function minified(path, data) {
+  const f = { '/app.js': minifyJs, '/styles.css': minifyCss, '/theme.js': minifyJs }['/' + path.replace(/^[/\\]+/, '')];
+  if (!MIN || !f) return data;
+  const key = createHash('sha1').update(data).digest('hex');
+  if (!minCache.has(key)) minCache.set(key, Buffer.from(f(data.toString('utf8'))));
+  return minCache.get(key);
+}
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.png': 'image/png', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 
@@ -231,7 +242,7 @@ export async function startServer(port = 0) {
     let path = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
     if (path.endsWith('/')) path += 'index.html';
     try {
-      const data = await readFile(join(webRoot, path));
+      const data = minified(path, await readFile(join(webRoot, path)));
       const type = TYPES[extname(path)] || 'application/octet-stream';
       // Comme GitHub Pages : textes compressés en gzip si le navigateur l'accepte (mesure de poids réaliste).
       if (/^(text\/|application\/(javascript|json)|image\/svg)/.test(type) && /\bgzip\b/.test(req.headers['accept-encoding'] || '')) {

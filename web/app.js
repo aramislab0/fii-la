@@ -103,7 +103,6 @@
 
   /* ================================================================ format & liens */
   function fmt(p) { return Number(p.lat).toFixed(6) + ', ' + Number(p.lng).toFixed(6); }
-  function gmSearch(p) { return 'https://www.google.com/maps/search/?api=1&query=' + Number(p.lat).toFixed(6) + '%2C' + Number(p.lng).toFixed(6); }
   function gmDir(p, mode) {
     return 'https://www.google.com/maps/dir/?api=1&destination=' + Number(p.lat).toFixed(6) + '%2C' + Number(p.lng).toFixed(6) + '&travelmode=' + (mode || 'driving');
   }
@@ -618,9 +617,11 @@
   var NUDGE_IDS = ['home_shop', 'shop_more_products', 'shop_share_vitrine', 'shop_courier', 'shop_team', 'shop_photos'];
   NUDGE_IDS.forEach(function (id) { ['shown', 'click', 'dismiss'].forEach(function (a) { TRACKABLE.nudge.push(id + ':' + a); }); });
   var NUDGE_SEQ = -1, NUDGE_FLAGS = null;
-  function nudgeFlags() {
+  // passive : lecture du cache seulement (pages reçues par lien : rien n'est écrit sur le téléphone sans action).
+  function nudgeFlags(passive) {
     var c = LS.get('fiila.flags', null);
     if (c && Date.now() - c.at < 6 * 3600e3) NUDGE_FLAGS = c.v;
+    if (passive) return (c && c.v) || { nudges: true, onboarding: true, discover: true };
     if (!c || Date.now() - c.at >= 6 * 3600e3) api('fiila_app_flags', {}).then(function (v) { NUDGE_FLAGS = v; LS.set('fiila.flags', { at: Date.now(), v: v }); }, function () {});
     return NUDGE_FLAGS || { nudges: true, onboarding: true, discover: true };
   }
@@ -781,7 +782,7 @@
   TRACKABLE.discover = [];
   AFTER_CTX.forEach(function (c) { ['shown', 'click', 'hide', 'all'].forEach(function (a) { TRACKABLE.discover.push(c + ':' + a); }); });
   ['fiche', 'event'].forEach(function (c) { TRACKABLE.discover.push(c + ':all'); });
-  function afterOn() { var f = nudgeFlags(); return onboardingOn() && f.discover !== false; }
+  function afterOn() { var f = nudgeFlags(true); return f.onboarding !== false && f.discover !== false; }
   function servicesLink(ctx) {
     return h('button', { class: 'after-all', type: 'button', id: 'after-all', onclick: function () { track('discover', ctx + ':all'); servicesSheet(); } }, 'Voir tous les services');
   }
@@ -6593,68 +6594,6 @@
     }, function () {});
     return box;
   }
-  // Fondateur : inscriptions à valider, gains à verser, gains en vérification.
-  function viewAdminAmbassadors() {
-    if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.'), footer());
-    return api('fiila_admin_ambassadors', {}).then(function (d) {
-      function decide(a, decision) {
-        var note = (document.getElementById('note-' + a.id) || {}).value || null;
-        api('fiila_admin_ambassador_decide', { p_id: a.id, p_decision: decision, p_note: note }).then(function () { toast('Enregistré.'); render(); }, function (e) { toast(errText(e)); });
-      }
-      var review = d.ambassadors.filter(function (a) { return a.status === 'review'; });
-      var others = d.ambassadors.filter(function (a) { return a.status !== 'review'; });
-      var byAmb = {}; d.to_pay.forEach(function (r) { (byAmb[r.ambassador + '|' + r.payout_method + '|' + r.payout_phone] = byAmb[r.ambassador + '|' + r.payout_method + '|' + r.payout_phone] || []).push(r); });
-      return page(backBtn('Statistiques', '#/stats'),
-        h('h1', null, 'Ambassadeurs'),
-        h('p', { class: 'small muted' }, 'Gains : ' + d.settings.rewards.map(fcfa).join(' · ') + '. Plafond : ' + d.settings.monthly_cap + ' commerçants par mois et par ambassadeur.'),
-        h('section', { class: 'stack tight', id: 'adm-review' }, h('h2', null, 'À valider (' + review.length + ')'),
-          review.length ? review.map(function (a) {
-            return h('div', { class: 'card stack tight' }, h('b', null, a.name), h('span', { class: 'small muted' }, a.phone + (a.zone ? ' · ' + a.zone : '') + ' · test ' + a.quiz_score + '/10'),
-              h('input', { type: 'text', id: 'note-' + a.id, placeholder: 'Note (facultatif)', maxlength: 200 }),
-              h('div', { class: 'row' }, h('button', { class: 'btn small', type: 'button', onclick: function () { decide(a, 'approve'); } }, 'Valider'),
-                h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { decide(a, 'exclude'); } }, 'Refuser')));
-          }) : h('p', { class: 'muted' }, 'Aucune inscription en attente.')),
-        h('section', { class: 'stack tight', id: 'adm-pay' }, h('h2', null, 'À verser'),
-          Object.keys(byAmb).length ? Object.keys(byAmb).map(function (k) {
-            var l = byAmb[k], p = k.split('|'), sum = l.reduce(function (n, r) { return n + r.amount; }, 0);
-            return h('div', { class: 'card stack tight' }, h('b', null, p[0] + ' · ' + fcfa(sum)), h('span', { class: 'small muted' }, (PAYOUT[p[1]] || p[1]) + ' ' + p[2]),
-              l.map(function (r) { return h('span', { class: 'small' }, r.shop + ' · niveau ' + r.level + ' · ' + fcfa(r.amount)); }),
-              h('button', { class: 'btn small', type: 'button', onclick: function () {
-                api('fiila_admin_reward', { p_ids: l.map(function (r) { return r.id; }), p_action: 'paid', p_reason: null }).then(function () { toast('Marqué versé.'); render(); }, function (e) { toast(errText(e)); });
-              } }, 'J’ai versé ' + fcfa(sum)));
-          }) : h('p', { class: 'muted' }, 'Rien à verser.')),
-        h('section', { class: 'stack tight', id: 'adm-pending' }, h('h2', null, 'En vérification (30 jours)'),
-          d.pending.length ? d.pending.map(function (r) {
-            return h('div', { class: 'item' }, h('span', { class: 'small wrapword' }, r.ambassador + ' · ' + r.shop + ' · niveau ' + r.level + ' · ' + fcfa(r.amount) + ' · le ' + shortDate(r.validate_after)),
-              h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () {
-                var inp = document.getElementById('cancel-' + r.id); var reason = inp && inp.value;
-                api('fiila_admin_reward', { p_ids: [r.id], p_action: 'cancel', p_reason: reason || '' }).then(function () { toast('Gain annulé.'); render(); }, function (e) { toast(errText(e)); });
-              } }, 'Annuler'), h('input', { type: 'text', id: 'cancel-' + r.id, placeholder: 'Motif', maxlength: 200, style: 'max-width:120px' }));
-          }) : h('p', { class: 'muted' }, 'Aucun gain en vérification.')),
-        h('section', { class: 'stack tight' }, h('h2', null, 'Tous les ambassadeurs (' + others.length + ')'),
-          others.map(function (a) {
-            return h('div', { class: 'item' }, h('div', { class: 'stack tight' }, h('b', null, a.name + ' · ' + (GRADES[a.grade] || '')),
-              h('span', { class: 'small muted' }, a.status + ' · ' + a.shops + ' commerçants (' + a.month + ' ce mois) · ' + a.cancelled + ' gain(s) annulé(s)')),
-              a.status === 'active' ? h('button', { class: 'btn quiet danger-text', type: 'button', onclick: function () { decide(a, 'suspend'); } }, 'Suspendre')
-                : a.status === 'suspended' ? h('button', { class: 'btn ghost small', type: 'button', onclick: function () { decide(a, 'reactivate'); } }, 'Réactiver') : null);
-          })),
-        // Test de passage : les questions les plus manquées disent quelle fiche de formation clarifier.
-        (function () {
-          var qs = (d.quiz_stats || []).slice().sort(function (x, y) { return y.wrong - x.wrong; });
-          var runs = qs.length ? qs[0].answered : 0;
-          return h('details', { class: 'card more-sec', id: 'adm-quiz' }, h('summary', null, 'Test de passage : questions manquées'),
-            !runs ? h('p', { class: 'muted' }, 'Aucun test terminé pour l’instant.') : h('div', { class: 'stack tight', style: 'margin-top:10px' },
-              h('p', { class: 'small muted' }, runs + ' test(s) terminé(s). Une question souvent manquée : la fiche correspondante est à clarifier.'),
-              qs.map(function (x) {
-                var pct = Math.round(x.wrong / runs * 100);
-                return h('div', { class: 'stack tight' }, h('div', { class: 'total-row' }, h('span', { class: 'small wrapword' }, (x.q + 1) + '. ' + AMB_QUIZ[x.q][0]), h('b', { class: 'small' }, pct + ' %')),
-                  h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, h('i', { class: pct >= 40 ? 'wait' : 'paid', style: 'width:' + pct + '%' })));
-              })));
-        })(),
-        footer());
-    }, function (e) { return page(backBtn(), stateCard('!', 'Accès réservé', errText(e)), footer()); });
-  }
-
   /* ================================================================ VIDE-DRESSING (pilote tenu par Fii La ; tout type d'article depuis le 20/10)
      Chacun propose ; Fii La valide, publie dans sa vitrine, coordonne la livraison et reverse le prix moins la commission. */
   var VD_AGES = [['0-6m', '0-6 mois'], ['6-12m', '6-12 mois'], ['1-2a', '1-2 ans'], ['2-4a', '2-4 ans'], ['4-6a', '4-6 ans'], ['6-8a', '6-8 ans'], ['8-10a', '8-10 ans'], ['10-12a', '10-12 ans'], ['12-14a', '12-14 ans']];
