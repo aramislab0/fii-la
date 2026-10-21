@@ -1,0 +1,71 @@
+[
+  {
+    "path": "media/commerce.mp4",
+    "sha256": "3a11e457d87dedf6731b1107e1741aeaf04182146a5c3616f55b842da0799d87",
+    "probe": {
+      "programs": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1200,
+          "height": 800,
+          "pix_fmt": "yuv420p",
+          "nb_frames": "150"
+        }
+      ],
+      "format": {
+        "duration": "5.000000",
+        "size": "546488"
+      }
+    },
+    "decode": "PASS",
+    "physical_phone": "NOT_RUN",
+    "whatsapp_delivery": "NOT_RUN"
+  },
+  {
+    "path": "media/evenement.mp4",
+    "sha256": "f9e4d4b138b0bbccc7a27a27c83a5a56fec96a9007dba5a864db795889a18a1a",
+    "probe": {
+      "programs": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1200,
+          "height": 800,
+          "pix_fmt": "yuv420p",
+          "nb_frames": "150"
+        }
+      ],
+      "format": {
+        "duration": "5.000000",
+        "size": "987494"
+      }
+    },
+    "decode": "PASS",
+    "physical_phone": "NOT_RUN",
+    "whatsapp_delivery": "NOT_RUN"
+  },
+  {
+    "path": "media/signature.mp4",
+    "sha256": "e6d7b7f095f792e94ce125a5a3664c2e6231b249601e66546c31eb92026125f1",
+    "probe": {
+      "programs": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1200,
+          "height": 800,
+          "pix_fmt": "yuv420p",
+          "nb_frames": "150"
+        }
+      ],
+      "format": {
+        "duration": "5.000000",
+        "size": "958749"
+      }
+    },
+    "decode": "PASS",
+    "physical_phone": "NOT_RUN",
+    "whatsapp_delivery": "NOT_RUN"
+  }
+]

@@ -1,0 +1,198 @@
+{
+  "created_at": "2026-10-21",
+  "author_interface": "CHATGPT",
+  "exact_model": null,
+  "self_hash_note": "MANIFEST.json and VERIFICATION-DU-PAQUET.json excluded to avoid recursive hashes.",
+  "files": [
+    {
+      "path": "00-LIRE-DABORD.md",
+      "bytes": 3853,
+      "sha256": "8e8f12b1333845a51bfa7480fac51f435732c81a255d655b0f7f4d8b6ff92103"
+    },
+    {
+      "path": "01-MANDAT-CLAUDE-CONSOLIDE.md",
+      "bytes": 9185,
+      "sha256": "10ef765e462faf3182de61a20427dc7a2987e750b494af1cb8c440b3fdbe3e0d"
+    },
+    {
+      "path": "02-DECISIONS-ET-STATUTS.md",
+      "bytes": 3335,
+      "sha256": "36240ed13b99fd2cfe3c4d060e33cbc48ef883afaeb2b87f46276968f8fed16e"
+    },
+    {
+      "path": "03-DIRECTION-PHOTO-ET-PROMPTS.md",
+      "bytes": 4817,
+      "sha256": "702c33b8b612af5e7491052612103507c8014094b105129ce6e749b45e7457da"
+    },
+    {
+      "path": "04-ANIMATION-ET-RECETTE.md",
+      "bytes": 6967,
+      "sha256": "8ffe1109c78ccadaeece933540ad8c2418a280324e8c1a6d92e42529e5958315"
+    },
+    {
+      "path": "PROMPT-POUR-CLAUDE.txt",
+      "bytes": 1532,
+      "sha256": "060a4b9da2251939b0606c63592ffa9c1c15a28abc3ad10d8df4f1033f798a9e"
+    },
+    {
+      "path": "assets/animations/commerce.mp4",
+      "bytes": 546488,
+      "sha256": "3a11e457d87dedf6731b1107e1741aeaf04182146a5c3616f55b842da0799d87"
+    },
+    {
+      "path": "assets/animations/evenement.mp4",
+      "bytes": 987494,
+      "sha256": "f9e4d4b138b0bbccc7a27a27c83a5a56fec96a9007dba5a864db795889a18a1a"
+    },
+    {
+      "path": "assets/animations/signature.mp4",
+      "bytes": 958749,
+      "sha256": "e6d7b7f095f792e94ce125a5a3664c2e6231b249601e66546c31eb92026125f1"
+    },
+    {
+      "path": "assets/brand/fiila-logo-source.png",
+      "bytes": 11918,
+      "sha256": "60dc3ca72272e96567ff1215d960299226f877f2a0d2f59ce9104ccf6bfd650a"
+    },
+    {
+      "path": "assets/fonts/OFL.txt",
+      "bytes": 4401,
+      "sha256": "e8ea3e532e2fcccd6fc50989bbb31869e424cd5f00dc4f63f866b08a4c2ebd9c"
+    },
+    {
+      "path": "assets/fonts/PROVENANCE.md",
+      "bytes": 404,
+      "sha256": "410626cf4d2ca146cf4703f9cc9b923d5fc89a202185f3b636323739d56f3994"
+    },
+    {
+      "path": "assets/fonts/montserrat-600.woff2",
+      "bytes": 18688,
+      "sha256": "d857325c360f7128b347ca924c1974967aaa886ba47dad22e4042d6c38b26a83"
+    },
+    {
+      "path": "assets/fonts/montserrat-700.woff2",
+      "bytes": 18824,
+      "sha256": "f9d9e65b15372cebcafc3acd1e664a564c5c4b23278de4d5760de9a13c530371"
+    },
+    {
+      "path": "assets/photos/commerce.png",
+      "bytes": 1962968,
+      "sha256": "8b5b49dc84e8b4ed39680023c26e144b925582060a1b07d11504a38e55846caa"
+    },
+    {
+      "path": "assets/photos/evenement.png",
+      "bytes": 2501141,
+      "sha256": "85da833133a3477cd30037765db0b78e27c2d08629ff2d832d11c49a912e55ee"
+    },
+    {
+      "path": "assets/photos/signature.png",
+      "bytes": 2479916,
+      "sha256": "d7fed89be996655810c3cc91a57c4b1b2e571c75789d6341b65ab752a68e9fc7"
+    },
+    {
+      "path": "docs/MANDAT-WHATSAPP-001.md",
+      "bytes": 15218,
+      "sha256": "5a676dd3e5fa36e42a355e207f8c1feea0f27d14049c5bd685dd5c088327114d"
+    },
+    {
+      "path": "docs/VERIFICATION-MOTION-001-ORIGINALE.json",
+      "bytes": 1604,
+      "sha256": "64c3daeaa534f416e52df87b18112a86b427edad57f53a5b6a83d47bbfd7de25"
+    },
+    {
+      "path": "docs/design/whatsapp/PASSATION-INSERTIONS.md",
+      "bytes": 3473,
+      "sha256": "5bbb6749c8e8fdbbb82a730fda626691ec7cf53d46b0ea61146625910733c235"
+    },
+    {
+      "path": "docs/design/whatsapp/PHOTO-V2-VALIDEE.md",
+      "bytes": 3611,
+      "sha256": "ae2da323230e225cd42b8e6b47a2b1ebcf07dbc9a91487742a26a1141dda2730"
+    },
+    {
+      "path": "docs/design/whatsapp/README.md",
+      "bytes": 3052,
+      "sha256": "3338c1f4ea52ed69f6b4f57643b4dbe77e1803364b41d45dea7d1e25eca7e83a"
+    },
+    {
+      "path": "docs/design/whatsapp/catalogue.json",
+      "bytes": 7066,
+      "sha256": "38ca615068adefdbaeb4d7a09460161c84d1834dc7d5dde8ca52bb138a19419c"
+    },
+    {
+      "path": "docs/design/whatsapp/manifest.json",
+      "bytes": 4090,
+      "sha256": "d6a5b10200517fb1cca98e160787ff9a260b5ea1c958ee63c4faf852c9dd1d7e"
+    },
+    {
+      "path": "docs/historique/MANDAT-AGENTS-AMBASSADEURS-001-SOURCE.md",
+      "bytes": 28372,
+      "sha256": "bfbc580596e364b7ce65dc1e53982fca726364348ee96969dd943bfb56f2855a"
+    },
+    {
+      "path": "docs/historique/MOTION-001-README-ORIGINAL.md",
+      "bytes": 3951,
+      "sha256": "fb9b5bfc67f3aacac1e2ab78878b416f892e27602467e8d8344c46735bf6d1b7"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/01-ambassadeur-api.png",
+      "bytes": 1480526,
+      "sha256": "afdbb21cab549d89103b837198eaa005a7ee562d4546441029638c5ee0726f96"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/02-ambassadeur-manuel.png",
+      "bytes": 1465620,
+      "sha256": "8dac8aeec9d6512cec11ef149bf26f57eb8ee2bfeade2c7c9174f3b0cbc62828"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/03-agent-api.png",
+      "bytes": 1477973,
+      "sha256": "fb7042de38d8e06c4363df359dbf6ea62eb326fe469e3c61ee71b964fbf65898"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/04-commande-api.png",
+      "bytes": 1558738,
+      "sha256": "26673f1d8a85b66e6dacf54111eedb787f54e50a9727cc600ed4ecdae413441e"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/05-demande-adresse-api.png",
+      "bytes": 1594976,
+      "sha256": "fb0f9701c76b531f122712682d844ab3f3199e04aff8d62b1262c9d30a41fcbe"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/06-livraison-api.png",
+      "bytes": 1586743,
+      "sha256": "db9d874b159124d186857c9402ed47cd2f7c6bf0fcdbc05b434c34ab88a48a14"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/07-evenement-api.png",
+      "bytes": 1578095,
+      "sha256": "686d37f50acf10c6bd6978a4b89c6d6c17113cf0d8cbf32a15320bd7638c61a3"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v2/01-ambassadeur-photo.png",
+      "bytes": 1653956,
+      "sha256": "97f882e57b48e72fa44aea908034ff9edb05a26b5d5a284b44b0dbb4706bbbbe"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v2/02-demande-adresse-photo.png",
+      "bytes": 1668174,
+      "sha256": "41f9d7e50395d7d72e8dff6ec0b3aab9a097284eeb8c51160787157d191007d1"
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v2/03-evenement-photo.png",
+      "bytes": 1729927,
+      "sha256": "e5dd1b0e64f5008b622311bfdf5a6a326897c24bc7bf784ba8c83b9c5ccff1eb"
+    },
+    {
+      "path": "index.html",
+      "bytes": 7460,
+      "sha256": "ade138bfc04abbaf68c01333a5e64c9c899ebfb6f21b060b8f57117f47f5c4ba"
+    },
+    {
+      "path": "scripts/render_motion.py",
+      "bytes": 2523,
+      "sha256": "c70a0fb7f23f55ef9ca0e1ecffb1ca8ceabeea6abb157dd01090d3a44c07f5ff"
+    }
+  ]
+}

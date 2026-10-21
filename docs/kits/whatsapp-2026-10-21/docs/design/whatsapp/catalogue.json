@@ -1,0 +1,156 @@
+{
+  "specification_only": true,
+  "created_at": "2026-10-21",
+  "locale": "fr",
+  "timezone": "Africa/Dakar",
+  "synthetic_examples_only": true,
+  "templates": [
+    {
+      "id": "fiila_ambassador_invite_v1",
+      "revision": 1,
+      "kicker": "AMBASSADEURS",
+      "artwork_title": "Votre marque est invitée.",
+      "artwork_detail": "{duration_months} mois offert(s), dès l’activation",
+      "body": "Bonjour {first_name},\nDécouvrez votre pack Ambassadeur Fii La : {available_benefits}.",
+      "footer": "Aucun paiement automatique.",
+      "cta_label": "Voir mon invitation",
+      "destination_contract": "invitation_ambassadeur_owner_scoped",
+      "variables": [
+        "first_name",
+        "duration_months",
+        "available_benefits"
+      ],
+      "manual_fallback": {
+        "text": "{rendered_body}\n\n{cta_label} :\n{resource_url}\n\n{rendered_footer}",
+        "image_optional": true
+      },
+      "meta_template_status": "NOT_SUBMITTED",
+      "integration_status": "TO_IMPLEMENT",
+      "notes": "Do not promise Studio until entitlement and provider are ready; 1/2 months from accepted pack, never hardcode 1."
+    },
+    {
+      "id": "fiila_agent_invite_v1",
+      "revision": 1,
+      "kicker": "AGENTS FII LA",
+      "artwork_title": "Accompagnez. Faites la différence.",
+      "artwork_detail": "Votre parcours commence ici",
+      "body": "Bonjour {first_name},\nDécouvrez le parcours Agent Fii La : formation, validation puis missions d’accompagnement des commerçants.",
+      "footer": "Les gains dépendent des missions validées.",
+      "cta_label": "Commencer",
+      "destination_contract": "existing_agent_career_entry",
+      "variables": [
+        "first_name"
+      ],
+      "manual_fallback": {
+        "text": "{rendered_body}\n\n{cta_label} :\n{resource_url}\n\n{rendered_footer}",
+        "image_optional": true
+      },
+      "meta_template_status": "NOT_SUBMITTED",
+      "integration_status": "TO_IMPLEMENT",
+      "notes": "Preserve existing training/authentication; no automatic qualification or earnings."
+    },
+    {
+      "id": "fiila_order_recorded_v1",
+      "revision": 1,
+      "kicker": "COMMANDE",
+      "artwork_title": "Votre commande est enregistrée.",
+      "artwork_detail": "{shop_name} · N° {order_reference}",
+      "body": "Bonjour {first_name},\nVotre commande chez {shop_name} a bien été enregistrée.\n\nMontant : {order_total_fcfa}\nRetrouvez les articles et la prochaine étape dans votre commande.",
+      "footer": "Enregistrée ne signifie pas payée.",
+      "cta_label": "Voir ma commande",
+      "destination_contract": "order_customer_view",
+      "variables": [
+        "first_name",
+        "shop_name",
+        "order_reference",
+        "order_total_fcfa"
+      ],
+      "manual_fallback": {
+        "text": "{rendered_body}\n\n{cta_label} :\n{resource_url}\n\n{rendered_footer}",
+        "image_optional": true
+      },
+      "meta_template_status": "NOT_SUBMITTED",
+      "integration_status": "TO_IMPLEMENT",
+      "notes": "Use factual current payment state if available. A missing address may require a single contextual address CTA instead; never two competing buttons."
+    },
+    {
+      "id": "fiila_address_request_v1",
+      "revision": 1,
+      "kicker": "VOTRE ENTRÉE",
+      "artwork_title": "Livrer à la bonne porte.",
+      "artwork_detail": "Un point précis. Un repère utile.",
+      "body": "Bonjour {first_name},\n{shop_name} vous demande où livrer votre commande. Indiquez votre entrée et, si utile, ajoutez une photo ou un repère.",
+      "footer": "Votre adresse sert à cette livraison.",
+      "cta_label": "Indiquer mon entrée",
+      "destination_contract": "existing_order_address_request",
+      "variables": [
+        "first_name",
+        "shop_name"
+      ],
+      "manual_fallback": {
+        "text": "{rendered_body}\n\n{cta_label} :\n{resource_url}\n\n{rendered_footer}",
+        "image_optional": true
+      },
+      "meta_template_status": "NOT_SUBMITTED",
+      "integration_status": "TO_IMPLEMENT",
+      "notes": "State requesting merchant truthfully; verify actual recipient visibility. No door photo in public preview."
+    },
+    {
+      "id": "fiila_delivery_started_v1",
+      "revision": 1,
+      "kicker": "LIVRAISON",
+      "artwork_title": "Votre livraison est en route.",
+      "artwork_detail": "Commande {order_reference} · {shop_name}",
+      "body": "Bonjour {first_name},\nVotre livreur a démarré la livraison. Ouvrez votre suivi pour consulter les informations disponibles.",
+      "footer": "Le statut à jour se trouve dans votre suivi.",
+      "cta_label": "Suivre ma livraison",
+      "destination_contract": "existing_customer_delivery_tracking",
+      "variables": [
+        "first_name",
+        "order_reference",
+        "shop_name"
+      ],
+      "manual_fallback": {
+        "text": "{rendered_body}\n\n{cta_label} :\n{resource_url}\n\n{rendered_footer}",
+        "image_optional": true
+      },
+      "meta_template_status": "NOT_SUBMITTED",
+      "integration_status": "TO_IMPLEMENT",
+      "notes": "Only after verified dispatch event; no fabricated ETA or chat-live position. Manual fallback preserves existing no-paid-courier-API decision."
+    },
+    {
+      "id": "fiila_event_invite_v1",
+      "revision": 1,
+      "kicker": "ÉVÉNEMENT",
+      "artwork_title": "On se retrouve au bon endroit.",
+      "artwork_detail": "{event_name} · {city}",
+      "body": "Bonjour {first_name},\nVous êtes invité(e) à {event_name}.\n\n{event_datetime_local}.\nRetrouvez les informations et l’entrée à rejoindre.",
+      "footer": "Consultez la fiche pour les dernières informations.",
+      "cta_label": "Voir l’événement",
+      "destination_contract": "existing_event_recipient_view",
+      "variables": [
+        "first_name",
+        "event_name",
+        "city",
+        "event_datetime_local"
+      ],
+      "manual_fallback": {
+        "text": "{rendered_body}\n\n{cta_label} :\n{resource_url}\n\n{rendered_footer}",
+        "image_optional": true
+      },
+      "meta_template_status": "NOT_SUBMITTED",
+      "integration_status": "TO_IMPLEMENT",
+      "notes": "Neutral copy may replace invited(e); exact timezone and cancellations resolved from event. No invented RSVP."
+    }
+  ],
+  "visual_reference": "See root 02-DECISIONS-ET-STATUTS.md; use assets/photos, not historical embedded stock-style artwork.",
+  "copy_status": "Editorial specification; test actual entitlement, state and API before publication.",
+  "photo_sources": {
+    "fiila_ambassador_invite_v1": "assets/photos/commerce.png (candidate contextual crop)",
+    "fiila_agent_invite_v1": "source to finalize; no invented earnings claim",
+    "fiila_order_recorded_v1": "real authorized product photo or typography fallback",
+    "fiila_address_request_v1": "assets/photos/signature.png (approved brand image, illustrative only)",
+    "fiila_delivery_started_v1": "assets/photos/signature.png (illustrative only)",
+    "fiila_event_invite_v1": "assets/photos/evenement.png (illustrative only)"
+  }
+}

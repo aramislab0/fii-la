@@ -1,0 +1,19 @@
+{
+  "created_at": "2026-10-21",
+  "png_files_decoded": 14,
+  "html_and_markdown_local_links": "PASS",
+  "json_parse": "PASS",
+  "motion_script_syntax": "PASS",
+  "motion_videos_unchanged_from_locally_verified_outputs": "PASS",
+  "archive_integrity": "PASS",
+  "real_phone_whatsapp_test": "NOT_RUN",
+  "generative_character_motion": "NOT_PRODUCED",
+  "repository_publication": "NOT_COMMITTED_BY_THIS_PACKAGE",
+  "counts": {
+    "whatsapp_mockups": 10,
+    "standalone_photos": 3,
+    "logo": 1,
+    "mp4_camera_motion_tests": 3,
+    "font_files": 2
+  }
+}

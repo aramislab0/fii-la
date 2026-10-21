@@ -1,0 +1,100 @@
+{
+  "created_at": "2026-10-21",
+  "author_interface": "CHATGPT",
+  "model_exact": null,
+  "logo_source": "web/icons/icon-512.png",
+  "files": [
+    {
+      "path": "docs/screenshots/whatsapp-v1/01-ambassadeur-api.png",
+      "sha256": "afdbb21cab549d89103b837198eaa005a7ee562d4546441029638c5ee0726f96",
+      "bytes": 1480526,
+      "source": "exec-7345a285-88f1-478d-b1d9-1c25bb4299ac.png",
+      "kind": "imagegen_static_mockup",
+      "status": "reference_validated",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/02-ambassadeur-manuel.png",
+      "sha256": "8dac8aeec9d6512cec11ef149bf26f57eb8ee2bfeade2c7c9174f3b0cbc62828",
+      "bytes": 1465620,
+      "source": "exec-c94f93f9-d20f-4809-93d8-909303c418d2.png",
+      "kind": "imagegen_static_mockup",
+      "status": "manual_reference",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/03-agent-api.png",
+      "sha256": "fb7042de38d8e06c4363df359dbf6ea62eb326fe469e3c61ee71b964fbf65898",
+      "bytes": 1477973,
+      "source": "exec-933d61cc-2e1c-4bb2-bcd9-1fb62032661e.png",
+      "kind": "imagegen_static_mockup",
+      "status": "derived_proposal",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/04-commande-api.png",
+      "sha256": "26673f1d8a85b66e6dacf54111eedb787f54e50a9727cc600ed4ecdae413441e",
+      "bytes": 1558738,
+      "source": "exec-409c2329-6e93-451c-ab44-1bb79bbd559f.png",
+      "kind": "imagegen_static_mockup",
+      "status": "derived_proposal",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/05-demande-adresse-api.png",
+      "sha256": "fb0f9701c76b531f122712682d844ab3f3199e04aff8d62b1262c9d30a41fcbe",
+      "bytes": 1594976,
+      "source": "exec-4eb912a9-3552-4010-9ba6-e1d0392613b9.png",
+      "kind": "imagegen_static_mockup",
+      "status": "derived_proposal",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/06-livraison-api.png",
+      "sha256": "db9d874b159124d186857c9402ed47cd2f7c6bf0fcdbc05b434c34ab88a48a14",
+      "bytes": 1586743,
+      "source": "exec-ae28e59b-64d8-475b-add2-76b91182ec3e.png",
+      "kind": "imagegen_static_mockup",
+      "status": "derived_proposal",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v1/07-evenement-api.png",
+      "sha256": "686d37f50acf10c6bd6978a4b89c6d6c17113cf0d8cbf32a15320bd7638c61a3",
+      "bytes": 1578095,
+      "source": "exec-34319eaa-b2a1-4174-9f16-0bd8bc9d716d.png",
+      "kind": "imagegen_static_mockup",
+      "status": "derived_proposal",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v2/01-ambassadeur-photo.png",
+      "sha256": "97f882e57b48e72fa44aea908034ff9edb05a26b5d5a284b44b0dbb4706bbbbe",
+      "bytes": 1653956,
+      "source": "exec-e10e9d74-5a75-4d8c-8f72-cbede80b4734.png",
+      "kind": "imagegen_static_mockup",
+      "status": "founder_validated_photo_direction_2026-10-21",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v2/02-demande-adresse-photo.png",
+      "sha256": "41f9d7e50395d7d72e8dff6ec0b3aab9a097284eeb8c51160787157d191007d1",
+      "bytes": 1668174,
+      "source": "exec-963795b3-d07a-493e-a272-d1e4afcaaa3a.png",
+      "kind": "imagegen_static_mockup",
+      "status": "founder_validated_photo_direction_2026-10-21",
+      "real_whatsapp_capture": false
+    },
+    {
+      "path": "docs/screenshots/whatsapp-v2/03-evenement-photo.png",
+      "sha256": "e5dd1b0e64f5008b622311bfdf5a6a326897c24bc7bf784ba8c83b9c5ccff1eb",
+      "bytes": 1729927,
+      "source": "exec-32596dce-857a-4df1-8430-b55b4d3edc84.png",
+      "kind": "imagegen_static_mockup",
+      "status": "founder_validated_photo_direction_2026-10-21",
+      "real_whatsapp_capture": false
+    }
+  ],
+  "current_reference": "whatsapp-v2-photo",
+  "founder_validation_source": "Direct ChatGPT conversation, 2026-10-21: Je valide, after three photography-enriched mockups."
+}
