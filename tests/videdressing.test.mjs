@@ -56,6 +56,8 @@ await t('vendeuse : compte, photo du vêtement seul (case obligatoire), fille 2-
   await V.goto(URL0 + '#/'); await V.locator('#services-open').click(); await V.locator('#svc-vide_dressing-go').click();
   await V.locator('#vd-sell').click();
   await V.locator('#vd-photo input[type=file], input[type=file]').first().setInputFiles({ name: 'robe.png', mimeType: 'image/png', buffer: pngFile() });
+  assert.equal(await V.locator('#vd-kid').isVisible(), false, 'genre et âge cachés avant la catégorie');
+  await V.selectOption('#vd-cat', 'enfants');
   await V.fill('#vd-title', 'Robe fleurie (test)');
   await V.locator('#vd-gender').getByText('Fille').click();
   await V.selectOption('#vd-age', '2-4a');
@@ -64,7 +66,7 @@ await t('vendeuse : compte, photo du vêtement seul (case obligatoire), fille 2-
   await V.fill('#vd-price', '4000');
   await V.getByText('Vous recevrez 3 400 FCFA').waitFor();
   await V.click('#vd-send');
-  await V.getByText('Confirmez qu’aucun enfant').waitFor();
+  await V.getByText('Confirmez qu’aucune personne').waitFor();
   await V.check('#vd-photo-ok');
   await shot(V, '01-depot');
   await V.click('#vd-send');

@@ -39,6 +39,22 @@ await t('dépôt : compte obligatoire, règle photo, genre, âge, état et prix 
   assert.equal(S1.status, 'pending'); assert.equal(S1.net, 3400, 'commission 15 %');
 });
 
+await t('ouvert à tout article (20/10) : catégorie contrôlée ; genre et âge seulement pour « Enfants » ; publié dans sa catégorie', async () => {
+  const W = await user('vendeuse2@example.test');
+  await ko('fiila_vd_submit', { p: item({ category: 'alimentation' }) }, 'vd_category_required', W);
+  await ko('fiila_vd_submit', { p: item({ category: 'enfants', gender: null }) }, 'vd_gender_required', W);
+  const m = await ok('fiila_vd_submit', { p: item({ category: 'maison', title: 'Ventilateur [TEST]', gender: 'fille', age_band: null, size: null }) }, W);
+  assert.equal(m.category, 'maison'); assert.equal(m.gender, undefined, 'pas de genre hors « Enfants »'); assert.equal(m.age_band, undefined);
+  const old = await ok('fiila_vd_submit', { p: item({ title: 'Ancien format [TEST]' }) }, W);
+  assert.equal(old.category, 'enfants', 'sans catégorie : « Enfants » (applications pas encore à jour)');
+  const A2 = await user('admin2@example.test', true);
+  await ok('fiila_admin_vd_decide', { p_id: m.id, p_decision: 'approve', p_reason: null }, A2);
+  const pr = await one(`select category, gender from fiila.products where submission_id = $1`, [m.id]);
+  assert.equal(pr.category, 'maison'); assert.equal(pr.gender, null);
+  await db.query(`update fiila.products set active = false where submission_id = $1`, [m.id]);
+  await db.query(`delete from fiila.vd_submissions where user_id = $1`, [W.uid]);
+});
+
 await t('rien n’est publié sans validation ; seule l’équipe valide ; publié dans la vitrine Fii La, vendeuse invisible', async () => {
   let v = await ok('fiila_vitrine', { p_slug: 'vide-dressing' });
   assert.equal(v.products.length, 0); assert.equal(v.shop.platform, true);
