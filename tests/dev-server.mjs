@@ -141,7 +141,7 @@ function makeAuth(db) {
           const f = { id: randomUUID(), secret: newSecret(), status: 'unverified', friendly_name: body.friendly_name || 'TOTP' };
           if (list.some((x) => x.friendly_name === f.friendly_name)) return err(422, 'mfa_factor_name_conflict', 'A factor with the friendly name already exists');
           list.push(f);
-          const uri = 'otpauth://totp/' + encodeURIComponent((body.issuer || 'Fii La') + ':' + byId(who.uid).email) + '?secret=' + f.secret + '&issuer=' + encodeURIComponent(body.issuer || 'Fii La');
+          const uri = 'otpauth://totp/' + encodeURIComponent((body.issuer || 'Fii') + ':' + byId(who.uid).email) + '?secret=' + f.secret + '&issuer=' + encodeURIComponent(body.issuer || 'Fii');
           // Même format que l'API Supabase (internal/api/mfa.go : QRCode = buf.String()) : SVG brut, sans préfixe « data: »,
           // avec en-tête XML et des couleurs « # ». FIILA_QR_PREFIX=1 simule l'ancien format préfixé (supabase-js).
           const qr = (process.env.FIILA_QR_PREFIX ? 'data:image/svg+xml;utf-8,' : '') + '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" fill="#ffffff"/><rect x="20" y="20" width="120" height="120" fill="#111111"/></svg>';
@@ -259,5 +259,5 @@ export async function startServer(port = 0) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const s = await startServer(Number(process.env.PORT || 8787));
-  console.log('Fii La local :', s.url);
+  console.log('Fii local :', s.url);
 }

@@ -1,4 +1,4 @@
-// Comptes, carnet d'adresses et boutique (Rali dans Fii La), de bout en bout.
+// Comptes, carnet d'adresses et boutique (Rali dans Fii), de bout en bout.
 // Chromium (ou ENGINE=webkit), émulation iPhone 13, vrai Postgres local (PGlite) + émulation de Supabase Auth.
 // Simulations : [SIMULÉ AUTH] inscription et connexion par le serveur de test ; [SIMULÉ GPS] position du livreur.
 import { createRequire } from 'node:module';
@@ -459,7 +459,7 @@ await t('mot de passe oublié (PKCE + code) : le lien marche là où il a été 
   await O.page.goto(URL0 + '?code=' + code + '#/');
   await O.page.getByText('Ce lien ne s’ouvre pas ici').waitFor();
   await O.ctx.close();
-  // Cas réel de l'iPhone (icône Fii La ≠ Safari) : le code du même e-mail, saisi dans l'application, ouvre la session.
+  // Cas réel de l'iPhone (icône Fii ≠ Safari) : le code du même e-mail, saisi dans l'application, ouvre la session.
   await R.page.locator('#mail-code-box summary').click();
   await R.page.locator('#mail-code').waitFor();
   await R.page.fill('#mail-code', '000000');

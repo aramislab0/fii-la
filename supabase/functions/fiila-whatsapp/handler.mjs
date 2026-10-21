@@ -1,4 +1,4 @@
-// Fii La — le Manager Fii La Carrière sur WhatsApp (API WhatsApp Business de Meta, « Cloud API »).
+// Fii — le Manager Fii Carrière sur WhatsApp (API WhatsApp Business de Meta, « Cloud API »).
 //   GET  ?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…  vérification du webhook par Meta ;
 //   POST (Meta, signé X-Hub-Signature-256)  messages reçus des agents : même conversation que dans l'application ; le Manager
 //        répond sur WhatsApp (règles, ou IA si activée) ; un numéro inconnu reçoit le lien d'inscription ;
@@ -15,7 +15,7 @@
 import { draftReply } from './manager.mjs';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
-export const UNKNOWN_TEXT = (url) => `Bonjour ! Ici le Manager de Fii La Carrière. Ce numéro n’est pas encore celui d’un agent Fii La. Pour nous rejoindre : ${url}#/carriere`;
+export const UNKNOWN_TEXT = (url) => `Bonjour ! Ici le Manager de Fii Carrière. Ce numéro n’est pas encore celui d’un agent Fii. Pour nous rejoindre : ${url}#/carriere`;
 
 async function hmacHex(secret, raw) {
   const enc = new TextEncoder();

@@ -1,4 +1,4 @@
-// Fii La — lit un lien court Google Maps (maps.app.goo.gl) et renvoie le point qu'il désigne.
+// Fii — lit un lien court Google Maps (maps.app.goo.gl) et renvoie le point qu'il désigne.
 // Le navigateur ne peut pas suivre ce lien lui-même (redirections vers un autre domaine).
 // Sécurité : seuls les liens courts Google Maps sont acceptés, et seules les redirections vers Google
 // sont suivies. Rien n'est enregistré. Aucune clé privilégiée.

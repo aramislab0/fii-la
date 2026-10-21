@@ -75,7 +75,7 @@ await t('propriétaire : Réglages → Équipe (section repliée), invitation av
   const u = new URL(href);
   assert.equal(u.hostname, 'wa.me'); assert.match(u.pathname, /221772222222$/);
   const msg = u.searchParams.get('text');
-  assert.match(msg, /^Bonjour Fatou, Boutique Awa \(test\) vous invite à rejoindre son équipe sur Fii La \(éditeur\)/);
+  assert.match(msg, /^Bonjour Fatou, Boutique Awa \(test\) vous invite à rejoindre son équipe sur Fii \(éditeur\)/);
   LINK = msg.match(/https?:\S+#\/equipe\/[A-Za-z0-9_-]+/)[0];
   assert.ok(await noOverflow(O));
   await shot(O, '02-envoyer');

@@ -123,7 +123,7 @@ await t('accueil (nouveau visiteur) : une action principale, « Découvrir les s
   await A.locator('#services-open').waitFor();
   await shot(A, '01-accueil');
   await A.locator('#services-open').click();
-  for (const n of ['Ma boutique', 'Demander une adresse', 'Créer un événement', 'Espace livreur', 'Vide-dressing', 'Fii La Carrière']) await A.locator('#services-sheet').getByText(n, { exact: true }).waitFor();
+  for (const n of ['Ma boutique', 'Demander une adresse', 'Créer un événement', 'Espace livreur', 'Vide-dressing', 'Fii Carrière']) await A.locator('#services-sheet').getByText(n, { exact: true }).waitFor();
   assert.equal(await A.locator('#services-sheet .svc-ic svg').count(), 6, 'chaque service a son pictogramme');
   await A.locator('#services-close').click();
 });

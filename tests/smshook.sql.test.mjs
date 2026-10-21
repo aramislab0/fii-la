@@ -6,7 +6,7 @@ import { makeHandler, recipient, SMS_TEXT } from '../supabase/functions/fiila-se
 
 let passed = 0, failed = 0;
 async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
-const SECRET = Buffer.from('secret-de-test-fii-la-0123456789').toString('base64');
+const SECRET = Buffer.from('secret-de-test-fii-0123456789').toString('base64');
 const ENV = { SEND_SMS_HOOK_SECRET: 'v1,whsec_' + SECRET, AT_USERNAME: 'fiila-test', AT_API_KEY: 'cle-de-test', AT_SENDER_ID: 'FIILA' };
 const calls = [];
 function atFetch(status, recipients) {
@@ -31,7 +31,7 @@ await t('signature valide : SMS envoyé à Africa’s Talking (numéro +221, tex
   assert.equal(calls[0].init.headers.apiKey, 'cle-de-test');
   const f = new URLSearchParams(calls[0].init.body);
   assert.deepEqual(Object.fromEntries(f), { username: 'fiila-test', to: '+221771234567', message: SMS_TEXT('482913'), from: 'FIILA' });
-  assert.match(f.get('message'), /^Fii La : votre code est 482913\./);
+  assert.match(f.get('message'), /^Fii : votre code est 482913\./);
 });
 
 await t('signature absente, fausse ou d’un autre secret : refus 401, aucun SMS', async () => {

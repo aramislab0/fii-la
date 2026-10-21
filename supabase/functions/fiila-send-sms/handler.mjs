@@ -1,4 +1,4 @@
-// Fii La — envoi des codes de vérification par SMS via Africa's Talking (« Send SMS hook » de Supabase Auth).
+// Fii — envoi des codes de vérification par SMS via Africa's Talking (« Send SMS hook » de Supabase Auth).
 // Supabase Auth génère le code et appelle cette fonction ; elle vérifie la signature (Standard Webhooks), puis transmet
 // le SMS à Africa's Talking. Rien n'est enregistré : ni le numéro, ni le code. Aucun secret dans le code :
 //   SEND_SMS_HOOK_SECRET  secret du crochet, fourni par Supabase (Authentication → Hooks), forme « v1,whsec_… »
@@ -7,7 +7,7 @@
 //   AT_SENDER_ID          facultatif : nom d'expéditeur approuvé (sinon, le numéro par défaut d'Africa's Talking)
 // Module sans dépendance d'exécution (testé sous Node, déployé sous Deno).
 
-export const SMS_TEXT = (otp) => `Fii La : votre code est ${otp}. Ne le communiquez à personne.`;
+export const SMS_TEXT = (otp) => `Fii : votre code est ${otp}. Ne le communiquez à personne.`;
 const OK_CODES = new Set([100, 101, 102]); // Processed, Sent, Queued
 
 export function recipient(ev) {
@@ -33,7 +33,7 @@ export function makeHandler({ env, fetch, Webhook, timeoutMs = 4000 }) {
       return fail(401, 'Signature invalide');
     }
     // Seule la confirmation du numéro d'un compte existant est servie : une inscription ou une connexion par SMS
-    // (non utilisées par Fii La) ne déclenche aucun envoi, donc aucun coût si quelqu'un appelle l'API directement.
+    // (non utilisées par Fii) ne déclenche aucun envoi, donc aucun coût si quelqu'un appelle l'API directement.
     const type = ev && ev.sms && ev.sms.sms_type;
     if (type && type !== 'phone_change') return fail(403, 'Envoi de SMS réservé à la confirmation du numéro');
     const to = recipient(ev);

@@ -1,4 +1,4 @@
-// Fii La — extraction de coordonnées depuis une URL Google Maps (partagé entre la fonction et les tests).
+// Fii — extraction de coordonnées depuis une URL Google Maps (partagé entre la fonction et les tests).
 // Aucune donnée n'est conservée : on lit une URL, on renvoie un point.
 
 const PAIR = /(-?\d{1,2}\.\d{3,})\s*[,;\s]\s*\+?\s*(-?\d{1,3}\.\d{3,})/;

@@ -133,7 +133,7 @@ await t('Facebook sans configuration : action de copie honnête, consigne affich
   O.on('popup', (pp) => popups.push(pp));
   const copied = waitTrack(O, 'link_copied', 'request');
   await O.locator('#share-facebook-copy').click();
-  await O.locator('#fb-help').getByText('Fii La n’est pas relié à Facebook : le lien est seulement copié.', { exact: false }).waitFor();
+  await O.locator('#fb-help').getByText('Fii n’est pas relié à Facebook : le lien est seulement copié.', { exact: false }).waitFor();
   if (ENGINE === 'chromium') { await copied; assert.equal(await O.evaluate(() => navigator.clipboard.readText()), recipientUrl.request); }
   await O.waitForTimeout(400);
   assert.equal(popups.length, 0, 'une fenêtre s’est ouverte');
@@ -228,7 +228,7 @@ await t('export : fichier PNG 1080 × 1920 téléchargé, QR décodé = lien des
   const m = await sharp(buf).metadata();
   assert.deepEqual([m.width, m.height, m.format], [1080, 1920, 'png']);
   assert.equal(decodePng(buf), recipientUrl.meeting);
-  assert.equal(d.suggestedFilename(), 'fii-la-evenement.png');
+  assert.equal(d.suggestedFilename(), 'fii-evenement.png');
   exportedMeeting = path;
 });
 
@@ -254,16 +254,16 @@ await t('TikTok : consigne du champ « Site web » (non garanti), formule neutre
   await O.getByText('TikTok ne le propose pas à tous les comptes', { exact: false }).waitFor();
   await O.locator('#v-title').uncheck();
   await O.locator('#v-when').uncheck();
-  await O.waitForFunction(() => /partagé avec Fii La/.test(document.getElementById('visual-preview').dataset.meta));
+  await O.waitForFunction(() => { const m = document.getElementById('visual-preview').dataset.meta || ''; return /partagé avec Fii/.test(m) && !/heure de Dakar/.test(m); });
   const meta = JSON.parse(await O.locator('#visual-preview').getAttribute('data-meta'));
-  assert.equal(meta.titleLines.join(' '), 'Un événement partagé avec Fii La');
+  assert.equal(meta.titleLines.join(' '), 'Un événement partagé avec Fii');
   assert.ok(!meta.texts.some((x) => x.includes('Ndèye')), 'nom affiché malgré le choix');
   assert.ok(!meta.texts.some((x) => /heure de Dakar/.test(x)), 'date affichée malgré le choix');
 });
 
 await t('adresse et demande : titre neutre réellement appliqué, photo non incluse par défaut, nom du demandeur jamais exporté', async () => {
-  const cases = { address: { name: 'Atelier Ndèye', neutral: 'Une adresse partagée avec Fii La' },
-    request: { name: 'Livraison de votre commande', neutral: 'Une demande d’adresse Fii La' } };
+  const cases = { address: { name: 'Atelier Ndèye', neutral: 'Une adresse partagée avec Fii' },
+    request: { name: 'Livraison de votre commande', neutral: 'Une demande d’adresse Fii' } };
   for (const kind of ['address', 'request']) {
     let meta = await openVisual(O, views[kind], 'instagram');
     assert.equal(meta.includesPhoto, false, 'photo incluse par défaut');

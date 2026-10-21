@@ -1,4 +1,4 @@
-/* Fii La — application web (sans framework, sans étape de build).
+/* Fii — application web (sans framework, sans étape de build).
    Toutes les données passent par les fonctions RPC Supabase `fiila_*`.
    Aucun contenu saisi n'est injecté en HTML : tout passe par textContent. */
 (function () {
@@ -48,10 +48,10 @@
   // Pied de page : complet sur les écrans de gestion ; réduit sur les pages reçues par lien.
   function footer(minimal) {
     if (minimal) return h('footer', { class: 'foot foot-min' },
-      h('div', { class: 'foot-links' }, h('a', { href: '#/', class: 'foot-brand' }, 'Fii La'), h('a', { href: '#/confidentialite' }, 'Données et confidentialité')));
+      h('div', { class: 'foot-links' }, h('a', { href: '#/', class: 'foot-brand' }, 'Fii'), h('a', { href: '#/confidentialite' }, 'Données et confidentialité')));
     return h('footer', { class: 'foot' },
       h('div', { class: 'foot-links' },
-        h('a', { href: '#/' }, 'Fii La'),
+        h('a', { href: '#/' }, 'Fii'),
         h('a', { href: '#/compte', id: 'foot-account' }, authed() ? 'Mon compte' : 'Se connecter'),
         h('a', { href: '#/livreur', id: 'foot-courier' }, 'Espace livreur'),
         h('a', { href: '#/confidentialite' }, 'Données et confidentialité'),
@@ -59,8 +59,12 @@
   }
   // Thème : toujours celui du téléphone (clair ou sombre), sans réglage dans l'application (fondateur, 20/10).
   // En-tête discret des pages reçues par lien : de quoi il s'agit, en un coup d'œil.
+  // Logo Fii (validé par le fondateur le 21/10/2026, docs/brand/) : pastille verte, sans redessin. size : '' | 'small' | 'tiny'.
+  function brandLogo(size, label) {
+    return h('img', { class: 'logo' + (size ? ' ' + size : ''), src: 'media/brand/fii-tile.png', alt: label == null ? 'Fii' : label, width: 160, height: 160, decoding: 'async' });
+  }
   function brandBar(kind) {
-    return h('div', { class: 'brand-bar' }, h('span', { class: 'mark small', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La')), kind ? h('span', { class: 'brand-kind' }, kind) : null);
+    return h('div', { class: 'brand-bar' }, brandLogo('small'), kind ? h('span', { class: 'brand-kind' }, kind) : null);
   }
   var STATE_ICONS = { '?': 'help', '!': 'alert', '⦸': 'ban', '⌛': 'hourglass', '✓': 'check' };
   function stateCard(glyph, title, text, extra) {
@@ -226,13 +230,13 @@
     ambassador_unknown: 'Code agent inconnu ou pas encore actif.',
     invite_not_found: 'Invitation introuvable. Vérifiez que le lien a été copié en entier.',
     invite_used: 'Cette invitation a déjà été acceptée par une autre boutique.',
-    invite_revoked: 'Cette invitation a été retirée par Fii La.',
-    invite_expired: 'Cette invitation a expiré. Demandez un nouveau lien à Fii La.',
+    invite_revoked: 'Cette invitation a été retirée par Fii.',
+    invite_expired: 'Cette invitation a expiré. Demandez un nouveau lien à Fii.',
     invite_other_shop: 'Cette invitation est réservée à une autre boutique. Ouvrez le lien sur le téléphone qui gère la boutique invitée.',
     trial_already: 'Cette boutique a déjà eu un essai Ambassadeur.',
     trial_none: 'Aucun essai pour cette boutique.',
     trial_not_ready: 'L’essai ne peut pas être activé dans son état actuel.',
-    pack_blocked_dependency: 'Le pack n’est pas encore disponible : un service qu’il inclut n’est pas prêt. Fii La vous prévient dès qu’il l’est.',
+    pack_blocked_dependency: 'Le pack n’est pas encore disponible : un service qu’il inclut n’est pas prêt. Fii vous prévient dès qu’il l’est.',
     pack_not_ready: 'Le pack n’est pas encore prêt.',
     pack_none: 'Aucun pack défini. Créez d’abord une version du pack.',
     pack_benefits_required: 'Indiquez au moins un avantage du pack.',
@@ -321,7 +325,7 @@
     no_courier: 'Aucun livreur attitré disponible.',
     reauth_required: 'Saisissez à nouveau votre mot de passe.',
     not_allowed: 'Action non autorisée.',
-    comment_contact: 'Pas de lien ni de numéro dans un commentaire : la commande se fait sur Fii La.',
+    comment_contact: 'Pas de lien ni de numéro dans un commentaire : la commande se fait sur Fii.',
     comment_too_long: 'Commentaire trop long (300 caractères au plus).',
     comment_empty: 'Écrivez votre commentaire.',
     name_required: 'Ajoutez votre prénom dans votre compte pour commenter.',
@@ -329,7 +333,7 @@
     invalid_value: 'Valeur hors des limites autorisées.',
     invalid_setting: 'Réglage inconnu.',
     reason_required: 'Indiquez un motif.',
-    shop_suspended: 'Votre boutique est suspendue par l’équipe Fii La. Contactez-nous pour la réactiver.',
+    shop_suspended: 'Votre boutique est suspendue par l’équipe Fii. Contactez-nous pour la réactiver.',
     invite_invalid: 'Invitation expirée, annulée ou déjà utilisée.',
     invite_email_mismatch: 'Cette invitation a été créée pour une autre adresse e-mail.',
     already_staff: 'Cette personne fait déjà partie de l’équipe.',
@@ -342,7 +346,7 @@
     mfa_verification_failed: 'Code incorrect. Vérifiez qu’il est à jour (il change toutes les 30 secondes) et que l’heure du téléphone est automatique.',
     mfa_challenge_expired: 'Code expiré. Saisissez le nouveau code affiché.',
     insufficient_aal: 'Saisissez d’abord le code de votre application d’authentification.',
-    payout_pending: 'Un versement vous est encore dû. Contactez Fii La pour le recevoir avant de supprimer votre compte.'
+    payout_pending: 'Un versement vous est encore dû. Contactez Fii pour le recevoir avant de supprimer votre compte.'
   };
   function ApiError(code) { this.code = code; this.message = ERRORS[code] || ERRORS.server; }
   ApiError.prototype = Object.create(Error.prototype);
@@ -473,7 +477,7 @@
     // Double authentification (application d'authentification, code à 6 chiffres) : API MFA de Supabase Auth.
     mfaFactors: function () { return authCall('/user', 'GET', null, true).then(function (u) { return (u && u.factors) || []; }); },
     mfaEnroll: function () {
-      return authCall('/factors', 'POST', { factor_type: 'totp', issuer: 'Fii La', friendly_name: 'Fii La ' + new Date().toISOString().slice(0, 16) }, true);
+      return authCall('/factors', 'POST', { factor_type: 'totp', issuer: 'Fii', friendly_name: 'Fii ' + new Date().toISOString().slice(0, 16) }, true);
     },
     mfaRemove: function (id) { return authCall('/factors/' + id, 'DELETE', null, true); },
     mfaVerify: function (factorId, code) {
@@ -687,9 +691,9 @@
     { id: 'livreur', icon: 'moto', label: 'Livreur', hero: 'Espace livreur', sub: 'Vos courses avec l’adresse exacte', href: '#/livreur',
       text: 'Recevez les courses de vos commerçants, avec l’adresse exacte et le chemin.' },
     { id: 'vide_dressing', icon: 'users', label: 'Vide-dressing', hero: 'Vide-dressing', sub: 'Vendre ou acheter d’occasion', href: '#/vide-dressing',
-      text: 'Proposez vos articles d’occasion à Fii La, ou achetez près de chez vous.' },
-    { id: 'ambassadeur', icon: 'cash', label: 'Agent', hero: 'Fii La Carrière', sub: 'Missions, gains, classement', href: '#/agent',
-      text: 'Gagnez de l’argent en installant Fii La chez les commerçants, après une formation et une validation.' }];
+      text: 'Proposez vos articles d’occasion à Fii, ou achetez près de chez vous.' },
+    { id: 'ambassadeur', icon: 'cash', label: 'Agent', hero: 'Fii Carrière', sub: 'Missions, gains, classement', href: '#/agent',
+      text: 'Gagnez de l’argent en installant Fii chez les commerçants, après une formation et une validation.' }];
   var ACT_LS = 'fiila.acts';
   ['hero_reprendre', 'hero_adresse', 'services'].concat(SERVICES.map(function (x) { return 'hero_' + x.id; })).forEach(function (k) { TRACKABLE.onboarding.push(k === 'services' ? 'services:open' : k + ':click'); });
   SERVICES.forEach(function (x) { TRACKABLE.onboarding.push('act_' + x.id + ':click', 'svc_' + x.id + ':click', 'svc_' + x.id + ':hide'); });
@@ -772,7 +776,7 @@
     var list = SERVICES.filter(function (s) { return !(s.id === 'boutique' && CFG.shop === false); });
     var close;
     back.append(h('div', { class: 'sheet svc-sheet' },
-      h('div', { class: 'svc-head' }, h('h2', { id: 'services-h' }, 'Les services Fii La'),
+      h('div', { class: 'svc-head' }, h('h2', { id: 'services-h' }, 'Les services Fii'),
         h('button', { class: 'svc-x', type: 'button', 'aria-label': 'Fermer', id: 'services-close', onclick: function () { close(); } }, icon('close', 18))),
       h('div', { class: 'svc-list' }, list.map(function (s) {
         var on = mine.indexOf(s) >= 0;
@@ -895,8 +899,8 @@
       if (hidden()) { setKids(box); return; }
       setKids(box, h('div', { class: 'install-cta' },
         h('button', { class: 'install-go', type: 'button', id: 'install-app', onclick: open },
-          h('span', { class: 'install-ic', 'aria-hidden': 'true' }, h('span', { class: 'mark tiny' }, 'Fii', h('span', null, 'La'))),
-          h('span', { class: 'install-t' }, h('b', null, 'Installer l’app'), h('small', null, 'L’icône Fii La sur votre téléphone')),
+          h('span', { class: 'install-ic', 'aria-hidden': 'true' }, brandLogo('tiny', '')),
+          h('span', { class: 'install-t' }, h('b', null, 'Installer l’app'), h('small', null, 'L’icône Fii sur votre téléphone')),
           icon('down', 20)),
         h('button', { class: 'install-x', type: 'button', 'aria-label': 'Masquer', onclick: function () { LS.set('fiila.install.hide', Date.now() + 30 * 864e5); draw(); } }, '×')));
     }
@@ -904,7 +908,7 @@
       if (deferredInstall) {
         var ev = deferredInstall; deferredInstall = null;
         Promise.resolve().then(function () { return ev.prompt(); }).then(function () { return ev.userChoice; })
-          .then(function (c) { if (c && c.outcome === 'accepted') { LS.set('fiila.install.done', true); toast('Fii La est sur votre écran d’accueil.'); } draw(); }, function () { draw(); });
+          .then(function (c) { if (c && c.outcome === 'accepted') { LS.set('fiila.install.done', true); toast('Fii est sur votre écran d’accueil.'); } draw(); }, function () { draw(); });
         return;
       }
       sheet();
@@ -915,24 +919,24 @@
       var steps = ios && !inApp ? [
         ['share', 'Touchez le bouton Partager', 'en bas de l’écran (le carré avec une flèche).'],
         ['plus', 'Choisissez « Sur l’écran d’accueil »', 'faites défiler la liste si besoin.'],
-        ['check', 'Touchez « Ajouter »', 'l’icône Fii La apparaît avec vos autres apps.']]
+        ['check', 'Touchez « Ajouter »', 'l’icône Fii apparaît avec vos autres apps.']]
         : inApp || !('serviceWorker' in navigator) ? [
         ['link', 'Copiez le lien', 'avec le bouton ci-dessous.'],
         ['eye', 'Ouvrez-le dans ' + (ios ? 'Safari' : 'Chrome'), 'l’installation n’est pas possible depuis cette application.'],
-        ['down', 'Touchez « Installer l’app »', 'sur l’accueil de Fii La.']]
+        ['down', 'Touchez « Installer l’app »', 'sur l’accueil de Fii.']]
         : [
         ['dots', 'Ouvrez le menu du navigateur', 'les trois points en haut à droite.'],
         ['plus', 'Choisissez « Installer l’application »', 'ou « Ajouter à l’écran d’accueil ».'],
-        ['check', 'Confirmez', 'l’icône Fii La apparaît avec vos autres apps.']];
+        ['check', 'Confirmez', 'l’icône Fii apparaît avec vos autres apps.']];
       var back = h('div', { class: 'sheet-back', id: 'install-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'install-sheet-h',
         onclick: function (e) { if (e.target === back) close(); } },
         h('div', { class: 'sheet' },
-          h('h2', { id: 'install-sheet-h' }, 'Mettre Fii La sur votre écran d’accueil'),
+          h('h2', { id: 'install-sheet-h' }, 'Mettre Fii sur votre écran d’accueil'),
           h('ol', { class: 'steps-pic' }, steps.map(function (st, i) {
             return h('li', { class: 'spic' }, h('span', { class: 'spic-n' }, String(i + 1)), h('span', { class: 'spic-ic', 'aria-hidden': 'true' }, icon(st[0], 22)),
               h('span', null, h('b', null, st[1]), h('span', { class: 'small muted' }, ' ' + st[2])));
           })),
-          inApp || !('serviceWorker' in navigator) ? iconBtn('button', { class: 'btn', type: 'button', onclick: function () { copy(baseUrl(), 'Lien'); } }, 'link', 'Copier le lien de Fii La') : null,
+          inApp || !('serviceWorker' in navigator) ? iconBtn('button', { class: 'btn', type: 'button', onclick: function () { copy(baseUrl(), 'Lien'); } }, 'link', 'Copier le lien de Fii') : null,
           h('button', { class: 'btn ghost', type: 'button', id: 'install-sheet-close', onclick: close }, 'J’ai compris')));
       function close() { back.remove(); document.removeEventListener('keydown', esc); }
       function esc(e) { if (e.key === 'Escape') close(); }
@@ -955,18 +959,18 @@
       var later = h('button', { class: 'btn link', type: 'button', id: 'install-later', onclick: function () { LS.set('fiila.install.dismissed', true); draw(); } }, 'Plus tard');
       if (deferredInstall) {
         add(slot, h('section', { class: 'install', 'aria-labelledby': 'install-title' },
-          h('p', null, h('strong', { id: 'install-title' }, 'Installer Fii La'), ' (facultatif) : retrouvez vos fiches depuis l’écran d’accueil. C’est le même site, rien à télécharger depuis un store.'),
+          h('p', null, h('strong', { id: 'install-title' }, 'Installer Fii'), ' (facultatif) : retrouvez vos fiches depuis l’écran d’accueil. C’est le même site, rien à télécharger depuis un store.'),
           h('div', { class: 'install-actions' },
             h('button', { class: 'btn ghost small', type: 'button', id: 'install-btn', onclick: function () {
               var ev = deferredInstall; deferredInstall = null;
               if (!ev) { draw(); return; }
               Promise.resolve().then(function () { return ev.prompt(); }).then(function () { return ev.userChoice; })
                 .then(function (c) { if (c && c.outcome === 'accepted') LS.set('fiila.install.done', true); draw(); }, function () { draw(); });
-            } }, 'Installer Fii La'),
+            } }, 'Installer Fii'),
             later)));
       } else if (iosManualInstall()) {
         add(slot, h('section', { class: 'install', 'aria-labelledby': 'install-title' },
-          h('p', null, h('strong', { id: 'install-title' }, 'Ajouter Fii La à l’écran d’accueil'), ' (facultatif) : touchez le bouton Partager du navigateur, puis « Sur l’écran d’accueil ».'),
+          h('p', null, h('strong', { id: 'install-title' }, 'Ajouter Fii à l’écran d’accueil'), ' (facultatif) : touchez le bouton Partager du navigateur, puis « Sur l’écran d’accueil ».'),
           h('div', { class: 'install-actions' }, later)));
       }
     }
@@ -1143,8 +1147,8 @@
       var steps;
       if (IN_APP) {
         steps = [h('p', null, h('strong', null, 'Vous êtes dans le navigateur d’une application'), ', qui n’a pas accès à votre position.'),
-          h('p', null, IS_IOS ? 'Ouvrez Fii La dans Safari : touchez « ⋯ » ou le menu de l’application, puis « Ouvrir dans Safari » (ou « Ouvrir dans le navigateur »).'
-            : 'Ouvrez Fii La dans Chrome : touchez « ⋮ » ou le menu de l’application, puis « Ouvrir dans Chrome » (ou « Ouvrir dans le navigateur »).'),
+          h('p', null, IS_IOS ? 'Ouvrez Fii dans Safari : touchez « ⋯ » ou le menu de l’application, puis « Ouvrir dans Safari » (ou « Ouvrir dans le navigateur »).'
+            : 'Ouvrez Fii dans Chrome : touchez « ⋮ » ou le menu de l’application, puis « Ouvrir dans Chrome » (ou « Ouvrir dans le navigateur »).'),
           h('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(location.href, 'Lien de la page'); } }, 'Copier le lien de cette page')];
       } else if (IS_IOS) {
         steps = [h('p', null, h('strong', null, 'Autoriser la position sur iPhone')),
@@ -1518,7 +1522,7 @@
         return;
       }
       // Jamais masqué en silence : certains navigateurs intégrés (WhatsApp, Instagram, Facebook) n'ont pas le micro.
-      if (!voiceSupported()) { setKids(box, h('p', { class: 'small muted', id: 'voice-unsupported' }, icon('mic', 14), ' Repère vocal : ouvrez Fii La dans Safari ou Chrome pour l’enregistrer.')); return; }
+      if (!voiceSupported()) { setKids(box, h('p', { class: 'small muted', id: 'voice-unsupported' }, icon('mic', 14), ' Repère vocal : ouvrez Fii dans Safari ou Chrome pour l’enregistrer.')); return; }
       setKids(box, h('div', { class: 'voice' },
         h('button', { class: 'btn vbtn', type: 'button', id: 'voice-record', 'aria-label': 'Enregistrer un message vocal', onclick: start }, icon('mic', 24)),
         h('div', { class: 'vtxt' }, h('strong', null, 'Repère vocal'), h('span', { class: 'muted' }, 'Facultatif. 30 secondes, dans votre langue.'))));
@@ -2007,7 +2011,7 @@
     else img.classList.remove('loading-skel');
     var acc = (VT_ACCENTS[s.accent] || VT_ACCENTS.foret)[1];
     return h('a', { class: 'fcard', href: '#/b/' + s.slug, style: '--accent:' + acc, 'aria-label': 'Voir la boutique ' + s.name, 'data-cats': (s.categories || []).join(' ') },
-      s.demo || s.platform ? h('span', { class: 'fwrap' }, img, h('span', { class: 'demo-tag' + (s.platform ? ' fl-tag' : '') }, s.demo ? 'Démo' : 'Par Fii La')) : img,
+      s.demo || s.platform ? h('span', { class: 'fwrap' }, img, h('span', { class: 'demo-tag' + (s.platform ? ' fl-tag' : '') }, s.demo ? 'Démo' : 'Par Fii')) : img,
       h('span', { class: 'fbody' },
         h('span', { class: 'fname wrapword' }, s.name),
         s.type ? h('span', { class: 'ftype' }, typeLabel(s.type)) : null,
@@ -2163,7 +2167,7 @@
       h('a', { class: 'post-head', href: shopHref },
         h('span', { class: 'post-av', 'aria-hidden': 'true' }, (p.shop.name || '?').trim().charAt(0).toUpperCase()),
         h('span', { class: 'post-who' }, h('b', { class: 'wrapword' }, p.shop.name), p.shop.type ? h('span', { class: 'small muted' }, typeLabel(p.shop.type)) : null),
-        p.shop.demo || p.shop.platform ? h('span', { class: 'demo-tag' + (p.shop.platform ? ' fl-tag' : '') }, p.shop.demo ? 'Démo' : 'Par Fii La') : null),
+        p.shop.demo || p.shop.platform ? h('span', { class: 'demo-tag' + (p.shop.platform ? ' fl-tag' : '') }, p.shop.demo ? 'Démo' : 'Par Fii') : null),
       h('div', { class: 'post-media' }, img, burst),
       h('div', { class: 'post-bar' }, likeBtn,
         h('button', { class: 'post-act', type: 'button', 'aria-label': 'Commenter', onclick: function () { openComments(p, st, draw); } }, icon('bubble', 25)),
@@ -2265,7 +2269,7 @@
           iconBtn('a', { class: 'btn', href: mine ? '#/boutique/reglages' : '#/boutique', id: 'feed-join-btn' }, 'shop', mine ? 'Ouvrir ma vitrine' : 'Créer ma boutique')) : null);
     }, function () {});
     return page(backBtn(), demoBanner(),
-      h('header', { class: 'feed-top' }, h('h1', null, 'Fil Fii La'),
+      h('header', { class: 'feed-top' }, h('h1', null, 'Fil Fii'),
         h('a', { class: 'btn quiet icon-only', href: '#/enregistres', id: 'saved-link', 'aria-label': 'Mes enregistrés' }, icon('bookmark', 24))),
       tabs, listBox, moreBox, join, footer(true));
   }
@@ -2302,7 +2306,7 @@
       drawList();
       return page(backBtn(),
         demoBanner(),
-        h('header', { class: 'stack tight' }, h('h1', null, 'Boutiques Fii La'),
+        h('header', { class: 'stack tight' }, h('h1', null, 'Boutiques Fii'),
           h('p', { class: 'muted' }, 'Commandez sans compte. Vous donnez votre adresse à la fin, la boutique livre à la bonne porte.')),
         cats.length >= 2 ? chipsBox : null,
         list.length ? listBox : h('div', { class: 'card' }, h('p', null, 'Les premières boutiques arrivent bientôt.')),
@@ -2327,18 +2331,18 @@
       if (changed) draw();
     }, function () {});
     var err = h('div', { role: 'alert' });
-    // Fil Fii La : place gratuite (25 premières boutiques) et choix d'y apparaître.
+    // Fil Fii : place gratuite (25 premières boutiques) et choix d'y apparaître.
     var feedBox = h('div', { class: 'stack tight', id: 'feed-settings' }), feedState = null;
     function loadFeedState() { sapi('fiila_shop_feed', { p_on: null }).then(function (r) { feedState = r; drawFeed(); }, function () {}); }
     function drawFeed() {
       var f = feedState;
       if (!f) { setKids(feedBox); return; }
       var line = !f.public ? (f.rank ? 'Votre place gratuite n° ' + f.rank + ' est gardée. Rouvrez la vitrine pour réapparaître dans le fil.'
-          : f.free_left > 0 ? 'Ouvrez votre vitrine : les 25 premières boutiques sont mises en avant gratuitement dans le fil Fii La (encore ' + f.free_left + ').'
-          : 'Les 25 places gratuites du fil Fii La sont prises.')
-        : f.rank ? (f.feed ? 'Place gratuite n° ' + f.rank + ' sur 25 : votre boutique apparaît dans le fil Fii La.' : 'Place gratuite n° ' + f.rank + ' gardée, mais vous n’apparaissez pas dans le fil.')
-        : 'Les 25 places gratuites du fil Fii La sont prises.';
-      setKids(feedBox, h('h3', null, 'Fil Fii La'),
+          : f.free_left > 0 ? 'Ouvrez votre vitrine : les 25 premières boutiques sont mises en avant gratuitement dans le fil Fii (encore ' + f.free_left + ').'
+          : 'Les 25 places gratuites du fil Fii sont prises.')
+        : f.rank ? (f.feed ? 'Place gratuite n° ' + f.rank + ' sur 25 : votre boutique apparaît dans le fil Fii.' : 'Place gratuite n° ' + f.rank + ' gardée, mais vous n’apparaissez pas dans le fil.')
+        : 'Les 25 places gratuites du fil Fii sont prises.';
+      setKids(feedBox, h('h3', null, 'Fil Fii'),
         h('p', { class: 'small muted', id: 'feed-status' }, line),
         f.rank ? segField({ name: 'feed-on', id: 'feed-on', value: f.feed ? 'on' : 'off', options: [['on', 'Apparaître'], ['off', 'Ne pas apparaître']],
           onChange: function (v) {
@@ -2406,7 +2410,7 @@
   }
 
   /* ================================================================ ORIGINE ET PARRAINAGE
-     Chaque lien Fii La reçu dit d'où vient la personne. On garde la première origine (30 jours) sur ce téléphone,
+     Chaque lien Fii reçu dit d'où vient la personne. On garde la première origine (30 jours) sur ce téléphone,
      et on l'envoie au serveur juste après une création (boutique, livreur, adresse, rendez-vous).
      Un lien de parrainage (#/r/CODE) remplace toujours une origine passive. Rien de personnel n'est stocké ici. */
   var TOUCH_LS = 'fiila.touch', REF_LS = 'fiila.ref';
@@ -2468,12 +2472,12 @@
     if (t && t.src && t.token) { p.src = t.src; p.token = t.token; }
     return api('fiila_attribute', { p_kind: kind, p_id: id || null, p_key: key || null, p: p }).then(null, function () { /* sans effet */ });
   }
-  // « Qui vous a parlé de Fii La ? » : replié, facultatif ; absent si la personne arrive par un lien de parrainage.
+  // « Qui vous a parlé de Fii ? » : replié, facultatif ; absent si la personne arrive par un lien de parrainage.
   function referralAsk(id) {
     var val = '';
     var t = touchGet();
     var el = t && t.src === 'link' ? null : h('details', { class: 'ref-ask', id: id },
-      h('summary', null, 'Quelqu’un vous a recommandé Fii La ?'),
+      h('summary', null, 'Quelqu’un vous a recommandé Fii ?'),
       textField({ id: id + '-input', label: 'Son numéro ou son code', optional: true, inputmode: 'text', max: 30,
         placeholder: 'Ex. : 77 123 45 67 ou K7M2QD', onInput: function (v) { val = v; } }));
     return { el: el, value: function () { return val; } };
@@ -2481,9 +2485,9 @@
   function referralUrl(code) { return baseUrl() + '#/r/' + code; }
   function referralMessage(kind, code) {
     var url = referralUrl(code);
-    if (kind === 'shop') return 'Je reçois l’adresse de mes clientes en une photo avec Fii La : la bonne porte, un repère, le livreur arrive du premier coup. Crée ta boutique, c’est gratuit : ' + url;
-    if (kind === 'courier') return 'Avec Fii La, les boutiques m’envoient l’adresse exacte avec la photo de l’entrée. Plus besoin d’appeler pour trouver. Essaie : ' + url;
-    return 'J’envoie mon adresse en une photo avec Fii La : la bonne porte, un repère, où se garer. C’est gratuit : ' + url;
+    if (kind === 'shop') return 'Je reçois l’adresse de mes clientes en une photo avec Fii : la bonne porte, un repère, le livreur arrive du premier coup. Crée ta boutique, c’est gratuit : ' + url;
+    if (kind === 'courier') return 'Avec Fii, les boutiques m’envoient l’adresse exacte avec la photo de l’entrée. Plus besoin d’appeler pour trouver. Essaie : ' + url;
+    return 'J’envoie mon adresse en une photo avec Fii : la bonne porte, un repère, où se garer. C’est gratuit : ' + url;
   }
   // Bandeau d'arrivée par lien de parrainage (accueil), tant que rien n'a été créé sur ce téléphone.
   function inviteBanner() {
@@ -2495,7 +2499,7 @@
       if (r.state === 'unknown' || r.state === 'invalid') { var c = touchGet(); if (c && c.token === t.token) forgetTouch(); return; }
       if (r.state !== 'ok' || !r.name) return;
       var pro = r.kind === 'shop' || r.kind === 'courier';
-      setKids(box, inviteCard({ compact: true, kind: 'Invitation', from: r.name, title: 'Vous êtes invité(e) sur Fii La',
+      setKids(box, inviteCard({ compact: true, kind: 'Invitation', from: r.name, title: 'Vous êtes invité(e) sur Fii',
         sub: pro ? 'Recevez l’adresse exacte de vos clients en une photo. Gratuit, sans compte.' : 'Créez votre adresse une fois, envoyez-la par un lien. Gratuit, sans compte.',
         cta: pro ? ivcBtn('a', { href: '#/boutique', id: 'invite-shop' }, 'Créer ma boutique') : ivcBtn('a', { href: '#/new', id: 'invite-address' }, 'Créer mon adresse'),
         more: pro ? h('a', { class: 'ivc-link', href: '#/livreur' }, 'Je suis livreur') : null }));
@@ -2532,7 +2536,7 @@
     } }, 'Créer mon code');
     return page(back,
       h('div', { class: 'stack tight' }, h('h1', null, 'Inviter vos proches'),
-        h('p', { class: 'muted' }, 'Votre code et votre lien comptent chaque personne qui rejoint Fii La grâce à vous.')),
+        h('p', { class: 'muted' }, 'Votre code et votre lien comptent chaque personne qui rejoint Fii grâce à vous.')),
       textField({ id: 'ref-name', label: 'Votre nom', max: 60, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
       textField({ id: 'ref-phone', label: 'Votre numéro', optional: true, type: 'tel', inputmode: 'tel', onInput: function (v) { f.phone = v; },
         hint: 'Vos proches pourront taper votre numéro au lieu du code. Il n’est jamais affiché.' }),
@@ -2540,9 +2544,9 @@
   }
   function referralPage(forWho, ref, back) {
     var msg = referralMessage(forWho, ref.code);
-    var intro = forWho === 'shop' ? 'Invitez d’autres boutiques et vos clientes. Chaque personne qui rejoint Fii La par votre lien, votre code ou votre numéro est comptée pour vous.'
+    var intro = forWho === 'shop' ? 'Invitez d’autres boutiques et vos clientes. Chaque personne qui rejoint Fii par votre lien, votre code ou votre numéro est comptée pour vous.'
       : forWho === 'courier' ? 'Invitez les boutiques que vous livrez et d’autres livreurs. Chaque arrivée par votre lien, votre code ou votre numéro est comptée pour vous.'
-      : 'Invitez vos proches. Chaque personne qui rejoint Fii La par votre lien ou votre code est comptée pour vous.';
+      : 'Invitez vos proches. Chaque personne qui rejoint Fii par votre lien ou votre code est comptée pour vous.';
     var recent = ref.recent || [];
     return page(back,
       h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Parrainage'), h('h1', null, forWho === 'person' ? 'Inviter vos proches' : 'Parrainer'),
@@ -2816,9 +2820,9 @@
     var bar = node.querySelector('.brand-bar');
     // Pages reçues par lien : le logo ramène à l'accueil ; une flèche apparaît si l'on vient d'un autre écran de l'application.
     if (bar) {
-      var mark = bar.querySelector('.mark');
-      if (mark && mark.tagName !== 'A') {
-        var link = h('a', { class: 'mark small brand-home', href: '#/', 'aria-label': 'Fii La, accueil' }, 'Fii', h('span', null, 'La'));
+      var mark = bar.querySelector('.logo');
+      if (mark && !mark.closest('a')) {
+        var link = h('a', { class: 'brand-home', href: '#/', 'aria-label': 'Fii, accueil' }, brandLogo('small', ''));
         mark.replaceWith(link);
       }
       if (prev && !bar.querySelector('.bar-back')) {
@@ -2922,7 +2926,7 @@
       return page(
         h('header', { class: 'stack tight' },
           h('div', { class: 'brand-row' },
-            h('div', { class: 'brand' }, h('span', { class: 'mark', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La'))),
+            h('div', { class: 'brand' }, brandLogo()),
             who),
           hello,
           h('p', { class: 'promise' + (hello ? ' small-promise' : '') }, 'Votre adresse, en une photo.')),
@@ -2940,7 +2944,7 @@
     return page(
       h('header', { class: 'stack tight' },
         h('div', { class: 'brand-row' },
-          h('div', { class: 'brand' }, h('span', { class: 'mark', 'aria-label': 'Fii La' }, 'Fii', h('span', null, 'La'))),
+          h('div', { class: 'brand' }, brandLogo()),
           who),
         hello,
         h('p', { class: 'promise' + (hello ? ' small-promise' : '') }, 'Votre adresse, en une photo.')),
@@ -2961,11 +2965,11 @@
       listBox,
       feedSection(3, { id: 'home-feed' }),
       // Règle « simple et intuitif » (19/10) : les propositions secondaires dans une seule section repliée.
-      h('details', { class: 'more-home', id: 'home-more' }, h('summary', null, 'Plus sur Fii La'),
+      h('details', { class: 'more-home', id: 'home-more' }, h('summary', null, 'Plus sur Fii'),
         h('div', { class: 'stack tight' },
           h('a', { class: 'invite-row', id: 'vd-link-home', href: '#/vide-dressing' }, icon('users', 24), h('span', null, 'Vide-dressing : acheter ou vendre'),
             h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
-          h('a', { class: 'invite-row', id: 'amb-link-home', href: '#/agent' }, icon('cash', 24), h('span', null, 'Devenir agent Fii La'),
+          h('a', { class: 'invite-row', id: 'amb-link-home', href: '#/agent' }, icon('cash', 24), h('span', null, 'Devenir agent Fii'),
             h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
           h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer' }, icon('gift', 24), h('span', null, 'Inviter un proche'),
             h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))))),
@@ -3253,7 +3257,7 @@
           h('div', { class: 'stack', style: 'margin-top:10px' },
             h('p', { class: 'small' }, 'Cette fiche est gérée depuis ce téléphone. Si vous le perdez ou effacez les données du navigateur, seule la clé de gestion permet encore de la modifier ou de la supprimer. Gardez-la pour vous : elle donne tous les droits sur la fiche.'),
             iconBtn('button', { class: 'btn ghost small', type: 'button', onclick: function () { copy(key, 'Clé de gestion'); } }, 'link', 'Copier la clé de gestion', 18),
-            iconBtn('a', { class: 'btn ghost small', href: waLink('Ma clé de gestion Fii La pour « ' + pl.label + ' » (ne pas partager) : ' + key), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'M’envoyer la clé sur WhatsApp', 18),
+            iconBtn('a', { class: 'btn ghost small', href: waLink('Ma clé de gestion Fii pour « ' + pl.label + ' » (ne pas partager) : ' + key), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'M’envoyer la clé sur WhatsApp', 18),
             h('p', { class: 'hint' }, 'Choisissez votre propre discussion WhatsApp, pas celle d’une autre personne.')))),
       !key ? h('p', { class: 'hint' }, 'Fiche rattachée à votre compte : retrouvez-la sur tous vos téléphones en vous connectant.') : null,
       h('section', { class: 'sensitive', 'aria-labelledby': 'h-sensitive' },
@@ -3389,7 +3393,7 @@
   /* Cartes WhatsApp (mandat WHATSAPP-001) : image de marque rendue d'avance (scripts/render_wa_cards.py), partagée AVEC le texte
      quand le téléphone sait partager un fichier ; sinon lien WhatsApp texte et « Télécharger l'image ». Aucune donnée personnelle
      dans l'image ; le lien et le nom du demandeur restent dans le texte. Réglage du back-office wa_card_media (0 = texte seul). */
-  var WA_CARDS = { request: { src: 'media/wa/demande-adresse.jpg', file: 'fii-la-demande-adresse.jpg', alt: 'Carte Fii La « Livrer à la bonne porte » : une cliente ouvre son portail à un livreur' } };
+  var WA_CARDS = { request: { src: 'media/wa/demande-adresse.jpg', file: 'fii-demande-adresse.jpg', alt: 'Carte Fii « Livrer à la bonne porte » : une cliente ouvre son portail à un livreur' } };
   TRACKABLE.wa_card = [];
   Object.keys(WA_CARDS).forEach(function (k) { ['file', 'text', 'download', 'failed'].forEach(function (a) { TRACKABLE.wa_card.push(k + ':' + a); }); });
   var WA_FILES = {};
@@ -3431,7 +3435,7 @@
     var withCard = !!(o.card && WA_CARDS[o.card] && nudgeFlags().wa_card !== false);
     var visualBox = h('div', { class: 'visual-box', id: 'visual-box', hidden: true });
     var fbHelp = h('p', { class: 'hint', id: 'fb-help', hidden: true },
-      'Fii La n’est pas relié à Facebook : le lien est seulement copié. Ouvrez Facebook, créez une publication ou un message, puis collez le lien. Facebook affichera un aperçu générique de Fii La.');
+      'Fii n’est pas relié à Facebook : le lien est seulement copié. Ouvrez Facebook, créez une publication ou un message, puis collez le lien. Facebook affichera un aperçu générique de Fii.');
     var openChannel = null;
     // Instagram / TikTok : rond (raccourci) ou bouton à icône (dans « Autres »).
     function channelBtn(ch, label, round) {
@@ -3452,7 +3456,7 @@
     var nativeShare = navigator.share ? iconBtn('button', { class: 'btn ghost small chan', type: 'button', id: o.ids.native || 'share-native', onclick: function () {
       track('share_initiated', 'native_' + o.kind);
       try {
-        navigator.share({ title: o.title || 'Fii La', text: text, url: o.url }).catch(function (e) {
+        navigator.share({ title: o.title || 'Fii', text: text, url: o.url }).catch(function (e) {
           if (e && e.name !== 'AbortError') toast('Partage indisponible ici. Utilisez « Copier ».');
         });
       } catch (e) { toast('Partage indisponible ici. Utilisez « Copier ».'); }
@@ -3513,7 +3517,7 @@
     function checkbox(id, label, key) {
       return h('label', null, h('input', { type: 'checkbox', id: id, checked: opts[key], onchange: function (e) { opts[key] = e.target.checked; redraw(); } }), label);
     }
-    function fileName() { return 'fii-la-' + (o.kind === 'meeting' ? 'evenement' : o.kind === 'request' ? 'demande' : 'adresse') + '.png'; }
+    function fileName() { return 'fii-' + (o.kind === 'meeting' ? 'evenement' : o.kind === 'request' ? 'demande' : 'adresse') + '.png'; }
     function download() {
       if (!current) return;
       var supportsDownload = 'download' in HTMLAnchorElement.prototype;
@@ -3566,7 +3570,7 @@
       h('p', { class: 'hint' }, 'Une image téléchargée ou publiée ne peut pas être rappelée, même si vous désactivez ou supprimez la fiche ensuite.'));
   }
 
-  // Image verticale 1080 × 1920, déterministe (canvas, polices et couleurs de Fii La).
+  // Image verticale 1080 × 1920, déterministe (canvas, polices et couleurs de Fii).
   // Jamais : clé de gestion, coordonnées, réponse privée. La photo n'apparaît que si l'utilisateur la coche,
   // entière (jamais recadrée) et sans texte par-dessus.
   function buildShareVisual(o, opts) {
@@ -3578,8 +3582,11 @@
     var photoReady = opts.withPhoto && o.photo ? new Promise(function (res) {
       var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = o.photo;
     }) : Promise.resolve(null);
-    return Promise.all([fontsReady, photoReady, loadQr()]).then(function (r) {
-      var photo = r[1], qrcode = r[2];
+    var logoReady = new Promise(function (res) {
+      var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = 'media/brand/fii-tile.png';
+    });
+    return Promise.all([fontsReady, photoReady, loadQr(), logoReady]).then(function (r) {
+      var photo = r[1], qrcode = r[2], logo = r[3];
       var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
       var g = cv.getContext('2d');
       var meta = { width: W, height: H, texts: [], includesPhoto: false, qrText: o.url };
@@ -3615,11 +3622,9 @@
       g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
       g.textBaseline = 'alphabetic';
       // Marque
-      font(800, 72);
-      var fiiW = g.measureText('Fii').width;
-      text('Fii', M, 170, C.ink);
-      rr(M + fiiW + 12, 104, g.measureText('La').width + 28, 86, 18, C.lime);
-      text('La', M + fiiW + 26, 170, C.ink);
+      // Marque : le logo validé (pastille), sinon le nom en texte si l'image n'a pas pu être chargée.
+      if (logo) { g.save(); rr(M, 84, 112, 112, 30); g.clip(); g.drawImage(logo, M, 84, 112, 112); g.restore(); meta.texts.push('Fii'); }
+      else { font(800, 72); text('Fii', M, 170, C.ink); }
       var y = 250;
       if (photo) {
         var boxH = 520;
@@ -3637,7 +3642,7 @@
       g.letterSpacing = '0px';
       y += 30;
       // Titre (ou formule neutre)
-      var title = opts.showTitle && o.title ? o.title : (o.kind === 'meeting' ? 'Un événement partagé avec Fii La' : o.kind === 'request' ? 'Une demande d’adresse Fii La' : 'Une adresse partagée avec Fii La');
+      var title = opts.showTitle && o.title ? o.title : (o.kind === 'meeting' ? 'Un événement partagé avec Fii' : o.kind === 'request' ? 'Une demande d’adresse Fii' : 'Une adresse partagée avec Fii');
       font(800, 84);
       var tl = wrap(title, CW, photo ? 2 : 3);
       tl.forEach(function (l) { y += 96; text(l, M, y, C.ink); });
@@ -3971,11 +3976,11 @@
 
   /* ================================================================ VUE DESTINATAIRE */
   function viewRecipient(token) {
-    var create = h('a', { class: 'btn ghost small', href: '#/new' }, 'Créer mon Fii La');
+    var create = h('a', { class: 'btn ghost small', href: '#/new' }, 'Créer mon Fii');
     return api('fiila_get_public', { p_token: token }).then(function (r) {
       var cta = h('div', { class: 'row', style: 'justify-content:center' }, h('div', { style: 'flex:0 1 auto' }, create));
       if (r.state === 'ok') {
-        document.title = 'Fii La';
+        document.title = 'Fii';
         var mine = owned.all().filter(function (x) { return x.type === 'place' && x.share === token; })[0];
         var isMeet = r.place.kind === 'meeting';
         var joined = isMeet && LS.get('fiila.guest.' + token, null);
@@ -4411,7 +4416,7 @@
   }
 
   /* ================================================================ COMPTE, CARNET D'ADRESSES, BOUTIQUE
-     Rali dans Fii La : un compte (facultatif) qui garde les adresses de l'utilisateur sur tous ses
+     Rali dans Fii : un compte (facultatif) qui garde les adresses de l'utilisateur sur tous ses
      téléphones, et pour un commerçant une boutique : clients, commandes, facture partageable,
      demande d'adresse liée, livraison suivie, paiements enregistrés. Paiement en ligne : plus tard. */
   // Boutique sans compte obligatoire : sa clé reste sur ce téléphone (comme la clé d'une fiche).
@@ -4481,7 +4486,7 @@
   /* ----- compte : connexion, inscription, mot de passe oublié */
   function viewAccount(q) {
     q = q || {};
-    if (q.lien === 'invalide') return page(backBtn(), stateCard('!', 'Ce lien ne s’ouvre pas ici', 'Il a expiré, ou il a été ouvert ailleurs que là où la demande a été faite (par exemple Safari au lieu de l’icône Fii La). Refaites la demande depuis le navigateur où vous ouvrez vos e-mails.', h('a', { class: 'btn', href: '#/compte' }, 'Se connecter')), footer());
+    if (q.lien === 'invalide') return page(backBtn(), stateCard('!', 'Ce lien ne s’ouvre pas ici', 'Il a expiré, ou il a été ouvert ailleurs que là où la demande a été faite (par exemple Safari au lieu de l’icône Fii). Refaites la demande depuis le navigateur où vous ouvrez vos e-mails.', h('a', { class: 'btn', href: '#/compte' }, 'Se connecter')), footer());
     if (!authed()) return authForm(q);
     return account.me().then(function (me) {
       if (!me) return authForm(q);
@@ -4592,13 +4597,13 @@
         } }, 'Pas maintenant')));
     return card;
   }
-  // Fii La Carrière depuis le compte : l'état de l'ambassadeur en un coup d'œil, ou l'invitation à le devenir.
+  // Fii Carrière depuis le compte : l'état de l'ambassadeur en un coup d'œil, ou l'invitation à le devenir.
   function ambEntry() {
     var AMB_STATE = { training: 'formation en cours', review: 'validation en cours', active: 'agent actif', suspended: 'suspendu', excluded: 'programme terminé' };
-    var box = h('div', null, iconRow('#/carriere', 'star', 'Fii La Carrière', { id: 'amb-entry' }));
+    var box = h('div', null, iconRow('#/carriere', 'star', 'Fii Carrière', { id: 'amb-entry' }));
     api('fiila_ambassador_me', {}).then(function (r) {
       var a = r && r.ambassador;
-      var label = a ? 'Fii La Carrière · ' + (AMB_STATE[a.status] || a.status) + (a.status === 'training' && a.quiz_passed ? ' (test réussi)' : '') : 'Fii La Carrière · devenir agent';
+      var label = a ? 'Fii Carrière · ' + (AMB_STATE[a.status] || a.status) + (a.status === 'training' && a.quiz_passed ? ' (test réussi)' : '') : 'Fii Carrière · devenir agent';
       setKids(box, iconRow('#/carriere', 'star', label, { id: 'amb-entry' }));
     }, function () {});
     return box;
@@ -4749,7 +4754,7 @@
       h('nav', { class: 'list', 'aria-label': 'Raccourcis' },
         h('a', { class: 'item', href: '#/' }, h('div', null, h('div', { class: 't' }, 'Mes adresses'), h('div', { class: 'small muted' }, 'Maison, bureau, boutique…')), h('span', { class: 'chev' }, icon('chev', 18))),
         h('a', { class: 'item', href: '#/boutique', id: 'go-shop' }, h('div', null, h('div', { class: 't' }, me.shop ? me.shop.name : 'Ma boutique'),
-          h('div', { class: 'small muted' }, me.shop ? 'Commandes, clients, factures' : 'Vendre et livrer avec Fii La')), h('span', { class: 'chev' }, icon('chev', 18)))),
+          h('div', { class: 'small muted' }, me.shop ? 'Commandes, clients, factures' : 'Vendre et livrer avec Fii')), h('span', { class: 'chev' }, icon('chev', 18)))),
       h('details', { id: 'phone-box', open: q.numero === '1' ? true : null },
         h('summary', null, me.phone_verified ? 'Numéro confirmé : ' + prettyPhone(me.phone_verified) : 'Confirmer mon numéro par SMS'),
         h('div', { style: 'margin-top:12px' }, phoneVerifyBox({ id: 'me-phone-verify', prefill: me.phone_verified || me.phone || '' }))),
@@ -4809,7 +4814,7 @@
         h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
           h('option', { value: '' }, 'Choisir…'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: f.type === t[0] || null }, t[1]); })),
         h('p', { class: 'hint' }, 'Il nous permet de vous proposer les outils adaptés à votre métier.')),
-      shop ? null : textField({ id: 'shop-amb', label: 'Code agent', optional: true, max: 10, placeholder: 'Si un agent Fii La vous aide', onInput: function (v) { ambCode = v; } }),
+      shop ? null : textField({ id: 'shop-amb', label: 'Code agent', optional: true, max: 10, placeholder: 'Si un agent Fii vous aide', onInput: function (v) { ambCode = v; } }),
       ask ? ask.el : null,
       err, btn,
       shop ? ambassadorShopBox() : null,
@@ -4889,7 +4894,7 @@
       h('details', { class: 'more-details', id: 'shop-more' }, h('summary', null, 'Téléphone, code agent (facultatif)'),
         h('div', { class: 'stack', style: 'margin-top:12px' },
           textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', onInput: function (v) { f.phone = v; } }),
-          textField({ id: 'shop-amb', label: 'Code agent', optional: true, max: 10, placeholder: 'Si un agent Fii La vous aide', onInput: function (v) { ambCode = v; } }),
+          textField({ id: 'shop-amb', label: 'Code agent', optional: true, max: 10, placeholder: 'Si un agent Fii vous aide', onInput: function (v) { ambCode = v; } }),
           ask ? ask.el : null)),
       err, btn));
   }
@@ -4943,7 +4948,7 @@
         sapi('fiila_shop_feed', { p_on: null }).then(null, function () { return null; }).then(function (fd) {
           celebrate({ icon: 'star', kicker: 'Boutique ouverte', title: 'Bravo, ' + shop.name + ' est en ligne !',
             gain: fd && fd.rank ? 'Place n° ' + fd.rank + ' / 25' : null,
-            sub: (fd && fd.rank ? 'Votre place offerte dans le fil Fii La. ' : '') + 'Vos clientes peuvent commander dès maintenant, sans compte, et vous donner leur adresse exacte.',
+            sub: (fd && fd.rank ? 'Votre place offerte dans le fil Fii. ' : '') + 'Vos clientes peuvent commander dès maintenant, sans compte, et vous donner leur adresse exacte.',
             cta: 'Partager ma vitrine', onClose: function () { render(); } });
         });
       }, function (e) { btn.disabled = false; errBox(err, e); });
@@ -4990,7 +4995,7 @@
     return api('fiila_partner_invite', { p_token: token }).then(function (r) {
       if (r.state === 'not_found') return page(brandBar('Invitation'), stateCard('?', 'Invitation introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
       if (r.state === 'revoked') return page(brandBar('Invitation'), stateCard('⦸', 'Invitation retirée', 'Cette invitation n’est plus valable.'), footer(true));
-      if (r.state === 'expired') return page(brandBar('Invitation'), stateCard('⌛', 'Invitation expirée', 'Demandez un nouveau lien à Fii La.'), footer(true));
+      if (r.state === 'expired') return page(brandBar('Invitation'), stateCard('⌛', 'Invitation expirée', 'Demandez un nouveau lien à Fii.'), footer(true));
       var err = h('div', { role: 'alert' });
       var hasShop = !!(shopKey() || (ME && ME.shop));
       var btn = h('button', { class: 'btn big', type: 'button', id: 'invite-accept', onclick: function () {
@@ -5004,9 +5009,9 @@
       return page(brandBar('Invitation'),
         h('section', { class: 'ivc pinv', id: 'partner-invite' },
           h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
-          h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')), h('span', { class: 'ivc-kind' }, 'Ambassadeur Fii La')),
+          h('div', { class: 'ivc-top' }, h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 }), h('span', { class: 'ivc-kind' }, 'Ambassadeur Fii')),
           h('h1', { class: 'ivc-title wrapword' }, r.brand),
-          h('p', { class: 'ivc-sub' }, 'Fii La vous invite à essayer gratuitement le pack complet pendant ' + r.months + ' mois. Sans engagement, sans paiement à la fin.')),
+          h('p', { class: 'ivc-sub' }, 'Fii vous invite à essayer gratuitement le pack complet pendant ' + r.months + ' mois. Sans engagement, sans paiement à la fin.')),
         r.pack ? h('section', { class: 'card stack tight' }, h('h2', null, 'Ce que comprend votre essai'), packDetails(r.pack, r.months),
           h('p', { class: 'small muted' }, 'L’essai commence seulement quand vous touchez « Activer mon essai » dans votre boutique.')) : null,
         r.existing_shop && !hasShop ? h('p', { class: 'notice' }, 'Invitation pour la boutique « ' + r.existing_shop + ' ». Ouvrez ce lien sur le téléphone qui la gère, ou restaurez sa clé de gestion.') : null,
@@ -5021,7 +5026,7 @@
     function draw(msgs) {
       setKids(list, msgs.length ? msgs.map(function (m) {
         return h('div', { class: 'pmsg pmsg-' + m.author },
-          h('span', { class: 'pmsg-who' }, m.author === 'brand' ? 'Vous' : m.author === 'staff' ? 'Équipe Fii La' : 'Manager'),
+          h('span', { class: 'pmsg-who' }, m.author === 'brand' ? 'Vous' : m.author === 'staff' ? 'Équipe Fii' : 'Manager'),
           h('p', { class: 'wrapword' }, m.body),
           m.escalate ? h('span', { class: 'small muted' }, 'Transmis à l’équipe') : null);
       }) : h('p', { class: 'small muted' }, 'Posez votre question : configuration, articles, vitrine, commandes ou suite de l’essai.'));
@@ -5038,7 +5043,7 @@
       sapi('fiila_partner_message_send', { p_body: body.trim() }).then(function (r) { body = ''; input.value = ''; draw(r.messages); if (b) b.disabled = false; },
         function (x) { if (b) b.disabled = false; errBox(err, x); });
     } },
-      h('div', { class: 'svc-head' }, h('h2', { id: 'pmsg-h' }, 'Le Manager Fii La'),
+      h('div', { class: 'svc-head' }, h('h2', { id: 'pmsg-h' }, 'Le Manager Fii'),
         h('button', { class: 'svc-x', type: 'button', 'aria-label': 'Fermer', onclick: function () { close(); } }, icon('close', 18))),
       list, err, input, h('button', { class: 'btn', type: 'submit', id: 'pmsg-send' }, 'Envoyer')));
     close = openSheet(back);
@@ -5052,7 +5057,7 @@
       var err = h('div', { role: 'alert' });
       function dateFr(d) { try { return new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return d; } }
       var head = h('div', { class: 'ptn-head' }, h('span', { class: 'ptn-ic', 'aria-hidden': 'true' }, icon('star', 20)),
-        h('div', null, h('p', { class: 'eyebrow' }, 'Ambassadeur Fii La'),
+        h('div', null, h('p', { class: 'eyebrow' }, 'Ambassadeur Fii'),
           h('b', null, t.status === 'active' ? 'Essai en cours jusqu’au ' + dateFr(t.ends_on) : t.status === 'ready' ? 'Votre essai de ' + t.months + ' mois vous attend'
             : t.status === 'ended' ? 'Votre essai est terminé' : t.status === 'suspended' ? 'Essai suspendu' : 'Essai arrêté')));
       var body = [];
@@ -5061,7 +5066,7 @@
           var act = h('button', { class: 'btn', type: 'button', id: 'trial-activate', onclick: function () {
             act.disabled = true; setKids(err);
             sapi('fiila_partner_activate', {}).then(function () {
-              celebrate({ icon: 'star', kicker: 'Ambassadeur Fii La', title: 'Votre essai commence', sub: 'Pendant ' + t.months + ' mois, profitez du pack complet. Fii La vous accompagne.', cta: 'Continuer', onClose: function () { render(); } });
+              celebrate({ icon: 'star', kicker: 'Ambassadeur Fii', title: 'Votre essai commence', sub: 'Pendant ' + t.months + ' mois, profitez du pack complet. Fii vous accompagne.', cta: 'Continuer', onClose: function () { render(); } });
             }, function (e) { act.disabled = false; errBox(err, e); });
           } }, 'Activer mon essai');
           body.push(packDetails(t.pack, t.months), h('p', { class: 'small muted' }, 'L’essai dure ' + t.months + ' mois à partir de l’activation. Rien à payer à la fin.'), act);
@@ -5071,8 +5076,8 @@
           t.studio_left != null ? h('p', { class: 'small' }, 'Retouches Studio restantes : ' + t.studio_left) : null);
       } else if (t.status === 'ended') {
         body.push(h('p', { class: 'small muted' }, 'Votre boutique, vos articles, vos commandes et vos photos restent. Les avantages de l’essai sont arrêtés.'),
-          r.manager ? iconBtn('a', { class: 'btn ghost', id: 'trial-next', href: 'https://wa.me/' + r.manager + '?text=' + encodeURIComponent('Bonjour, mon essai Ambassadeur Fii La est terminé. J’aimerais connaître la suite.'), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Demander la suite au Manager')
-            : h('p', { class: 'small' }, 'Pour la suite, écrivez à l’équipe Fii La.'));
+          r.manager ? iconBtn('a', { class: 'btn ghost', id: 'trial-next', href: 'https://wa.me/' + r.manager + '?text=' + encodeURIComponent('Bonjour, mon essai Ambassadeur Fii est terminé. J’aimerais connaître la suite.'), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Demander la suite au Manager')
+            : h('p', { class: 'small' }, 'Pour la suite, écrivez à l’équipe Fii.'));
       }
       if (t.status !== 'revoked') body.push(h('button', { class: 'ptn-chat', type: 'button', id: 'partner-chat', onclick: partnerChatSheet }, icon('chat', 16), 'Écrire au Manager'));
       setKids(box, h('section', { class: 'card stack tight ptn ptn-' + t.status, id: 'partner-card' }, head, body, err));
@@ -5127,7 +5132,7 @@
         sapi('fiila_courier_invite', { p_name: f.name.trim() || null, p_phone: f.phone.trim() }).then(function (r) {
           b.disabled = false;
           var link = baseUrl() + '#/livreur/invitation/' + r.token;
-          var wa = waTo(f.phone, shop.name + ' vous invite à livrer ses commandes avec Fii La. Acceptez ici : ' + link);
+          var wa = waTo(f.phone, shop.name + ' vous invite à livrer ses commandes avec Fii. Acceptez ici : ' + link);
           track('courier_invited', 'whatsapp');
           // un seul bouton à la fois : l'invitation prête remplace « Inviter »
           b.hidden = true;
@@ -5141,14 +5146,14 @@
   }
 
 
-  /* ----- carte d'invitation (équipe de boutique, livreur attitré, équipe Fii La, parrainage) : une seule carte premium.
+  /* ----- carte d'invitation (équipe de boutique, livreur attitré, équipe Fii, parrainage) : une seule carte premium.
      o : { id, kind (petit titre), from (qui invite), title, sub, points: [[icône, texte]], cta (élément), more (élément), compact } */
   function inviteCard(o) {
     var initial = String(o.from || 'F').trim().charAt(0).toUpperCase() || 'F';
     return h('section', { class: 'ivc' + (o.compact ? ' compact' : ''), id: o.id || null },
       h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
       h('div', { class: 'ivc-top' },
-        h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')),
+        h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 }),
         h('span', { class: 'ivc-kind' }, o.kind || 'Invitation')),
       o.from ? h('div', { class: 'ivc-from' },
         h('span', { class: 'ivc-mono', 'aria-hidden': 'true' }, h('span', null, initial)),
@@ -5217,7 +5222,7 @@
         sapi('fiila_shop_invite', { p_name: f.name.trim() || null, p_phone: f.phone.trim(), p_role: f.role }).then(function (r) {
           var link = baseUrl() + '#/equipe/' + r.token;
           var who = f.name.trim() ? f.name.trim().split(' ')[0] : '';
-          var msg = 'Bonjour' + (who ? ' ' + who : '') + ', ' + shop.name + ' vous invite à rejoindre son équipe sur Fii La (' + ROLE_LABEL[f.role].toLowerCase() + '). Ouvrez ce lien pour accepter : ' + link;
+          var msg = 'Bonjour' + (who ? ' ' + who : '') + ', ' + shop.name + ' vous invite à rejoindre son équipe sur Fii (' + ROLE_LABEL[f.role].toLowerCase() + '). Ouvrez ce lien pour accepter : ' + link;
           track('team_invited', f.role);
           b.hidden = true;
           setKids(sendBox, iconBtn('a', { class: 'btn', id: 'team-invite-send', href: waTo(f.phone, msg), target: '_blank', rel: 'noopener noreferrer',
@@ -5286,7 +5291,7 @@
           cta: authed() ? ivcBtn('button', { id: 'team-accept', onclick: function (ev) { join(ev.currentTarget); } }, 'Rejoindre la boutique')
             : ivcBtn('a', { id: 'team-login', href: '#/compte' + qs({ retour: 'equipe/' + token }) }, 'Rejoindre l’équipe'),
           more: authed() ? (r.verify ? h('p', { class: 'ivc-note', id: 'team-verify-note' }, 'Votre numéro sera confirmé par un code SMS.') : null)
-            : h('p', { class: 'ivc-note' }, 'Un compte Fii La gratuit suffit. Pas encore de compte ? Créez-le en un instant.') }),
+            : h('p', { class: 'ivc-note' }, 'Un compte Fii gratuit suffit. Pas encore de compte ? Créez-le en un instant.') }),
         verifyZone, err, footer());
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher l’invitation', errText(e), retryBtn())); });
   }
@@ -5957,7 +5962,7 @@
       api('fiila_courier_me', { p_key: courierKey() }).then(function (n) {
         if (n.courses.length > seen) { try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch (e) { /* rien */ } toast('Nouvelle course.'); }
         seen = n.courses.length;
-        document.title = (n.courses.length ? '(' + n.courses.length + ') ' : '') + 'Fii La · Livreur';
+        document.title = (n.courses.length ? '(' + n.courses.length + ') ' : '') + 'Fii · Livreur';
         draw(n.courses);
       }, function () { /* hors ligne : on réessaie au prochain tour */ });
     }
@@ -6083,12 +6088,12 @@
     }, function (e) { return page(stateCard('!', 'Impossible d’afficher la commande', errText(e), retryBtn())); });
   }
 
-  /* ================================================================ FII LA CARRIÈRE : AMBASSADEURS
+  /* ================================================================ FII CARRIÈRE : AMBASSADEURS
      Parcours : présentation → inscription (compte, charte) → 6 fiches → test (8/10) → validation par l'équipe → missions.
      Règle affichée partout : on est payé pour un commerçant actif, jamais pour une inscription. */
   // Les 6 fiches : une démonstration animée de l'écran, deux phrases simples, une chose à retenir.
   var AMB_LESSONS = [
-    { t: 'Fii La, c’est quoi ?', say: 'Une boutique en ligne gratuite pour le commerçant. Ses clientes voient ses articles, commandent, et il reçoit leur adresse exacte en une photo.', keep: 'Gratuit pour le commerçant, simple pour ses clientes.' },
+    { t: 'Fii, c’est quoi ?', say: 'Une boutique en ligne gratuite pour le commerçant. Ses clientes voient ses articles, commandent, et il reçoit leur adresse exacte en une photo.', keep: 'Gratuit pour le commerçant, simple pour ses clientes.' },
     { t: 'On crée la boutique ensemble', say: 'Toujours sur le téléphone du commerçant, jamais sur le vôtre. Il choisit le nom et le type de commerce, puis tape votre code.', keep: 'Votre code va dans « Code agent », au plus tard 7 jours après.' },
     { t: 'Des photos qui donnent envie', say: 'L’article seul, à la lumière du jour, sur un fond simple. L’application recadre chaque photo au bon format.', keep: '5 articles avec photo : c’est le début du niveau 1.' },
     { t: 'On ouvre la vitrine', say: 'Dans les réglages, la vitrine passe à « Ouverte ». Le commerçant envoie le lien à ses clientes sur WhatsApp et dans son statut.', keep: 'Type de commerce + 5 photos + vitrine ouverte = niveau 1.' },
@@ -6096,17 +6101,17 @@
     { t: 'Ce qui ne se fait jamais', say: 'Commander soi-même ou par des proches, inventer une boutique, promettre des ventes, garder les numéros des clientes.', keep: 'Une fraude, et les gains sont annulés : exclusion du programme.' }];
   // Questions du test (l'ordre des réponses suit la correction gardée par le serveur, qui n'est jamais envoyée d'avance).
   var AMB_QUIZ = [
-    ['Quand êtes-vous payé pour un commerçant ?', ['Dès qu’il crée sa boutique', 'Quand il atteint un niveau vérifié par Fii La', 'Quand il vous paie']],
+    ['Quand êtes-vous payé pour un commerçant ?', ['Dès qu’il crée sa boutique', 'Quand il atteint un niveau vérifié par Fii', 'Quand il vous paie']],
     ['Combien d’articles avec photo pour le niveau 1 ?', ['3', '5', '10']],
     ['Le niveau 2 demande :', ['3 commandes de 3 clientes différentes, dont 1 livrée', '1 commande', '10 visites de la vitrine']],
     ['Pouvez-vous passer des commandes vous-même pour l’aider ?', ['Oui, ça l’aide à démarrer', 'Non : elles ne comptent pas et peuvent vous faire exclure']],
     ['Où le commerçant tape-t-il votre code ?', ['Dans « Code agent », en créant sa boutique', 'Dans WhatsApp', 'Nulle part']],
     ['Une bonne photo d’article, c’est :', ['Prise de nuit, au flash', 'L’article seul, bien éclairé, fond simple', 'Avec le prix écrit à la main']],
-    ['Que pouvez-vous promettre à un commerçant ?', ['Des ventes garanties', 'Ce que Fii La offre vraiment : boutique, vitrine et adresses gratuites', 'Un prêt']],
+    ['Que pouvez-vous promettre à un commerçant ?', ['Des ventes garanties', 'Ce que Fii offre vraiment : boutique, vitrine et adresses gratuites', 'Un prêt']],
     ['Vos gains sont versés :', ['Tout de suite', 'Après 30 jours de vérification, une fois par mois', 'Jamais']],
     ['Les numéros des clientes du commerçant :', ['Vous pouvez les garder', 'Restent confidentiels : vous ne les copiez pas', 'Vous pouvez les revendre']],
     ['Un commerçant arrête après une semaine :', ['Vous gardez les niveaux déjà validés, pas les suivants', 'Vous perdez tout', 'Vous êtes exclu']]];
-  var GRADES = { ambassadeur: 'Agent', confirme: 'Agent confirmé', certifie: 'Agent certifié Fii La' };
+  var GRADES = { ambassadeur: 'Agent', confirme: 'Agent confirmé', certifie: 'Agent certifié Fii' };
   var PAYOUT = { wave: 'Wave', orange_money: 'Orange Money' };
 
   // Le parcours en 5 étapes, l'étape en cours mise en avant (inscription → formation → test → validation → missions).
@@ -6119,7 +6124,7 @@
       }));
   }
 
-  // Portail Fii La Carrière : connexion ou inscription sur place, retour direct à l'espace ambassadeur.
+  // Portail Fii Carrière : connexion ou inscription sur place, retour direct à l'espace ambassadeur.
   function ambAccess() {
     var mode = 'signup', f = { name: '', email: '', password: '' };
     var root = h('section', { class: 'card stack', id: 'amb-access' });
@@ -6136,7 +6141,7 @@
         btn.disabled = true;
         (mode === 'signup' ? account.signUp(email, f.password, f.name.trim(), 'ambassador', '#/agent') : account.signIn(email, f.password)).then(function (r) {
           if (r && r.confirm) { emailCodeStep(root, 'signup', email, '#/agent'); return; }
-          toast(mode === 'signup' ? 'Compte créé. Bienvenue dans Fii La Carrière.' : 'Connecté.'); render();
+          toast(mode === 'signup' ? 'Compte créé. Bienvenue dans Fii Carrière.' : 'Connecté.'); render();
         }, function (e) { btn.disabled = false; errBox(err, e); });
       }
       setKids(root,
@@ -6157,7 +6162,7 @@
   }
   function viewAmbassador() {
     function hero(cta) {
-      return inviteCard({ id: 'amb-hero', kind: 'Fii La Carrière', title: 'Devenez agent Fii La',
+      return inviteCard({ id: 'amb-hero', kind: 'Fii Carrière', title: 'Devenez agent Fii',
         sub: 'Aidez les commerçants de votre quartier à ouvrir leur boutique. Vous êtes payé quand ils vendent vraiment.',
         points: [['shop', 'Vous les installez sur leur téléphone, en 20 minutes'], ['cash', 'Payé à chaque niveau atteint par vos commerçants'], ['star', 'Trois grades : agent, confirmé, certifié']],
         cta: cta || null });
@@ -6221,7 +6226,7 @@
         textField({ id: 'amb-payout', label: 'Numéro de versement', optional: true, type: 'tel', inputmode: 'tel', value: f.payout, placeholder: 'Le même que ci-dessus si vide', onInput: function (v) { f.payout = v; } }),
         h('details', { class: 'more-details' }, h('summary', null, 'Lire la charte de l’agent'),
           h('ul', { class: 'small' },
-            h('li', null, 'Je suis indépendant : je ne suis pas salarié de Fii La.'),
+            h('li', null, 'Je suis indépendant : je ne suis pas salarié de Fii.'),
             h('li', null, 'Je n’aide que de vrais commerçants, avec leur accord, sur leur propre téléphone.'),
             h('li', null, 'Je ne passe jamais de commande moi-même ou par mes proches pour atteindre un niveau.'),
             h('li', null, 'Je ne promets ni ventes ni argent au commerçant.'),
@@ -6231,7 +6236,7 @@
         err, btn),
       footer());
   }
-  /* ----- Fii La Carrière : démonstrations animées des fiches (un mini-écran qui montre le geste, en boucle).
+  /* ----- Fii Carrière : démonstrations animées des fiches (un mini-écran qui montre le geste, en boucle).
      Chaque élément porte data-at : l'étape à laquelle il apparaît. Mouvement réduit : l'écran final, sans boucle. */
   function dmPop(at, kids, cls) { return h('div', { class: 'pop ' + (cls || ''), 'data-at': String(at) }, kids); }
   function ambDemo(i, code) {
@@ -6382,7 +6387,7 @@
       ? h('div', { class: 'cel-inner' }, h('div', { class: 'cel-head' }, h('p', { class: 'cel-kicker' }, o.kicker), h('h2', { id: 'cel-t' }, o.title), o.sub ? h('p', null, o.sub) : null), o.card, btn)
       : h('div', { class: 'cel-inner' }, h('div', { class: 'ivc cel-card' },
           h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
-          h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')), h('span', { class: 'ivc-kind' }, o.kicker || 'Bravo')),
+          h('div', { class: 'ivc-top' }, h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 }), h('span', { class: 'ivc-kind' }, o.kicker || 'Bravo')),
           h('div', { class: 'cel-badge', 'aria-hidden': 'true' }, h('span', null, icon(o.icon || 'star', 38))),
           h('h2', { class: 'ivc-title', id: 'cel-t' }, o.title),
           o.gain ? h('p', { class: 'cel-gain' }, o.gain) : null,
@@ -6406,7 +6411,7 @@
     var stat = function (n, label, fmt) { return h('div', null, countUp(h('b'), n, fmt), h('small', null, label)); };
     return h('section', { class: 'ivc agc', id: opts.id || null },
       h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
-      h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La')), h('span', { class: 'ivc-kind' }, 'Carte agent')),
+      h('div', { class: 'ivc-top' }, h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 }), h('span', { class: 'ivc-kind' }, 'Carte agent')),
       h('div', { class: 'agc-id' }, ph,
         h('div', { class: 'agc-who' }, h('strong', { class: 'wrapword' }, a.name),
           h('span', { class: 'agc-grade', id: opts.cta ? 'amb-grade' : null }, icon('star', 12), GRADES[a.grade] || 'Agent'),
@@ -6442,7 +6447,7 @@
       var m = q.shift();
       if (!m || location.hash !== hash) return;
       var o = { onClose: function () { setTimeout(next, 250); } };
-      if (m.kind === 'validated') Object.assign(o, { kicker: 'Profil validé', title: 'Bienvenue dans l’équipe Fii La', sub: 'Voici votre carte. Envoyez votre code au premier commerçant.',
+      if (m.kind === 'validated') Object.assign(o, { kicker: 'Profil validé', title: 'Bienvenue dans l’équipe Fii', sub: 'Voici votre carte. Envoyez votre code au premier commerçant.',
         card: ambAgentCard(a, {}), cta: 'Ouvrir mon tableau de bord' });
       else if (m.kind === 'grade') Object.assign(o, { icon: 'star', kicker: 'Nouveau grade', title: GRADES[a.grade], sub: 'Vos commerçants actifs vous ont fait monter d’un grade. Bravo.' });
       else if (m.kind === 'level') Object.assign(o, { icon: 'shop', kicker: 'Niveau ' + m.x.level + ' atteint', title: m.x.shop + ' passe au niveau ' + m.x.level, gain: '+ ' + fcfa(m.x.amount),
@@ -6463,7 +6468,7 @@
         h('section', { class: 'ivc amb-lesson-card', id: 'amb-lesson', 'aria-live': 'polite' },
           h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
           h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-kind', style: 'text-align:left' }, 'Formation · ' + (i + 1) + ' sur ' + AMB_LESSONS.length),
-            h('span', { class: 'ivc-brand', 'aria-hidden': 'true' }, 'Fii', h('b', null, 'La'))),
+            h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 })),
           h('div', { class: 'amb-prog', 'aria-hidden': 'true' }, AMB_LESSONS.map(function (x, k) { return h('i', { class: k < i ? 'on' : k === i ? 'now' : '' }); })),
           ambDemo(i, a.code),
           h('h2', { class: 'ivc-title' }, l.t),
@@ -6545,7 +6550,7 @@
       function finish(r) {
         if (r.passed) {
           render();
-          celebrate({ icon: 'check', kicker: 'Test réussi', title: 'Test réussi : ' + r.score + '/10', sub: 'Bravo ! L’équipe Fii La valide votre profil, en général sous 48 heures. Vous recevrez alors votre carte et votre code.', cta: 'Continuer' });
+          celebrate({ icon: 'check', kicker: 'Test réussi', title: 'Test réussi : ' + r.score + '/10', sub: 'Bravo ! L’équipe Fii valide votre profil, en général sous 48 heures. Vous recevrez alors votre carte et votre code.', cta: 'Continuer' });
           return;
         }
         var missed = Object.keys(res).map(Number).filter(function (n) { return !res[n].correct; }).sort(function (x, y) { return x - y; });
@@ -6564,13 +6569,13 @@
   }
   function ambWaiting(a) {
     return page(backBtn(), ambPath(3),
-      inviteCard({ id: 'amb-waiting', kind: 'Fii La Carrière', title: 'Test réussi : ' + (a.quiz_score || 8) + '/10',
-        sub: 'L’équipe Fii La valide votre profil, en général sous 48 heures. Vous recevrez alors votre carte agent et votre code.',
+      inviteCard({ id: 'amb-waiting', kind: 'Fii Carrière', title: 'Test réussi : ' + (a.quiz_score || 8) + '/10',
+        sub: 'L’équipe Fii valide votre profil, en général sous 48 heures. Vous recevrez alors votre carte agent et votre code.',
         points: [['key', 'Votre code : ' + a.code + ' (actif après la validation)'], ['shop', 'Repérez déjà 3 commerçants de votre quartier'], ['cam', 'Préparez-les : 5 articles à photographier']] }),
       ambManagerCard(a),
       footer());
   }
-  /* ----- Manager Fii La Carrière : missions du jour, cap du mois, conversation (réponse sans IA immédiate ; avec IA, la fonction
+  /* ----- Manager Fii Carrière : missions du jour, cap du mois, conversation (réponse sans IA immédiate ; avec IA, la fonction
      fiila-manager rédige ; si elle ne répond pas, la base répond à la lecture suivante, une minute après). */
   function ambManagerCall(id) {
     if (!API_URL || !SESSION || !SESSION.access_token) return Promise.reject(new Error('offline'));
@@ -6587,7 +6592,7 @@
     var SUGG = ['Comment convaincre un commerçant ?', 'Quand suis-je payé ?', 'J’ai un problème dans l’application'];
     function bubble(m) {
       return h('div', { class: 'mgr-msg ' + (m.author === 'agent' ? 'me' : m.author) },
-        m.author === 'staff' ? h('small', null, 'Équipe Fii La') : null, h('p', null, m.body),
+        m.author === 'staff' ? h('small', null, 'Équipe Fii') : null, h('p', null, m.body),
         h('time', null, (m.channel === 'whatsapp' ? 'via WhatsApp · ' : '') + (m.at ? new Date(m.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '')));
     }
     function draw(msgs) {
@@ -6615,7 +6620,7 @@
     send.addEventListener('click', post);
     var back = h('div', { class: 'sheet-back', id: 'mgr-chat', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mgr-h' },
       h('div', { class: 'sheet mgr-sheet' },
-        h('header', { class: 'mgr-head' }, ambMgrAv(40), h('div', { class: 'stack tight', style: 'gap:0;flex:1' }, h('b', { id: 'mgr-h' }, 'Votre Manager'), h('small', { class: 'muted' }, 'Fii La Carrière · répond tout de suite')),
+        h('header', { class: 'mgr-head' }, ambMgrAv(40), h('div', { class: 'stack tight', style: 'gap:0;flex:1' }, h('b', { id: 'mgr-h' }, 'Votre Manager'), h('small', { class: 'muted' }, 'Fii Carrière · répond tout de suite')),
           h('button', { class: 'qz-quit', type: 'button', 'aria-label': 'Fermer', id: 'mgr-close', onclick: function () { close(); } }, icon('close', 18))),
         list, h('div', { class: 'mgr-compose' }, input, send)));
     var close = openSheet(back, { onClose: function () { clearTimeout(retry); if (onClose) onClose(); } });
@@ -6662,12 +6667,12 @@
     return box;
   }
   function ambDashboard(a) {
-    var codeMsg = 'Bonjour ! Je vous aide à ouvrir votre boutique en ligne gratuite avec Fii La : vitrine, commandes, factures et l’adresse exacte de vos clientes. ' +
+    var codeMsg = 'Bonjour ! Je vous aide à ouvrir votre boutique en ligne gratuite avec Fii : vitrine, commandes, factures et l’adresse exacte de vos clientes. ' +
       'Ouvrez ' + baseUrl() + '#/boutique et, à « Code agent », tapez : ' + a.code;
     var shops = a.shops || [];
     var amounts = a.amounts || [2000, 5000, 10000];
     var next = a.grade === 'ambassadeur' ? ['Agent confirmé', a.l2 || 0, 10, 'commerçants actifs (niveau 2)']
-      : a.grade === 'confirme' ? ['Agent certifié Fii La', a.l3 || 0, 25, 'commerçants autonomes (niveau 3)'] : null;
+      : a.grade === 'confirme' ? ['Agent certifié Fii', a.l3 || 0, 25, 'commerçants autonomes (niveau 3)'] : null;
     function todoList(s) {
       return s.level === 0 ? [['Type de commerce choisi', !!s.typed], [s.photos >= 5 ? '5 articles avec photo' : (5 - (s.photos || 0)) + ' article(s) avec photo à ajouter', s.photos >= 5], ['Vitrine ouverte', !!s.public]]
         : s.level === 1 ? [[s.clients >= 3 ? '3 clientes différentes' : (3 - (s.clients || 0)) + ' cliente(s) de plus', s.clients >= 3], ['1 commande livrée', !!s.delivered]]
@@ -6761,8 +6766,8 @@
     }, function () {});
     return box;
   }
-  /* ================================================================ VIDE-DRESSING (pilote tenu par Fii La ; tout type d'article depuis le 20/10)
-     Chacun propose ; Fii La valide, publie dans sa vitrine, coordonne la livraison et reverse le prix moins la commission. */
+  /* ================================================================ VIDE-DRESSING (pilote tenu par Fii ; tout type d'article depuis le 20/10)
+     Chacun propose ; Fii valide, publie dans sa vitrine, coordonne la livraison et reverse le prix moins la commission. */
   var VD_AGES = [['0-6m', '0-6 mois'], ['6-12m', '6-12 mois'], ['1-2a', '1-2 ans'], ['2-4a', '2-4 ans'], ['4-6a', '4-6 ans'], ['6-8a', '6-8 ans'], ['8-10a', '8-10 ans'], ['10-12a', '10-12 ans'], ['12-14a', '12-14 ans']];
   var VD_GENDERS = [['fille', 'Fille'], ['garcon', 'Garçon'], ['mixte', 'Mixte']];
   // Catégories du vide-dressing (20/10 23:36 : ouvert à tout type d'article ; « Enfants » est une catégorie).
@@ -6777,8 +6782,8 @@
         h('li', null, 'Photo de l’article seul : à plat, sur cintre, sur mannequin ou posé. Jamais de personne reconnaissable, ni enfant ni adulte.'),
         h('li', null, 'Article propre, complet et en état de marche. Un article par annonce.'),
         h('li', null, 'Interdits : sous-vêtements portés, cosmétiques et produits de soin entamés, médicaments, sièges auto et lits pour bébé, contrefaçons, armes, animaux.'),
-        h('li', null, 'Fii La vérifie chaque annonce avant de la publier, et peut la refuser.'),
-        h('li', null, 'Article vendu : un livreur le récupère chez vous. Vous recevez le prix moins la commission Fii La, après la livraison.')));
+        h('li', null, 'Fii vérifie chaque annonce avant de la publier, et peut la refuser.'),
+        h('li', null, 'Article vendu : un livreur le récupère chez vous. Vous recevez le prix moins la commission Fii, après la livraison.')));
   }
   function viewVideDressing() {
     var mine = h('section', { class: 'stack tight', id: 'vd-mine', hidden: true });
@@ -6797,8 +6802,8 @@
       mine.hidden = false;
     }, function () {});
     return page(backBtn(),
-      h('section', { class: 'card stack tight amb-hero' }, h('p', { class: 'eyebrow' }, 'Fii La'), h('h1', null, 'Vide-dressing'),
-        h('p', null, 'Articles de seconde main vérifiés par Fii La : vêtements, chaussures, maison, électronique, enfants… Livrés à la bonne porte.')),
+      h('section', { class: 'card stack tight amb-hero' }, h('p', { class: 'eyebrow' }, 'Fii'), h('h1', null, 'Vide-dressing'),
+        h('p', null, 'Articles de seconde main vérifiés par Fii : vêtements, chaussures, maison, électronique, enfants… Livrés à la bonne porte.')),
       h('div', { class: 'duo' },
         iconBtn('a', { class: 'btn', href: '#/b/vide-dressing', id: 'vd-buy' }, 'shop', 'Acheter'),
         iconBtn('a', { class: 'btn ghost', href: '#/vide-dressing/vendre', id: 'vd-sell' }, 'cam', 'Vendre')),
@@ -6820,7 +6825,7 @@
             VD_AGES.map(function (a) { return h('option', { value: a[0], selected: f.age === a[0] || null }, a[1]); }))));
       var err = h('div', { role: 'alert' });
       var net = h('p', { class: 'small muted', id: 'vd-net' });
-      function drawNet() { var p = parseInt(String(f.price).replace(/\D/g, ''), 10); net.textContent = p ? 'Vous recevrez ' + fcfa(p - Math.floor(p * d.commission / 100)) + ' (commission Fii La ' + d.commission + ' %).' : ''; }
+      function drawNet() { var p = parseInt(String(f.price).replace(/\D/g, ''), 10); net.textContent = p ? 'Vous recevrez ' + fcfa(p - Math.floor(p * d.commission / 100)) + ' (commission Fii ' + d.commission + ' %).' : ''; }
       drawNet();
       var send = iconBtn('button', { class: 'btn big', type: 'button', id: 'vd-send', onclick: function () {
         setKids(err);
@@ -6832,7 +6837,7 @@
         var p = { id: ed ? ed.id : undefined, category: f.cat, title: f.title.trim(), gender: kid ? f.gender : null, age_band: kid ? f.age : null, size: f.size.trim() || null, condition: f.condition,
           price: parseInt(String(f.price).replace(/\D/g, ''), 10), quartier: f.quartier.trim() || null, photo_ok: true };
         if (f.photo !== original) p.photo = f.photo.replace(/^data:[^,]+,/, '');
-        api('fiila_vd_submit', { p: p }).then(function () { toast('Article envoyé. Fii La le vérifie avant de le publier.'); go('#/vide-dressing'); },
+        api('fiila_vd_submit', { p: p }).then(function () { toast('Article envoyé. Fii le vérifie avant de le publier.'); go('#/vide-dressing'); },
           function (e) { send.disabled = false; errBox(err, e); });
       } }, 'send', ed ? 'Renvoyer l’article corrigé' : 'Envoyer pour vérification');
       return page(backBtn('Vide-dressing', '#/vide-dressing'),
@@ -6855,7 +6860,7 @@
     }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger', errText(e), retryBtn()), footer()); });
   }
   /* ================================================================ BACK-OFFICE (#/bo)
-     Portail unique de l'équipe Fii La (fondateur, 19/10 10:41). Chaque membre a son propre compte et un rôle ;
+     Portail unique de l'équipe Fii (fondateur, 19/10 10:41). Chaque membre a son propre compte et un rôle ;
      la base décide de chaque droit (fiila.staff_can) : l'interface ne fait que masquer ce qui n'est pas permis.
      Ordinateur : barre latérale ; téléphone : barre du haut et menu. Règle « simple et intuitif » : une action principale
      et une seule rangée de filtres par écran. */
@@ -6863,7 +6868,7 @@
   var BO_ROLES = { super_admin: 'Super admin', strategy: 'Head of Stratégie', operations: 'Opérations', moderation: 'Modération', support: 'Support', finance: 'Finances' };
   var BO_ROLE_HELP = {
     super_admin: 'Tout, y compris l’équipe, les réglages et le journal.',
-    strategy: 'Head of Stratégie et Développement : fixe le cap de Fii La Carrière, décide des propositions du Manager, crée les missions.',
+    strategy: 'Head of Stratégie et Développement : fixe le cap de Fii Carrière, décide des propositions du Manager, crée les missions.',
     operations: 'Boutiques, commandes, comptes, fil, modération, vide-dressing, agents, finances.',
     moderation: 'Modération des commentaires, vérification du vide-dressing, suspension des boutiques.',
     support: 'Lecture des boutiques, commandes et comptes pour aider les utilisateurs.',
@@ -7085,7 +7090,7 @@
     }));
     var shell = h('div', { class: 'bo-shell' });
     var side = h('aside', { class: 'bo-side', id: 'bo-side' },
-      h('div', { class: 'bo-brand' }, h('span', { class: 'mark small' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+      h('div', { class: 'bo-brand' }, brandLogo('small'), h('span', { class: 'bo-brand-t' }, 'Back-office')),
       nav,
       h('div', { class: 'bo-user' },
         h('div', { class: 'bo-user-id' }, h('span', { class: 'bo-av', 'aria-hidden': 'true' }, ((me.name || me.email || 'M').trim().charAt(0) || 'M').toUpperCase()),
@@ -7096,7 +7101,7 @@
       h('button', { class: 'bo-menu-btn', type: 'button', id: 'bo-menu', 'aria-label': 'Menu', 'aria-expanded': 'false', 'aria-controls': 'bo-side', onclick: function () {
         var open = !shell.classList.contains('menu-open'); shell.classList.toggle('menu-open', open); this.setAttribute('aria-expanded', open ? 'true' : 'false');
       } }, h('span', { class: 'bo-burger', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'))),
-      h('span', { class: 'mark small' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office'),
+      brandLogo('small'), h('span', { class: 'bo-brand-t' }, 'Back-office'),
       h('button', { class: 'bo-top-search', type: 'button', 'aria-label': 'Rechercher', onclick: boPalette }, icon('search', 20)));
     var scrim = h('div', { class: 'bo-scrim', onclick: function () { shell.classList.remove('menu-open'); } });
     boKeys();
@@ -7166,9 +7171,9 @@
         e.preventDefault(); setKids(err); btn.disabled = true;
         account.signIn(f.email.trim(), f.password).then(function () { btn.disabled = false; render(); }, function (x) { btn.disabled = false; errBox(err, x); });
       } },
-      h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+      h('div', { class: 'bo-brand' }, brandLogo(), h('span', { class: 'bo-brand-t' }, 'Back-office')),
       h('h1', null, 'Connexion de l’équipe'),
-      h('p', { class: 'small muted' }, 'Accès réservé à l’équipe Fii La. Chaque membre se connecte avec son propre compte.'),
+      h('p', { class: 'small muted' }, 'Accès réservé à l’équipe Fii. Chaque membre se connecte avec son propre compte.'),
       h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Adresse e-mail'), h('input', { type: 'email', id: 'bo-email', autocomplete: 'username', required: true, oninput: function (e) { f.email = e.target.value; } })),
       h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Mot de passe'), h('input', { type: 'password', id: 'bo-pass', autocomplete: 'current-password', required: true, oninput: function (e) { f.password = e.target.value; } })),
       err, btn,
@@ -7193,7 +7198,7 @@
   }
   function boMfa(me) {
     function card() { return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-mfa' },
-      h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+      h('div', { class: 'bo-brand' }, brandLogo(), h('span', { class: 'bo-brand-t' }, 'Back-office')),
       Array.prototype.slice.call(arguments))); }
     function codeForm(factorId, label, okText) {
       var err = h('div', { role: 'alert' });
@@ -7212,7 +7217,7 @@
     return account.mfaFactors().then(function (fs) {
       var ok = fs.filter(function (f) { return f.status === 'verified'; })[0];
       if (ok) return card(h('h1', null, 'Code de vérification'),
-        h('p', { class: 'small muted' }, 'Ouvrez votre application d’authentification et saisissez le code « Fii La ».'),
+        h('p', { class: 'small muted' }, 'Ouvrez votre application d’authentification et saisissez le code « Fii ».'),
         codeForm(ok.id, 'Valider', 'Connexion vérifiée.'),
         h('details', { class: 'small' }, h('summary', null, 'Téléphone perdu ?'),
           h('p', { class: 'small muted' }, (me.role === 'super_admin' ? 'Retirez votre facteur dans le tableau de bord Supabase (Authentication → Users → votre compte), puis reconnectez-vous ici pour en activer un nouveau.'
@@ -7229,7 +7234,7 @@
               h('li', null, 'Scannez ce QR code avec l’application.', h('img', { src: mfaQrSrc(en.totp.qr_code), alt: 'QR code de la double authentification', class: 'bo-qr', id: 'bo-mfa-qr', width: 180, height: 180 }),
                 en.totp.uri ? h('a', { class: 'btn ghost small', href: en.totp.uri, id: 'bo-mfa-open', style: 'align-self:flex-start' }, 'Sur ce téléphone : ajouter à l’application') : null,
                 h('span', { class: 'small muted' }, 'Sans QR code : dans l’application, choisissez « Saisir une clé de configuration » (type « basé sur l’heure ») et recopiez cette clé. Elle ne se tape pas ici.'), h('code', { id: 'bo-mfa-secret', class: 'wrapword' }, secret.replace(/(.{4})/g, '$1 ').trim())),
-              h('li', null, 'Recopiez ici le code à 6 chiffres que l’application affiche pour « Fii La » (il change toutes les 30 secondes).')),
+              h('li', null, 'Recopiez ici le code à 6 chiffres que l’application affiche pour « Fii » (il change toutes les 30 secondes).')),
             codeForm(en.id, 'Activer', 'Double authentification activée.'),
             leave);
         });
@@ -7237,16 +7242,16 @@
   }
   function boDenied(me) {
     return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-denied' },
-      h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+      h('div', { class: 'bo-brand' }, brandLogo(), h('span', { class: 'bo-brand-t' }, 'Back-office')),
       h('h1', null, 'Accès non autorisé'),
-      h('p', { class: 'muted' }, 'Ce compte ne fait pas partie de l’équipe Fii La. Pour rejoindre l’équipe, ouvrez le lien d’invitation reçu.'),
+      h('p', { class: 'muted' }, 'Ce compte ne fait pas partie de l’équipe Fii. Pour rejoindre l’équipe, ouvrez le lien d’invitation reçu.'),
       h('a', { class: 'btn', href: '#/' }, 'Retour au site'),
       h('button', { class: 'btn ghost', type: 'button', onclick: function () { account.signOut().then(function () { BO.me = null; render(); }); } }, 'Changer de compte')));
   }
   function viewBoInvite(token) {
     return api('fiila_bo_invite_get', { p_token: token || '' }).then(function (r) {
       var box = function () { return h('div', { class: 'bo-portal' }, h('div', { class: 'bo-login card stack', id: 'bo-invite' },
-        h('div', { class: 'bo-brand' }, h('span', { class: 'mark' }, 'Fii', h('span', null, 'La')), h('span', { class: 'bo-brand-t' }, 'Back-office')),
+        h('div', { class: 'bo-brand' }, brandLogo(), h('span', { class: 'bo-brand-t' }, 'Back-office')),
         Array.prototype.slice.call(arguments))); };
       if (r.state !== 'ok') return box(h('h1', null, r.state === 'used' ? 'Invitation déjà utilisée' : 'Invitation expirée ou non valide'),
         h('p', { class: 'muted' }, r.state === 'used' ? 'Connectez-vous au back-office avec votre compte.' : 'Demandez une nouvelle invitation à la personne qui vous l’a envoyée.'),
@@ -7254,7 +7259,7 @@
       var back = 'bo/invitation/' + token;
       var err = h('div', { role: 'alert' });
       return h('div', { class: 'bo-portal' }, h('div', { class: 'stack', id: 'bo-invite', style: 'width:100%;max-width:460px' },
-        inviteCard({ id: 'bo-invite-card', kind: 'Équipe Fii La · ' + (BO_ROLES[r.role] || r.role), from: 'Fii La', title: 'Rejoindre l’équipe Fii La',
+        inviteCard({ id: 'bo-invite-card', kind: 'Équipe Fii · ' + (BO_ROLES[r.role] || r.role), from: 'Fii', title: 'Rejoindre l’équipe Fii',
           sub: BO_ROLE_HELP[r.role] || '',
           points: [['key', 'Accès au back-office selon votre rôle'], ['lock', 'Double authentification à la première connexion']],
           cta: authed() ? ivcBtn('button', { id: 'bo-invite-accept', onclick: function () {
@@ -7317,7 +7322,7 @@
   var BO_SHOP_FILTERS = [['', 'Toutes'], ['open', 'Ouvertes'], ['closed', 'Fermées'], ['suspended', 'Suspendues'], ['feed', 'Dans le fil'], ['demo', 'Démo']];
   function boShopState(s) {
     if (s.suspended || s.suspended_at) return boBadge('danger', 'Suspendue');
-    if (s.platform) return boBadge('info', 'Fii La');
+    if (s.platform) return boBadge('info', 'Fii');
     if (s.demo) return boBadge('muted', 'Démo');
     return s.public ? boBadge('ok', 'Ouverte') : boBadge('muted', 'Fermée');
   }
@@ -7457,7 +7462,7 @@
       { label: 'Créé', get: function (a) { return boDate(a.created_at); } }],
       function (a) { return '#/bo/comptes/' + a.id; }, null, q, 'Nom ou e-mail');
   }
-  // Équipe de la boutique (membres invités par le commerçant) : rôle, numéro confirmé, retrait par l'équipe Fii La.
+  // Équipe de la boutique (membres invités par le commerçant) : rôle, numéro confirmé, retrait par l'équipe Fii.
   var SHOP_ROLE_LABEL = { admin: 'Administrateur', editor: 'Éditeur' };
   function boShopTeam(s, id) {
     var t = s.team || { members: [] };
@@ -7496,7 +7501,7 @@
     }, function (e) { return boShell('comptes', 'Compte', stateCard('!', 'Compte introuvable', errText(e)), { back: ['#/bo/comptes', 'Comptes'] }); });
   }
 
-  // ----- Ambassadeurs (Fii La Carrière) : files « à valider » et « à verser », liste filtrable, fiche avec toutes les actions.
+  // ----- Ambassadeurs (Fii Carrière) : files « à valider » et « à verser », liste filtrable, fiche avec toutes les actions.
   var AMB_ST = { training: ['muted', 'En formation'], review: ['warn', 'À valider'], active: ['ok', 'Actif'], suspended: ['danger', 'Suspendu'], excluded: ['muted', 'Exclu'] };
   function boAmbState(a) { var x = AMB_ST[a.status] || ['muted', a.status]; return boBadge(x[0], x[1]); }
   function boAmbDecide(a, decision, note, btn, okText, after) {
@@ -7576,7 +7581,7 @@
                 h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, h('i', { class: pct >= 40 ? 'wait' : 'paid', style: 'width:' + pct + '%' })));
             }))),
         h('p', { class: 'small muted' }, 'Gains : ' + d.settings.rewards.map(fcfa).join(' · ') + ' par niveau. Plafond : ' + d.settings.monthly_cap + ' commerçants par mois et par agent (Réglages).')
-      ], { sub: 'Inscriptions, gains et versements de Fii La Carrière.' });
+      ], { sub: 'Inscriptions, gains et versements de Fii Carrière.' });
     }, function (e) { return boShell('agents', 'Agents', stateCard('!', 'Chargement impossible', errText(e))); });
   }
   function boAmbassador(id) {
@@ -7628,7 +7633,7 @@
     }, function (e) { return boShell('agents', 'Agent', stateCard('!', 'Chargement impossible', errText(e)), { back: back }); });
   }
 
-  // ----- Manager Fii La Carrière (back-office) : cap du mois, propositions, conversations, missions.
+  // ----- Manager Fii Carrière (back-office) : cap du mois, propositions, conversations, missions.
   var NOTE_KIND = { training: ['info', 'Formation'], mission: ['ok', 'Mission'], insight: ['muted', 'Constat'] };
   function boCareer() {
     return api('fiila_bo_career', {}).then(function (d) {
@@ -7739,17 +7744,17 @@
     var back = ['#/bo/carriere', 'Manager Carrière'];
     return api('fiila_bo_career_thread', { p_amb: id }).then(function (t) {
       var a = t.ambassador, body = '';
-      var input = h('textarea', { id: 'bo-career-input', rows: 2, maxlength: 1500, placeholder: 'Répondre au nom de l’équipe Fii La…', oninput: function (e) { body = e.target.value; } });
+      var input = h('textarea', { id: 'bo-career-input', rows: 2, maxlength: 1500, placeholder: 'Répondre au nom de l’équipe Fii…', oninput: function (e) { body = e.target.value; } });
       var TAGL = { question: 'question', objection: 'objection', probleme: 'problème', gains: 'gains', idee: 'idée', positif: 'positif', retour: 'retour de mission', formation: 'formation', motivation: 'motivation' };
       var waBtn = a.wa ? h('a', { class: 'btn ghost small', id: 'bo-career-wa', target: '_blank', rel: 'noopener noreferrer',
-        href: 'https://wa.me/' + a.wa + '?text=' + encodeURIComponent('Bonjour ' + String(a.name).split(' ')[0] + ', c’est votre Manager Fii La Carrière.') }, icon('phone', 14), ' WhatsApp') : null;
+        href: 'https://wa.me/' + a.wa + '?text=' + encodeURIComponent('Bonjour ' + String(a.name).split(' ')[0] + ', c’est votre Manager Fii Carrière.') }, icon('phone', 14), ' WhatsApp') : null;
       return boShell('carriere', a.name, [
         boHero(a.name, [boAmbState(a), h('span', { class: 'bo-code-tag' }, a.code), a.wa_open ? boBadge('ok', 'WhatsApp ouvert 24 h') : null], [a.zone, h('a', { href: '#/bo/agents/' + a.id }, 'Fiche agent')].filter(Boolean).map(function (x, i) { return [i ? ' · ' : '', x]; })),
         h('div', { class: 'bo-grid2' },
           h('section', { class: 'card stack tight bo-panel', id: 'bo-career-thread' }, h('h2', null, 'Conversation'),
             h('div', { class: 'mgr-thread', style: 'max-height:520px;border-radius:14px' }, t.messages.map(function (m) {
               return h('div', { class: 'mgr-msg ' + (m.author === 'agent' ? 'staff-in' : m.author === 'staff' ? 'me' : 'manager') },
-                h('small', null, (m.author === 'agent' ? a.name : m.author === 'staff' ? 'Équipe Fii La' : 'Manager') + (m.channel === 'whatsapp' ? ' · WhatsApp' : '')),
+                h('small', null, (m.author === 'agent' ? a.name : m.author === 'staff' ? 'Équipe Fii' : 'Manager') + (m.channel === 'whatsapp' ? ' · WhatsApp' : '')),
                 h('p', null, m.body),
                 m.tags && m.tags.length ? h('div', { class: 'bo-hero-b' }, m.tags.map(function (x) { return boBadge(x === 'probleme' ? 'danger' : x === 'objection' ? 'warn' : 'muted', TAGL[x] || x); })) : null,
                 h('time', null, boDate(m.at, true)));
@@ -7888,7 +7893,7 @@
           last ? h('p', { class: 'small muted' }, 'Pack : ' + last.name + ' (version ' + last.version + ')' + (last.blocked ? ' · activation bloquée tant qu’un service inclus n’est pas prêt' : '')) : h('p', { class: 'notice' }, 'Créez d’abord une version du pack (plus bas).'),
           h('details', { class: 'more-details' }, h('summary', null, 'Boutique existante, note (facultatif)'),
             h('div', { class: 'stack', style: 'margin-top:12px' },
-              textField({ id: 'inv-shop', label: 'Lien de sa vitrine Fii La', optional: true, max: 40, placeholder: 'Ex. : maison-diallo', onInput: function (v) { f.shop_slug = v.replace(/^.*#\/b\//, '').trim(); } }),
+              textField({ id: 'inv-shop', label: 'Lien de sa vitrine Fii', optional: true, max: 40, placeholder: 'Ex. : maison-diallo', onInput: function (v) { f.shop_slug = v.replace(/^.*#\/b\//, '').trim(); } }),
               textField({ id: 'inv-note', label: 'Note interne', optional: true, multiline: true, max: 300, onInput: function (v) { f.note = v; } }))),
           h('button', { class: 'btn', type: 'submit', id: 'inv-create' }, 'Préparer l’invitation'),
           h('button', { class: 'btn ghost', type: 'button', onclick: function () { close(); } }, 'Annuler'));
@@ -7898,7 +7903,7 @@
       // Aperçu personnalisé et lien privé : le lien n'est montré qu'une fois. Ouvrir WhatsApp ne prouve pas l'envoi.
       function shareSheet(r) {
         var url = baseUrl() + '#/invitation/' + r.token;
-        var msg = 'Bonjour, ici Assane, fondateur de Fii La. J’aime le travail de ' + r.brand + ' et je vous invite à essayer gratuitement le pack complet de Fii La pendant ' + r.months + ' mois, sans engagement : ' + url;
+        var msg = 'Bonjour, ici Assane, fondateur de Fii. J’aime le travail de ' + r.brand + ' et je vous invite à essayer gratuitement le pack complet de Fii pendant ' + r.months + ' mois, sans engagement : ' + url;
         var wa = r.whatsapp ? 'https://wa.me/' + (r.whatsapp.replace(/\D/g, '').length === 9 ? '221' : '') + r.whatsapp.replace(/\D/g, '') + '?text=' + encodeURIComponent(msg) : waLink(msg);
         var back = h('div', { class: 'sheet-back', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bo-share-h', id: 'bo-share-sheet' });
         var close;
@@ -8045,7 +8050,7 @@
             { label: 'Livrées', get: function (m) { return boNum(m.delivered); }, cls: 'num' },
             { label: 'Volume livré', get: function (m) { return fcfa(m.gmv); }, cls: 'num' },
             { label: 'Commission vide-dressing', get: function (m) { return fcfa(Math.round(m.vd_gmv * rate / 100)); }, cls: 'num' }], f.months, { id: 'bo-months' }),
-          h('p', { class: 'small muted' }, 'Le volume est celui des commandes livrées, hors boutiques de démonstration. Fii La n’encaisse pas encore les paiements en ligne : la commission de vide-dressing est retenue au reversement.'))]);
+          h('p', { class: 'small muted' }, 'Le volume est celui des commandes livrées, hors boutiques de démonstration. Fii n’encaisse pas encore les paiements en ligne : la commission de vide-dressing est retenue au reversement.'))]);
     });
   }
 
@@ -8073,7 +8078,7 @@
                 h('p', null, h('b', null, 'Invitation créée. '), 'Envoyez ce lien à la personne : il fonctionne une seule fois, pendant 7 jours, avec son adresse e-mail.'),
                 h('code', { class: 'wrapword' }, link),
                 h('div', { class: 'row' }, h('button', { class: 'btn small', type: 'button', onclick: function () { copy(link, 'Lien'); } }, 'Copier le lien'),
-                  h('a', { class: 'btn ghost small', href: 'https://wa.me/?text=' + encodeURIComponent('Invitation au back-office Fii La (' + BO_ROLES[f.role] + ') : ' + link), target: '_blank', rel: 'noopener' }, 'WhatsApp'))));
+                  h('a', { class: 'btn ghost small', href: 'https://wa.me/?text=' + encodeURIComponent('Invitation au back-office Fii (' + BO_ROLES[f.role] + ') : ' + link), target: '_blank', rel: 'noopener' }, 'WhatsApp'))));
             }, function (e) { btn.disabled = false; if (e && e.code !== 'reauth_required') errBox(err, e); });
           } }, 'Créer le lien d’invitation'), out));
       }
@@ -8118,7 +8123,7 @@
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain agent, niveau 1', 'FCFA'], amb_reward_2: ['Gain agent, niveau 2', 'FCFA'],
     amb_reward_3: ['Gain agent, niveau 3', 'FCFA'], amb_monthly_cap: ['Plafond de commerçants par agent et par mois', ''],
     sms_verify: ['Code SMS obligatoire pour rejoindre une équipe de boutique', '0 = non, 1 = oui'],
-    amb_manager_llm: ['Manager Fii La Carrière avec IA (clé d’API à saisir dans Supabase)', '0 = non, 1 = oui'],
+    amb_manager_llm: ['Manager Fii Carrière avec IA (clé d’API à saisir dans Supabase)', '0 = non, 1 = oui'],
     nudges: ['Suggestions discrètes dans l’application (découverte progressive)', '0 = non, 1 = oui'],
     onboarding_v2: ['Nouvel accueil (mes activités, « Découvrir les services »)', '1 = nouvel accueil, 0 = ancien'],
     discover_after: ['Suggestion discrète après une action (commande, adresse envoyée, course)', '0 = non, 1 = oui'],
@@ -8244,7 +8249,7 @@
     return page(backBtn(),
       h('div', { class: 'prose' },
         h('h1', null, 'Données et confidentialité'),
-        h('p', null, 'Fii La est en phase pilote. Cette page décrit ce que le service enregistre et comment le supprimer.'),
+        h('p', null, 'Fii est en phase pilote. Cette page décrit ce que le service enregistre et comment le supprimer.'),
         h('h2', null, 'Ce qui est enregistré'),
         h('ul', null,
           h('li', null, 'Ce que vous saisissez : nom du lieu, quartier, repère, point d’entrée, point d’arrêt voiture, photo, et pour un événement sa date.'),
@@ -8252,17 +8257,17 @@
           h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.'),
           h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.'),
           h('li', null, 'Si vous créez un compte (facultatif) : votre e-mail, votre mot de passe (géré par Supabase Auth, jamais visible en clair), et si vous les ajoutez votre nom, votre téléphone et votre photo de profil.'),
-          h('li', null, 'Si vous ouvrez une boutique : son nom et son téléphone s’il est indiqué ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii La les héberge pour lui.'),
+          h('li', null, 'Si vous ouvrez une boutique : son nom et son téléphone s’il est indiqué ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii les héberge pour lui.'),
           h('li', null, 'Si vous êtes livreur : votre nom, et si vous les indiquez votre téléphone, votre moyen de livraison et votre zone. Vos boutiques voient votre nom, votre téléphone et votre note ; les clients voient votre prénom.'),
           h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom. Le commerçant voit la moyenne de ses articles.'),
-          h('li', null, 'Origine et parrainage : quand vous créez une adresse, un événement, une boutique ou un espace livreur, Fii La note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
+          h('li', null, 'Origine et parrainage : quand vous créez une adresse, un événement, une boutique ou un espace livreur, Fii note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
           h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro. Le numéro n’est jamais affiché ; il sert seulement à vous reconnaître quand quelqu’un le tape. Les personnes qui ouvrent votre lien voient votre prénom.'),
           h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus que vous ajoutez à votre adresse. Le micro n’est utilisé que lorsque vous appuyez sur « Enregistrer ». Toute personne qui a le lien, et le livreur d’une course, peuvent l’écouter. Il est supprimé avec la fiche, ou dès que vous le retirez.'),
           h('li', null, 'Vitrine d’une boutique (si elle l’ouvre) : ses articles visibles par toute personne qui a le lien. Une commande passée sur la vitrine transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
           h('li', null, 'Fil des boutiques : les 25 premières boutiques qui ouvrent leur vitrine y apparaissent gratuitement (nom, présentation, articles, prix, note). La boutique peut en sortir à tout moment dans ses réglages. Aucune donnée de client n’y figure.'),
           h('li', null, 'Programme Agents (facultatif, avec un compte) : votre nom, votre téléphone, votre quartier, votre numéro de versement, votre résultat au test, les boutiques que vous accompagnez et vos gains. Une boutique accompagnée voit le prénom de son agent ; l’agent voit le nom de la boutique et ses indicateurs (nombre d’articles, de commandes et de clientes), jamais le nom ni le numéro des clientes.'),
-          h('li', null, 'Vide-dressing : pour vendre, votre nom, votre téléphone, votre quartier et les informations de l’article (photo, catégorie, taille, état, prix ; genre et âge pour un article d’enfant). Ils ne sont visibles que de l’équipe Fii La, pour vérifier l’article et organiser l’enlèvement ; l’acheteur ne voit que l’article. Les photos ne doivent montrer aucune personne reconnaissable.'),
-          h('li', null, 'Publication d’un article : Fii La compte seulement qu’une publication a été faite, pas le réseau choisi.'),
+          h('li', null, 'Vide-dressing : pour vendre, votre nom, votre téléphone, votre quartier et les informations de l’article (photo, catégorie, taille, état, prix ; genre et âge pour un article d’enfant). Ils ne sont visibles que de l’équipe Fii, pour vérifier l’article et organiser l’enlèvement ; l’acheteur ne voit que l’article. Les photos ne doivent montrer aucune personne reconnaissable.'),
+          h('li', null, 'Publication d’un article : Fii compte seulement qu’une publication a été faite, pas le réseau choisi.'),
           h('li', null, 'Suivi en direct (livreur ou invité d’un événement), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou de l’événement. Pour un événement, votre prénom.')),
         h('h2', null, 'Ce qui est obligatoire'),
         h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un événement : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),
@@ -8281,16 +8286,16 @@
         h('p', null, 'Depuis le téléphone qui a créé la fiche (ou avec sa clé de gestion), vous pouvez à tout moment la consulter, la modifier, désactiver son lien ou la supprimer définitivement.'),
         h('h2', null, 'Ce qui n’est pas collecté'),
         h('ul', null,
-          h('li', null, 'Pas de compte obligatoire, pas d’accès à vos contacts, pas de pièce d’identité. Aucun paiement en ligne n’est traité par Fii La pour le moment.'),
+          h('li', null, 'Pas de compte obligatoire, pas d’accès à vos contacts, pas de pièce d’identité. Aucun paiement en ligne n’est traité par Fii pour le moment.'),
           h('li', null, 'Pas de suivi de position : votre position n’est lue qu’au moment où vous appuyez sur « Utiliser ma position ».'),
           h('li', null, 'Les données de localisation contenues dans les photos sont retirées avant l’envoi, et le serveur refuse les photos qui en contiennent encore.'),
-          h('li', null, 'Pas de publicité ni d’outil de suivi. Fii La compte seulement, par jour et sans aucun identifiant, quelques actions (par exemple « une fiche a été créée » ou « un lien a été copié »), pour savoir si le service est utile. Si votre navigateur envoie le signal « ne pas suivre », rien n’est compté.')),
+          h('li', null, 'Pas de publicité ni d’outil de suivi. Fii compte seulement, par jour et sans aucun identifiant, quelques actions (par exemple « une fiche a été créée » ou « un lien a été copié »), pour savoir si le service est utile. Si votre navigateur envoie le signal « ne pas suivre », rien n’est compté.')),
         h('h2', null, 'Qui peut voir une fiche'),
         h('p', null, 'Toute personne qui a le lien peut voir la fiche et le transférer. Les fiches ne sont jamais listées publiquement. Une réponse à une demande n’est visible que par le demandeur.'),
         h('h2', null, 'Désactiver et supprimer'),
         h('p', null, 'Depuis « Mes adresses », vous pouvez désactiver un lien (il n’affiche plus rien) ou supprimer la fiche et sa photo. Les événements cessent d’afficher le lieu à la date choisie, puis sont effacés 30 jours plus tard. Les copies d’écran ou messages déjà envoyés ne peuvent pas être rappelés. Les sauvegardes techniques de la base peuvent conserver une copie pendant quelques jours avant d’être écrasées.'),
         h('h2', null, 'Clé de gestion'),
-        h('p', null, 'Vos fiches sont gérées depuis le téléphone qui les a créées. Si vous le perdez ou effacez ses données, seule la clé de gestion permet de les modifier ou de les supprimer. Sans elle, Fii La ne peut pas vérifier que la fiche vous appartient.'),
+        h('p', null, 'Vos fiches sont gérées depuis le téléphone qui les a créées. Si vous le perdez ou effacez ses données, seule la clé de gestion permet de les modifier ou de les supprimer. Sans elle, Fii ne peut pas vérifier que la fiche vous appartient.'),
         h('h2', null, 'Services tiers'),
         h('p', null, 'La carte utilise les tuiles OpenStreetMap, chargées uniquement pendant la création d’une fiche. Les itinéraires s’ouvrent dans Google Maps, selon ses propres conditions.')),
       footer());

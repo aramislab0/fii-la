@@ -1,4 +1,4 @@
-// Fii La — le Manager Fii La Carrière (IA). Deux actions, appelées par l'application avec la session de la personne :
+// Fii — le Manager Fii Carrière (IA). Deux actions, appelées par l'application avec la session de la personne :
 //   { action: 'reply', message }  un agent vient d'écrire : réponse rédigée par le modèle, enregistrée dans la conversation ;
 //   { action: 'digest' }          un membre de l'équipe (droit « strategy ») demande l'analyse : rapport et propositions.
 // Sans clé d'API, ou réglage amb_manager_llm = 0, ou réponse du modèle inutilisable : la réponse du Manager sans IA (règles du
@@ -17,7 +17,7 @@ export function replyPrompt(ctx) {
   const a = ctx.ambassador || {}, o = ctx.objective;
   const shops = (a.shops || []).map((s) => `- ${s.shop} : niveau ${s.level}/3${s.expired ? ' (délai dépassé)' : ''}, ${s.photos} article(s) avec photo, vitrine ${s.public ? 'ouverte' : 'fermée'}, ${s.clients || 0} cliente(s)`).join('\n') || '- aucun commerçant pour l’instant';
   return [
-    'Tu es le Manager de Fii La Carrière, le programme des Agents Fii La : des personnes rémunérées pour installer et accompagner les commerçants sur Fii La (boutique en ligne gratuite pour les commerçants de Dakar : vitrine, commandes, factures, adresse exacte des clientes en une photo).',
+    'Tu es le Manager de Fii Carrière, le programme des Agents Fii : des personnes rémunérées pour installer et accompagner les commerçants sur Fii (boutique en ligne gratuite pour les commerçants de Dakar : vitrine, commandes, factures, adresse exacte des clientes en une photo).',
     'Tu encadres chaque agent au quotidien : tu l’aides à réussir ses missions, tu réponds à ses questions, tu le motives, tu recueilles ses retours du terrain. Tu travailles sous la tutelle du Head of Stratégie et Développement : tu suis le cap du mois.',
     'Style : français simple et chaleureux, phrases courtes, tutoiement interdit (vouvoiement), 2 à 5 phrases, une action concrète à la fin. Pas de jargon, pas de superlatifs, pas d’émojis en excès (au plus un).',
     'Règles absolues : ne promets jamais d’argent, de ventes ni de délai de paiement autre que les règles ; ne décide jamais d’un gain, d’une validation, d’une suspension ou d’une exclusion (c’est l’équipe) ; n’invente aucune fonction de l’application ; ne demande jamais de numéro de téléphone ni de donnée de cliente ; en cas de problème technique, de fraude, de conflit ou de question que tu ne sais pas traiter, dis que tu transmets à l’équipe et mets "escalate": true.',
@@ -33,7 +33,7 @@ export function replyPrompt(ctx) {
 
 export function digestPrompt(d) {
   return [
-    'Tu es le Manager de Fii La Carrière (programme des Agents Fii La, Dakar). Tu prépares l’analyse hebdomadaire pour le Head of Stratégie et Développement.',
+    'Tu es le Manager de Fii Carrière (programme des Agents Fii, Dakar). Tu prépares l’analyse hebdomadaire pour le Head of Stratégie et Développement.',
     'Données de la semaine (JSON) :\n' + JSON.stringify(d).slice(0, 20000),
     'Produis au plus 4 éléments, utiles et concrets, fondés sur les données (cite les chiffres) : constats ("insight"), améliorations de formation ("training"), nouvelles missions ("mission"). Pas de généralités. Ne propose rien qui change les gains ou les règles de paiement.',
     'Réponds UNIQUEMENT par un objet JSON : {"items": [{"kind": "insight|training|mission", "title": "... (80 caractères au plus)", "body": "... (3 phrases au plus)"}]}.'

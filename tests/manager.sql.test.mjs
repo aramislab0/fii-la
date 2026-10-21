@@ -1,4 +1,4 @@
-// Tests SQL : Manager Fii La Carrière — messages d'étape, missions du jour selon l'objectif et les commerçants, conversation
+// Tests SQL : Manager Fii Carrière — messages d'étape, missions du jour selon l'objectif et les commerçants, conversation
 // (classement, réponse sans IA, remontée d'un problème, IA : rôle service seulement), analyse et propositions, back-office et
 // rôle « Head of Stratégie et Développement ».
 import assert from 'node:assert/strict';
@@ -218,5 +218,5 @@ await t('WhatsApp : numéro du Manager (Head of Stratégie), message reçu sur W
 });
 
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
-console.log(`\n${passed}/${results.length} tests SQL Manager Fii La Carrière réussis`);
+console.log(`\n${passed}/${results.length} tests SQL Manager Fii Carrière réussis`);
 process.exit(passed === results.length ? 0 : 1);

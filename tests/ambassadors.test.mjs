@@ -1,4 +1,4 @@
-// Fii La Carrière de bout en bout : inscription de l'ambassadeur (compte, charte), formation, test, validation par le fondateur,
+// Fii Carrière de bout en bout : inscription de l'ambassadeur (compte, charte), formation, test, validation par le fondateur,
 // code tapé par un commerçant à la création de sa boutique, missions et portefeuille, versement marqué par le fondateur.
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
@@ -61,7 +61,7 @@ await t('accueil → « Devenir ambassadeur » : les 3 niveaux et leurs montants
   await shot(A, '01-presentation');
 });
 
-await t('portail Fii La Carrière (#/carriere) : inscription sur place, puis connexion ; retour direct à l’espace ambassadeur', async () => {
+await t('portail Fii Carrière (#/carriere) : inscription sur place, puis connexion ; retour direct à l’espace ambassadeur', async () => {
   const P = await newPhone();
   await P.goto(URL0 + '#/carriere');
   await P.locator('#amb-access').waitFor();
@@ -72,7 +72,7 @@ await t('portail Fii La Carrière (#/carriere) : inscription sur place, puis con
   await shot(P, '00-portail');
   await P.click('#amb-auth-submit');
   await P.locator('#amb-register').waitFor();
-  assert.ok(/#\/carriere$/.test(P.url()), 'on reste dans Fii La Carrière');
+  assert.ok(/#\/carriere$/.test(P.url()), 'on reste dans Fii Carrière');
   await P.waitForFunction(() => document.getElementById('amb-name').value === 'Awa Portail');
   // déconnexion puis connexion par l'onglet « J’ai déjà un compte »
   await P.evaluate(() => localStorage.removeItem('fiila.session'));
@@ -163,7 +163,7 @@ await t('fondateur : valide l’inscription depuis « Ambassadeurs »', async ()
 await t('ambassadeur : code, portefeuille, aucun commerçant ; un commerçant tape le code en créant sa boutique', async () => {
   await A.goto(URL0 + '#/'); await A.goto(URL0 + '#/ambassadeur');
   // Profil validé : la carte ambassadeur s'affiche une fois, en grand, avec le code.
-  await A.locator('#cel').getByRole('heading', { name: 'Bienvenue dans l’équipe Fii La' }).waitFor();
+  await A.locator('#cel').getByRole('heading', { name: 'Bienvenue dans l’équipe Fii' }).waitFor();
   await A.locator('#cel').getByText(CODE).waitFor();
   await shot(A, '03d-profil-valide');
   await A.click('#cel-close');
@@ -225,9 +225,9 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   await A.click('#cel-close');
   const w = (await A.locator('#amb-wallet').textContent()).replace(/\s/g, ' ');
   assert.match(w, /Déjà reçu\s*2 000 FCFA/);
-  // Depuis le compte : l'entrée « Fii La Carrière » montre l'état de l'ambassadeur
+  // Depuis le compte : l'entrée « Fii Carrière » montre l'état de l'ambassadeur
   await A.goto(URL0 + '#/compte');
-  await A.locator('#amb-entry').getByText('Fii La Carrière · agent actif').waitFor();
+  await A.locator('#amb-entry').getByText('Fii Carrière · agent actif').waitFor();
   await A.click('#amb-entry');
   await A.locator('#amb-code').waitFor();
   await shot(A, '05-portefeuille');
@@ -251,7 +251,7 @@ await t('back-office : Manager Carrière — cap du mois, conversation de l’am
   await F.locator('#bo-threads-table tbody tr').filter({ hasText: 'Moussa Diop' }).locator('td').nth(1).click();
   await F.locator('#bo-career-thread').getByText('Quand suis-je payé ?').waitFor();
   await F.locator('#bo-career-thread').getByText(/vraie vitrine/).waitFor();
-  assert.equal(await F.locator('#bo-career-wa').getAttribute('href'), 'https://wa.me/221775000001?text=' + encodeURIComponent('Bonjour Moussa, c’est votre Manager Fii La Carrière.'));
+  assert.equal(await F.locator('#bo-career-wa').getAttribute('href'), 'https://wa.me/221775000001?text=' + encodeURIComponent('Bonjour Moussa, c’est votre Manager Fii Carrière.'));
   await F.fill('#bo-career-input', 'Bravo Moussa, continuez !');
   await F.click('#bo-career-send');
   await F.getByText('Message envoyé.').waitFor();

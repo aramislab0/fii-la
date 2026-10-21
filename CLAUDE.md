@@ -1,4 +1,4 @@
-# Fii La — règles pour tout agent qui travaille dans ce dépôt
+# Fii (ex-Fii La) — règles pour tout agent qui travaille dans ce dépôt
 
 1. **Au début de chaque session** : lire `docs/HANDOFF.md` (état, décisions, actions en attente) et `docs/REVUE-VP.md` (retours du VP produit), s'il existe.
 2. **À chaque action** (code, test, déploiement, décision, doc) : mettre à jour `docs/HANDOFF.md` dans le même commit :

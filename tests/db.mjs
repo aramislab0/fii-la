@@ -1,4 +1,4 @@
-// Postgres local (PGlite) qui reproduit l'environnement Supabase utile à Fii La :
+// Postgres local (PGlite) qui reproduit l'environnement Supabase utile à Fii :
 // schéma `extensions` avec pgcrypto, rôles `anon` / `authenticated`, puis la migration réelle.
 import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';

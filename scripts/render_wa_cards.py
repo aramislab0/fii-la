@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fii La — rendu déterministe des cartes WhatsApp (mandat WHATSAPP-001).
+"""Fii — rendu déterministe des cartes WhatsApp (mandat WHATSAPP-001).
 
 Sources : photos du kit (docs/kits/whatsapp-2026-10-21/assets/photos/), textes du catalogue
 (docs/kits/whatsapp-2026-10-21/docs/design/whatsapp/catalogue.json), police Montserrat (@fontsource).
@@ -56,14 +56,6 @@ def wrap(draw, text, f, max_w):
     return lines
 
 
-def pin(draw, cx, cy, r, fill, hole):
-    """Repère Fii La (épingle de l'icône de l'application), dessiné en vectoriel."""
-    draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=fill)
-    draw.polygon([(cx - r * 0.82, cy + r * 0.55), (cx + r * 0.82, cy + r * 0.55), (cx, cy + r * 2.05)], fill=fill)
-    hr = r * 0.38
-    draw.ellipse((cx - hr, cy - hr, cx + hr, cy + hr), fill=hole)
-
-
 def render(card, tpl):
     photo = Image.open(os.path.join(KIT, 'assets', 'photos', card['photo'])).convert('RGB')
     base = cover(photo, W, H, card.get('focus_x', 0.5)).convert('RGBA')
@@ -85,9 +77,12 @@ def render(card, tpl):
     d = ImageDraw.Draw(img)
 
     x0, col = 72, 470
-    # Marque : épingle + « Fii La »
-    pin(d, x0 + 15, 86, 15, LIME, GREEN)
-    d.text((x0 + 44, 70), 'Fii La', font=font(800, 30), fill=IVORY)
+    # Logo Fii validé (web/media/brand/fii-logo.png, dérivé de docs/brand/fii-logo-source.png), sans redessin.
+    logo = Image.open(os.path.join(ROOT, 'web', 'media', 'brand', 'fii-logo.png')).convert('RGBA')
+    lh = 88
+    logo = logo.resize((round(logo.width * lh / logo.height), lh), Image.LANCZOS)
+    img.alpha_composite(logo, (x0, 52))
+    d = ImageDraw.Draw(img)
 
     # Kicker, titre, détail
     y = 300

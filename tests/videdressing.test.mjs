@@ -1,4 +1,4 @@
-// Vide-dressing enfants de bout en bout : une maman propose un vêtement (règle photo), Fii La le publie, une cliente filtre
+// Vide-dressing enfants de bout en bout : une maman propose un vêtement (règle photo), Fii le publie, une cliente filtre
 // « Fille · 2-4 ans » et commande ; le fondateur voit chez qui récupérer l'article ; la vendeuse suit son article.
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
@@ -73,7 +73,7 @@ await t('vendeuse : compte, photo du vêtement seul (case obligatoire), fille 2-
   await V.locator('#vd-mine').getByText('En vérification').waitFor();
 });
 
-await t('Fii La : vérifie et publie ; la vitrine « Vide-dressing Fii La » se filtre par genre et âge', async () => {
+await t('Fii : vérifie et publie ; la vitrine « Vide-dressing Fii » se filtre par genre et âge', async () => {
   await signup(F, 'Fondateur', 'fondateur.vd@example.invalid');
   await local.db.query(`insert into fiila.staff (user_id, role) select user_id, 'super_admin' from fiila.profiles where display_name = 'Fondateur'`);
   await F.goto(URL0 + '#/admin/vide-dressing');

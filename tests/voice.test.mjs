@@ -153,7 +153,7 @@ await t('navigateur sans micro (ex. intégré à une app) : le repère vocal n�
   await N.locator('#wizard-next').click();
   await N.getByLabel('Oui').check();
   await N.locator('#wizard-next').click();
-  await N.locator('#voice-unsupported').getByText('ouvrez Fii La dans Safari ou Chrome').waitFor();
+  await N.locator('#voice-unsupported').getByText('ouvrez Fii dans Safari ou Chrome').waitFor();
   assert.equal(await N.locator('#voice-record').count(), 0);
 });
 

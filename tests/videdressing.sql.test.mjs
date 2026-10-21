@@ -1,4 +1,4 @@
-// Tests SQL : vide-dressing enfants (dépôt, règles, validation, vitrine Fii La, vente, reversement, garde-fous).
+// Tests SQL : vide-dressing enfants (dépôt, règles, validation, vitrine Fii, vente, reversement, garde-fous).
 import assert from 'node:assert/strict';
 import { createDb, rpc } from './db.mjs';
 
@@ -55,7 +55,7 @@ await t('ouvert à tout article (20/10) : catégorie contrôlée ; genre et âge
   await db.query(`delete from fiila.vd_submissions where user_id = $1`, [W.uid]);
 });
 
-await t('rien n’est publié sans validation ; seule l’équipe valide ; publié dans la vitrine Fii La, vendeuse invisible', async () => {
+await t('rien n’est publié sans validation ; seule l’équipe valide ; publié dans la vitrine Fii, vendeuse invisible', async () => {
   let v = await ok('fiila_vitrine', { p_slug: 'vide-dressing' });
   assert.equal(v.products.length, 0); assert.equal(v.shop.platform, true);
   await ko('fiila_admin_vd_decide', { p_id: S1.id, p_decision: 'approve', p_reason: null }, 'not_allowed', V);
@@ -68,11 +68,11 @@ await t('rien n’est publié sans validation ; seule l’équipe valide ; publi
   assert.ok(!JSON.stringify(v).includes('77 700'), 'aucun numéro de la vendeuse');
   assert.ok(!JSON.stringify(v).includes('Fatou'), 'aucun nom de la vendeuse');
   const feed = await ok('fiila_feed', {});
-  assert.ok(feed.shops.some((s) => s.platform && s.name === 'Vide-dressing Fii La'), 'dans le fil, sans prendre une des 25 places');
+  assert.ok(feed.shops.some((s) => s.platform && s.name === 'Vide-dressing Fii'), 'dans le fil, sans prendre une des 25 places');
   assert.equal((await one(`select featured_rank from fiila.shops where platform`)).featured_rank, null);
 });
 
-await t('commande : exemplaire unique ; la vendeuse apparaît seulement côté Fii La ; vendu puis reversé', async () => {
+await t('commande : exemplaire unique ; la vendeuse apparaît seulement côté Fii ; vendu puis reversé', async () => {
   const v = await ok('fiila_vitrine', { p_slug: 'vide-dressing' });
   const o = await ok('fiila_vitrine_order', { p_slug: 'vide-dressing', p: { customer: { name: 'Acheteuse [TEST]', phone: '70 900 00 01' }, items: [{ product_id: v.products[0].id, qty: 1, size: '3 ans' }] } });
   await ko('fiila_vitrine_order', { p_slug: 'vide-dressing', p: { customer: { name: 'Autre [TEST]', phone: '70 900 00 02' }, items: [{ product_id: v.products[0].id, qty: 1, size: '3 ans' }] } }, 'out_of_stock');

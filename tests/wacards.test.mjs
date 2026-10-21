@@ -75,9 +75,9 @@ await t('sans partage de fichier : WhatsApp en texte, « Télécharger l’image
   const P = pages[0];
   await P.locator('#wa-card-download').waitFor();
   assert.equal(await P.locator('#wa-text-only').count(), 0);
-  assert.equal(await P.locator('#wa-card-download').getAttribute('download'), 'fii-la-demande-adresse.jpg');
+  assert.equal(await P.locator('#wa-card-download').getAttribute('download'), 'fii-demande-adresse.jpg');
   const [dl] = await Promise.all([P.waitForEvent('download'), P.click('#wa-card-download')]);
-  assert.equal(dl.suggestedFilename(), 'fii-la-demande-adresse.jpg');
+  assert.equal(dl.suggestedFilename(), 'fii-demande-adresse.jpg');
   await P.click('#share-whatsapp');
   await new Promise((r) => setTimeout(r, 500));
   assert.equal(await metric('request:download'), 1);
@@ -92,7 +92,7 @@ await t('partage de fichier [SIMULÉ] : l’image JPEG et le texte partent ensem
   await P.waitForFunction(() => window.__shared.length === 1);
   const s = await P.evaluate(() => window.__shared[0]);
   assert.equal(s.files.length, 1);
-  assert.equal(s.files[0].name, 'fii-la-demande-adresse.jpg');
+  assert.equal(s.files[0].name, 'fii-demande-adresse.jpg');
   assert.equal(s.files[0].type, 'image/jpeg');
   assert.ok(s.files[0].size > 50000, 'image complète');
   assert.ok(s.text.includes(recipientUrl) && s.text.includes('Boutique Ndèye (test)'));
