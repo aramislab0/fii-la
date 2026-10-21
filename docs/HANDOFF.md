@@ -232,6 +232,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 21/10 06:40 | Run 39554631281 : migration `20261022000000_fiila_wa_cards` appliquée en production ; contrôle de la base en échec car `scripts/verify-db.mjs` ne listait pas `fiila_bo_wa` et `fiila_bo_wa_status` (oubli du Builder) — liste corrigée, relance | ce commit |
 | 21/10 06:10 | WHATSAPP-001 lot 1 : carte pilote « Indiquer mon entrée » (image signature + texte, repli texte / téléchargement), page d'arrivée animée, back-office Messages WhatsApp + réglage `wa_card_media`, migration `20261022000000_fiila_wa_cards`, tests `wacards` 5/5, `wacards.sql` 4/4, `backoffice` 13/13 | ce commit ; `docs/RAPPORT-WHATSAPP-001.md` |
 | 21/10 08:10 | Mandat WHATSAPP-001 enregistré : kit importé (38 fichiers, empreintes vérifiées), point d'entrée, décision, action #57, entrée en tête de REVUE-VP | ce commit |
 | 21/10 07:50 | Mandat : lots 2 à 4 en production (run 39549577355 tout vert) ; comptages de production identiques à la référence ; fonctions fiila-manager v8 et fiila-whatsapp v10 ; rapport complété (preuves, retour arrière, dépendances) | ce commit |

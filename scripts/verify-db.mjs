@@ -29,6 +29,8 @@ const EXPECTED_FUNCTIONS = [
   'fiila_shop_team', 'fiila_shop_invite', 'fiila_shop_invite_cancel', 'fiila_shop_invite_get', 'fiila_shop_invite_accept', 'fiila_shop_member_set', 'fiila_shop_leave',
   // photos d'articles (20261020400000)
   'fiila_product_photos',
+  // cartes WhatsApp (20261022000000)
+  'fiila_bo_wa', 'fiila_bo_wa_status',
 ].sort();
 const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
