@@ -235,6 +235,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 21/10 10:20 | Nom « Fii » et logo sans fond en production : runs 39574747910 (nom, migration) et 39579874946 (logo, favicon) tout verts, tests en production Chrome + Safari compris | run 39579874946 |
 | 21/10 09:50 | Logo sans fond, bicolore partout (lettres ivoire sur sombre, vertes sur clair, épingle lime) à la demande du fondateur (09:36) ; versions vectorielles clair / sombre / mono vert / mono ivoire ; favicon SVG sans fond qui suit le thème de l'onglet ; cache hors ligne v29 ; revue visuelle des écrans et cartes | ce commit |
 | 21/10 09:30 | Logo des écrans : version monochrome sans fond (masque coloré par l'application selon le thème et la surface) au lieu de la pastille verte ; cache hors ligne v28 ; navigation 55/55, accueil 8/8, partage 23/23, back-office 13/13 | ce commit |
 | 21/10 09:05 | Nouveau nom « Fii » et nouveau logo : pastille du logo (en-tête, accueil, back-office, cartes, image Story), icônes du téléphone et favicon, carte WhatsApp re-rendue, textes « Fii La » → « Fii » (application, fonctions de la base, Manager, WhatsApp, SMS), noms de fichiers téléchargés `fii-…` ; cache hors ligne v27 ; tests : SQL tous verts, navigateur tous verts après 3 corrections (lien du logo, noms de fichiers, attente d'un double rendu dans `social`) | ce commit |
