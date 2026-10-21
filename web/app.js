@@ -59,9 +59,11 @@
   }
   // Thème : toujours celui du téléphone (clair ou sombre), sans réglage dans l'application (fondateur, 20/10).
   // En-tête discret des pages reçues par lien : de quoi il s'agit, en un coup d'œil.
-  // Logo Fii (validé par le fondateur le 21/10/2026, docs/brand/) : pastille verte, sans redessin. size : '' | 'small' | 'tiny'.
+  // Logo Fii (validé par le fondateur le 21/10/2026, docs/brand/) : version monochrome, sans fond, posée sur l'écran ;
+  // sa couleur suit la surface (vert sur fond clair, ivoire sur fond sombre ou vert). size : '' | 'small' | 'tiny'.
   function brandLogo(size, label) {
-    return h('img', { class: 'logo' + (size ? ' ' + size : ''), src: 'media/brand/fii-tile.png', alt: label == null ? 'Fii' : label, width: 160, height: 160, decoding: 'async' });
+    var named = label == null || label !== '';
+    return h('span', { class: 'logo' + (size ? ' ' + size : ''), role: named ? 'img' : null, 'aria-label': named ? (label || 'Fii') : null, 'aria-hidden': named ? null : 'true' });
   }
   function brandBar(kind) {
     return h('div', { class: 'brand-bar' }, brandLogo('small'), kind ? h('span', { class: 'brand-kind' }, kind) : null);
@@ -3583,7 +3585,7 @@
       var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = o.photo;
     }) : Promise.resolve(null);
     var logoReady = new Promise(function (res) {
-      var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = 'media/brand/fii-tile.png';
+      var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = 'media/brand/fii-logo-mask.png';
     });
     return Promise.all([fontsReady, photoReady, loadQr(), logoReady]).then(function (r) {
       var photo = r[1], qrcode = r[2], logo = r[3];
@@ -3623,7 +3625,13 @@
       g.textBaseline = 'alphabetic';
       // Marque
       // Marque : le logo validé (pastille), sinon le nom en texte si l'image n'a pas pu être chargée.
-      if (logo) { g.save(); rr(M, 84, 112, 112, 30); g.clip(); g.drawImage(logo, M, 84, 112, 112); g.restore(); meta.texts.push('Fii'); }
+      if (logo) {
+        // Logo monochrome vert posé sur le fond ivoire (forme du masque, couleur de la marque).
+        var lh = 120, lw = Math.round(logo.naturalWidth * lh / logo.naturalHeight);
+        var lc = document.createElement('canvas'); lc.width = lw; lc.height = lh;
+        var lg = lc.getContext('2d'); lg.drawImage(logo, 0, 0, lw, lh); lg.globalCompositeOperation = 'source-in'; lg.fillStyle = C.green; lg.fillRect(0, 0, lw, lh);
+        g.drawImage(lc, M, 72); meta.texts.push('Fii');
+      }
       else { font(800, 72); text('Fii', M, 170, C.ink); }
       var y = 250;
       if (photo) {
@@ -5009,7 +5017,7 @@
       return page(brandBar('Invitation'),
         h('section', { class: 'ivc pinv', id: 'partner-invite' },
           h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
-          h('div', { class: 'ivc-top' }, h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 }), h('span', { class: 'ivc-kind' }, 'Ambassadeur Fii')),
+          h('div', { class: 'ivc-top' }, h('span', { class: 'logo ivc-brand', 'aria-hidden': 'true' }), h('span', { class: 'ivc-kind' }, 'Ambassadeur Fii')),
           h('h1', { class: 'ivc-title wrapword' }, r.brand),
           h('p', { class: 'ivc-sub' }, 'Fii vous invite à essayer gratuitement le pack complet pendant ' + r.months + ' mois. Sans engagement, sans paiement à la fin.')),
         r.pack ? h('section', { class: 'card stack tight' }, h('h2', null, 'Ce que comprend votre essai'), packDetails(r.pack, r.months),
@@ -5153,7 +5161,7 @@
     return h('section', { class: 'ivc' + (o.compact ? ' compact' : ''), id: o.id || null },
       h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
       h('div', { class: 'ivc-top' },
-        h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 }),
+        h('span', { class: 'logo ivc-brand', 'aria-hidden': 'true' }),
         h('span', { class: 'ivc-kind' }, o.kind || 'Invitation')),
       o.from ? h('div', { class: 'ivc-from' },
         h('span', { class: 'ivc-mono', 'aria-hidden': 'true' }, h('span', null, initial)),
@@ -6387,7 +6395,7 @@
       ? h('div', { class: 'cel-inner' }, h('div', { class: 'cel-head' }, h('p', { class: 'cel-kicker' }, o.kicker), h('h2', { id: 'cel-t' }, o.title), o.sub ? h('p', null, o.sub) : null), o.card, btn)
       : h('div', { class: 'cel-inner' }, h('div', { class: 'ivc cel-card' },
           h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
-          h('div', { class: 'ivc-top' }, h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 }), h('span', { class: 'ivc-kind' }, o.kicker || 'Bravo')),
+          h('div', { class: 'ivc-top' }, h('span', { class: 'logo ivc-brand', 'aria-hidden': 'true' }), h('span', { class: 'ivc-kind' }, o.kicker || 'Bravo')),
           h('div', { class: 'cel-badge', 'aria-hidden': 'true' }, h('span', null, icon(o.icon || 'star', 38))),
           h('h2', { class: 'ivc-title', id: 'cel-t' }, o.title),
           o.gain ? h('p', { class: 'cel-gain' }, o.gain) : null,
@@ -6411,7 +6419,7 @@
     var stat = function (n, label, fmt) { return h('div', null, countUp(h('b'), n, fmt), h('small', null, label)); };
     return h('section', { class: 'ivc agc', id: opts.id || null },
       h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
-      h('div', { class: 'ivc-top' }, h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 }), h('span', { class: 'ivc-kind' }, 'Carte agent')),
+      h('div', { class: 'ivc-top' }, h('span', { class: 'logo ivc-brand', 'aria-hidden': 'true' }), h('span', { class: 'ivc-kind' }, 'Carte agent')),
       h('div', { class: 'agc-id' }, ph,
         h('div', { class: 'agc-who' }, h('strong', { class: 'wrapword' }, a.name),
           h('span', { class: 'agc-grade', id: opts.cta ? 'amb-grade' : null }, icon('star', 12), GRADES[a.grade] || 'Agent'),
@@ -6468,7 +6476,7 @@
         h('section', { class: 'ivc amb-lesson-card', id: 'amb-lesson', 'aria-live': 'polite' },
           h('div', { class: 'ivc-glow', 'aria-hidden': 'true' }),
           h('div', { class: 'ivc-top' }, h('span', { class: 'ivc-kind', style: 'text-align:left' }, 'Formation · ' + (i + 1) + ' sur ' + AMB_LESSONS.length),
-            h('img', { class: 'ivc-brand', src: 'media/brand/fii-tile.png', alt: '', 'aria-hidden': 'true', width: 160, height: 160 })),
+            h('span', { class: 'logo ivc-brand', 'aria-hidden': 'true' })),
           h('div', { class: 'amb-prog', 'aria-hidden': 'true' }, AMB_LESSONS.map(function (x, k) { return h('i', { class: k < i ? 'on' : k === i ? 'now' : '' }); })),
           ambDemo(i, a.code),
           h('h2', { class: 'ivc-title' }, l.t),

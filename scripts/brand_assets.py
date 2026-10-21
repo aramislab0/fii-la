@@ -7,7 +7,7 @@ Sorties :
   web/media/brand/fii-logo.png      logo seul sur fond transparent (pour les surfaces vertes : cartes WhatsApp…)
   web/icons/icon-512.png, icon-192.png, apple-touch-icon.png (180), favicon-64.png   carré vert, logo centré
   web/icons/icon-maskable-512.png   logo réduit dans la zone sûre (Android)
-  web/media/brand/fii-tile.png      pastille de l'en-tête (160 px)
+  web/media/brand/fii-logo-mask.png forme monochrome sans fond (colorée par l'application : vert / ivoire)
 Usage : python3 scripts/brand_assets.py
 """
 import os
@@ -58,8 +58,12 @@ def main():
     for name, side, ratio in [('icon-512.png', 512, .58), ('icon-192.png', 192, .58), ('apple-touch-icon.png', 180, .58),
                               ('favicon-64.png', 64, .70), ('icon-maskable-512.png', 512, .46)]:
         square(logo, side, ratio).save(os.path.join(icons, name), optimize=True)
-    # Pastille de l'en-tête de l'application (logo plus grand dans le carré, lisible à 28–48 px).
-    square(logo, 160, .74).save(os.path.join(ROOT, 'web', 'media', 'brand', 'fii-tile.png'), optimize=True)
+    # Version monochrome (masque) : la forme exacte du logo, sans fond ; l'application la colore selon la surface
+    # (vert sur fond clair, ivoire sur fond sombre ou vert). La porte de l'épingle reste ajourée.
+    m = logo.resize((round(logo.width * h / logo.height), h), Image.LANCZOS)
+    mono = Image.new('RGBA', m.size, (255, 255, 255, 0))
+    mono.putalpha(m.getchannel('A'))
+    mono.save(os.path.join(ROOT, 'web', 'media', 'brand', 'fii-logo-mask.png'), optimize=True)
     print('logo', logo.size)
 
 

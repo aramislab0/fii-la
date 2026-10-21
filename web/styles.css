@@ -739,7 +739,7 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .install-cta{display:flex;align-items:center;gap:6px;background:var(--surface);border-radius:20px;box-shadow:var(--shadow-card);border:1.5px solid var(--lime);padding:6px 6px 6px 8px}
 .install-go{flex:1;display:flex;align-items:center;gap:12px;background:none;border:0;padding:6px;color:var(--ink);text-align:left;cursor:pointer;min-height:56px;font:inherit}
 .install-ic{width:44px;height:44px;border-radius:12px;background:var(--green);display:flex;align-items:center;justify-content:center;flex:none}
-.install-ic .logo.tiny{width:44px;height:44px;border-radius:12px}
+.install-ic .logo.tiny{height:26px}
 .install-t{display:flex;flex-direction:column;flex:1;min-width:0}
 .install-t b{font-size:16px}
 .install-t small{color:var(--muted);font-size:13px}
@@ -1026,7 +1026,7 @@ input[type=number]{font:inherit;font-size:16px;padding:12px 14px;border-radius:1
 .ivc-glow{position:absolute;z-index:-1;width:120%;aspect-ratio:1;left:-10%;top:-70%;border-radius:50%;
   background:radial-gradient(closest-side,rgba(126,204,154,.35),rgba(126,204,154,0));animation:ivc-drift 9s ease-in-out infinite alternate}
 .ivc-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.ivc-brand{display:block;width:30px;height:30px;border-radius:8px}
+.ivc-brand{height:28px}
 .ivc-kind{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ivc-muted);text-align:right}
 .ivc-from{display:flex;align-items:center;gap:12px;margin-top:6px}
 .ivc-mono{position:relative;flex:0 0 52px;width:52px;height:52px;border-radius:50%;padding:2px;
@@ -1688,7 +1688,12 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
   @keyframes fiila-arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 }
 /* Logo Fii (21/10/2026) : pastille verte tirée du logo validé ; aucune variante redessinée. */
-.logo{display:block;width:48px;height:48px;border-radius:13px;flex:none}
-.logo.small{width:34px;height:34px;border-radius:9px}
-.logo.tiny{width:26px;height:26px;border-radius:7px}
+.logo{display:block;flex:none;height:46px;aspect-ratio:492/533;color:var(--logo,#1E4A34);background:currentColor;
+  -webkit-mask:url(media/brand/fii-logo-mask.png) center/contain no-repeat;mask:url(media/brand/fii-logo-mask.png) center/contain no-repeat}
+.logo.small{height:32px}
+.logo.tiny{height:24px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--logo:#F5F2EA}}
+:root[data-theme="dark"]{--logo:#F5F2EA}
+.bo-side .logo,.install-ic .logo,.ivc .logo{color:#F5F2EA}
 a.brand-home{display:inline-flex}
+.brand .logo{margin-bottom:6px}
