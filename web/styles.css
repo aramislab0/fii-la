@@ -1688,12 +1688,14 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
   @keyframes fiila-arrive{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 }
 /* Logo Fii (21/10/2026) : pastille verte tirée du logo validé ; aucune variante redessinée. */
-.logo{display:block;flex:none;height:46px;aspect-ratio:492/533;color:var(--logo,#1E4A34);background:currentColor;
-  -webkit-mask:url(media/brand/fii-logo-mask.png) center/contain no-repeat;mask:url(media/brand/fii-logo-mask.png) center/contain no-repeat}
+.logo{position:relative;display:block;flex:none;height:46px;aspect-ratio:222/240}
+.logo::before,.logo::after{content:"";position:absolute;inset:0}
+.logo::before{background:var(--logo-ink,#1E4A34);-webkit-mask:url(media/brand/fii-letters.png) center/contain no-repeat;mask:url(media/brand/fii-letters.png) center/contain no-repeat}
+.logo::after{background:#C9E265;-webkit-mask:url(media/brand/fii-pin.png) center/contain no-repeat;mask:url(media/brand/fii-pin.png) center/contain no-repeat}
 .logo.small{height:32px}
 .logo.tiny{height:24px}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--logo:#F5F2EA}}
-:root[data-theme="dark"]{--logo:#F5F2EA}
-.bo-side .logo,.install-ic .logo,.ivc .logo{color:#F5F2EA}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--logo-ink:#F5F2EA}}
+:root[data-theme="dark"]{--logo-ink:#F5F2EA}
+.bo-side .logo,.install-ic .logo,.ivc .logo{--logo-ink:#F5F2EA}
 a.brand-home{display:inline-flex}
 .brand .logo{margin-bottom:6px}

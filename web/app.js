@@ -59,8 +59,8 @@
   }
   // Thème : toujours celui du téléphone (clair ou sombre), sans réglage dans l'application (fondateur, 20/10).
   // En-tête discret des pages reçues par lien : de quoi il s'agit, en un coup d'œil.
-  // Logo Fii (validé par le fondateur le 21/10/2026, docs/brand/) : version monochrome, sans fond, posée sur l'écran ;
-  // sa couleur suit la surface (vert sur fond clair, ivoire sur fond sombre ou vert). size : '' | 'small' | 'tiny'.
+  // Logo Fii (validé par le fondateur le 21/10/2026, docs/brand/) : sans fond, posé sur l'écran ; épingle lime, lettres
+  // vertes sur fond clair, ivoires sur fond sombre ou vert (deux masques colorés en CSS). size : '' | 'small' | 'tiny'.
   function brandLogo(size, label) {
     var named = label == null || label !== '';
     return h('span', { class: 'logo' + (size ? ' ' + size : ''), role: named ? 'img' : null, 'aria-label': named ? (label || 'Fii') : null, 'aria-hidden': named ? null : 'true' });
@@ -3584,9 +3584,8 @@
     var photoReady = opts.withPhoto && o.photo ? new Promise(function (res) {
       var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = o.photo;
     }) : Promise.resolve(null);
-    var logoReady = new Promise(function (res) {
-      var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = 'media/brand/fii-logo-mask.png';
-    });
+    function loadImg(src) { return new Promise(function (res) { var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = src; }); }
+    var logoReady = Promise.all([loadImg('media/brand/fii-letters.png'), loadImg('media/brand/fii-pin.png')]).then(function (r) { return r[0] && r[1] ? r : null; });
     return Promise.all([fontsReady, photoReady, loadQr(), logoReady]).then(function (r) {
       var photo = r[1], qrcode = r[2], logo = r[3];
       var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -3626,11 +3625,14 @@
       // Marque
       // Marque : le logo validé (pastille), sinon le nom en texte si l'image n'a pas pu être chargée.
       if (logo) {
-        // Logo monochrome vert posé sur le fond ivoire (forme du masque, couleur de la marque).
-        var lh = 120, lw = Math.round(logo.naturalWidth * lh / logo.naturalHeight);
-        var lc = document.createElement('canvas'); lc.width = lw; lc.height = lh;
-        var lg = lc.getContext('2d'); lg.drawImage(logo, 0, 0, lw, lh); lg.globalCompositeOperation = 'source-in'; lg.fillStyle = C.green; lg.fillRect(0, 0, lw, lh);
-        g.drawImage(lc, M, 72); meta.texts.push('Fii');
+        // Logo sans fond, version claire (fond ivoire) : lettres vertes, épingle lime.
+        var lh = 120, lw = Math.round(logo[0].naturalWidth * lh / logo[0].naturalHeight);
+        [[logo[0], C.green], [logo[1], C.lime]].forEach(function (x) {
+          var lc = document.createElement('canvas'); lc.width = lw; lc.height = lh;
+          var lg = lc.getContext('2d'); lg.drawImage(x[0], 0, 0, lw, lh); lg.globalCompositeOperation = 'source-in'; lg.fillStyle = x[1]; lg.fillRect(0, 0, lw, lh);
+          g.drawImage(lc, M, 72);
+        });
+        meta.texts.push('Fii');
       }
       else { font(800, 72); text('Fii', M, 170, C.ink); }
       var y = 250;
