@@ -89,7 +89,7 @@ await t('adresse commencée : « Reprendre mon adresse » en action principale',
 
 await t('sombre : suit le téléphone, sans débordement', async () => {
   const P = await newPhone(`localStorage.setItem('fiila.shop', JSON.stringify({ key: ${JSON.stringify(key)} }))`, 'dark');
-  await P.goto(URL0 + '#/'); await P.locator('#act-boutique').waitFor();
+  await P.goto(URL0 + '#/'); await P.locator('#home-hero[data-hero="boutique"]').waitFor(); await P.locator('#my-shop').waitFor(); // commerçant : « Ma boutique » en action principale (22/10)
   assert.equal(await P.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(13, 19, 16)');
   const over = await P.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.ok(over <= 1, 'débordement ' + over);

@@ -156,6 +156,7 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   assert.match(await D.locator('#bo-onboarding').textContent(), /Nouvel accueil actif/);
   await D.locator('#bo-setup').getByText('Démarrage guidé de la boutique').waitFor();
   await D.locator('#bo-discover-table').waitFor();
+  assert.match(await D.locator('#bo-marketing-use').textContent(), /Ma boutique et Marketing.*Raccourcis de l’accueil : Commandes \d+.*Écran Marketing ouvert : \d+/s);
   // Messages WhatsApp (WHATSAPP-001) : registre, aperçu, état Meta saisi à la main et journalisé.
   await D.locator('#bo-wa-table').waitFor();
   assert.equal(await D.locator('#bo-wa-table tbody tr').count(), 6);
@@ -191,6 +192,8 @@ await t('boutiques : recherche, filtre, fiche ; suspension (motif) qui ferme la 
   await D.locator('#bo-table tbody tr').filter({ hasText: 'Couture Awa (test)' }).locator('td').nth(2).click();
   await D.locator('#bo-shop-info').waitFor();
   assert.equal(await heading(D).textContent(), 'Couture Awa (test)');
+  // Marketing de la boutique (22/10) : visites, commandes vitrine, publications, réseaux sur 30 jours.
+  assert.match(await D.locator('#bo-shop-marketing').textContent(), /Marketing · 30 jours.*Visites de la vitrine\d+.*Commandes via la vitrine\d+.*Réseaux/s);
   await D.locator('#bo-main .bo-crumbs').getByRole('link', { name: 'Boutiques' }).waitFor(); // ordinateur : le fil d’Ariane remplace le bouton retour
   await D.click('#bo-suspend');
   await D.getByText('Indiquez un motif.').waitFor();
