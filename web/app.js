@@ -221,6 +221,7 @@
     invalid_kind: 'Type de fiche non valide.',
     invalid_payload: 'Données non valides.',
     invalid_theme: 'Modèle ou couleur non reconnu. Choisissez dans la liste.',
+    premium_required: 'Ce modèle est réservé aux abonnés Premium.',
     invalid_social: 'Identifiant non reconnu. Écrivez seulement le nom du compte, par exemple : maboutique.',
     invalid_category: 'Catégorie non reconnue. Choisissez dans la liste.',
     invalid_business_type: 'Type de commerce non reconnu. Choisissez dans la liste.',
@@ -1844,20 +1845,20 @@
     }
     function list() {
       setKids(root,
-        h('header', { class: 'vhead' },
-          h('span', { class: 'vavatar', 'aria-hidden': 'true' }, (shop.name || '?').trim().charAt(0).toUpperCase()),
+        // En-tête : logo (carré arrondi) et réseaux en ronds alignés à côté ; nom et présentation dessous.
+        shop.socials && socialCircles(shop.socials, 'x', shop.name) ? h('header', { class: 'vhead vprof' },
+          h('div', { class: 'vprof-top' }, shopLogo(shop), socialCircles(shop.socials, 'vitrine-socials', shop.name)),
+          h('div', { class: 'vprof-txt' }, h('h1', { class: 'wrapword' }, shop.name),
+            shop.reviews ? ratingEl(shop.rating, shop.reviews) : null,
+            shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null))
+        : h('header', { class: 'vhead' }, shopLogo(shop),
           h('div', null, h('h1', { class: 'wrapword' }, shop.name),
             shop.reviews ? ratingEl(shop.rating, shop.reviews) : null,
             shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null)),
         shop.demo ? h('div', { class: 'demo-banner', id: 'vitrine-demo' }, h('span', null, h('b', null, 'Boutique fictive de démonstration.'), ' Les commandes passées ici ne sont pas livrées.')) : null,
         q.a && !byId[q.a] ? h('p', { class: 'msg', id: 'vitrine-gone' }, 'Cet article n’est plus proposé. Voici les autres articles de la boutique.') : null,
         products.length ? [filters, grid] : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun article pour le moment.')),
-        h('p', { class: 'safe-line' }, icon('lock', 18), 'Commande sans compte. Vous donnez votre adresse à la dernière étape.'),
-        shop.socials ? h('nav', { class: 'vsocials', id: 'vitrine-socials', 'aria-label': 'Suivre ' + shop.name },
-          h('span', { class: 'small muted' }, 'Suivre la boutique'),
-          SOCIALS.filter(function (o) { return shop.socials[o[0]]; }).map(function (o) {
-            return h('a', { class: 'vsoc', href: socialUrl(o[0], shop.socials[o[0]]), target: '_blank', rel: 'noopener noreferrer', 'aria-label': o[1] + ' : @' + shop.socials[o[0]] }, icon(o[0], 20));
-          })) : null);
+        h('p', { class: 'safe-line' }, icon('lock', 18), 'Commande sans compte. Vous donnez votre adresse à la dernière étape.'));
       if (products.length) { drawFilters(); drawGrid(); }
       refreshBar();
       if (q.a && byId[q.a]) setTimeout(function () { var el = document.getElementById('p-' + q.a); if (el) el.scrollIntoView({ block: 'center' }); }, 60);
@@ -1893,11 +1894,16 @@
       window.scrollTo(0, 0);
     }
     list();
-    var theme = ['galerie', 'catalogue', 'magazine'].indexOf(shop.theme) >= 0 ? shop.theme : 'galerie';
+    // Aperçu d'un modèle premium (?modele=…) : la page seule change, rien n'est enregistré.
+    var preview = q.modele && isPremiumTheme(q.modele) && q.modele !== shop.theme ? q.modele : null;
+    var theme = preview || (['galerie', 'catalogue', 'magazine', 'atelier', 'comptoir', 'maison'].indexOf(shop.theme) >= 0 ? shop.theme : 'galerie');
     var cover = shop.has_cover ? h('div', { class: 'vcover loading-skel', id: 'vitrine-cover' }) : null;
     if (cover) lazyPhoto(cover, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: 'cover' }).then(function (x) { return x.photo; }); }, '');
     var pg = page(brandBar('Boutique'), cover, root, h('div', { style: 'height:80px' }), footer(true));
     pg.classList.add('vt', 'vt-' + theme);
+    if (isPremiumTheme(theme)) { pg.classList.add('vt-premium'); document.documentElement.setAttribute('data-vt', theme); }
+    if (preview) pg.insertBefore(h('div', { class: 'prev-banner', id: 'premium-preview-banner', role: 'status' }, icon('eye', 16),
+      h('span', null, 'Aperçu du modèle Premium « ' + VT_PREMIUM.filter(function (t) { return t[0] === preview; })[0][1] + ' ». Vos clientes voient votre modèle actuel.')), pg.firstChild.nextSibling);
     pg.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.foret)[1]);
     pg.appendChild(bar);
     return pg;
@@ -2382,19 +2388,13 @@
         footer(true));
     }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger les boutiques', errText(e), retryBtn()), footer()); });
   }
-  // Réglages : ouvrir, fermer et présenter sa vitrine.
+  // Réglages : ouvrir ou fermer la vitrine d'un seul geste, la partager, et un accès évident à « Personnaliser ma vitrine »
+  // (fondateur, 22/10 04:55 : « modifier l'apparence est presque invisible… je veux que ça soit évident et simple »).
   function vitrineSection(shop) {
-    var box = h('section', { class: 'card', id: 'vitrine-section' });
-    var state = { public: !!shop.public, slug: shop.slug, about: shop.about || '', theme: shop.theme || 'galerie', accent: shop.accent || 'foret', cover: null };
-    var saved = { cover: null }, lookOpen = false;
-    // La couverture n'arrive qu'ici : on ne redessine que si elle change (une saisie en cours n'est pas effacée).
-    sapi('fiila_shop_vitrine', { p: null }).then(function (r) {
-      var changed = (r.cover || null) !== state.cover || (r.theme && r.theme !== state.theme) || (r.accent && r.accent !== state.accent);
-      state.cover = r.cover || null; state.theme = r.theme || state.theme; state.accent = r.accent || state.accent;
-      saved.cover = state.cover;
-      if (changed) draw();
-    }, function () {});
+    var box = h('section', { class: 'card stack', id: 'vitrine-section' });
+    var state = { public: !!shop.public, slug: shop.slug, logo: null, plan: 'free' }, busy = false;
     var err = h('div', { role: 'alert' });
+    sapi('fiila_shop_vitrine', { p: null }).then(function (r) { state.logo = r.logo || null; state.plan = r.plan || 'free'; state.slug = r.slug || state.slug; draw(); }, function () {});
     // Fil Fii : place gratuite (25 premières boutiques) et choix d'y apparaître.
     var feedBox = h('div', { class: 'stack tight', id: 'feed-settings' }), feedState = null;
     function loadFeedState() { sapi('fiila_shop_feed', { p_on: null }).then(function (r) { feedState = r; drawFeed(); }, function () {}); }
@@ -2416,61 +2416,216 @@
         f.public && f.rank && f.feed ? iconRow('#/boutiques', 'eye', 'Voir le fil', { id: 'feed-view' }) : null);
     }
     loadFeedState();
-    function save(p, okText) {
-      setKids(err);
-      return sapi('fiila_shop_vitrine', { p: p }).then(function (r) {
-        state.public = !!r.public; state.slug = r.slug; state.theme = r.theme || 'galerie'; state.accent = r.accent || 'foret'; state.cover = r.cover || null;
-        if ('about' in p) state.about = r.about || ''; // un texte tapé mais pas encore enregistré est gardé
-        saved.cover = state.cover;
-        if ('public' in p) { FEED_CACHE = null; loadFeedState(); }
-        toast(okText); draw();
-      }, function (e) {
-        // Rien n'a changé sur le serveur : les choix reviennent à l'état enregistré.
-        if ('cover' in p) state.cover = saved.cover;
-        draw(); errBox(err, e);
-      });
+    function toggle() {
+      if (busy) return;
+      busy = true; setKids(err);
+      var want = !state.public;
+      state.public = want; draw(); // l'interrupteur bouge tout de suite ; il revient si le serveur refuse
+      sapi('fiila_shop_vitrine', { p: { public: want } }).then(function (r) {
+        busy = false; state.public = !!r.public; state.slug = r.slug; FEED_CACHE = null; loadFeedState();
+        toast(want ? 'Vitrine ouverte : vos clientes peuvent commander.' : 'Vitrine fermée.'); draw();
+      }, function (e) { busy = false; state.public = !want; draw(); errBox(err, e); });
     }
     function draw() {
       var url = state.slug ? vitrineUrl(state.slug) : null;
-      setKids(box, h('h2', null, 'Ma vitrine en ligne'),
-        h('p', { class: 'small muted' }, 'Vos articles visibles sur une page à partager. Vos clientes commandent sans compte et donnent leur adresse à la fin.'),
-        segField({ name: 'vitrine-open', id: 'vitrine-open', value: state.public ? 'on' : 'off', options: [['off', 'Fermée'], ['on', 'Ouverte']],
-          onChange: function (v) { save({ public: v === 'on' }, v === 'on' ? 'Vitrine ouverte.' : 'Vitrine fermée.'); } }),
+      setKids(box,
+        h('div', { class: 'vs-head' }, shopLogo({ name: shop.name, logo: state.logo }, 'vs-logo'),
+          h('div', null, h('h2', { class: 'wrapword' }, 'Ma vitrine en ligne'),
+            h('p', { class: 'small muted' }, state.plan === 'premium' ? 'Abonnement Premium' : 'Vos articles sur une page à partager'))),
+        h('button', { class: 'switch-row' + (state.public ? ' on' : ''), type: 'button', role: 'switch', id: 'vitrine-switch', 'aria-checked': state.public ? 'true' : 'false', onclick: toggle },
+          h('span', { class: 'sw-t' }, h('b', null, state.public ? 'Vitrine ouverte' : 'Vitrine fermée'),
+            h('small', null, state.public ? 'Visible par vos clientes. Touchez pour fermer.' : 'Personne ne la voit. Touchez pour l’ouvrir.')),
+          h('span', { class: 'sw', 'aria-hidden': 'true' }, h('i'))),
         state.public && url ? [
           h('p', { class: 'sharelink', id: 'vitrine-url' }, url),
           h('div', { class: 'duo' },
-            iconBtn('a', { class: 'btn mid', id: 'vitrine-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer' }, 'chat', 'Envoyer'),
-            iconBtn('button', { class: 'btn ghost mid', type: 'button', onclick: function () { copy(url, 'Lien'); } }, 'link', 'Copier')),
-          iconRow('#/b/' + state.slug, 'eye', 'Voir ma vitrine', { id: 'vitrine-view' })] : null,
-        // Apparence repliée par défaut (règle « simple ») ; reste ouverte pendant qu'on la règle.
-        h('details', { class: 'more-details', id: 'vitrine-look', open: lookOpen || null, ontoggle: function (e) { lookOpen = e.target.open; } },
-          h('summary', null, 'Personnaliser l’apparence'),
-          h('div', { class: 'stack', style: 'margin-top:12px' },
-        h('fieldset', { class: 'vt-pick', id: 'vitrine-theme' }, h('legend', null, 'Modèle'),
-          VT_THEMES.map(function (t) {
-            return h('label', { class: 'vt-opt' + (state.theme === t[0] ? ' on' : '') },
-              h('input', { type: 'radio', name: 'vt-theme', value: t[0], checked: state.theme === t[0] || null,
-                onchange: function () { save({ theme: t[0] }, 'Modèle « ' + t[1] + ' » appliqué.'); } }),
-              h('span', { class: 'vt-mini vt-mini-' + t[0], 'aria-hidden': 'true', style: '--accent:' + VT_ACCENTS[state.accent][1] }, h('i'), h('i'), h('i'), h('i')),
-              h('span', { class: 'vt-name' }, t[1]), h('span', { class: 'small muted' }, t[2]));
-          })),
-        h('fieldset', { class: 'vt-colors', id: 'vitrine-accent' }, h('legend', null, 'Couleur'),
-          Object.keys(VT_ACCENTS).map(function (k) {
-            return h('label', { class: 'swatch' + (state.accent === k ? ' on' : ''), title: VT_ACCENTS[k][0] },
-              h('input', { type: 'radio', name: 'vt-accent', value: k, 'aria-label': VT_ACCENTS[k][0], checked: state.accent === k || null,
-                onchange: function () { save({ accent: k }, 'Couleur « ' + VT_ACCENTS[k][0] + ' » appliquée.'); } }),
-              h('span', { style: 'background:' + VT_ACCENTS[k][1] }));
-          })),
-        photoField({ id: 'vitrine-cover', optional: true, label: 'Photo de couverture', maxSide: 1280,
-          get: function () { return state.cover; },
-          set: function (v) { state.cover = v; save({ cover: v ? v.replace(/^data:[^,]+,/, '') : '' }, v ? 'Couverture enregistrée.' : 'Couverture retirée.'); } }),
-        textField({ id: 'vitrine-about', label: 'Présentation', optional: true, max: 160, value: state.about, placeholder: 'Ex. : Robes wax et foulards, livrés à Dakar.',
-          onInput: function (v) { state.about = v; } }),
-        iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'vitrine-about-save', onclick: function () { save({ about: state.about }, 'Présentation enregistrée.'); } }, 'check', 'Enregistrer la présentation', 18))),
-        feedBox, err);
+            iconBtn('a', { class: 'btn ghost mid', id: 'vitrine-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
+              onclick: waCardClick('vitrine', 'Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url) }, 'chat', 'Envoyer'),
+            iconBtn('a', { class: 'btn ghost mid', id: 'vitrine-view', href: '#/b/' + state.slug }, 'eye', 'Voir'))] : null,
+        h('a', { class: 'look-row', id: 'vitrine-customize', href: '#/boutique/vitrine' },
+          h('span', { class: 'look-ic', 'aria-hidden': 'true' }, icon('edit', 22)),
+          h('span', { class: 'look-t' }, h('b', null, 'Personnaliser ma vitrine'), h('small', null, 'Logo, modèle, couleur, couverture, réseaux')),
+          h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 20))),
+        err, feedBox);
     }
     draw();
     return box;
+  }
+  // Logo de la boutique : carré aux bords arrondis ; l'initiale quand il n'y a pas de logo.
+  function shopLogo(shop, cls) {
+    return shop.logo ? h('span', { class: 'vavatar has-logo ' + (cls || '') }, h('img', { src: shop.logo, alt: 'Logo de ' + (shop.name || 'la boutique') }))
+      : h('span', { class: 'vavatar ' + (cls || ''), 'aria-hidden': 'true' }, (shop.name || '?').trim().charAt(0).toUpperCase());
+  }
+  // Réseaux de la boutique : ronds alignés (raccourcis).
+  function socialCircles(socials, id, name) {
+    var list = SOCIALS.filter(function (o) { return socials && socials[o[0]]; });
+    return list.length ? h('nav', { class: 'vsocials', id: id, 'aria-label': 'Réseaux de ' + (name || 'la boutique') }, list.map(function (o) {
+      return h('a', { class: 'vsoc', href: socialUrl(o[0], socials[o[0]]), target: '_blank', rel: 'noopener noreferrer', 'aria-label': o[1] + ' : @' + socials[o[0]] }, icon(o[0], 20));
+    })) : null;
+  }
+  // Logo : recadré au carré (centre), 320 px, JPEG léger (< 60 Ko).
+  function logoFromFile(file) {
+    if (!file || !/^image\//.test(file.type || '')) return Promise.reject(new Error('Ce fichier n’est pas une image.'));
+    return blobToImage(file).then(function (img) {
+      var w = img.width || img.naturalWidth, hh = img.height || img.naturalHeight, side = Math.min(w, hh);
+      if (!side) throw new Error('Impossible de lire cette image.');
+      var c = document.createElement('canvas'); c.width = c.height = 320;
+      var g = c.getContext('2d'); g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, 320, 320);
+      g.drawImage(img, (w - side) / 2, (hh - side) / 2, side, side, 0, 0, 320, 320);
+      if (img.close) img.close();
+      var q = 0.86, url = c.toDataURL('image/jpeg', q);
+      while (url.length > 78000 && q > 0.4) { q -= 0.1; url = c.toDataURL('image/jpeg', q); }
+      return stripJpegMetadata(url);
+    });
+  }
+
+  /* ----- Personnaliser ma vitrine (#/boutique/vitrine). Un seul bouton « Enregistrer », en bas et toujours visible ;
+     chaque choix se fait en un toucher (pas de double validation). Modèles premium : réservés aux abonnés Premium,
+     visibles et prévisualisables par tous. */
+  var VT_PREMIUM = [['atelier', 'Atelier', 'Mode, couture, prêt-à-porter'], ['comptoir', 'Comptoir', 'Restauration, traiteur, pâtisserie'],
+    ['maison', 'Maison', 'Beauté, cosmétiques, déco']];
+  function isPremiumTheme(t) { return t === 'atelier' || t === 'comptoir' || t === 'maison'; }
+  TRACKABLE.premium = [];
+  VT_PREMIUM.forEach(function (t) { ['locked', 'preview', 'interest', 'applied'].forEach(function (a) { TRACKABLE.premium.push(t[0] + ':' + a); }); });
+  function viewVitrineLook() {
+    return Promise.all([sapi('fiila_shop_get', {}), sapi('fiila_shop_vitrine', { p: null })]).then(function (rr) {
+      var shop = rr[0].shop, v = rr[1];
+      if (!shop) { redirect('#/boutique'); return loading(); }
+      SHOP_ROLE = shop.role || 'owner';
+      var back = backBtn('Réglages', '#/boutique/reglages');
+      if (SHOP_ROLE === 'editor') return page(back, stateCard('?', 'Réservé aux administrateurs', 'Seuls le propriétaire et les administrateurs de la boutique modifient la vitrine.'), footer());
+      var premium = v.plan === 'premium';
+      var saved = { theme: v.theme || 'galerie', accent: v.accent || 'foret', about: v.about || '', cover: v.cover || null, logo: v.logo || null, socials: Object.assign({}, v.socials || {}) };
+      var d = JSON.parse(JSON.stringify(saved));
+      var err = h('div', { role: 'alert' });
+      var prevBox = h('div', { class: 'look-prev', id: 'look-preview', 'aria-hidden': 'true' });
+      var themesBox = h('div', { class: 'stack tight' }), colorsBox = h('div'), logoBox = h('div', { class: 'logo-edit' });
+      var saveBtn = h('button', { class: 'btn big full', type: 'button', id: 'look-save', disabled: true, onclick: save }, 'Enregistrer');
+      var bar = h('div', { class: 'savebar', id: 'look-savebar' }, h('span', { class: 'small', id: 'look-dirty' }, ''), saveBtn);
+      function diff() {
+        var p = {};
+        ['theme', 'accent', 'about'].forEach(function (k) { if (d[k] !== saved[k]) p[k] = d[k]; });
+        if (d.cover !== saved.cover) p.cover = d.cover ? d.cover.replace(/^data:[^,]+,/, '') : '';
+        if (d.logo !== saved.logo) p.logo = d.logo ? d.logo.replace(/^data:[^,]+,/, '') : '';
+        if (JSON.stringify(d.socials) !== JSON.stringify(saved.socials)) { p.socials = {}; SOCIALS.forEach(function (o) { p.socials[o[0]] = (d.socials[o[0]] || '').trim(); }); }
+        return p;
+      }
+      function refresh() {
+        var n = Object.keys(diff()).length;
+        saveBtn.disabled = !n;
+        document.getElementById('look-dirty') && (document.getElementById('look-dirty').textContent = n ? 'Modifications à enregistrer' : 'Tout est enregistré');
+        drawPreview();
+      }
+      function save() {
+        var p = diff();
+        if (!Object.keys(p).length) return;
+        setKids(err); saveBtn.disabled = true; saveBtn.textContent = 'Enregistrement…';
+        sapi('fiila_shop_vitrine', { p: p }).then(function (r) {
+          if (p.theme && isPremiumTheme(p.theme)) track('premium', p.theme + ':applied');
+          saved = { theme: r.theme || 'galerie', accent: r.accent || 'foret', about: r.about || '', cover: r.cover || null, logo: r.logo || null, socials: Object.assign({}, r.socials || {}) };
+          d = JSON.parse(JSON.stringify(saved));
+          saveBtn.textContent = 'Enregistrer'; toast('Vitrine enregistrée.'); drawAll();
+        }, function (e) { saveBtn.textContent = 'Enregistrer'; saveBtn.disabled = false; errBox(err, e); err.scrollIntoView({ block: 'center' }); });
+      }
+      function drawPreview() {
+        var th = d.theme, acc = (VT_ACCENTS[d.accent] || VT_ACCENTS.foret)[1];
+        prevBox.className = 'look-prev vtp-' + th;
+        prevBox.style.setProperty('--accent', acc);
+        setKids(prevBox,
+          d.cover ? h('div', { class: 'lp-cover', style: 'background-image:url(' + JSON.stringify(d.cover) + ')' }) : null,
+          h('div', { class: 'lp-head' }, shopLogo({ name: shop.name, logo: d.logo }, 'lp-logo'),
+            socialCircles(d.socials, 'look-prev-socials', shop.name)),
+          h('b', { class: 'lp-name wrapword' }, shop.name),
+          d.about ? h('span', { class: 'lp-about wrapword' }, d.about) : null,
+          h('div', { class: 'lp-grid' }, h('i'), h('i')));
+      }
+      function themeCard(t, locked) {
+        var on = d.theme === t[0];
+        return h('button', { class: 'vt-card' + (on ? ' on' : '') + (locked ? ' locked' : ''), type: 'button', 'data-theme': t[0], 'aria-pressed': on ? 'true' : 'false',
+          onclick: function () {
+            if (locked) { track('premium', t[0] + ':locked'); premiumSheet(t, v.slug); return; }
+            d.theme = t[0]; drawThemes(); refresh();
+          } },
+          h('span', { class: 'vt-mini vt-mini-' + t[0], 'aria-hidden': 'true', style: '--accent:' + (VT_ACCENTS[d.accent] || VT_ACCENTS.foret)[1] }, h('i'), h('i'), h('i'), h('i')),
+          h('span', { class: 'vt-name' }, t[1], isPremiumTheme(t[0]) ? h('span', { class: 'prem-badge' }, locked ? icon('lock', 12) : null, 'Premium') : null),
+          h('span', { class: 'small muted' }, t[2]),
+          on ? h('span', { class: 'vt-check', 'aria-hidden': 'true' }, icon('check', 14)) : null);
+      }
+      function drawThemes() {
+        setKids(themesBox,
+          h('div', { class: 'vt-cards', id: 'vitrine-theme' }, VT_THEMES.map(function (t) { return themeCard(t, false); })),
+          h('div', { class: 'prem-h' }, h('h3', null, 'Modèles Premium'), premium ? h('span', { class: 'chip ok' }, icon('check', 12), 'Inclus dans votre abonnement')
+            : h('span', { class: 'small muted' }, 'Réservés aux abonnés Premium')),
+          h('div', { class: 'vt-cards', id: 'vitrine-theme-premium' }, VT_PREMIUM.map(function (t) { return themeCard(t, !premium); })));
+      }
+      function drawColors() {
+        setKids(colorsBox, h('div', { class: 'vt-colors', id: 'vitrine-accent', role: 'group', 'aria-label': 'Couleur' },
+          Object.keys(VT_ACCENTS).map(function (k) {
+            var on = d.accent === k;
+            return h('button', { class: 'swatch' + (on ? ' on' : ''), type: 'button', title: VT_ACCENTS[k][0], 'aria-label': VT_ACCENTS[k][0], 'aria-pressed': on ? 'true' : 'false',
+              onclick: function () { d.accent = k; drawColors(); drawThemes(); refresh(); } }, h('span', { style: 'background:' + VT_ACCENTS[k][1] }));
+          })));
+      }
+      var logoInput = h('input', { type: 'file', accept: 'image/*', id: 'look-logo', hidden: true, onchange: function () {
+        var f = logoInput.files && logoInput.files[0]; logoInput.value = '';
+        if (!f) return;
+        logoFromFile(f).then(function (u) { d.logo = u; drawLogo(); refresh(); }, function (e) { toast(e.message); });
+      } });
+      function drawLogo() {
+        setKids(logoBox, shopLogo({ name: shop.name, logo: d.logo }, 'logo-big'),
+          h('div', { class: 'stack tight' },
+            h('button', { class: 'btn ghost small', type: 'button', id: 'look-logo-pick', onclick: function () { logoInput.click(); } }, icon('cam', 18), h('span', null, d.logo ? 'Changer le logo' : 'Ajouter un logo')),
+            d.logo ? h('button', { class: 'btn link small', type: 'button', id: 'look-logo-remove', onclick: function () { d.logo = null; drawLogo(); refresh(); } }, 'Retirer le logo')
+              : h('p', { class: 'small muted' }, 'Sans logo, l’initiale de la boutique s’affiche.')),
+          logoInput);
+      }
+      function drawAll() { drawLogo(); drawThemes(); drawColors(); refresh(); setKids(socialFields, socialInputs()); setKids(aboutBox, aboutField()); setKids(coverBox, coverField()); }
+      function socialInputs() {
+        return SOCIALS.map(function (o) {
+          return textField({ id: 'look-' + o[0], label: o[1], optional: true, max: 120, value: d.socials[o[0]] ? '@' + d.socials[o[0]] : '', placeholder: '@maboutique',
+            onInput: function (val) { var x = val.trim().replace(/^@/, ''); if (x) d.socials[o[0]] = x; else delete d.socials[o[0]]; refresh(); } });
+        });
+      }
+      function aboutField() {
+        return textField({ id: 'vitrine-about', label: 'Présentation', optional: true, max: 160, value: d.about, placeholder: 'Ex. : Robes wax et foulards, livrés à Dakar.',
+          onInput: function (val) { d.about = val; refresh(); } });
+      }
+      function coverField() {
+        return photoField({ id: 'vitrine-cover', optional: true, label: 'Photo de couverture', maxSide: 1280, get: function () { return d.cover; }, set: function (val) { d.cover = val; refresh(); } });
+      }
+      var socialFields = h('div', { class: 'stack tight', id: 'look-socials' }), aboutBox = h('div'), coverBox = h('div');
+      drawAll();
+      var pg = page(back,
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow wrapword' }, shop.name), h('h1', null, 'Personnaliser ma vitrine')),
+        prevBox,
+        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Logo'), logoBox),
+        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Modèle'), themesBox),
+        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couleur'), colorsBox),
+        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couverture et présentation'), coverBox, aboutBox),
+        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Réseaux sociaux'),
+          h('p', { class: 'small muted' }, 'Affichés en ronds à côté de votre logo. Le nom du compte ou son lien.'), socialFields),
+        err, h('div', { style: 'height:96px' }), footer());
+      pg.appendChild(bar);
+      pg.classList.add('has-savebar');
+      return pg;
+    }, failPage('Impossible de charger la vitrine', 'boutique/vitrine'));
+  }
+  // Modèle premium verrouillé : aperçu sur sa propre vitrine, et demande d'accès (rien n'est payé ici).
+  function premiumSheet(t, slug) {
+    var back = h('div', { class: 'sheet-back', id: 'premium-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'premium-h', onclick: function (e) { if (e.target === back) close(); } },
+      h('div', { class: 'sheet' },
+        h('span', { class: 'prem-badge big' }, icon('lock', 14), 'Premium'),
+        h('h2', { id: 'premium-h' }, 'Modèle ' + t[1]),
+        h('p', { class: 'muted' }, t[2] + '. Typographie et mise en page dédiées, pour une vitrine haut de gamme.'),
+        h('div', { class: 'vt-mini big vt-mini-' + t[0], 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
+        slug ? iconBtn('a', { class: 'btn big full', id: 'premium-preview', href: '#/b/' + slug + '?modele=' + t[0], onclick: function () { track('premium', t[0] + ':preview'); close(); } }, 'eye', 'Voir sur ma vitrine')
+          : h('p', { class: 'small muted' }, 'Ouvrez votre vitrine pour voir l’aperçu.'),
+        h('button', { class: 'btn ghost full', type: 'button', id: 'premium-interest', onclick: function () {
+          track('premium', t[0] + ':interest'); close(); toast('C’est noté. L’abonnement Premium arrive bientôt.');
+        } }, 'Je veux ce modèle'),
+        h('p', { class: 'small muted' }, 'L’aperçu ne change rien à votre vitrine : vos clientes voient toujours votre modèle actuel.')));
+    var closeSheet; function close() { closeSheet(); }
+    closeSheet = openSheet(back);
   }
 
   /* ================================================================ ORIGINE ET PARRAINAGE
@@ -2766,6 +2921,7 @@
   }
   function render() {
     var seq = ++renderSeq;
+    document.documentElement.removeAttribute('data-vt'); // palette d'un modèle de vitrine premium : seulement sur la vitrine
     stopMedia();
     staleToast();
     var r = parseHash(), p = r.parts, view;
@@ -2803,6 +2959,7 @@
       else if (p[0] === 'vide-dressing' && p[1] === 'vendre') view = viewVdSell(r.q);
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'marketing') view = viewShopMarketing(r.q || {});
+      else if (p[0] === 'boutique' && p[1] === 'vitrine') view = viewVitrineLook();
       else if (p[0] === 'boutique' && p[1] === 'demarrer') view = viewShopSetup();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
@@ -3352,6 +3509,7 @@
     facebook: 'M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8Z',
     instagram: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm5 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm5.5-1.5h.01',
     tiktok: 'M14 3v11a3 3 0 1 1-3-3M14 3c0 3 2 5 5 5',
+    snapchat: 'M12 3.5c2.9 0 4.8 2.1 4.8 5v2.3l1.7.5c.6.2.6.9 0 1.1l-1.8.7c.6 1.6 1.8 2.7 3.3 3.2-.3.7-1.4 1-2.5 1.1-.2.7-.3 1.2-1 1.2-.8 0-1.6-.4-2.6 0-.8.3-1.2 1.1-1.9 1.1s-1.1-.8-1.9-1.1c-1-.4-1.8 0-2.6 0-.7 0-.8-.5-1-1.2-1.1-.1-2.2-.4-2.5-1.1 1.5-.5 2.7-1.6 3.3-3.2l-1.8-.7c-.6-.2-.6-.9 0-1.1l1.7-.5V8.5c0-2.9 1.9-5 4.8-5Z',
     check: 'M5 12.5l4.5 4.5L19 7.5',
     ban: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM5.6 5.6l12.8 12.8',
     clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7v5l3 2',
@@ -4908,6 +5066,30 @@
         ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, shop ? 'Enregistrer' : 'Créer ma boutique');
+    // Réglages d'une boutique existante (22/10) : la vitrine d'abord (ouvrir, partager, personnaliser), puis les
+    // informations avec leur bouton « Enregistrer » sous les champs (plus en haut de page), puis le reste replié.
+    if (shop) {
+      btn.textContent = 'Enregistrer les informations';
+      var ambBox = ambassadorShopBox();
+      return shopTabs(page(backBtn('Ma boutique', '#/boutique'),
+        h('h1', null, 'Réglages'),
+        vitrineSection(shop),
+        h('section', { class: 'card stack', id: 'shop-info' }, h('h2', null, 'Informations de la boutique'),
+          h('p', { class: 'small muted' }, 'Elles apparaissent sur vos factures.'),
+          textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
+          textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
+          h('div', { class: 'field' }, h('label', { for: 'shop-type' }, 'Type de commerce'),
+            h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
+              h('option', { value: '' }, 'Choisir…'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: f.type === t[0] || null }, t[1]); }))),
+          err, btn),
+        ambBox,
+        teamSection(shop),
+        courierSection(shop),
+        h('a', { class: 'invite-row', id: 'shop-referral', href: '#/parrainer?pour=boutique' }, icon('gift', 24), h('span', null, 'Parrainer une boutique'),
+          h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
+        SHOP_ROLE === 'admin' ? leaveShopBox() : shopDeleteBox(),
+        footer()), 'settings');
+    }
     var pg = page(backBtn(shop ? 'Ma boutique' : 'Accueil', shop ? '#/boutique' : '#/'),
       h('div', { class: 'stack tight' },
         h('h1', null, shop ? 'Réglages de la boutique' : 'Créer ma boutique'),
@@ -5873,7 +6055,8 @@
   /* ----- Ma boutique → Marketing (fondateur, 22/10/2026 : « gérer les créas et campagnes + pages sur les réseaux.
      Statistiques et tout compris »). Lot 1 : statistiques, partage de la vitrine, réseaux de la boutique.
      Une seule rangée de filtres (la période) ; une seule action principale (partager la vitrine). */
-  var SOCIALS = [['instagram', 'Instagram', 'https://www.instagram.com/'], ['tiktok', 'TikTok', 'https://www.tiktok.com/@'], ['facebook', 'Facebook', 'https://www.facebook.com/']];
+  var SOCIALS = [['instagram', 'Instagram', 'https://www.instagram.com/'], ['tiktok', 'TikTok', 'https://www.tiktok.com/@'], ['snapchat', 'Snapchat', 'https://www.snapchat.com/add/'],
+    ['facebook', 'Facebook', 'https://www.facebook.com/']];
   function socialUrl(k, v) { var x = SOCIALS.filter(function (o) { return o[0] === k; })[0]; return x && v ? x[2] + encodeURIComponent(v) : null; }
   TRACKABLE.marketing = ['open', 'period:7', 'period:30', 'period:90', 'share:wa', 'share:copy', 'share:qr', 'socials:open', 'socials:save', 'publish:click', 'vitrine:open'];
   function trendText(cur, prev) {
@@ -6981,12 +7164,14 @@
       if (r.ambassador) { setKids(box, h('h2', null, 'Agent'), h('p', { class: 'small muted' }, 'Accompagné par ' + r.ambassador + '.')); box.hidden = false; return; }
       if (!r.can_link) return;
       var code = '', err = h('div', { role: 'alert' });
-      setKids(box, h('h2', null, 'Un agent vous aide ?'),
-        textField({ id: 'amb-code-input', label: 'Code agent', max: 10, placeholder: 'Ex. : K7M2QD', onInput: function (v) { code = v; } }),
-        err, h('button', { class: 'btn ghost small', type: 'button', id: 'amb-link', onclick: function () {
-          setKids(err);
-          sapi('fiila_ambassador_link', { p_code: code }).then(function (x) { toast('Accompagné par ' + x.ambassador + '.'); render(); }, function (e) { errBox(err, e); });
-        } }, 'Valider le code'));
+      // Replié (règle 7) : rarement utilisé après la création.
+      setKids(box, h('details', { class: 'more-details', id: 'amb-details' }, h('summary', null, 'Un agent Fii vous aide ?'),
+        h('div', { class: 'stack tight', style: 'margin-top:12px' },
+          textField({ id: 'amb-code-input', label: 'Code agent', max: 10, placeholder: 'Ex. : K7M2QD', onInput: function (v) { code = v; } }),
+          err, h('button', { class: 'btn ghost small', type: 'button', id: 'amb-link', onclick: function () {
+            setKids(err);
+            sapi('fiila_ambassador_link', { p_code: code }).then(function (x) { toast('Accompagné par ' + x.ambassador + '.'); render(); }, function (e) { errBox(err, e); });
+          } }, 'Valider le code'))));
       box.hidden = false;
     }, function () {});
     return box;
@@ -7610,6 +7795,14 @@
           boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'set_type', p_value: v }); }, 'Type enregistré.', function () { s.type = v; },
             function () { sel.value = s.type || ''; });
         } }, h('option', { value: '' }, '—'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: s.type === t[0] || null }, t[1]); })) : (typeLabel(s.type) || '—');
+      // Abonnement (22/10) : Gratuit / Premium, réglé à la main (aucun paiement en ligne) ; journalisé.
+      var planSel = boCan('shops_write') ? h('select', { id: 'bo-shop-plan', 'aria-label': 'Abonnement', onchange: function (e) {
+          var sel = e.target, val = sel.value;
+          boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'set_plan', p_value: val }); }, val === 'premium' ? 'Abonnement Premium activé.' : 'Abonnement gratuit.',
+            function () { s.plan = val; }, function () { sel.value = s.plan || 'free'; });
+        } }, h('option', { value: 'free', selected: s.plan !== 'premium' || null }, 'Gratuit'), h('option', { value: 'premium', selected: s.plan === 'premium' || null }, 'Premium'))
+        : (s.plan === 'premium' ? 'Premium' : 'Gratuit');
+      var themeName = function (k) { var x = VT_THEMES.concat(VT_PREMIUM).filter(function (t) { return t[0] === k; })[0]; return x ? x[1] : k || 'Galerie'; };
       return boShell('boutiques', s.name, [
         boHero(s.name, [boShopState(s), s.rank ? boBadge('info', 'Fil · place ' + s.rank + (s.feed ? '' : ' (masquée)')) : null, s.type ? boBadge('muted', typeLabel(s.type)) : null],
           [s.slug ? '/b/' + s.slug : 'Vitrine sans lien', s.phone, 'créée le ' + boDate(s.created_at)].filter(Boolean).join(' · ')),
@@ -7625,6 +7818,8 @@
             row('Vitrine', s.slug ? h('a', { href: '#/b/' + s.slug }, '/b/' + s.slug) : '—'),
             row('Téléphone', s.phone || '—'),
             row('Type', typeSel),
+            row('Abonnement', planSel),
+            row('Vitrine', themeName(s.shown_theme) + (s.theme !== s.shown_theme ? ' (choix « ' + themeName(s.theme) + ' » gardé, réservé Premium)' : '') + (s.has_logo ? ' · logo' : ' · sans logo')),
             row('Accès', s.access === 'account' ? 'Compte' : 'Clé du téléphone (sans compte)'),
             s.owner ? row('Propriétaire', h('a', { href: '#/bo/comptes/' + s.owner.id }, s.owner.email)) : null,
             s.ambassador ? row('Agent', s.ambassador) : null,
@@ -8049,6 +8244,10 @@
             ' · Marketing ' + boNum(n('biz_marketing:click')) + ' · Clients ' + boNum(n('biz_customers:click')) + '. Écran Marketing ouvert : ' + m('open') +
             ' · partage WhatsApp touché : ' + m('share:wa') + ' · lien copié : ' + m('share:copy') + ' · QR code : ' + m('share:qr') +
             ' · réseaux enregistrés : ' + m('socials:save') + ' · « Publier » touché : ' + m('publish:click') + '.'),
+          h('p', { class: 'small', id: 'bo-premium-line' }, 'Modèles Premium (30 jours) : ' + VT_PREMIUM.map(function (t) {
+            var pm = d.premium || {}; function q(a) { return boNum(Number(pm[t[0] + ':' + a] || 0)); }
+            return t[1] + ' — touché verrouillé ' + q('locked') + ', aperçu ' + q('preview') + ', « Je veux ce modèle » ' + q('interest') + ', appliqué ' + q('applied');
+          }).join(' · ') + '. Boutiques Premium : ' + boNum(d.premium_shops || 0) + '.'),
           h('p', { class: 'small muted' }, 'Un partage touché ne prouve pas qu’un message est parti.'));
       })(),
       (function () {

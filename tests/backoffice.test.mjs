@@ -157,6 +157,7 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   await D.locator('#bo-setup').getByText('Démarrage guidé de la boutique').waitFor();
   await D.locator('#bo-discover-table').waitFor();
   assert.match(await D.locator('#bo-marketing-use').textContent(), /Ma boutique et Marketing.*Raccourcis de l’accueil : Commandes \d+.*Écran Marketing ouvert : \d+/s);
+  assert.match(await D.locator('#bo-premium-line').textContent(), /Modèles Premium \(30 jours\) : Atelier.*Boutiques Premium : \d+/);
   // Messages WhatsApp (WHATSAPP-001) : registre, aperçu, état Meta saisi à la main et journalisé.
   await D.locator('#bo-wa-table').waitFor();
   assert.equal(await D.locator('#bo-wa-table tbody tr').count(), 6);
@@ -192,6 +193,12 @@ await t('boutiques : recherche, filtre, fiche ; suspension (motif) qui ferme la 
   await D.locator('#bo-table tbody tr').filter({ hasText: 'Couture Awa (test)' }).locator('td').nth(2).click();
   await D.locator('#bo-shop-info').waitFor();
   assert.equal(await heading(D).textContent(), 'Couture Awa (test)');
+  // Abonnement (22/10) : Gratuit / Premium, journalisé.
+  assert.equal(await D.locator('#bo-shop-plan').inputValue(), 'free');
+  await D.selectOption('#bo-shop-plan', 'premium');
+  await D.getByText('Abonnement Premium activé.').waitFor();
+  await D.selectOption('#bo-shop-plan', 'free');
+  await D.getByText('Abonnement gratuit.').waitFor();
   // Marketing de la boutique (22/10) : visites, commandes vitrine, publications, réseaux sur 30 jours.
   assert.match(await D.locator('#bo-shop-marketing').textContent(), /Marketing · 30 jours.*Visites de la vitrine\d+.*Commandes via la vitrine\d+.*Réseaux/s);
   await D.locator('#bo-main .bo-crumbs').getByRole('link', { name: 'Boutiques' }).waitFor(); // ordinateur : le fil d’Ariane remplace le bouton retour

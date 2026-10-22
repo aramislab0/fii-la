@@ -58,8 +58,10 @@ await t('boutique : ouvre sa vitrine depuis les réglages, lien prêt à envoyer
   P2 = await ok('fiila_product_save', { p_key: KEY, p: { name: 'Foulard (test)', price: 3000 } });
   await S.goto(URL0 + '#/'); await S.goto(URL0 + '#/boutique');
   await S.locator('#vitrine-open-link').click();
-  await S.locator('#vitrine-section').getByText('Ouverte').click();
+  assert.equal(await S.locator('#vitrine-switch').getAttribute('aria-checked'), 'false');
+  await S.click('#vitrine-switch'); // un seul toucher
   await S.locator('#vitrine-url').waitFor();
+  assert.equal(await S.locator('#vitrine-switch').getAttribute('aria-checked'), 'true');
   URLV = await S.locator('#vitrine-url').textContent();
   assert.ok(URLV.endsWith('#/b/boutique-awa-test'), URLV);
   await shot(S, '01-reglages');
@@ -107,39 +109,69 @@ await t('publication d’un article : la légende renvoie vers la vitrine', asyn
   await S.locator('#post-caption').getByText(/Pour commander : .*#\/b\/boutique-awa-test\?a=/).waitFor();
 });
 
-await t('personnalisation : modèle Magazine, couleur Prune, couverture ; la vitrine change aussitôt', async () => {
+await t('personnalisation : accès évident, un seul « Enregistrer » ; Magazine, Prune, couverture, logo, réseaux ; la vitrine change', async () => {
   await S.goto(URL0 + '#/boutique/reglages');
-  assert.equal(await S.locator('#vitrine-look').evaluate((d) => d.open), false, 'apparence repliée par défaut');
-  await S.locator('#vitrine-look summary').click();
+  await S.click('#vitrine-customize');
+  await S.locator('#look-save').waitFor();
+  assert.equal(await S.locator('#look-save').isDisabled(), true, 'rien à enregistrer au départ');
   await S.locator('#vitrine-theme').getByText('Magazine').click();
-  await S.getByText('Modèle « Magazine » appliqué.').waitFor();
-  // L'écran se redessine après chaque réglage : on retente si le choix tombe pendant le redessin (vu sous WebKit).
-  for (let i = 0; i < 3; i++) {
-    // geste réel : toucher la pastille (le bouton radio est masqué derrière)
-    await S.locator('#vitrine-accent label[title="Prune"]').click().catch(() => {});
-    if (await S.getByText('Couleur « Prune » appliquée.').waitFor({ timeout: 4000 }).then(() => true, () => false)) break;
-  }
-  await S.getByText('Couleur « Prune » appliquée.').waitFor();
+  await S.locator('#vitrine-accent button[title="Prune"]').click();
   await S.setInputFiles('#vitrine-cover', 'tests/fixtures/door-with-exif.jpg');
-  await S.getByText('Couverture enregistrée.').waitFor();
-  await shot(S, '05-personnalisation');
+  await S.locator('#vitrine-cover').locator('xpath=..').locator('img.photo-prev').waitFor();
+  await S.setInputFiles('#look-logo', 'tests/fixtures/door-with-exif.jpg');
+  await S.locator('#look-logo-remove').waitFor();
+  await S.fill('#look-instagram', '@boutique.awa');
+  await S.fill('#look-snapchat', 'boutiqueawa');
+  assert.equal(await S.locator('#look-save').isDisabled(), false);
+  await S.click('#look-save');
+  await S.getByText('Vitrine enregistrée.').waitFor();
+  assert.equal(await S.locator('#look-save').isDisabled(), true);
+  // Modèle premium : verrouillé pour une boutique gratuite → feuille avec aperçu, rien d'enregistré.
+  await S.locator('#vitrine-theme-premium [data-theme="atelier"]').click();
+  await S.locator('#premium-sheet').waitFor();
+  await S.click('#premium-preview');
+  await S.locator('#premium-preview-banner').waitFor();
+  await S.locator('.vt.vt-atelier').waitFor();
+  await shot(S, '05-apercu-atelier');
   const C = await newPhone();
   await C.goto(URLV);
   await C.locator('.vt.vt-magazine').waitFor();
   await C.locator('#vitrine-cover img').waitFor();
+  await C.locator('.vprof .vavatar.has-logo img').waitFor();
+  assert.deepEqual(await C.locator('#vitrine-socials a').evaluateAll((a) => a.map((x) => x.href)),
+    ['https://www.instagram.com/boutique.awa', 'https://www.snapchat.com/add/boutiqueawa']);
   const bg = await C.locator(`[data-add="${P1.id}"]`).evaluate((b) => getComputedStyle(b).backgroundColor);
   assert.equal(bg, 'rgb(91, 42, 134)', 'couleur d’accent appliquée aux boutons');
   await shot(C, '06-magazine');
+  await S.goto(URL0 + '#/boutique/vitrine');
   await S.locator('#vitrine-theme').getByText('Catalogue').click();
-  await S.getByText('Modèle « Catalogue » appliqué.').waitFor();
+  await S.click('#look-save');
+  await S.getByText('Vitrine enregistrée.').waitFor();
   await C.goto(URL0 + '#/'); await C.goto(URLV);
   await C.locator('.vt.vt-catalogue').waitFor();
   await shot(C, '07-catalogue');
 });
 
+await t('Premium (réglé au back-office) : le modèle Maison s’applique et s’affiche chez la cliente', async () => {
+  await local.db.query(`update fiila.shops set plan = 'premium' where slug = 'boutique-awa-test'`);
+  await S.goto(URL0 + '#/'); await S.goto(URL0 + '#/boutique/vitrine');
+  await S.locator('#vitrine-theme-premium [data-theme="maison"]').click();
+  assert.equal(await S.locator('#premium-sheet').count(), 0, 'plus de verrou');
+  await S.click('#look-save');
+  await S.getByText('Vitrine enregistrée.').waitFor();
+  const C = await newPhone();
+  await C.goto(URLV);
+  await C.locator('.vt.vt-maison').waitFor();
+  assert.equal(await C.evaluate(() => document.documentElement.getAttribute('data-vt')), 'maison');
+  assert.match(await C.locator('.vhead h1').evaluate((e) => getComputedStyle(e).fontFamily), /Instrument Serif/);
+  await shot(C, '08-maison');
+  await C.goto(URL0 + '#/');
+  assert.equal(await C.evaluate(() => document.documentElement.getAttribute('data-vt')), null, 'la palette ne déborde pas sur le reste de l’app');
+});
+
 await t('vitrine fermée : message clair, plus de commande possible', async () => {
   await S.goto(URL0 + '#/boutique/reglages');
-  await S.locator('#vitrine-section').getByText('Fermée').click();
+  await S.click('#vitrine-switch');
   await S.getByText('Vitrine fermée.').waitFor();
   const C = await newPhone();
   await C.goto(URLV);

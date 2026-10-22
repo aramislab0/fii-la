@@ -57,7 +57,7 @@ await t('mise en place : boutique avec un article à 2 photos, puis photos « co
   const r = (await local.db.query(`select s.slug from fiila.products p join fiila.shops s on s.id = p.shop_id where p.id = $1`, [PID])).rows[0];
   SLUG = r.slug;
   await S.goto(URL0 + '#/boutique/reglages');
-  await S.locator('#vitrine-section').getByText('Ouverte').click();
+  await S.click('#vitrine-switch');
   await S.waitForTimeout(500);
   SLUG = (await local.db.query(`select s.slug from fiila.products p join fiila.shops s on s.id = p.shop_id where p.id = $1`, [PID])).rows[0].slug;
   await local.db.query(`update fiila.shops set public = true where slug = $1`, [SLUG]);

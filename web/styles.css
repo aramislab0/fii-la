@@ -1,6 +1,9 @@
 /* Fii — design system v1.1 (Light + Dark), appliqué le 17/10/2026.
    Référence : docs/design-system/. Aucune couleur en dur hors tokens, sauf exceptions documentées
    (repère de carte en SVG, point central de la carte, champ du toast : la carte et le toast restent lisibles quel que soit le thème). */
+@font-face{font-family:"Cormorant Garamond";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/cormorant-garamond-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Bricolage Grotesque";font-style:normal;font-weight:800;font-display:swap;src:url(fonts/bricolage-grotesque-latin-800-normal.woff2) format("woff2")}
+@font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/instrument-serif-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Montserrat";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/montserrat-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Montserrat";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/montserrat-latin-600-normal.woff2) format("woff2")}
 @font-face{font-family:"Montserrat";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/montserrat-latin-700-normal.woff2) format("woff2")}
@@ -1714,3 +1717,138 @@ button.irow{width:100%;background:none;border:0;border-radius:0;box-shadow:none;
 .mk-pub{color:var(--green);font-weight:700}
 .vsocials{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;padding:4px 0}
 .vsoc{width:44px;height:44px;border-radius:22px;background:var(--surface-2);color:var(--ink);display:flex;align-items:center;justify-content:center}
+
+/* ===== Vitrine premium et réglages simplifiés (22/10/2026) ===== */
+/* Logo de la boutique */
+.vavatar.has-logo{background:var(--surface);padding:0;overflow:hidden;box-shadow:0 0 0 1px var(--line)}
+.vavatar.has-logo img{width:100%;height:100%;object-fit:cover;display:block}
+.vprof{flex-direction:column;align-items:stretch;gap:12px}
+.vprof-top{display:flex;align-items:center;gap:14px}
+.vprof-top .vavatar{width:76px;height:76px;border-radius:22px;font-size:32px}
+.vprof-top .vsocials{flex:1;justify-content:flex-start;padding:0;gap:8px}
+.vprof-txt{display:flex;flex-direction:column;gap:4px;min-width:0}
+.vsoc{border:1px solid var(--line);background:var(--surface);color:var(--ink);transition:transform .15s}
+.vsoc:active{transform:scale(.94)}
+.prev-banner{display:flex;gap:8px;align-items:center;background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px;font-size:13px;font-weight:600}
+/* Réglages : interrupteur évident, accès « Personnaliser » visible */
+.vs-head{display:flex;align-items:center;gap:12px}
+.vs-head .vavatar{width:52px;height:52px;border-radius:16px;font-size:22px}
+.vs-head h2{margin:0}
+.switch-row{display:flex;align-items:center;gap:14px;width:100%;min-height:72px;padding:14px 16px;border-radius:18px;border:2px solid var(--line);background:var(--surface-2);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.switch-row.on{border-color:var(--green);background:var(--soft)}
+.sw-t{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.sw-t b{font-size:17px}
+.sw-t small{font-size:13px;color:var(--muted);font-weight:500}
+.sw{width:56px;height:32px;border-radius:16px;background:var(--surface-3);position:relative;flex:none;transition:background .2s}
+.sw i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}
+.switch-row.on .sw{background:var(--green)}
+.switch-row.on .sw i{left:27px}
+.look-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:18px;background:var(--green);color:var(--on-green);text-decoration:none;min-height:68px}
+.look-row:active{background:var(--green-press)}
+.look-ic{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.14);color:var(--lime);display:flex;align-items:center;justify-content:center;flex:none}
+.look-t{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.look-t b{font-size:16px}
+.look-t small{font-size:12.5px;opacity:.85}
+.look-row .chev{color:var(--on-green);display:flex}
+@media (prefers-reduced-motion:reduce){.sw,.sw i{transition:none}}
+/* Personnaliser ma vitrine */
+.look-sec{padding-top:6px;border-top:1px solid var(--line)}
+.look-sec h2{font-size:18px;margin:10px 0 2px}
+.logo-edit{display:flex;align-items:center;gap:16px}
+.logo-edit .vavatar.logo-big{width:88px;height:88px;border-radius:24px;font-size:36px}
+.vt-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.vt-card{display:flex;flex-direction:column;gap:5px;padding:8px;border:1.5px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer;position:relative;min-width:0}
+.vt-card.on{border:2px solid var(--green);box-shadow:0 0 0 3px var(--soft)}
+.vt-card .vt-name{font-weight:700;font-size:13.5px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.vt-card .small{font-size:11px;line-height:1.3}
+.vt-card.locked .vt-mini{filter:saturate(.6);opacity:.8}
+.vt-check{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--green);color:var(--on-green);display:flex;align-items:center;justify-content:center}
+.prem-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:8px}
+.prem-h h3{margin:0;font-size:15px}
+.prem-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:99px;background:#1B1A17;color:#E9D9A6}
+.prem-badge.big{font-size:12px;padding:5px 10px;align-self:flex-start}
+.vt-mini-atelier{grid-template-columns:1fr 1fr 1fr;grid-template-rows:2fr 1fr;background:#F6F2EA;border-radius:4px}
+.vt-mini-atelier i{border-radius:0;opacity:.9}.vt-mini-atelier i:first-child{grid-column:1/-1;background:#2B2620}
+.vt-mini-comptoir{grid-template-columns:1fr;grid-template-rows:1.4fr 1fr 1fr;background:#FFF8EE}
+.vt-mini-comptoir i:first-child{background:#22160E;opacity:1}.vt-mini-comptoir i:nth-child(4){display:none}
+.vt-mini-maison{grid-template-columns:1fr 1fr;grid-template-rows:1.3fr 1fr;background:#F7F5F2;border-radius:14px}
+.vt-mini-maison i{border-radius:10px;opacity:.55}.vt-mini-maison i:first-child{grid-column:1/-1;opacity:.35}
+.vt-mini.big{height:120px}
+.vt-colors{display:flex;flex-wrap:wrap;gap:10px}
+button.swatch{background:none}
+button.swatch.on{border-color:var(--ink)}
+/* Aperçu en direct */
+.look-prev{border-radius:22px;background:var(--surface);box-shadow:var(--shadow-card);padding:14px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.lp-cover{height:76px;margin:-14px -14px 4px;background-size:cover;background-position:center}
+.lp-head{display:flex;align-items:center;gap:10px}
+.lp-head .vavatar{width:56px;height:56px;border-radius:17px;font-size:24px;background:var(--accent)}
+.lp-head .vavatar.has-logo{background:var(--surface)}
+.lp-head .vsocials{padding:0;gap:6px;justify-content:flex-start}
+.lp-head .vsoc{width:34px;height:34px}
+.lp-head .vsoc .ico{width:16px;height:16px}
+.lp-name{font-size:18px;line-height:1.15}
+.lp-about{font-size:12.5px;color:var(--muted)}
+.lp-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lp-grid i{display:block;height:54px;border-radius:12px;background:var(--accent);opacity:.18}
+.vtp-catalogue .lp-grid,.vtp-magazine .lp-grid,.vtp-comptoir .lp-grid{grid-template-columns:1fr}
+.vtp-atelier{background:#F6F2EA;color:#1B1A17;border-radius:6px}
+.vtp-atelier .lp-name{font-family:"Cormorant Garamond",Georgia,serif;font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:20px}
+.vtp-atelier .lp-grid i{border-radius:0;opacity:.3}
+.vtp-comptoir{background:#FFF8EE;color:#22160E}
+.vtp-comptoir .lp-name{font-family:"Bricolage Grotesque",Montserrat,sans-serif;font-weight:800;font-size:22px}
+.vtp-comptoir .lp-head{background:#22160E;margin:-14px -14px 0;padding:14px}
+.vtp-maison{background:#F7F5F2;color:#20201E;border-radius:26px}
+.vtp-maison .lp-name{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:26px}
+.vtp-maison .lp-grid i{border-radius:18px}
+.vtp-atelier .lp-about,.vtp-comptoir .lp-about,.vtp-maison .lp-about{color:inherit;opacity:.7}
+/* Barre d'enregistrement fixe (une seule action) */
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:900;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.savebar>*{width:100%;max-width:528px}
+.savebar .small{text-align:center;color:var(--muted);font-weight:600}
+.btn[disabled]{opacity:.45;cursor:default}
+
+/* ===== Trois modèles premium de vitrine (Atelier, Comptoir, Maison) ===== */
+:root:root[data-vt="atelier"]{--bg:#F6F2EA;--surface:#FFFFFF;--surface-2:#EDE6D9;--surface-3:#E2D9C8;--ink:#1B1A17;--muted:#5E574C;--line:#DDD3C2;--green:#1B1A17;--green-press:#000;--on-green:#F6F2EA;--soft:#EDE6D9;color-scheme:light}
+:root:root[data-vt="comptoir"]{--bg:#FFF8EE;--surface:#FFFFFF;--surface-2:#F3E8D8;--surface-3:#EADFCF;--ink:#22160E;--muted:#6B5A4C;--line:#EADFCF;--green:#22160E;--green-press:#000;--on-green:#FFF8EE;--soft:#F3E8D8;color-scheme:light}
+:root:root[data-vt="maison"]{--bg:#F7F5F2;--surface:#FFFFFF;--surface-2:#ECE8E1;--surface-3:#E2DDD4;--ink:#20201E;--muted:#6B6A66;--line:#E6E1D8;--green:#20201E;--green-press:#000;--on-green:#F7F5F2;--soft:#ECE8E1;color-scheme:light}
+:root[data-vt] body{background:var(--bg);color:var(--ink)}
+/* Atelier : mode, couture. Serif capitales espacées, angles droits, noir et ivoire. */
+.vt-atelier .vhead h1{font-family:"Cormorant Garamond",Georgia,serif;font-weight:600;text-transform:uppercase;letter-spacing:.12em;font-size:28px;line-height:1.1}
+.vt-atelier .vavatar{border-radius:4px;background:var(--accent)}
+.vt-atelier .vcover{border-radius:0;height:260px;margin:0 -16px}
+.vt-atelier .vcard{border-radius:0;box-shadow:none;background:transparent}
+.vt-atelier .vimg{border-radius:0}
+.vt-atelier .vbody{padding:10px 0 4px}
+.vt-atelier .vbody h3{font-weight:500;font-size:14px}
+.vt-atelier .btn,.vt-atelier .opt,.vt-atelier .vsoc{border-radius:0}
+.vt-atelier .vsoc{border-color:var(--ink)}
+.vt-atelier .safe-line{border-radius:0;background:var(--surface-2)}
+/* Comptoir : restauration. En-tête sombre, titre gras, liste façon menu. */
+.vt-comptoir .vhead{background:#22160E;color:#FFF8EE;margin:0 -16px;padding:22px 16px;border-radius:0 0 26px 26px}
+.vt-comptoir .vhead .muted{color:rgba(255,248,238,.78)}
+.vt-comptoir .vhead h1{font-family:"Bricolage Grotesque",Montserrat,sans-serif;font-weight:800;font-size:34px;line-height:1;letter-spacing:-.02em}
+.vt-comptoir .vavatar{background:var(--accent);color:#22160E;border-radius:50%}
+.vt-comptoir .vavatar.has-logo{border-radius:50%}
+.vt-comptoir .vsoc{background:rgba(255,248,238,.12);border-color:transparent;color:#FFF8EE}
+.vt-comptoir .vgrid{grid-template-columns:1fr;gap:0}
+.vt-comptoir .vcard{flex-direction:row;align-items:center;border-radius:0;box-shadow:none;background:transparent;border-bottom:1px solid var(--line);padding:12px 0;gap:14px}
+.vt-comptoir .vimg{width:84px;height:84px;flex:none;aspect-ratio:1;border-radius:16px}
+.vt-comptoir .vbody{padding:0;flex:1;min-width:0}
+.vt-comptoir .vbody h3{font-size:16px;font-weight:700}
+.vt-comptoir .vcover{border-radius:22px;height:200px}
+.vt-comptoir .btn.big{border-radius:16px}
+/* Maison : beauté, déco. Serif douce, grands arrondis, tons poudrés. */
+.vt-maison .vhead h1{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:40px;line-height:1}
+.vt-maison .vavatar{border-radius:26px;background:var(--accent)}
+.vt-maison .vcover{border-radius:28px;height:240px}
+.vt-maison .vcard{border-radius:22px;box-shadow:none;padding:8px;background:var(--surface)}
+.vt-maison .vimg{border-radius:16px}
+.vt-maison .vbody h3{font-weight:600;font-size:14px}
+.vt-maison .btn,.vt-maison .opt{border-radius:999px}
+.vt-maison .safe-line{border-radius:22px}
+.vt-premium .vprice{font-weight:700}
+.vhead.vprof{display:flex;flex-direction:column;align-items:stretch;text-align:left}
+.vhead>.vprof-top{flex-direction:row;align-items:center;gap:14px}
+.vhead>.vprof-txt{align-items:flex-start}
+.vt-comptoir .vhead>.vprof-top .vsocials{justify-content:flex-start}
+.vt-card .vt-mini{width:100%;box-sizing:border-box;flex:none}

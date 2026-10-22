@@ -86,7 +86,7 @@ await t('retirer une photo puis en remettre : 5 au plus', async () => {
 
 await t('vitrine : carrousel (5 points, compteur 1/5), glisser, défilement automatique', async () => {
   await S.goto(URL0 + '#/boutique/reglages');
-  await S.locator('#vitrine-section').getByText('Ouverte').click();
+  await S.click('#vitrine-switch');
   await S.getByText(/Vitrine (ouverte|en ligne)/).first().waitFor().catch(() => {});
   SLUG = (await local.db.query(`select slug from fiila.shops where name = 'Boutique Photos (test)'`)).rows[0].slug;
   await local.db.query(`update fiila.shops set public = true where slug = $1`, [SLUG]);
