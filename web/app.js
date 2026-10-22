@@ -306,7 +306,7 @@
     phone_required: 'Indiquez votre numéro WhatsApp.',
     voice_invalid: 'Enregistrement non reconnu. Réessayez.',
     voice_too_large: 'Enregistrement trop long (30 secondes au plus).',
-    slug_unavailable: 'Nom de vitrine indisponible. Réessayez.',
+    slug_unavailable: 'Adresse du site indisponible. Réessayez.',
     customer_not_found: 'Client introuvable.',
     order_not_found: 'Commande introuvable.',
     items_required: 'Ajoutez au moins un article.',
@@ -686,8 +686,8 @@
      Action principale : « Reprendre… » si une adresse est en cours, sinon l'activité la plus utilisée sur 14 jours, sinon
      « Créer mon adresse ». Retirer un raccourci ne retire aucun accès. Réglage du back-office onboarding_v2 (0 = ancien accueil). */
   var SERVICES = [
-    { id: 'boutique', icon: 'shop', label: 'Boutique', hero: 'Ma boutique', sub: 'Commandes, articles, vitrine', href: '#/boutique',
-      text: 'Vendez en ligne : vitrine, commandes, factures et adresse exacte de vos clientes.' },
+    { id: 'boutique', icon: 'shop', label: 'Boutique', hero: 'Ma boutique', sub: 'Commandes, articles, site', href: '#/boutique',
+      text: 'Vendez en ligne : site, commandes, factures et adresse exacte de vos clientes.' },
     { id: 'demander', icon: 'ask', label: 'Demander', hero: 'Demander une adresse', sub: 'Un lien, l’adresse exacte en retour', href: '#/demande/nouvelle',
       text: 'Recevez l’adresse exacte d’un client en lui envoyant un lien.' },
     { id: 'evenement', icon: 'cal', label: 'Événement', hero: 'Créer un événement', sub: 'Un lien pour tous vos invités', href: '#/rdv/nouveau',
@@ -762,7 +762,7 @@
   // Marketing, Clients. Les compteurs arrivent après coup ; hors ligne, les liens restent.
   var SHOP_HOME = null;
   function shopHero() {
-    var sub = h('small', { id: 'home-shop-sub' }, SHOP_HOME ? shopHomeLine(SHOP_HOME) : 'Commandes, articles, vitrine');
+    var sub = h('small', { id: 'home-shop-sub' }, SHOP_HOME ? shopHomeLine(SHOP_HOME) : 'Commandes, articles, site');
     var hero = h('a', { class: 'hero', href: '#/boutique', id: 'home-hero', 'data-hero': 'boutique', 'aria-label': 'Ma boutique',
       onclick: function () { track('onboarding', 'hero_boutique:click'); } },
       h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon('shop', 32)),
@@ -878,8 +878,8 @@
   // Tableau de bord de la boutique : la prochaine fonction utile selon l'avancement, une seule à la fois.
   function shopNudge(shop, st) {
     var p = st.products || 0, o = st.orders || 0;
-    if (p >= 1 && p < 3) return nudge('shop_more_products', { icon: 'cam', title: 'Encore 2 ou 3 articles', text: 'Une vitrine bien remplie inspire confiance à vos clientes.', cta: 'Ajouter un article', href: '#/boutique/article/nouveau' });
-    if (p >= 3 && shop.public && shop.slug && o === 0) return nudge('shop_share_vitrine', { icon: 'share', title: 'Faites connaître votre vitrine', text: 'Un lien dans votre statut WhatsApp suffit pour recevoir vos premières commandes.', cta: 'Partager sur WhatsApp',
+    if (p >= 1 && p < 3) return nudge('shop_more_products', { icon: 'cam', title: 'Encore 2 ou 3 articles', text: 'Un site bien rempli inspire confiance à vos clientes.', cta: 'Ajouter un article', href: '#/boutique/article/nouveau' });
+    if (p >= 3 && shop.public && shop.slug && o === 0) return nudge('shop_share_vitrine', { icon: 'share', title: 'Faites connaître votre site', text: 'Un lien dans votre statut WhatsApp suffit pour recevoir vos premières commandes.', cta: 'Partager sur WhatsApp',
       href: waLink('Découvrez ma boutique ' + shop.name + ' : ' + baseUrl() + '#/b/' + shop.slug), external: true });
     if (o >= 2 && !shop.courier && !shop.courier_invite && SHOP_ROLE !== 'editor') return nudge('shop_courier', { icon: 'moto', title: 'Un livreur de confiance ?', text: 'Invitez-le : il reçoit l’adresse exacte et le chemin à chaque course.', cta: 'Inviter mon livreur', href: '#/boutique/reglages' });
     if (p >= 3 && o >= 1) return nudge('shop_photos', { icon: 'cam', title: 'Plusieurs photos par article', text: 'Jusqu’à 5 photos qui défilent : vos articles se vendent mieux.', cta: 'Voir mes articles', href: '#/boutique/articles' });
@@ -1406,7 +1406,7 @@
         function finish(v) { if (done) return; done = true; closeSheet(); resolve(v); }
         var back = h('div', { class: 'sheet-back', id: 'crop-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'crop-h', onclick: function (e) { if (e.target === back) finish(null); } },
           h('div', { class: 'sheet crop-sheet' }, h('h2', { id: 'crop-h' }, 'Recadrer la photo'),
-            h('p', { class: 'small muted' }, 'Format des cartes de la vitrine (4:5). Glissez pour cadrer, zoomez avec le curseur.'),
+            h('p', { class: 'small muted' }, 'Format des cartes du site (4:5). Glissez pour cadrer, zoomez avec le curseur.'),
             frame, h('label', { class: 'crop-zoom' }, icon('plus', 18), zoom),
             iconBtn('button', { class: 'btn', type: 'button', id: 'crop-ok', onclick: function () {
               var s = base * z;
@@ -1680,12 +1680,12 @@
     bordeaux: ['Bordeaux', '#7A1F3D'], terre: ['Terre', '#8A4B1F'] };
   function vitrineUrl(slug, productId) { return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : ''); }
   function viewVitrine(slug, q) {
-    if (!/^[a-z0-9-]{3,40}$/.test(slug)) return page(brandBar('Boutique'), stateCard('?', 'Vitrine introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
+    if (!/^[a-z0-9-]{3,40}$/.test(slug)) return page(brandBar('Boutique'), stateCard('?', 'Site introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
     return api('fiila_vitrine', { p_slug: slug }).then(function (r) {
-      if (r.state === 'closed') return page(brandBar('Boutique'), stateCard('⦸', r.shop.name, 'La vitrine est fermée pour le moment.'), footer(true));
-      if (r.state !== 'ok') return page(brandBar('Boutique'), stateCard('?', 'Vitrine introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
+      if (r.state === 'closed') return page(brandBar('Boutique'), stateCard('⦸', r.shop.name, 'Ce site est hors ligne pour le moment.'), footer(true));
+      if (r.state !== 'ok') return page(brandBar('Boutique'), stateCard('?', 'Site introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
       return vitrinePage(slug, r.shop, r.products, q || {});
-    }, function (e) { return page(brandBar('Boutique'), stateCard('!', 'Impossible d’afficher la vitrine', errText(e), retryBtn()), footer(true)); });
+    }, function (e) { return page(brandBar('Boutique'), stateCard('!', 'Impossible d’afficher le site', errText(e), retryBtn()), footer(true)); });
   }
   function vitrinePage(slug, shop, products, q) {
     var cart = {}; // ligne (article, taille, couleur) → { id, size, color, qty }
@@ -2335,8 +2335,8 @@
         d && d.free_left > 0 ? h('section', { class: 'card', id: 'feed-join' },
           h('h2', null, mine ? 'Votre boutique ici' : 'Vous vendez ?'),
           h('p', { class: 'small muted' }, (d.free_left === 1 ? 'Encore 1 place gratuite' : 'Encore ' + d.free_left + ' places gratuites') +
-            ' pour les 25 premières boutiques. Ouvrez votre vitrine avec au moins un article.'),
-          iconBtn('a', { class: 'btn', href: mine ? '#/boutique/reglages' : '#/boutique', id: 'feed-join-btn' }, 'shop', mine ? 'Ouvrir ma vitrine' : 'Créer ma boutique')) : null);
+            ' pour les 25 premières boutiques. Mettez votre site en ligne avec au moins un article.'),
+          iconBtn('a', { class: 'btn', href: mine ? '#/boutique/reglages' : '#/boutique', id: 'feed-join-btn' }, 'shop', mine ? 'Mettre mon site en ligne' : 'Créer ma boutique')) : null);
     }, function () {});
     return page(backBtn(), demoBanner(),
       h('header', { class: 'feed-top' }, h('h1', null, 'Fil Fii'),
@@ -2383,8 +2383,8 @@
         d && d.free_left > 0 ? h('section', { class: 'card', id: 'feed-join' },
           h('h2', null, mine ? 'Votre boutique ici' : 'Vous vendez ?'),
           h('p', { class: 'small muted' }, (d.free_left === 1 ? 'Encore 1 place gratuite' : 'Encore ' + d.free_left + ' places gratuites') +
-            ' pour les 25 premières boutiques. Ouvrez votre vitrine avec au moins un article.'),
-          iconBtn('a', { class: 'btn', href: mine ? '#/boutique/reglages' : '#/boutique', id: 'feed-join-btn' }, 'shop', mine ? 'Ouvrir ma vitrine' : 'Créer ma boutique')) : null,
+            ' pour les 25 premières boutiques. Mettez votre site en ligne avec au moins un article.'),
+          iconBtn('a', { class: 'btn', href: mine ? '#/boutique/reglages' : '#/boutique', id: 'feed-join-btn' }, 'shop', mine ? 'Mettre mon site en ligne' : 'Créer ma boutique')) : null,
         footer(true));
     }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger les boutiques', errText(e), retryBtn()), footer()); });
   }
@@ -2401,8 +2401,8 @@
     function drawFeed() {
       var f = feedState;
       if (!f) { setKids(feedBox); return; }
-      var line = !f.public ? (f.rank ? 'Votre place gratuite n° ' + f.rank + ' est gardée. Rouvrez la vitrine pour réapparaître dans le fil.'
-          : f.free_left > 0 ? 'Ouvrez votre vitrine : les 25 premières boutiques sont mises en avant gratuitement dans le fil Fii (encore ' + f.free_left + ').'
+      var line = !f.public ? (f.rank ? 'Votre place gratuite n° ' + f.rank + ' est gardée. Remettez le site en ligne pour réapparaître dans le fil.'
+          : f.free_left > 0 ? 'Mettez votre site en ligne : les 25 premières boutiques sont mises en avant gratuitement dans le fil Fii (encore ' + f.free_left + ').'
           : 'Les 25 places gratuites du fil Fii sont prises.')
         : f.rank ? (f.feed ? 'Place gratuite n° ' + f.rank + ' sur 25 : votre boutique apparaît dans le fil Fii.' : 'Place gratuite n° ' + f.rank + ' gardée, mais vous n’apparaissez pas dans le fil.')
         : 'Les 25 places gratuites du fil Fii sont prises.';
@@ -2423,18 +2423,18 @@
       state.public = want; draw(); // l'interrupteur bouge tout de suite ; il revient si le serveur refuse
       sapi('fiila_shop_vitrine', { p: { public: want } }).then(function (r) {
         busy = false; state.public = !!r.public; state.slug = r.slug; FEED_CACHE = null; loadFeedState();
-        toast(want ? 'Vitrine ouverte : vos clientes peuvent commander.' : 'Vitrine fermée.'); draw();
+        toast(want ? 'Site en ligne : vos clientes peuvent commander.' : 'Site hors ligne.'); draw();
       }, function (e) { busy = false; state.public = !want; draw(); errBox(err, e); });
     }
     function draw() {
       var url = state.slug ? vitrineUrl(state.slug) : null;
       setKids(box,
         h('div', { class: 'vs-head' }, shopLogo({ name: shop.name, logo: state.logo }, 'vs-logo'),
-          h('div', null, h('h2', { class: 'wrapword' }, 'Ma vitrine en ligne'),
+          h('div', null, h('h2', { class: 'wrapword' }, 'Mon site'),
             h('p', { class: 'small muted' }, state.plan === 'premium' ? 'Abonnement Premium' : 'Vos articles sur une page à partager'))),
         h('button', { class: 'switch-row' + (state.public ? ' on' : ''), type: 'button', role: 'switch', id: 'vitrine-switch', 'aria-checked': state.public ? 'true' : 'false', onclick: toggle },
-          h('span', { class: 'sw-t' }, h('b', null, state.public ? 'Vitrine ouverte' : 'Vitrine fermée'),
-            h('small', null, state.public ? 'Visible par vos clientes. Touchez pour fermer.' : 'Personne ne la voit. Touchez pour l’ouvrir.')),
+          h('span', { class: 'sw-t' }, h('b', null, state.public ? 'Site en ligne' : 'Site hors ligne'),
+            h('small', null, state.public ? 'Visible par vos clientes. Touchez pour le mettre hors ligne.' : 'Personne ne le voit. Touchez pour le mettre en ligne.')),
           h('span', { class: 'sw', 'aria-hidden': 'true' }, h('i'))),
         state.public && url ? [
           h('p', { class: 'sharelink', id: 'vitrine-url' }, url),
@@ -2444,7 +2444,7 @@
             iconBtn('a', { class: 'btn ghost mid', id: 'vitrine-view', href: '#/b/' + state.slug }, 'eye', 'Voir'))] : null,
         h('a', { class: 'look-row', id: 'vitrine-customize', href: '#/boutique/vitrine' },
           h('span', { class: 'look-ic', 'aria-hidden': 'true' }, icon('edit', 22)),
-          h('span', { class: 'look-t' }, h('b', null, 'Personnaliser ma vitrine'), h('small', null, 'Logo, modèle, couleur, couverture, réseaux')),
+          h('span', { class: 'look-t' }, h('b', null, 'Personnaliser mon site'), h('small', null, 'Logo, modèle, couleur, couverture, réseaux')),
           h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 20))),
         err, feedBox);
     }
@@ -2493,7 +2493,7 @@
       if (!shop) { redirect('#/boutique'); return loading(); }
       SHOP_ROLE = shop.role || 'owner';
       var back = backBtn('Réglages', '#/boutique/reglages');
-      if (SHOP_ROLE === 'editor') return page(back, stateCard('?', 'Réservé aux administrateurs', 'Seuls le propriétaire et les administrateurs de la boutique modifient la vitrine.'), footer());
+      if (SHOP_ROLE === 'editor') return page(back, stateCard('?', 'Réservé aux administrateurs', 'Seuls le propriétaire et les administrateurs de la boutique modifient le site.'), footer());
       var premium = v.plan === 'premium';
       var saved = { theme: v.theme || 'galerie', accent: v.accent || 'foret', about: v.about || '', cover: v.cover || null, logo: v.logo || null, socials: Object.assign({}, v.socials || {}) };
       var d = JSON.parse(JSON.stringify(saved));
@@ -2524,7 +2524,7 @@
           if (p.theme && isPremiumTheme(p.theme)) track('premium', p.theme + ':applied');
           saved = { theme: r.theme || 'galerie', accent: r.accent || 'foret', about: r.about || '', cover: r.cover || null, logo: r.logo || null, socials: Object.assign({}, r.socials || {}) };
           d = JSON.parse(JSON.stringify(saved));
-          saveBtn.textContent = 'Enregistrer'; toast('Vitrine enregistrée.'); drawAll();
+          saveBtn.textContent = 'Enregistrer'; toast('Site enregistré.'); drawAll();
         }, function (e) { saveBtn.textContent = 'Enregistrer'; saveBtn.disabled = false; errBox(err, e); err.scrollIntoView({ block: 'center' }); });
       }
       function drawPreview() {
@@ -2596,7 +2596,7 @@
       var socialFields = h('div', { class: 'stack tight', id: 'look-socials' }), aboutBox = h('div'), coverBox = h('div');
       drawAll();
       var pg = page(back,
-        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow wrapword' }, shop.name), h('h1', null, 'Personnaliser ma vitrine')),
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow wrapword' }, shop.name), h('h1', null, 'Personnaliser mon site')),
         prevBox,
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Logo'), logoBox),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Modèle'), themesBox),
@@ -2608,7 +2608,7 @@
       pg.appendChild(bar);
       pg.classList.add('has-savebar');
       return pg;
-    }, failPage('Impossible de charger la vitrine', 'boutique/vitrine'));
+    }, failPage('Impossible de charger le site', 'boutique/vitrine'));
   }
   // Modèle premium verrouillé : aperçu sur sa propre vitrine, et demande d'accès (rien n'est payé ici).
   function premiumSheet(t, slug) {
@@ -2616,14 +2616,14 @@
       h('div', { class: 'sheet' },
         h('span', { class: 'prem-badge big' }, icon('lock', 14), 'Premium'),
         h('h2', { id: 'premium-h' }, 'Modèle ' + t[1]),
-        h('p', { class: 'muted' }, t[2] + '. Typographie et mise en page dédiées, pour une vitrine haut de gamme.'),
+        h('p', { class: 'muted' }, t[2] + '. Typographie et mise en page dédiées, pour un site haut de gamme.'),
         h('div', { class: 'vt-mini big vt-mini-' + t[0], 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
-        slug ? iconBtn('a', { class: 'btn big full', id: 'premium-preview', href: '#/b/' + slug + '?modele=' + t[0], onclick: function () { track('premium', t[0] + ':preview'); close(); } }, 'eye', 'Voir sur ma vitrine')
-          : h('p', { class: 'small muted' }, 'Ouvrez votre vitrine pour voir l’aperçu.'),
+        slug ? iconBtn('a', { class: 'btn big full', id: 'premium-preview', href: '#/b/' + slug + '?modele=' + t[0], onclick: function () { track('premium', t[0] + ':preview'); close(); } }, 'eye', 'Voir sur mon site')
+          : h('p', { class: 'small muted' }, 'Mettez votre site en ligne pour voir l’aperçu.'),
         h('button', { class: 'btn ghost full', type: 'button', id: 'premium-interest', onclick: function () {
           track('premium', t[0] + ':interest'); close(); toast('C’est noté. L’abonnement Premium arrive bientôt.');
         } }, 'Je veux ce modèle'),
-        h('p', { class: 'small muted' }, 'L’aperçu ne change rien à votre vitrine : vos clientes voient toujours votre modèle actuel.')));
+        h('p', { class: 'small muted' }, 'L’aperçu ne change rien à votre site : vos clientes voient toujours votre modèle actuel.')));
     var closeSheet; function close() { closeSheet(); }
     closeSheet = openSheet(back);
   }
@@ -2862,7 +2862,7 @@
   /* ----- statistiques de croissance (compte administrateur seulement) */
   var SOURCE_LABEL = { code: 'Code tapé', phone: 'Numéro tapé', link: 'Lien de parrainage', request: 'Demande d’adresse', invoice: 'Facture',
     address: 'Adresse reçue', meeting: 'Événement reçu', course: 'Course livreur', watch: 'Suivi de livraison', courier_invite: 'Invitation livreur',
-    post: 'Publication', vitrine: 'Vitrine de boutique', direct: 'Direct' };
+    post: 'Publication', vitrine: 'Site de boutique', direct: 'Direct' };
   function viewStats() {
     if (!authed()) return page(backBtn(), stateCard('!', 'Accès réservé', 'Connectez-vous avec le compte autorisé.', h('a', { class: 'btn', href: '#/compte' + qs({ retour: 'stats' }) }, 'Se connecter')), footer());
     return api('fiila_admin_stats', {}).then(function (s) {
@@ -5066,7 +5066,7 @@
         ME = null; toast(shop ? 'Boutique mise à jour.' : 'Boutique créée.'); go('#/boutique');
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, shop ? 'Enregistrer' : 'Créer ma boutique');
-    // Réglages d'une boutique existante (22/10) : la vitrine d'abord (ouvrir, partager, personnaliser), puis les
+    // Réglages d'une boutique existante (22/10) : le site d'abord (ouvrir, partager, personnaliser), puis les
     // informations avec leur bouton « Enregistrer » sous les champs (plus en haut de page), puis le reste replié.
     if (shop) {
       btn.textContent = 'Enregistrer les informations';
@@ -5123,7 +5123,7 @@
   function setupState() { return LS.get(SETUP_LS, null) || {}; }
   function setupPending() { var st = setupState(); return !!(st.started && !st.done && (shopKey() || (ME && ME.shop))); }
   // Trois badges qui se débloquent (fondateur, 21/10 00:47 : « des cartes dynamiques gratifiantes… rendre ça amusant »).
-  var SETUP_BADGES = [['shop', 'Boutique'], ['cam', 'Article'], ['eye', 'Vitrine']];
+  var SETUP_BADGES = [['shop', 'Boutique'], ['cam', 'Article'], ['eye', 'Site']];
   function setupBadges(n) {
     return h('ol', { class: 'setup-badges', role: 'progressbar', 'aria-valuemin': '1', 'aria-valuemax': '3', 'aria-valuenow': String(n), 'aria-label': 'Étape ' + n + ' sur 3' },
       SETUP_BADGES.map(function (b, i) {
@@ -5137,7 +5137,7 @@
     if (!st.just || st.just.step !== n - 1) return null;
     var j = st.just; delete st.just; LS.set(SETUP_LS, st);
     var t = n === 2 ? ['Étape 1 réussie', '« ' + j.name + ' » est créée', 'Prochaine étape : votre premier article. Une photo et un prix suffisent.']
-      : ['Étape 2 réussie', 'Votre premier article est prêt', 'Dernière étape : ouvrir votre vitrine. Vos clientes pourront commander.'];
+      : ['Étape 2 réussie', 'Votre premier article est prêt', 'Dernière étape : mettre votre site en ligne. Vos clientes pourront commander.'];
     return h('section', { class: 'setup-win', id: 'setup-win', role: 'status' },
       h('span', { class: 'setup-win-ic', 'aria-hidden': 'true' }, icon('check', 24),
         h('span', { class: 'setup-win-spark' }, h('i'), h('i'), h('i'), h('i'), h('i'))),
@@ -5172,7 +5172,7 @@
         ME = null; go('#/boutique/demarrer');
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'Continuer');
-    return setupFrame(1, 'Votre boutique', 'Son nom apparaît sur votre vitrine et vos factures.', h('div', { class: 'stack' },
+    return setupFrame(1, 'Votre boutique', 'Son nom apparaît sur votre site et vos factures.', h('div', { class: 'stack' },
       textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
       h('div', { class: 'field' }, h('label', { for: 'shop-type' }, 'Type de commerce'),
         h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
@@ -5235,11 +5235,11 @@
           celebrate({ icon: 'star', kicker: 'Boutique ouverte', title: 'Bravo, ' + shop.name + ' est en ligne !',
             gain: fd && fd.rank ? 'Place n° ' + fd.rank + ' / 25' : null,
             sub: (fd && fd.rank ? 'Votre place offerte dans le fil Fii. ' : '') + 'Vos clientes peuvent commander dès maintenant, sans compte, et vous donner leur adresse exacte.',
-            cta: 'Partager ma vitrine', onClose: function () { render(); } });
+            cta: 'Partager mon site', onClose: function () { render(); } });
         });
       }, function (e) { btn.disabled = false; errBox(err, e); });
-    } }, 'Ouvrir ma vitrine');
-    return setupFrame(3, 'Votre vitrine', 'Voici ce que verront vos clientes. Elles commandent sans compte et donnent leur adresse à la fin.', h('div', { class: 'stack' },
+    } }, 'Mettre mon site en ligne');
+    return setupFrame(3, 'Votre site', 'Voici ce que verront vos clientes. Elles commandent sans compte et donnent leur adresse à la fin.', h('div', { class: 'stack' },
       h('div', { class: 'setup-preview', id: 'setup-preview' },
         h('div', { class: 'setup-pv-head' }, h('span', { class: 'vavatar', 'aria-hidden': 'true' }, (shop.name || '?').trim().charAt(0).toUpperCase()), h('b', { class: 'wrapword' }, shop.name)),
         h('div', { class: 'setup-pv-grid' }, prods.slice(0, 2).map(function (x) {
@@ -5259,7 +5259,7 @@
       h('section', { class: 'setup setup-ok', id: 'setup-done' },
         h('span', { class: 'setup-ok-ic', 'aria-hidden': 'true' }, icon('check', 34)),
         h('h1', null, 'Votre boutique est prête'),
-        h('p', { class: 'muted' }, 'Envoyez le lien de votre vitrine à vos clientes, ou mettez-le dans votre statut WhatsApp.'),
+        h('p', { class: 'muted' }, 'Envoyez le lien de votre site à vos clientes, ou mettez-le dans votre statut WhatsApp.'),
         h('p', { class: 'sharelink', id: 'setup-url' }, url),
         iconBtn('a', { class: 'btn big', id: 'setup-share', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
           onclick: function () { track('shop_setup', 'share:click'); } }, 'chat', 'Partager sur WhatsApp'),
@@ -5315,7 +5315,7 @@
           h('span', { class: 'pmsg-who' }, m.author === 'brand' ? 'Vous' : m.author === 'staff' ? 'Équipe Fii' : 'Manager'),
           h('p', { class: 'wrapword' }, m.body),
           m.escalate ? h('span', { class: 'small muted' }, 'Transmis à l’équipe') : null);
-      }) : h('p', { class: 'small muted' }, 'Posez votre question : configuration, articles, vitrine, commandes ou suite de l’essai.'));
+      }) : h('p', { class: 'small muted' }, 'Posez votre question : configuration, articles, site, commandes ou suite de l’essai.'));
       list.scrollTop = list.scrollHeight;
     }
     sapi('fiila_partner_messages', {}).then(function (r) { draw(r.messages); }, function (e) { errBox(err, e); });
@@ -5682,8 +5682,8 @@
         onChange: function (v) { vue = v; try { history.replaceState(null, '', location.pathname + location.search + '#/boutique?vue=' + v); } catch (e) { /* rien */ } setKids(listBox, loading()); load(); } }) : null,
       st.orders ? listBox : null,
       st.products ? (shop.public && shop.slug
-        ? h('a', { class: 'invite-row', id: 'vitrine-link', href: '#/b/' + shop.slug }, icon('shop', 24), h('span', null, 'Ma vitrine en ligne'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))
-        : h('a', { class: 'invite-row', id: 'vitrine-open-link', href: '#/boutique/reglages' }, icon('shop', 24), h('span', null, 'Ouvrir ma vitrine en ligne'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))) : null,
+        ? h('a', { class: 'invite-row', id: 'vitrine-link', href: '#/b/' + shop.slug }, icon('shop', 24), h('span', null, 'Mon site'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))
+        : h('a', { class: 'invite-row', id: 'vitrine-open-link', href: '#/boutique/reglages' }, icon('shop', 24), h('span', null, 'Mettre mon site en ligne'), h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)))) : null,
       footer()), 'orders');
   }
 
@@ -6080,11 +6080,11 @@
           h('div', { class: 'tiles mk-kpis' },
             kpi('mk-revenue', fcfa(x.revenue), 'Ventes', trendText(x.revenue, x.prev_revenue)),
             kpi('mk-orders', String(x.orders), x.orders > 1 ? 'Commandes' : 'Commande', trendText(x.orders, x.prev_orders)),
-            kpi('mk-views', String(x.views), x.views > 1 ? 'Visites de la vitrine' : 'Visite de la vitrine', trendText(x.views, x.prev_views)),
+            kpi('mk-views', String(x.views), x.views > 1 ? 'Visites du site' : 'Visite du site', trendText(x.views, x.prev_views)),
             kpi('mk-customers', String(x.new_customers), x.new_customers > 1 ? 'Nouveaux clients' : 'Nouveau client')),
           // Une ligne d'informations discrète.
           h('p', { class: 'small muted', id: 'mk-line' }, [x.orders ? 'Panier moyen ' + fcfa(x.basket) : null,
-            x.vitrine_orders ? x.vitrine_orders + ' via la vitrine' : null,
+            x.vitrine_orders ? x.vitrine_orders + ' via le site' : null,
             x.posts ? x.posts + (x.posts > 1 ? ' publications' : ' publication') : null].filter(Boolean).join(' · ') || 'Les chiffres se remplissent avec vos premières commandes.'),
           x.top && x.top.length ? h('section', { class: 'stack tight', id: 'mk-top' },
             h('h2', null, 'Les plus vendus'),
@@ -6109,7 +6109,7 @@
       var qrBox = h('div', { class: 'stack tight', id: 'mk-qr', hidden: true });
       var share = url ? h('section', { class: 'stack tight', id: 'mk-share' },
         iconBtn('a', { class: 'btn big full', id: 'mk-share-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
-          onclick: (function (go) { return function (e) { track('marketing', 'share:wa'); go(e); }; })(waCardClick('vitrine', 'Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url)) }, 'chat', 'Partager ma vitrine sur WhatsApp'),
+          onclick: (function (go) { return function (e) { track('marketing', 'share:wa'); go(e); }; })(waCardClick('vitrine', 'Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url)) }, 'chat', 'Partager mon site sur WhatsApp'),
         h('div', { class: 'rnd-row' },
           roundBtn('button', { type: 'button', id: 'mk-copy', onclick: function () { copy(url, 'Lien', function () { track('marketing', 'share:copy'); }); } }, 'link', 'Copier'),
           roundBtn('button', { type: 'button', id: 'mk-qr-btn', 'aria-expanded': 'false', 'aria-controls': 'mk-qr', onclick: function (e) {
@@ -6118,7 +6118,7 @@
               track('marketing', 'share:qr');
               loadQr().then(function (qrcode) {
                 var qr = qrcode(0, 'M'); qr.addData(url); qr.make();
-                setKids(qrBox, h('div', { class: 'qr' }, h('img', { src: qr.createDataURL(6), alt: 'QR code de la vitrine : ' + url, id: 'mk-qr-img' })),
+                setKids(qrBox, h('div', { class: 'qr' }, h('img', { src: qr.createDataURL(6), alt: 'QR code du site : ' + url, id: 'mk-qr-img' })),
                   h('p', { class: 'small muted' }, 'À imprimer près de la caisse ou sur vos sacs.'));
               }, function () { setKids(qrBox, h('p', { class: 'small muted' }, 'QR code indisponible pour le moment.')); });
             }
@@ -6126,9 +6126,9 @@
           roundBtn('a', { id: 'mk-vitrine', href: '#/b/' + r.vitrine.slug, onclick: function () { track('marketing', 'vitrine:open'); } }, 'eye', 'Voir')),
         qrBox, h('p', { class: 'sharelink', id: 'mk-url' }, url))
         : h('section', { class: 'card stack tight', id: 'mk-closed' },
-          h('h2', null, 'Ouvrez votre vitrine en ligne'),
+          h('h2', null, 'Mettez votre site en ligne'),
           h('p', { class: 'small muted' }, 'Vos articles sur une page à partager : vos clientes commandent sans compte.'),
-          iconBtn('a', { class: 'btn big full', id: 'mk-open-vitrine', href: '#/boutique/reglages' }, 'shop', 'Ouvrir ma vitrine'));
+          iconBtn('a', { class: 'btn big full', id: 'mk-open-vitrine', href: '#/boutique/reglages' }, 'shop', 'Mettre mon site en ligne'));
       // Réseaux de la boutique : affichés en bas de la vitrine.
       function drawSocials() {
         setKids(socialBox, SOCIALS.map(function (o) {
@@ -6147,7 +6147,7 @@
           setKids(err); save.disabled = true;
           var p = {}; SOCIALS.forEach(function (o) { p[o[0]] = (draft[o[0]] || '').trim(); });
           sapi('fiila_shop_vitrine', { p: { socials: p } }).then(function (x) {
-            socials = x.socials || {}; track('marketing', 'socials:save'); close(); toast('Réseaux enregistrés. Ils apparaissent sur votre vitrine.'); drawSocials();
+            socials = x.socials || {}; track('marketing', 'socials:save'); close(); toast('Réseaux enregistrés. Ils apparaissent sur votre site.'); drawSocials();
           }, function (e) { save.disabled = false; errBox(err, e); });
         } }, 'Enregistrer');
         var back = h('div', { class: 'sheet-back', id: 'mk-socials-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mk-socials-h', onclick: function (e) { if (e.target === back) close(); } },
@@ -6168,7 +6168,7 @@
         statsBox,
         share,
         h('section', { class: 'stack tight', id: 'mk-networks' }, h('h2', null, 'Mes réseaux'), socialBox,
-          h('p', { class: 'small muted' }, 'Affichés en bas de votre vitrine, pour qu’on vous suive.')),
+          h('p', { class: 'small muted' }, 'Affichés à côté de votre logo, pour qu’on vous suive.')),
         h('p', { class: 'small muted', id: 'mk-soon' }, 'Bientôt ici : promotions, campagnes WhatsApp et créations Fii Studio.'),
         footer()), 'marketing');
     }, failPage('Impossible de charger le marketing', 'boutique/marketing'));
@@ -6504,18 +6504,18 @@
     { t: 'Fii, c’est quoi ?', say: 'Une boutique en ligne gratuite pour le commerçant. Ses clientes voient ses articles, commandent, et il reçoit leur adresse exacte en une photo.', keep: 'Gratuit pour le commerçant, simple pour ses clientes.' },
     { t: 'On crée la boutique ensemble', say: 'Toujours sur le téléphone du commerçant, jamais sur le vôtre. Il choisit le nom et le type de commerce, puis tape votre code.', keep: 'Votre code va dans « Code agent », au plus tard 7 jours après.' },
     { t: 'Des photos qui donnent envie', say: 'L’article seul, à la lumière du jour, sur un fond simple. L’application recadre chaque photo au bon format.', keep: '5 articles avec photo : c’est le début du niveau 1.' },
-    { t: 'On ouvre la vitrine', say: 'Dans les réglages, la vitrine passe à « Ouverte ». Le commerçant envoie le lien à ses clientes sur WhatsApp et dans son statut.', keep: 'Type de commerce + 5 photos + vitrine ouverte = niveau 1.' },
+    { t: 'On met le site en ligne', say: 'Dans les réglages, le site passe « En ligne ». Le commerçant envoie le lien à ses clientes sur WhatsApp et dans son statut.', keep: 'Type de commerce + 5 photos + site en ligne = niveau 1.' },
     { t: 'Les premières commandes', say: 'Montrez-lui « Nouvelle commande » et « Demander l’adresse ». Ensuite, ce sont ses vraies clientes qui commandent.', keep: 'Niveau 2 : 3 clientes différentes, dont 1 commande livrée, en 30 jours.' },
     { t: 'Ce qui ne se fait jamais', say: 'Commander soi-même ou par des proches, inventer une boutique, promettre des ventes, garder les numéros des clientes.', keep: 'Une fraude, et les gains sont annulés : exclusion du programme.' }];
   // Questions du test (l'ordre des réponses suit la correction gardée par le serveur, qui n'est jamais envoyée d'avance).
   var AMB_QUIZ = [
     ['Quand êtes-vous payé pour un commerçant ?', ['Dès qu’il crée sa boutique', 'Quand il atteint un niveau vérifié par Fii', 'Quand il vous paie']],
     ['Combien d’articles avec photo pour le niveau 1 ?', ['3', '5', '10']],
-    ['Le niveau 2 demande :', ['3 commandes de 3 clientes différentes, dont 1 livrée', '1 commande', '10 visites de la vitrine']],
+    ['Le niveau 2 demande :', ['3 commandes de 3 clientes différentes, dont 1 livrée', '1 commande', '10 visites du site']],
     ['Pouvez-vous passer des commandes vous-même pour l’aider ?', ['Oui, ça l’aide à démarrer', 'Non : elles ne comptent pas et peuvent vous faire exclure']],
     ['Où le commerçant tape-t-il votre code ?', ['Dans « Code agent », en créant sa boutique', 'Dans WhatsApp', 'Nulle part']],
     ['Une bonne photo d’article, c’est :', ['Prise de nuit, au flash', 'L’article seul, bien éclairé, fond simple', 'Avec le prix écrit à la main']],
-    ['Que pouvez-vous promettre à un commerçant ?', ['Des ventes garanties', 'Ce que Fii offre vraiment : boutique, vitrine et adresses gratuites', 'Un prêt']],
+    ['Que pouvez-vous promettre à un commerçant ?', ['Des ventes garanties', 'Ce que Fii offre vraiment : boutique, site et adresses gratuites', 'Un prêt']],
     ['Vos gains sont versés :', ['Tout de suite', 'Après 30 jours de vérification, une fois par mois', 'Jamais']],
     ['Les numéros des clientes du commerçant :', ['Vous pouvez les garder', 'Restent confidentiels : vous ne les copiez pas', 'Vous pouvez les revendre']],
     ['Un commerçant arrête après une semaine :', ['Vous gardez les niveaux déjà validés, pas les suivants', 'Vous perdez tout', 'Vous êtes exclu']]];
@@ -6592,7 +6592,7 @@
   // Les 3 niveaux et leur montant, en une carte simple.
   function ambLevels(amounts) {
     var m = amounts || [2000, 5000, 10000];
-    var rows = [['1', 'Installé', 'Boutique, type de commerce, 5 articles avec photo, vitrine ouverte', '7 jours'],
+    var rows = [['1', 'Installé', 'Boutique, type de commerce, 5 articles avec photo, site en ligne', '7 jours'],
       ['2', 'Actif', '3 commandes de 3 clientes différentes, dont 1 livrée', '30 jours'],
       ['3', 'Autonome', 'Toujours actif : des commandes 4 semaines sur 8', 'après 60 jours']];
     return h('section', { class: 'card stack tight', id: 'amb-levels' }, h('h2', null, 'Vos gains par commerçant'),
@@ -6677,10 +6677,10 @@
     } else if (i === 3) {
       steps = 6;
       screen = [h('div', { class: 'dm-h' }, 'Réglages'),
-        h('div', { class: 'dm-row' }, h('span', null, 'Ma vitrine en ligne'),
+        h('div', { class: 'dm-row' }, h('span', null, 'Mon site'),
           h('span', { class: 'dm-st', 'data-at': '1' }, h('small', { class: 'no' }, 'Fermée'), h('small', { class: 'yes' }, 'Ouverte'), h('span', { class: 'dm-sw' }))),
         h('div', { class: 'dm-chat' },
-          dmPop(2, ['Ma boutique est en ligne ! Regardez :', h('span', { class: 'dm-link' }, icon('link', 12), 'Voir la vitrine')], 'dm-bub me'),
+          dmPop(2, ['Ma boutique est en ligne ! Regardez :', h('span', { class: 'dm-link' }, icon('link', 12), 'Voir le site')], 'dm-bub me'),
           dmPop(4, 'J’aime la robe bleue. Je commande !', 'dm-bub'),
           dmPop(5, 'Elle arrive demain à votre porte.', 'dm-bub me'))];
     } else if (i === 4) {
@@ -7075,14 +7075,14 @@
     return box;
   }
   function ambDashboard(a) {
-    var codeMsg = 'Bonjour ! Je vous aide à ouvrir votre boutique en ligne gratuite avec Fii : vitrine, commandes, factures et l’adresse exacte de vos clientes. ' +
+    var codeMsg = 'Bonjour ! Je vous aide à ouvrir votre boutique en ligne gratuite avec Fii : site, commandes, factures et l’adresse exacte de vos clientes. ' +
       'Ouvrez ' + baseUrl() + '#/boutique et, à « Code agent », tapez : ' + a.code;
     var shops = a.shops || [];
     var amounts = a.amounts || [2000, 5000, 10000];
     var next = a.grade === 'ambassadeur' ? ['Agent confirmé', a.l2 || 0, 10, 'commerçants actifs (niveau 2)']
       : a.grade === 'confirme' ? ['Agent certifié Fii', a.l3 || 0, 25, 'commerçants autonomes (niveau 3)'] : null;
     function todoList(s) {
-      return s.level === 0 ? [['Type de commerce choisi', !!s.typed], [s.photos >= 5 ? '5 articles avec photo' : (5 - (s.photos || 0)) + ' article(s) avec photo à ajouter', s.photos >= 5], ['Vitrine ouverte', !!s.public]]
+      return s.level === 0 ? [['Type de commerce choisi', !!s.typed], [s.photos >= 5 ? '5 articles avec photo' : (5 - (s.photos || 0)) + ' article(s) avec photo à ajouter', s.photos >= 5], ['Site en ligne', !!s.public]]
         : s.level === 1 ? [[s.clients >= 3 ? '3 clientes différentes' : (3 - (s.clients || 0)) + ' cliente(s) de plus', s.clients >= 3], ['1 commande livrée', !!s.delivered]]
         : s.level === 2 ? [['Des commandes 4 semaines sur 8 (' + Math.min(4, s.active_weeks || 0) + ' sur 4)', (s.active_weeks || 0) >= 4]] : [];
     }
@@ -7778,8 +7778,8 @@
       var reason = h('input', { type: 'text', id: 'bo-suspend-reason', maxlength: 300, placeholder: 'Motif (visible dans le journal)' });
       var actions = (boCan('shops_suspend') || boCan('feed')) && !s.platform ? h('section', { class: 'card stack tight', id: 'bo-shop-actions' }, h('h2', null, 'Actions'),
         !boCan('shops_suspend') ? null : s.suspended_at ? [h('p', { class: 'small' }, 'Suspendue le ' + boDate(s.suspended_at, true) + ' : ' + (s.suspended_reason || '')),
-            h('button', { class: 'btn', type: 'button', id: 'bo-unsuspend', onclick: function () { boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'unsuspend' }); }, 'Boutique réactivée. Elle peut rouvrir sa vitrine.', null, null, this); } }, 'Réactiver la boutique')]
-          : [h('p', { class: 'small muted' }, 'La suspension ferme la vitrine et la retire du fil. La boutique ne peut pas la rouvrir elle-même.'),
+            h('button', { class: 'btn', type: 'button', id: 'bo-unsuspend', onclick: function () { boAct(function () { return api('fiila_bo_shop_action', { p_id: id, p_action: 'unsuspend' }); }, 'Boutique réactivée. Elle peut remettre son site en ligne.', null, null, this); } }, 'Réactiver la boutique')]
+          : [h('p', { class: 'small muted' }, 'La suspension met le site hors ligne et la retire du fil. La boutique ne peut pas le remettre en ligne elle-même.'),
             h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif de suspension'), reason),
             h('button', { class: 'btn danger', type: 'button', id: 'bo-suspend', onclick: function () {
               if (!reason.value.trim()) { toast('Indiquez un motif.'); reason.focus(); return; }
@@ -7805,7 +7805,7 @@
       var themeName = function (k) { var x = VT_THEMES.concat(VT_PREMIUM).filter(function (t) { return t[0] === k; })[0]; return x ? x[1] : k || 'Galerie'; };
       return boShell('boutiques', s.name, [
         boHero(s.name, [boShopState(s), s.rank ? boBadge('info', 'Fil · place ' + s.rank + (s.feed ? '' : ' (masquée)')) : null, s.type ? boBadge('muted', typeLabel(s.type)) : null],
-          [s.slug ? '/b/' + s.slug : 'Vitrine sans lien', s.phone, 'créée le ' + boDate(s.created_at)].filter(Boolean).join(' · ')),
+          [s.slug ? '/b/' + s.slug : 'Site sans lien', s.phone, 'créée le ' + boDate(s.created_at)].filter(Boolean).join(' · ')),
         h('div', { class: 'bo-kpis small' },
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.products)), h('span', null, 'articles'), st.multi_photos ? h('small', { class: 'muted' }, boNum(st.multi_photos) + ' à plusieurs photos') : null,
             st.off_format ? h('small', { class: 'bo-warn', id: 'bo-shop-off-format' }, boNum(st.off_format) + ' hors format 4:5 (recadrées à la prochaine modification)') : null),
@@ -7815,11 +7815,11 @@
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(st.likes) + ' ♥'), h('span', null, boNum(st.comments) + ' commentaires'))),
         h('div', { class: 'bo-grid2' },
           h('section', { class: 'card stack tight', id: 'bo-shop-info' }, h('h2', null, 'Informations'),
-            row('Vitrine', s.slug ? h('a', { href: '#/b/' + s.slug }, '/b/' + s.slug) : '—'),
+            row('Site', s.slug ? h('a', { href: '#/b/' + s.slug }, '/b/' + s.slug) : '—'),
             row('Téléphone', s.phone || '—'),
             row('Type', typeSel),
             row('Abonnement', planSel),
-            row('Vitrine', themeName(s.shown_theme) + (s.theme !== s.shown_theme ? ' (choix « ' + themeName(s.theme) + ' » gardé, réservé Premium)' : '') + (s.has_logo ? ' · logo' : ' · sans logo')),
+            row('Modèle du site', themeName(s.shown_theme) + (s.theme !== s.shown_theme ? ' (choix « ' + themeName(s.theme) + ' » gardé, réservé Premium)' : '') + (s.has_logo ? ' · logo' : ' · sans logo')),
             row('Accès', s.access === 'account' ? 'Compte' : 'Clé du téléphone (sans compte)'),
             s.owner ? row('Propriétaire', h('a', { href: '#/bo/comptes/' + s.owner.id }, s.owner.email)) : null,
             s.ambassador ? row('Agent', s.ambassador) : null,
@@ -7827,8 +7827,8 @@
             s.about ? row('Présentation', s.about) : null),
           actions),
         s.marketing ? h('section', { class: 'card stack tight', id: 'bo-shop-marketing' }, h('h2', null, 'Marketing · 30 jours'),
-          row('Visites de la vitrine', boNum(s.marketing.views_30)),
-          row('Commandes via la vitrine', boNum(s.marketing.vitrine_orders_30)),
+          row('Visites du site', boNum(s.marketing.views_30)),
+          row('Commandes via le site', boNum(s.marketing.vitrine_orders_30)),
           row('Publications', boNum(s.marketing.posts_30)),
           row('Réseaux', s.marketing.socials ? h('span', null, SOCIALS.filter(function (o) { return s.marketing.socials[o[0]]; }).map(function (o, i) {
             return [i ? ' · ' : null, h('a', { href: socialUrl(o[0], s.marketing.socials[o[0]]), target: '_blank', rel: 'noopener noreferrer' }, o[1] + ' @' + s.marketing.socials[o[0]])];
@@ -8224,7 +8224,7 @@
         { label: 'Retiré de l’accueil', get: function (x) { return boNum(x.hide); }, cls: 'num' }], rows, { id: 'bo-onboarding-table' }),
       (function () {
         var su = d.setup || {};
-        var steps = [['Nom et type', su['name:done']], ['Premier article', su['product:done']], ['Vitrine ouverte', su['vitrine:open']], ['Partage WhatsApp touché', su['share:click']]];
+        var steps = [['Nom et type', su['name:done']], ['Premier article', su['product:done']], ['Site en ligne', su['vitrine:open']], ['Partage WhatsApp touché', su['share:click']]];
         var top = Number(su['name:done'] || 0);
         return h('div', { class: 'stack tight', id: 'bo-setup' },
           h('h3', null, 'Démarrage guidé de la boutique'),
@@ -8271,7 +8271,7 @@
         h('a', { class: 'btn ghost small', href: '#/', target: '_blank', rel: 'noopener', id: 'bo-onboarding-preview' }, 'Voir l’accueil')));
   }
   // Croissance : la découverte progressive (suggestions dans l'application), taux de suivi sur 30 jours.
-  var NUDGE_LABEL = { home_shop: 'Accueil → créer sa boutique', shop_more_products: 'Boutique → ajouter des articles', shop_share_vitrine: 'Boutique → partager la vitrine',
+  var NUDGE_LABEL = { home_shop: 'Accueil → créer sa boutique', shop_more_products: 'Boutique → ajouter des articles', shop_share_vitrine: 'Boutique → partager le site',
     shop_courier: 'Boutique → inviter un livreur', shop_team: 'Boutique → ajouter un membre', shop_photos: 'Boutique → plusieurs photos' };
   // Messages WhatsApp (mandat WHATSAPP-001) : registre des modèles, aperçu de la carte, mesures du partage, état Meta saisi à la main.
   var WA_META = { NOT_SUBMITTED: 'Non soumis', SUBMITTED: 'Soumis à Meta', APPROVED: 'Approuvé', REJECTED: 'Refusé', PAUSED: 'En pause' };
@@ -8281,7 +8281,7 @@
     var sh = d.shares || {};
     function n(k) { return Number(sh['request:' + k] || 0); }
     function c(card, k) { return Number(sh[card + ':' + k] || 0); }
-    var CARD_ROWS = [['request', 'Demande d’adresse'], ['address', 'Mon adresse'], ['event', 'Événement'], ['vitrine', 'Vitrine (Marketing)']];
+    var CARD_ROWS = [['request', 'Demande d’adresse'], ['address', 'Mon adresse'], ['event', 'Événement'], ['vitrine', 'Site (Marketing)']];
     var canEdit = boCan('settings');
     return h('section', { class: 'card stack tight bo-panel', id: 'bo-wa' },
       h('div', { class: 'bo-panel-h' }, h('h2', null, 'Messages WhatsApp'), d.media_on ? boBadge('ok', 'Carte image active') : boBadge('muted', 'Texte seul (Réglages)')),
@@ -8346,7 +8346,7 @@
           last ? h('p', { class: 'small muted' }, 'Pack : ' + last.name + ' (version ' + last.version + ')' + (last.blocked ? ' · activation bloquée tant qu’un service inclus n’est pas prêt' : '')) : h('p', { class: 'notice' }, 'Créez d’abord une version du pack (plus bas).'),
           h('details', { class: 'more-details' }, h('summary', null, 'Boutique existante, note (facultatif)'),
             h('div', { class: 'stack', style: 'margin-top:12px' },
-              textField({ id: 'inv-shop', label: 'Lien de sa vitrine Fii', optional: true, max: 40, placeholder: 'Ex. : maison-diallo', onInput: function (v) { f.shop_slug = v.replace(/^.*#\/b\//, '').trim(); } }),
+              textField({ id: 'inv-shop', label: 'Lien de son site Fii', optional: true, max: 40, placeholder: 'Ex. : maison-diallo', onInput: function (v) { f.shop_slug = v.replace(/^.*#\/b\//, '').trim(); } }),
               textField({ id: 'inv-note', label: 'Note interne', optional: true, multiline: true, max: 300, onInput: function (v) { f.note = v; } }))),
           h('button', { class: 'btn', type: 'submit', id: 'inv-create' }, 'Préparer l’invitation'),
           h('button', { class: 'btn ghost', type: 'button', onclick: function () { close(); } }, 'Annuler'));
@@ -8449,7 +8449,7 @@
           h('div', { class: 'stack tight', style: 'flex:1;min-width:0' },
             h('div', { class: 't wrapword' }, x.brand, x.shop ? h('span', { class: 'small muted' }, ' · ' + x.shop) : null),
             h('div', { class: 'small muted' }, [x.activity, x.months + ' mois', x.pack, x.trial && x.trial.ends_on ? 'jusqu’au ' + x.trial.ends_on : null].filter(Boolean).join(' · ')),
-            ms ? h('div', { class: 'bo-ms', 'aria-label': 'Jalons' }, [['configured', 'Boutique'], ['first_product', '1er article'], ['storefront', 'Vitrine ouverte'], ['orders', 'Commande'], ['delivered', 'Livrée'], ['returned', 'Retour']].map(function (k) {
+            ms ? h('div', { class: 'bo-ms', 'aria-label': 'Jalons' }, [['configured', 'Boutique'], ['first_product', '1er article'], ['storefront', 'Site en ligne'], ['orders', 'Commande'], ['delivered', 'Livrée'], ['returned', 'Retour']].map(function (k) {
               var v = ms[k[0]], on = v === true || v > 0;
               return h('span', { class: 'chip ' + (on ? 'ok' : 'off') }, k[1] + (typeof v === 'number' && v > 1 ? ' · ' + v : ''));
             }), ms.escalated ? h('span', { class: 'chip wait' }, 'À traiter · ' + ms.escalated) : null) : null,
@@ -8478,7 +8478,7 @@
         boTable([
           { label: 'Place', get: function (p) { return 'n° ' + p.rank; } },
           { label: 'Boutique', get: function (p) { return p.name; } },
-          { label: 'État', get: function (p) { return p.suspended ? boBadge('danger', 'Suspendue') : !p.public ? boBadge('muted', 'Vitrine fermée') : !p.feed ? boBadge('warn', 'Masquée du fil') : boBadge('ok', 'Visible'); } },
+          { label: 'État', get: function (p) { return p.suspended ? boBadge('danger', 'Suspendue') : !p.public ? boBadge('muted', 'Site hors ligne') : !p.feed ? boBadge('warn', 'Masquée du fil') : boBadge('ok', 'Visible'); } },
           { label: 'Publications', get: function (p) { return String(p.products); }, cls: 'num' }],
           d.places, { href: function (p) { return '#/bo/boutiques/' + p.id; }, id: 'bo-feed', empty: 'Aucune place attribuée.' }),
         d.waiting.length ? h('section', { class: 'stack tight' }, h('h2', null, 'En attente'),
@@ -8621,7 +8621,7 @@
     return h('section', { class: 'card stack tight bo-panel', id: 'bo-media' },
       h('div', { class: 'bo-panel-h' }, h('h2', null, 'Photos (stockage)'),
         !m.ready ? boBadge('muted', 'Stockage non configuré') : m.on ? boBadge('ok', 'Servies par le stockage') : boBadge('muted', 'Servies par la base (media_cdn = 0)')),
-      h('p', { class: 'small muted' }, 'Photos d’articles et couvertures de vitrine. Copiées : ' + boNum(m.copied) + ' (' + mb + ' Mo) · en attente : ' + boNum(m.pending) +
+      h('p', { class: 'small muted' }, 'Photos d’articles et couvertures de site. Copiées : ' + boNum(m.copied) + ' (' + mb + ' Mo) · en attente : ' + boNum(m.pending) +
         ' · dernière copie : ' + (m.last_run ? shortDate(m.last_run) + ' ' + new Date(m.last_run).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais') +
         '. Les photos de porte et les repères vocaux restent dans la base, jamais publics.'),
       (m.errors || []).length ? h('ul', { class: 'small', id: 'bo-media-errors' }, m.errors.map(function (e) { return h('li', null, shortDate(e.at) + ' · ' + (e.ref || '') + ' · ' + (e.detail || '')); })) : null,
@@ -8737,8 +8737,8 @@
           h('li', null, 'Origine et parrainage : quand vous créez une adresse, un événement, une boutique ou un espace livreur, Fii note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
           h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro. Le numéro n’est jamais affiché ; il sert seulement à vous reconnaître quand quelqu’un le tape. Les personnes qui ouvrent votre lien voient votre prénom.'),
           h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus que vous ajoutez à votre adresse. Le micro n’est utilisé que lorsque vous appuyez sur « Enregistrer ». Toute personne qui a le lien, et le livreur d’une course, peuvent l’écouter. Il est supprimé avec la fiche, ou dès que vous le retirez.'),
-          h('li', null, 'Vitrine d’une boutique (si elle l’ouvre) : ses articles visibles par toute personne qui a le lien. Une commande passée sur la vitrine transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
-          h('li', null, 'Fil des boutiques : les 25 premières boutiques qui ouvrent leur vitrine y apparaissent gratuitement (nom, présentation, articles, prix, note). La boutique peut en sortir à tout moment dans ses réglages. Aucune donnée de client n’y figure.'),
+          h('li', null, 'Site d’une boutique (s’il est en ligne) : ses articles visibles par toute personne qui a le lien. Une commande passée sur le site transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
+          h('li', null, 'Fil des boutiques : les 25 premières boutiques qui mettent leur site en ligne y apparaissent gratuitement (nom, présentation, articles, prix, note). La boutique peut en sortir à tout moment dans ses réglages. Aucune donnée de client n’y figure.'),
           h('li', null, 'Programme Agents (facultatif, avec un compte) : votre nom, votre téléphone, votre quartier, votre numéro de versement, votre résultat au test, les boutiques que vous accompagnez et vos gains. Une boutique accompagnée voit le prénom de son agent ; l’agent voit le nom de la boutique et ses indicateurs (nombre d’articles, de commandes et de clientes), jamais le nom ni le numéro des clientes.'),
           h('li', null, 'Vide-dressing : pour vendre, votre nom, votre téléphone, votre quartier et les informations de l’article (photo, catégorie, taille, état, prix ; genre et âge pour un article d’enfant). Ils ne sont visibles que de l’équipe Fii, pour vérifier l’article et organiser l’enlèvement ; l’acheteur ne voit que l’article. Les photos ne doivent montrer aucune personne reconnaissable.'),
           h('li', null, 'Publication d’un article : Fii compte seulement qu’une publication a été faite, pas le réseau choisi.'),

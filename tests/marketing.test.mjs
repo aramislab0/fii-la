@@ -72,8 +72,8 @@ await t('Marketing : chiffres de la période, comparaison, panier moyen ; change
   assert.equal(await P.locator('#tab-marketing').getAttribute('aria-current'), 'page');
   assert.match(await P.locator('#mk-revenue').textContent(), /^24\s000 FCFAVentes$/);
   assert.match(await P.locator('#mk-orders').textContent(), /^1Commande/);
-  assert.match(await P.locator('#mk-views').textContent(), /^1Visite de la vitrine/);
-  assert.match(await P.locator('#mk-line').textContent(), /Panier moyen 24\s000 FCFA · 1 via la vitrine/);
+  assert.match(await P.locator('#mk-views').textContent(), /^1Visite du site/);
+  assert.match(await P.locator('#mk-line').textContent(), /Panier moyen 24\s000 FCFA · 1 via le site/);
   assert.match(await P.locator('#mk-top').textContent(), /Robe Ndella \(test\).*2 vendus.*Publier/s);
   assert.equal(await P.locator('#mk-top a').getAttribute('href'), '#/boutique/article/' + A.id + '?publier=1');
   await P.locator('#mk-period').getByText('7 jours').click();

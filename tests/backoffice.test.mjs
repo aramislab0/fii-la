@@ -200,7 +200,7 @@ await t('boutiques : recherche, filtre, fiche ; suspension (motif) qui ferme la 
   await D.selectOption('#bo-shop-plan', 'free');
   await D.getByText('Abonnement gratuit.').waitFor();
   // Marketing de la boutique (22/10) : visites, commandes vitrine, publications, réseaux sur 30 jours.
-  assert.match(await D.locator('#bo-shop-marketing').textContent(), /Marketing · 30 jours.*Visites de la vitrine\d+.*Commandes via la vitrine\d+.*Réseaux/s);
+  assert.match(await D.locator('#bo-shop-marketing').textContent(), /Marketing · 30 jours.*Visites du site\d+.*Commandes via le site\d+.*Réseaux/s);
   await D.locator('#bo-main .bo-crumbs').getByRole('link', { name: 'Boutiques' }).waitFor(); // ordinateur : le fil d’Ariane remplace le bouton retour
   await D.click('#bo-suspend');
   await D.getByText('Indiquez un motif.').waitFor();

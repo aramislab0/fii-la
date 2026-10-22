@@ -124,7 +124,7 @@ await t('personnalisation : accès évident, un seul « Enregistrer » ; Magazin
   await S.fill('#look-snapchat', 'boutiqueawa');
   assert.equal(await S.locator('#look-save').isDisabled(), false);
   await S.click('#look-save');
-  await S.getByText('Vitrine enregistrée.').waitFor();
+  await S.getByText('Site enregistré.').waitFor();
   assert.equal(await S.locator('#look-save').isDisabled(), true);
   // Modèle premium : verrouillé pour une boutique gratuite → feuille avec aperçu, rien d'enregistré.
   await S.locator('#vitrine-theme-premium [data-theme="atelier"]').click();
@@ -146,7 +146,7 @@ await t('personnalisation : accès évident, un seul « Enregistrer » ; Magazin
   await S.goto(URL0 + '#/boutique/vitrine');
   await S.locator('#vitrine-theme').getByText('Catalogue').click();
   await S.click('#look-save');
-  await S.getByText('Vitrine enregistrée.').waitFor();
+  await S.getByText('Site enregistré.').waitFor();
   await C.goto(URL0 + '#/'); await C.goto(URLV);
   await C.locator('.vt.vt-catalogue').waitFor();
   await shot(C, '07-catalogue');
@@ -158,7 +158,7 @@ await t('Premium (réglé au back-office) : le modèle Maison s’applique et s�
   await S.locator('#vitrine-theme-premium [data-theme="maison"]').click();
   assert.equal(await S.locator('#premium-sheet').count(), 0, 'plus de verrou');
   await S.click('#look-save');
-  await S.getByText('Vitrine enregistrée.').waitFor();
+  await S.getByText('Site enregistré.').waitFor();
   const C = await newPhone();
   await C.goto(URLV);
   await C.locator('.vt.vt-maison').waitFor();
@@ -172,10 +172,10 @@ await t('Premium (réglé au back-office) : le modèle Maison s’applique et s�
 await t('vitrine fermée : message clair, plus de commande possible', async () => {
   await S.goto(URL0 + '#/boutique/reglages');
   await S.click('#vitrine-switch');
-  await S.getByText('Vitrine fermée.').waitFor();
+  await S.getByText('Site hors ligne.').waitFor();
   const C = await newPhone();
   await C.goto(URLV);
-  await C.getByText('La vitrine est fermée pour le moment.').waitFor();
+  await C.getByText('Ce site est hors ligne pour le moment.').waitFor();
 });
 
 await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors), []); });
