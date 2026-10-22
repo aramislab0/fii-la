@@ -168,7 +168,7 @@ await t('IA : données d’analyse et note enregistrée par le rôle service seu
 });
 
 await t('découverte progressive : réglage public, mesure anonyme des suggestions, taux dans le back-office', async () => {
-  assert.deepEqual(await ok('fiila_app_flags', {}), { nudges: true, onboarding: true, discover: true, wa_card: true });
+  assert.deepEqual(await ok('fiila_app_flags', {}), { nudges: true, onboarding: true, discover: true, wa_card: true, sugg_off: [] });
   for (const v of ['shop_courier:shown', 'shop_courier:shown', 'shop_courier:click', 'home_shop:shown', 'home_shop:dismiss']) await ok('fiila_track', { p_event: 'nudge', p_variant: v });
   await ko('fiila_track', { p_event: 'nudge', p_variant: 'x:hack' }, 'invalid_event');
   await ko('fiila_bo_nudges', {}, 'not_allowed', A);
@@ -177,7 +177,7 @@ await t('découverte progressive : réglage public, mesure anonyme des suggestio
   const c = d.items.find((x) => x.id === 'shop_courier');
   assert.equal(Number(c.shown), 2); assert.equal(Number(c.click), 1);
   await ok('fiila_bo_setting_set', { p_key: 'nudges', p_value: 0 }, ADMIN);
-  assert.deepEqual(await ok('fiila_app_flags', {}), { nudges: false, onboarding: true, discover: true, wa_card: true });
+  assert.deepEqual(await ok('fiila_app_flags', {}), { nudges: false, onboarding: true, discover: true, wa_card: true, sugg_off: [] });
   await ok('fiila_bo_setting_set', { p_key: 'nudges', p_value: 1 }, ADMIN);
 });
 
