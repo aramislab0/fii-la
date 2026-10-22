@@ -4,6 +4,42 @@
 > Une entrée par revue, la plus récente en haut. Statuts : **ALIGNÉ** / **ALIGNÉ AVEC RÉSERVES** / **NON ALIGNÉ**.
 > Chaque point : FAIT (vérifié, avec la preuve) / ANALYSE / RECOMMANDATION / priorité (bloquant, important, plus tard).
 
+## 22/10/2026 — Revue VP : rétention v1
+**Verdict : ALIGNÉ AVEC RÉSERVES — valider avec les cinq changements ci-dessous.** Le moteur commun est pertinent ; faire adopter toutes les fonctions n'est pas un objectif de rétention. L'objectif est de faire réussir puis répéter une tâche utile.
+**Base vérifiée :** `4860a586381629bb61a6de5da7ba9490e9c1b52c` ; `docs/PROPOSITION-RETENTION.md` v1, HANDOFF §3–4, PROPOSITION-ONBOARDING, LIVRAISON §11, BACK-OFFICE, `web/app.js` et suites nudges/aftertask. Lecture du code et des tests uniquement : aucune nouvelle exécution de test, recette sur téléphone ou mesure terrain. Les 20 boutiques sont la cible de pilote décrite par le Builder, pas un effectif vérifié.
+
+### Constats
+| # | FAIT (preuve) | ANALYSE |
+|---|---|---|
+| 1 | `app.js:658–675` : le clic pose `done=true` ; `tests/nudges.test.mjs` attend cette disparition définitive. | Un abandon après le clic est confondu avec une adoption. |
+| 2 | `app.js:662–665` limite trois nouveaux identifiants par jour, mais autorise leurs réaffichages ; `afterTask:855–870` a un état séparé et aucun plafond commun. | Deux suggestions par jour, tel qu'écrit, ne précise pas ce qui est réellement plafonné. |
+| 3 | Proposition §3–4 : rang séquentiel, logo avant réseaux, neuf étapes obligatoires visibles ; demande d'adresse au rang 5. | Des prérequis décoratifs peuvent retarder une action utile. L'adresse manquante appartient d'abord à la commande, avant la découverte. |
+| 4 | LIVRAISON §11 : compteurs par jour/événement/variante sans identifiant. Proposition §5 : retour J7/J30 par personne et comparaison selon trois fonctions adoptées. | Ces cohortes ne se déduisent pas des compteurs actuels. Une différence entre utilisateurs déjà engagés ne prouverait pas l'effet des suggestions. |
+
+### Cinq changements pour la v2
+| # | Priorité | Action pour le Builder | Critère de réussite |
+|---|---|---|---|
+| R1 | **Bloquant** | Remplacer l'échelle obligatoire par des conditions indépendantes + priorité contextuelle. Dans une commande sans adresse : « Demander l'adresse » est l'action métier prioritaire, sans seuil de commandes, logo ou site. Sinon, suivre le besoin observé : article manquant → site publiable → partage. Une boutique peut travailler par commandes sans site public. Respecter les droits du membre avant toute proposition. | Scénarios : commande sans adresse même à zéro article ; boutique sans site ; site prêt sans logo ; éditeur sans droit d'équipe. Aucune étape facultative ne bloque la tâche. |
+| R2 | **Bloquant** | Séparer `clicked`, `dismissed`, `known` et `used`. Pour chaque fonction, documenter un succès précis confirmé par le serveur ou l'état réel ; ouvrir un écran ne vaut pas adoption. Exemple : demande enregistrée = fonction utilisée ; adresse effectivement reçue = résultat métier distinct. Une ouverture de WhatsApp reste `share_initiated`, jamais « envoyé ». Ne pas convertir les anciens `done` en usages : vérifier l'état existant ; sinon les garder comme clics historiques, sans les relancer au déploiement. | Clic puis abandon ≠ utilisé ; erreur serveur ≠ succès ; fonction déjà utilisée avant exposition exclue des nouvelles adoptions ; usage valide compté une fois localement. Les tests actuels « clic = terminé » sont révisés. |
+| R3 | **Important** | Un arbitre et un budget communs à `nudge`, `afterTask` et aux autres invitations à découvrir, sans retirer « Voir tous les services ». Proposition de départ, à tester : une exposition par session, deux expositions au maximum sur sept jours glissants par téléphone. Consommer le budget seulement à visibilité réelle (au moins 50 %), pas au rendu ; pas de répétition sur reload. Garder silence 7 jours et arrêt après deux refus ; état métier prioritaire hors de ce budget. Préserver les pages reçues sans écriture locale automatique avant action et le refus des mesures. | Naviguer entre accueil, boutique et fin de tâche ne multiplie pas les cartes ; limite persistante après reload ; carte hors écran non comptée ; tâche en cours et démarrage guidé sans concurrence. Les anciens interrupteurs restent effectifs. |
+| R4 | **Important** | Réduire le lot 1 à la migration des six suggestions existantes, plus la demande d'adresse contextuelle. Garder le démarrage guidé existant ; retirer le nouveau compteur « 5/9 ». Différer catalogue élargi, nouveaux parcours particulier/livreur, synchronisation de compte et upsell Premium de cette mission. Garder un back-office minimal : compteurs définis, activation par suggestion et globale, journal, aperçu. Pas de prix/délai de réalisation présenté comme acquis. | Une seule surface discrète, parcours actuel conservé, sept conditions au maximum à auditer, retour arrière et tests Chrome/WebKit plus recette physique avant élargissement. |
+| R5 | **Important** | Mesurer séparément exposition visible, clic, premier succès dans les sept jours et répétition ultérieure. Attribution conservée localement, agrégats seuls exportés ; aucune clé boutique/client ni identifiant stable ajouté aux mesures. Marquer la fenêtre J7 incomplète tant qu'elle n'est pas échue. Le BO parle d'installations observées, pas de personnes/boutiques uniques. Pour le pilote, compter les boutiques distinctes et leurs retours dans le suivi terrain avec leur accord, hors des compteurs anonymes. Retirer le seuil automatique 200 vues/3 %. | Rapport avec nombres bruts, éligibilité, fenêtres complètes et limites. Hypothèse de décision du pilote : après au moins cinq boutiques distinctes éligibles ayant réellement vu une suggestion et sept jours complets d'observation, zéro usage réussi déclenche diagnostic, une révision puis une nouvelle observation ; zéro succès à nouveau = retrait de la suggestion du pilote. Aucun seuil n'est présenté comme benchmark ni preuve causale de rétention. |
+
+### Réponses aux cinq questions du §7
+1. **Adresse avant partage ?** Oui lorsqu'une commande en a besoin ; autrement, pas d'ordre universel. La tâche réelle décide.
+2. **« 5/9 » ?** Non au pilote : il transforme logo, réseaux et paiement en devoirs. Garder le démarrage existant et une prochaine action.
+3. **Deux par jour ?** Trop exposé au risque de répétition sans preuve terrain. Tester le plafond R3, mesuré en expositions.
+4. **200 vues / 3 % ?** Non : des rechargements d'une seule boutique peuvent remplir ce compteur. Utiliser les boutiques distinctes éligibles du suivi terrain et la règle R5, sans généralisation statistique.
+5. **Catalogue ?** Limiter le premier lot à l'existant et au besoin d'adresse ; le reste reste accessible dans les services, puis est proposé après preuve d'un besoin.
+
+### Alignement et suite
+Les décisions HANDOFF §3 (Fii, « site », boutique sans compte, partage WhatsApp manuel, accueil simple) sont conservées. **HYPOTHÈSE :** une suggestion liée à une difficulté réelle favorise un usage répété ; ce n'est pas encore démontré. Le nombre de fonctions utilisées sert au diagnostic, pas de KPI principal. Le succès recherché est une nouvelle commande traitée ou une adresse réutilisée à une occasion ultérieure, à observer sur le terrain.
+**Prochaine action :** Claude rédige la v2 et sa matrice conditions/succès/mesure, puis la soumet au fondateur. Cette revue n'autorise ni construction ni activation : la validation du fondateur prévue par la proposition reste requise.
+
+> Importée par le Builder le 22/10/2026 (le dépôt direct par le VP a échoué : GitHub 403). Revue ancrée sur `4860a58`, identique au `main` au moment de l'import : aucun constat dépassé. Précision du Builder sur le constat 3 : la demande d'adresse d'une commande existe déjà dans l'écran de la commande (`address_state` pending / expiré → « Redemander l'adresse ») ; la v2 la remonte comme état métier prioritaire, sans en créer une seconde.
+
+---
+
 ## 21/10/2026 05:55 — Mandat WHATSAPP-001 (autorisé par le fondateur) et kit complet
 
 **Nature : mandat d'exécution et kit de création préparés par le VP, autorisés par le fondateur. Ce n'est PAS une réalisation.** Kit importé par le Builder dans `docs/kits/whatsapp-2026-10-21/` (38 fichiers, empreintes vérifiées), point d'entrée `docs/MANDAT-WHATSAPP-001.md` (dépôt direct du VP refusé : GitHub 403).
