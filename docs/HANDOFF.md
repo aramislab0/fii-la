@@ -27,6 +27,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | Domaine | État | Preuve |
 |---|---|---|
+| Personnalisation adaptative (22/10) | **Avis du Builder demandé, avant exécution** : proposer l'adaptation du bloc « Votre prochaine action » sur le moteur de rétention existant, charte et navigation stables. Aucune implémentation ni activation autorisée par ce mandat ; avis de Claude puis accord du fondateur | `docs/MANDAT-UX-ADAPTATIVE-001.md` |
 | Application | **En ligne** : https://aramislab0.github.io/fii-la/ | GitHub Pages, workflow `.github/workflows/pages.yml` : 0) tous les tests, 1) migrations, 2) mise en ligne, 3) tests en production ; `branches.yml` teste toute branche (Chrome + Safari) sans mise en ligne : migrations → mise en ligne → tests en production Chrome + Safari, sans le Mac (migrations actives dès que le secret `SUPABASE_DB_PASSWORD` est enregistré, action #41) |
 | Base de données | Supabase, projet `fii-la` (`lkvulwocirttozfnyxck`), Paris `eu-west-3`, organisation « aramislab » (plan Pro, plafond de dépenses activé) | `docs/LIVRAISON.md` §1 bis |
 | Fonction serveur | `fiila-resolve-maps` (lit les liens courts Google Maps, n'enregistre rien) | `supabase/functions/fiila-resolve-maps/` |
@@ -76,6 +77,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | Date | Décision | Par |
 |---|---|---|
+| 22/10 | Demander à Claude un avis indépendant sur une UX adaptative fondée sur les usages ; mandat d'analyse seulement, avant toute exécution. Proposition du VP : première surface limitée à « Votre prochaine action », navigation et charte stables ; périmètre à arbitrer après l'avis | Fondateur (demande), VP (proposition) |
 | 15/10 | Construire de bout en bout sans validation par étape ; données synthétiques uniquement en test | Fondateur |
 | 15/10 | Supabase + GitHub Pages ; aucun service payant sans accord | Fondateur |
 | 15/10 | Périmètre fonctionnel gelé au commit `9576bc8` (aucune nouvelle fonction sans demande explicite) | Mandat fondateur |
@@ -153,6 +155,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | # | Action | Qui | Bloquant pour |
 |---|---|---|---|
+| 66 | UX-ADAPTATIVE-001 : Claude lit le mandat et rédige `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md` (avis, objections, périmètre, règles, mesures, coût et retour arrière), puis soumet au fondateur avant implémentation | Builder → Fondateur | Personnalisation adaptative |
 | 1 | Re-tester sur iPhone : « Utiliser ma position », « Depuis Google Maps » avec un **vrai** lien partagé, « Itinéraire » | Fondateur | Validation des correctifs du 17/10 (lien court réel jamais testé) |
 | 2 | Communiquer l'identité et le contact du responsable du traitement déclaré à la CDP | Fondateur | Page confidentialité (art. 58), fiche art. 22 |
 | 3 | Décider une durée maximale de conservation des adresses (proposition : 12 mois sans consultation ni modification) | Fondateur, avis VP | Art. 35 ; nécessite une petite évolution du code |
@@ -257,6 +260,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 22/10 19:54 | Mandat UX-ADAPTATIVE-001 : avis indépendant de Claude demandé avant exécution ; réutilisation du moteur de rétention à étudier, une surface adaptative proposée, charte et navigation stables | `docs/MANDAT-UX-ADAPTATIVE-001.md` |
 | 22/10 20:30 | Rétention lot 1 construit (arbitre commun, 6 suggestions, commande sans adresse, back-office Suggestions) ; tests SQL et navigateur verts | migration `20261022700000_fiila_retention_lot1` ; `tests/nudges.test.mjs` (7), `tests/retention.sql.test.mjs` (4) |
 | 22/10 19:30 | Proposition de rétention v2 (R1–R5 intégrés, matrice §3) soumise au fondateur ; aucun code modifié | `docs/PROPOSITION-RETENTION.md` |
 | 22/10 19:10 | Revue VP rétention v1 importée en haut de `docs/REVUE-VP.md` (ALIGNÉ AVEC RÉSERVES, 5 changements R1–R5 ; dépôt direct du VP refusé, GitHub 403) ; aucun code modifié | ce commit |

@@ -4,6 +4,17 @@
 > Une entrée par revue, la plus récente en haut. Statuts : **ALIGNÉ** / **ALIGNÉ AVEC RÉSERVES** / **NON ALIGNÉ**.
 > Chaque point : FAIT (vérifié, avec la preuve) / ANALYSE / RECOMMANDATION / priorité (bloquant, important, plus tard).
 
+## 22/10/2026 — UX-ADAPTATIVE-001 : avis du Builder demandé
+
+**Nature : mandat d'analyse demandé par le fondateur ; aucune autorisation d'implémentation.** Voir `docs/MANDAT-UX-ADAPTATIVE-001.md`.
+
+- Proposition du VP : adapter progressivement le bloc « Votre prochaine action » aux usages réussis et répétés, avec navigation et charte stables.
+- Base vérifiée : rétention lot 1 présente au commit `29fbab8` ; le mandat s'appuie sur elle et ne retire pas les décisions précédentes.
+- Claude doit donner son avis indépendant, signaler les objections et changements de priorité, puis proposer un périmètre minimal et une mesure fiable dans `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md`.
+- Suite : avis de Claude → arbitrage du fondateur → implémentation seulement après accord explicite.
+
+---
+
 ## 22/10/2026 — Revue VP : rétention v1
 **Verdict : ALIGNÉ AVEC RÉSERVES — valider avec les cinq changements ci-dessous.** Le moteur commun est pertinent ; faire adopter toutes les fonctions n'est pas un objectif de rétention. L'objectif est de faire réussir puis répéter une tâche utile.
 **Base vérifiée :** `4860a586381629bb61a6de5da7ba9490e9c1b52c` ; `docs/PROPOSITION-RETENTION.md` v1, HANDOFF §3–4, PROPOSITION-ONBOARDING, LIVRAISON §11, BACK-OFFICE, `web/app.js` et suites nudges/aftertask. Lecture du code et des tests uniquement : aucune nouvelle exécution de test, recette sur téléphone ou mesure terrain. Les 20 boutiques sont la cible de pilote décrite par le Builder, pas un effectif vérifié.
