@@ -4,6 +4,18 @@
 > Une entrée par revue, la plus récente en haut. Statuts : **ALIGNÉ** / **ALIGNÉ AVEC RÉSERVES** / **NON ALIGNÉ**.
 > Chaque point : FAIT (vérifié, avec la preuve) / ANALYSE / RECOMMANDATION / priorité (bloquant, important, plus tard).
 
+## 22/10/2026 — UX-ADAPTATIVE-001 : avis du Builder rendu (note du Builder)
+
+**Avis : ACCORD AVEC CHANGEMENTS**, périmètre réduit. Détail dans `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md`.
+
+- **Pas de bloc « Votre prochaine action » en plus.** Le bouton principal de l'accueil (`homeHero`) est déjà adaptatif ; un second bloc enfreindrait la règle 7.
+- **Écart corrigé en priorité.** Ce bouton apprend aujourd'hui des écrans ouverts (`noteActivity`), alors que le §4 du mandat les classe en « intérêt possible ». Proposition : apprendre des réussites et des réussites répétées, avec la récence, figé par session.
+- **Contrôles de l'utilisateur** (« Mettre en premier », remise à zéro, explication) dans la feuille des services. Commerçants inchangés. Moteur de rétention v2 et ordre validé inchangés. Réglage `adaptive_home` pour revenir en arrière.
+- **Meilleur argument contre** : au pilote, trop peu de répétitions pour apprendre mieux qu'une règle fixe ; l'adaptation doit rester lente et stable.
+- Suite : arbitrage du fondateur (§6 de l'avis) ; aucune implémentation avant son accord.
+
+---
+
 ## 22/10/2026 — UX-ADAPTATIVE-001 : avis du Builder demandé
 
 **Nature : mandat d'analyse demandé par le fondateur ; aucune autorisation d'implémentation.** Voir `docs/MANDAT-UX-ADAPTATIVE-001.md`.

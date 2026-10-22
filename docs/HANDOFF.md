@@ -27,7 +27,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | Domaine | État | Preuve |
 |---|---|---|
-| Personnalisation adaptative (22/10) | **Avis du Builder demandé, avant exécution** : proposer l'adaptation du bloc « Votre prochaine action » sur le moteur de rétention existant, charte et navigation stables. Aucune implémentation ni activation autorisée par ce mandat ; avis de Claude puis accord du fondateur | `docs/MANDAT-UX-ADAPTATIVE-001.md` |
+| Personnalisation adaptative (22/10) | **Avis du Builder rendu (22/10) : accord avec changements, périmètre réduit.** Pas de nouveau bloc : le bouton principal de l'accueil, déjà adaptatif, apprend des **réussites** et non plus des écrans ouverts ; choix figé par session ; « Mettre en premier » et remise à zéro dans la feuille des services ; commerçants inchangés ; réglage `adaptive_home`. **Rien n'est implémenté** : accord explicite du fondateur attendu | `docs/MANDAT-UX-ADAPTATIVE-001.md`, `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md` |
 | Application | **En ligne** : https://aramislab0.github.io/fii-la/ | GitHub Pages, workflow `.github/workflows/pages.yml` : 0) tous les tests, 1) migrations, 2) mise en ligne, 3) tests en production ; `branches.yml` teste toute branche (Chrome + Safari) sans mise en ligne : migrations → mise en ligne → tests en production Chrome + Safari, sans le Mac (migrations actives dès que le secret `SUPABASE_DB_PASSWORD` est enregistré, action #41) |
 | Base de données | Supabase, projet `fii-la` (`lkvulwocirttozfnyxck`), Paris `eu-west-3`, organisation « aramislab » (plan Pro, plafond de dépenses activé) | `docs/LIVRAISON.md` §1 bis |
 | Fonction serveur | `fiila-resolve-maps` (lit les liens courts Google Maps, n'enregistre rien) | `supabase/functions/fiila-resolve-maps/` |
@@ -155,7 +155,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | # | Action | Qui | Bloquant pour |
 |---|---|---|---|
-| 66 | UX-ADAPTATIVE-001 : Claude lit le mandat et rédige `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md` (avis, objections, périmètre, règles, mesures, coût et retour arrière), puis soumet au fondateur avant implémentation | Builder → Fondateur | Personnalisation adaptative |
+| 66 | UX-ADAPTATIVE-001 : ~~avis du Builder~~ rendu le 22/10 (`docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md`) ; **le fondateur tranche les 5 arbitrages du §6** et autorise ou non l'implémentation | Fondateur | Personnalisation adaptative |
 | 1 | Re-tester sur iPhone : « Utiliser ma position », « Depuis Google Maps » avec un **vrai** lien partagé, « Itinéraire » | Fondateur | Validation des correctifs du 17/10 (lien court réel jamais testé) |
 | 2 | Communiquer l'identité et le contact du responsable du traitement déclaré à la CDP | Fondateur | Page confidentialité (art. 58), fiche art. 22 |
 | 3 | Décider une durée maximale de conservation des adresses (proposition : 12 mois sans consultation ni modification) | Fondateur, avis VP | Art. 35 ; nécessite une petite évolution du code |
@@ -260,6 +260,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 22/10 21:15 | Avis du Builder UX-ADAPTATIVE-001 rendu (accord avec changements ; meilleur argument contre : pas assez de répétitions au pilote ; écart relevé : le bouton principal apprend aujourd'hui des écrans ouverts) ; aucun code modifié | `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md` |
 | 22/10 21:00 | Rétention lot 1 en production : run 39843821222 vert (premier passage bloqué par l'installation de Playwright sur GitHub, relancé ; un test SQL corrigé : `fiila_app_flags` renvoie aussi `sugg_off`) | run 39843821222 |
 | 22/10 19:54 | Mandat UX-ADAPTATIVE-001 : avis indépendant de Claude demandé avant exécution ; réutilisation du moteur de rétention à étudier, une surface adaptative proposée, charte et navigation stables | `docs/MANDAT-UX-ADAPTATIVE-001.md` |
 | 22/10 20:30 | Rétention lot 1 construit (arbitre commun, 6 suggestions, commande sans adresse, back-office Suggestions) ; tests SQL et navigateur verts | migration `20261022700000_fiila_retention_lot1` ; `tests/nudges.test.mjs` (7), `tests/retention.sql.test.mjs` (4) |
