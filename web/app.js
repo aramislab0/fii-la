@@ -1303,7 +1303,18 @@
     return jpegUnder(c);
   }
   function urlToImage(src) {
-    return new Promise(function (res, rej) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = function () { rej(new Error('Impossible de lire cette image.')); }; i.src = src; });
+    return new Promise(function (res, rej) {
+      var i = new Image();
+      if (/^https?:/.test(src)) i.crossOrigin = 'anonymous'; // photo du stockage : lisible par le canevas (recadrage)
+      i.onload = function () { res(i); }; i.onerror = function () { rej(new Error('Impossible de lire cette image.')); }; i.src = src;
+    });
+  }
+  // Photo servie par le stockage (adresse) ou par la base (data:) : contenu en data: pour l'envoi ou le partage.
+  function srcToDataUrl(src) {
+    if (!src || /^data:/.test(src)) return Promise.resolve(src || '');
+    return fetch(src, { mode: 'cors', credentials: 'omit' }).then(function (r) { if (!r.ok) throw new Error('Photo indisponible.'); return r.blob(); }).then(function (b) {
+      return new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { res(fr.result); }; fr.onerror = function () { rej(new Error('Photo indisponible.')); }; fr.readAsDataURL(b); });
+    });
   }
   function isRatio(img) { var W = img.naturalWidth || img.width, H = img.naturalHeight || img.height; return H > 0 && Math.abs(W / H - PHOTO_RATIO) <= 0.016; }
   // Photo d'article ajoutée : l'original réduit (pour recadrer plus tard) et la photo 4:5 recadrée au centre.
@@ -1968,8 +1979,10 @@
         var off = st.list.filter(function (x) { return x.off; });
         if ((!st.changed && !off.length) || !st.ready) return Promise.resolve(null);
         return Promise.all(off.map(function (it) { return urlToImage(it.src).then(function (im) { it.src = cropToRatio(im); it.off = false; }); })).then(function () {
-          var b = function (it) { return it.src.replace(/^data:[^,]+,/, ''); };
-          return { photo: st.list[0] ? b(st.list[0]) : '', photos: st.list.slice(1).map(b) };
+          return Promise.all(st.list.map(function (it) { return srcToDataUrl(it.src); }));
+        }).then(function (all) {
+          var b = function (d) { return d.replace(/^data:[^,]+,/, ''); };
+          return { photo: all[0] ? b(all[0]) : '', photos: all.slice(1).map(b) };
         });
       }
     };
@@ -2607,6 +2620,9 @@
     var countEl = h('p', { class: 'small muted', id: 'post-count' }, count ? 'Publié ' + count + ' fois.' : '');
     var more = h('div', { class: 'stack' });
     var text = productCaption(pr, shop);
+    // Photo servie par le stockage : préparée d'avance, car le partage doit partir du geste même (pas après un chargement).
+    var photoFile = pr.photo && /^data:/.test(pr.photo) ? dataUrlFile(pr.photo, slugName(pr.name)) : null, photoHref = pr.photo && /^data:/.test(pr.photo) ? pr.photo : null;
+    if (pr.photo && !photoFile) srcToDataUrl(pr.photo).then(function (d) { photoFile = dataUrlFile(d, slugName(pr.name)); photoHref = d; var a = document.getElementById('post-download'); if (a) a.href = d; }, function () { /* lien direct */ });
     function logged() {
       sapi('fiila_post_log', { p_product_id: pr.id }).then(function (r) { count = r.posts; countEl.textContent = 'Publié ' + count + ' fois.'; }, function () { /* sans effet */ });
     }
@@ -2614,13 +2630,13 @@
       setKids(more,
         h('p', { class: 'small' }, 'Enregistrez la photo, puis collez la légende dans votre publication.'),
         h('div', { class: 'row' },
-          pr.photo ? h('a', { class: 'btn ghost', id: 'post-download', href: pr.photo, download: slugName(pr.name), onclick: logged }, 'Enregistrer la photo') : null,
+          pr.photo ? h('a', { class: 'btn ghost', id: 'post-download', href: photoHref || pr.photo, download: slugName(pr.name), onclick: logged }, 'Enregistrer la photo') : null,
           h('button', { class: 'btn ghost', type: 'button', id: 'post-copy', onclick: function () { copy(text, 'Légende'); if (!pr.photo) logged(); } }, 'Copier la légende')),
         h('pre', { class: 'caption', id: 'post-caption' }, text));
     }
     function publish() {
       try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(null, function () { /* rien */ }); } catch (e) { /* rien */ }
-      var file = pr.photo ? dataUrlFile(pr.photo, slugName(pr.name)) : null;
+      var file = photoFile;
       var data = { text: text };
       var canFiles = false;
       try { canFiles = !!(file && navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { canFiles = false; }
@@ -8137,7 +8153,8 @@
     nudges: ['Suggestions discrètes dans l’application (découverte progressive)', '0 = non, 1 = oui'],
     onboarding_v2: ['Nouvel accueil (mes activités, « Découvrir les services »)', '1 = nouvel accueil, 0 = ancien'],
     discover_after: ['Suggestion discrète après une action (commande, adresse envoyée, course)', '0 = non, 1 = oui'],
-    wa_card_media: ['Carte image avec la demande d’adresse sur WhatsApp', '0 = texte seul, 1 = image + texte'] };
+    wa_card_media: ['Carte image avec la demande d’adresse sur WhatsApp', '0 = texte seul, 1 = image + texte'],
+    media_cdn: ['Photos servies par le stockage (adresse fixe, mise en cache)', '0 = servies par la base, 1 = stockage'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {
@@ -8169,9 +8186,29 @@
   }
 
   // ----- Réglages
+  // Photos (stockage) : copie des photos publiques vers Supabase Storage (22/10), état, erreurs, copie manuelle.
+  function boMediaPanel(m) {
+    if (!m) return null;
+    var mb = (Number(m.bytes || 0) / 1048576).toFixed(1).replace('.', ',');
+    var status = h('p', { class: 'small', role: 'status', id: 'bo-media-status' });
+    return h('section', { class: 'card stack tight bo-panel', id: 'bo-media' },
+      h('div', { class: 'bo-panel-h' }, h('h2', null, 'Photos (stockage)'),
+        !m.ready ? boBadge('muted', 'Stockage non configuré') : m.on ? boBadge('ok', 'Servies par le stockage') : boBadge('muted', 'Servies par la base (media_cdn = 0)')),
+      h('p', { class: 'small muted' }, 'Photos d’articles et couvertures de vitrine. Copiées : ' + boNum(m.copied) + ' (' + mb + ' Mo) · en attente : ' + boNum(m.pending) +
+        ' · dernière copie : ' + (m.last_run ? shortDate(m.last_run) + ' ' + new Date(m.last_run).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'jamais') +
+        '. Les photos de porte et les repères vocaux restent dans la base, jamais publics.'),
+      (m.errors || []).length ? h('ul', { class: 'small', id: 'bo-media-errors' }, m.errors.map(function (e) { return h('li', null, shortDate(e.at) + ' · ' + (e.ref || '') + ' · ' + (e.detail || '')); })) : null,
+      m.ready ? h('button', { class: 'btn ghost small', type: 'button', id: 'bo-media-run', onclick: function (ev) {
+        var b = ev.currentTarget; b.disabled = true; status.textContent = 'Copie en cours…';
+        fetch(API_URL + '/functions/v1/fiila-media-sync', { method: 'POST', headers: apiHeaders(), body: '{}' }).then(function (r) { return r.json(); }).then(function (x) {
+          b.disabled = false; status.textContent = x && x.ok ? (x.copied + ' copiée(s), ' + x.failed + ' échec(s), ' + x.removed + ' retirée(s).') : 'Copie impossible pour le moment.';
+        }, function () { b.disabled = false; status.textContent = 'Copie impossible pour le moment.'; });
+      } }, 'Copier maintenant') : null, status);
+  }
   function boSettings() {
-    return api('fiila_bo_settings', {}).then(function (s) {
-      return boShell('reglages', 'Réglages de la plateforme', [
+    return Promise.all([api('fiila_bo_settings', {}), api('fiila_bo_media', {}).then(null, function () { return null; })]).then(function (rr) {
+      var s = rr[0];
+      return boShell('reglages', 'Réglages de la plateforme', [boMediaPanel(rr[1]),
         h('p', { class: 'small muted' }, 'Chaque modification est appliquée aussitôt, tracée dans le journal, et demande une connexion récente.'),
         h('div', { class: 'stack', id: 'bo-settings' }, Object.keys(BO_SETTINGS).map(function (k) {
           var input = h('input', { type: 'number', inputmode: 'numeric', id: 'bo-set-' + k, value: s[k] != null ? s[k] : '', min: 0 });

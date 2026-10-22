@@ -170,6 +170,11 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   await D.click('#bo-nav-reglages');
   await D.locator('#bo-settings').getByText('Nouvel accueil', { exact: false }).waitFor();
   await D.locator('#bo-settings').getByText('Carte image avec la demande d’adresse', { exact: false }).waitFor();
+  // Photos (stockage) : état visible ; sans seau configuré (environnement local), pas de bouton de copie.
+  await D.locator('#bo-media').getByText('Stockage non configuré').waitFor();
+  assert.match(await D.locator('#bo-media').textContent(), /Copiées : 0 .*en attente : \d+/s);
+  assert.equal(await D.locator('#bo-media-run').count(), 0);
+  await D.locator('#bo-settings').getByText('Photos servies par le stockage', { exact: false }).waitFor();
 });
 
 await t('boutiques : recherche, filtre, fiche ; suspension (motif) qui ferme la vitrine ; réactivation ; journal', async () => {

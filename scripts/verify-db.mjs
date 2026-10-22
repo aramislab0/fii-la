@@ -31,6 +31,8 @@ const EXPECTED_FUNCTIONS = [
   'fiila_product_photos',
   // cartes WhatsApp (20261022000000)
   'fiila_bo_wa', 'fiila_bo_wa_status',
+  // photos dans le stockage (20261022200000) — fiila_media_* : clé de service seulement
+  'fiila_bo_media',
 ].sort();
 const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();
