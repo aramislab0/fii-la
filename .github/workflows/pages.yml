@@ -44,7 +44,7 @@ jobs:
         run: |
           for i in 1 2 3; do timeout 300 npx playwright install chromium && break; echo "navigateurs : essai $i"; [ $i = 3 ] && exit 1; done
           for i in 1 2 3; do
-            timeout 420 sudo npx playwright install-deps chromium && exit 0
+            timeout 420 npx playwright install-deps chromium && exit 0
             echo "dépendances : essai $i"; sudo pkill -9 -f 'apt|dpkg' || true; sudo dpkg --configure -a || true; sleep 10
           done
           exit 1
@@ -149,7 +149,7 @@ jobs:
         run: |
           for i in 1 2 3; do timeout 300 npx playwright install chromium webkit && break; echo "navigateurs : essai $i"; [ $i = 3 ] && exit 1; done
           for i in 1 2 3; do
-            timeout 420 sudo npx playwright install-deps chromium webkit && exit 0
+            timeout 420 npx playwright install-deps chromium webkit && exit 0
             echo "dépendances : essai $i"; sudo pkill -9 -f 'apt|dpkg' || true; sudo dpkg --configure -a || true; sleep 10
           done
           exit 1
