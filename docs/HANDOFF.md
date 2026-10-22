@@ -27,6 +27,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | Domaine | État | Preuve |
 |---|---|---|
+| Algorithmes (22/10) | **Revue VP : ALIGNÉ AVEC RÉSERVES**, cinq changements déposés ; v2 attendue du Builder, puis validation du fondateur. Aucun code ni activation dans cette revue | `docs/PROPOSITION-ALGORITHMES.md`, `docs/REVUE-VP.md` ; action #67 |
 | Personnalisation adaptative (22/10) | **Avis v1.1 validé par le fondateur le 22/10 21:11 ; en production (run 39865394872, tout vert, Chrome + Safari).** Accueil : le bouton principal apprend des **réussites** confirmées (adresse, événement, demande, course, vide-dressing), jamais des écrans ouverts ; score avec récence (paramètres `adaptive_v1` : demi-vie 7 j, bonus de répétition 1, seuil 2, fenêtre 30 j) ; recalcul à l'arrivée et après une réussite ; « Mettre en premier », « Revenir au choix automatique », « Remettre à zéro » et explication dans « Découvrir les services ». Haut de Ma boutique : commande sans adresse → reprise d'une commande ou d'un article commencés (brouillons sur le téléphone, par compte + boutique + rôle) → suggestion. Réglage `adaptive_home` (0 = règle d'avant). Back-office : Croissance → Parcours d'accueil → Accueil adaptatif. Migration `20261022800000_fiila_adaptive_home`. Essai de 14 jours | `docs/MANDAT-UX-ADAPTATIVE-001.md`, `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md` |
 | Application | **En ligne** : https://aramislab0.github.io/fii-la/ | GitHub Pages, workflow `.github/workflows/pages.yml` : 0) tous les tests, 1) migrations, 2) mise en ligne, 3) tests en production ; `branches.yml` teste toute branche (Chrome + Safari) sans mise en ligne : migrations → mise en ligne → tests en production Chrome + Safari, sans le Mac (migrations actives dès que le secret `SUPABASE_DB_PASSWORD` est enregistré, action #41) |
 | Base de données | Supabase, projet `fii-la` (`lkvulwocirttozfnyxck`), Paris `eu-west-3`, organisation « aramislab » (plan Pro, plafond de dépenses activé) | `docs/LIVRAISON.md` §1 bis |
@@ -157,7 +158,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | # | Action | Qui | Bloquant pour |
 |---|---|---|---|
-| 67 | Algorithmes : transmettre à ChatGPT le message en bas de `docs/PROPOSITION-ALGORITHMES.md` ; son avis va en haut de `docs/REVUE-VP.md` ; le Builder intègre (v2), puis le fondateur valide. Rien n'est construit avant | Fondateur → VP → Builder | Premier algorithme (A3 proposé) |
+| 67 | Algorithmes : avis VP rendu **ALIGNÉ AVEC RÉSERVES** (5 changements : A1 aide de complétude sans certification ; A3 audit des contrôles existants avant versement ; A2 et A4 différés ; A5 moyenne + nombre conservés, seuils futurs = réexamen). **Builder : rédiger la v2**, puis validation du fondateur avant toute construction | Builder → Fondateur | V2 de `docs/PROPOSITION-ALGORITHMES.md` ; `docs/REVUE-VP.md` |
 | 66 | UX-ADAPTATIVE-001 : ~~avis~~, ~~validation (22/10 21:11)~~, ~~construction~~ ; reste : essai de 14 jours (jusqu'au 05/11), recette sur téléphone, retours terrain (un « je ne m'y retrouve plus » → `adaptive_home` = 0 le temps d'examiner) | Fondateur, Builder | Bilan de l'essai |
 | 1 | Re-tester sur iPhone : « Utiliser ma position », « Depuis Google Maps » avec un **vrai** lien partagé, « Itinéraire » | Fondateur | Validation des correctifs du 17/10 (lien court réel jamais testé) |
 | 2 | Communiquer l'identité et le contact du responsable du traitement déclaré à la CDP | Fondateur | Page confidentialité (art. 58), fiche art. 22 |
@@ -263,6 +264,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 22/10 23:55 | Revue VP de la proposition d'algorithmes v1 : ALIGNÉ AVEC RÉSERVES, 5 changements R1–R5 et réponses aux 5 questions ; v2 demandée avant validation fondateur. Sources et limites documentées ; aucun code modifié ni test exécuté | `docs/REVUE-VP.md` ; base `a2e1cd5` |
 | 22/10 23:58 | Proposition d'algorithmes rédigée (5 maintenant, 5 plus tard, à éviter, ordre, 5 questions pour le VP) ; aucun code modifié | `docs/PROPOSITION-ALGORITHMES.md` |
 | 22/10 22:45 | Accueil adaptatif en production : run 39865394872 vert. CI rendue robuste : navigateurs et dépendances système installés séparément, bornés et réessayés (apt réparé entre deux essais) ; un échec isolé du test back-office (invitation de marque) ne s'est pas reproduit, ni en local ni au passage suivant | run 39865394872 |
 | 22/10 22:05 | CI : l'installation des navigateurs de test s'est bloquée deux fois chez GitHub (plus de 20 min) ; étape bornée à 6 min avec 3 essais (`.github/workflows/pages.yml`) | ce commit |
