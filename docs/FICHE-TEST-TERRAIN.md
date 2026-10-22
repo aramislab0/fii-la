@@ -102,3 +102,20 @@
 **Lecture.** Avec 15 arrivées par méthode, l’échantillon est trop petit pour une conclusion statistique. Il sert à décider de continuer ou non, et à repérer les problèmes. Seuil de décision proposé avant le test : Fii La vaut un pilote élargi si les appels d’explication baissent d’au moins moitié et si les mauvaises entrées ne sont pas plus nombreuses qu’avec la méthode habituelle.
 
 **Règles.** Ne rien inventer, ne rien arrondir pour faire joli. Une arrivée annulée est notée « annulée » avec la raison, pas remplacée.
+
+---
+
+## 5. Suivi des suggestions dans l'app (rétention lot 1, 22/10/2026)
+
+À remplir avec l'accord de chaque boutique du pilote, hors des compteurs anonymes. Une ligne par boutique et par suggestion vue.
+
+**Règle de décision (hypothèse du pilote, sans valeur statistique).**
+- Elle s'applique quand au moins 5 boutiques distinctes, éligibles, ont réellement vu une suggestion, et que 7 jours complets d'observation se sont écoulés.
+- Si aucune ne l'a utilisée avec succès : diagnostic, une seule réécriture, puis nouvelle observation.
+- Si c'est encore zéro : la suggestion est coupée au back-office (Croissance → Suggestions).
+
+| Boutique (avec accord) | Suggestion | Vue le | Succès dans les 7 jours (oui / non, lequel) | Utilisé de nouveau ensuite | Remarque de la boutique |
+|---|---|---|---|---|---|
+|  |  |  |  |  |  |
+|  |  |  |  |  |  |
+|  |  |  |  |  |  |

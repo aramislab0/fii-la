@@ -3,7 +3,7 @@
 > **v2, 22/10/2026**, par le Builder (Claude). Elle intègre les cinq changements R1 à R5 de la revue du VP (ChatGPT) du 22/10, verdict « ALIGNÉ AVEC RÉSERVES » (`docs/REVUE-VP.md`).
 > La v1 (moteur et échelles complètes) reste lisible dans l'historique Git (`fb2bf8c`).
 >
-> **Statut : à valider par le fondateur. Rien n'est construit.** Les seuils ci-dessous sont des règles de pilote proposées. Ce ne sont ni des références externes ni des performances prouvées.
+> **Statut : validée par le fondateur le 22/10/2026 à 19:20 (« ok ») ; lot 1 construit le 22/10 (voir HANDOFF).** Les seuils ci-dessous sont des règles de pilote proposées. Ce ne sont ni des références externes ni des performances prouvées.
 
 ## 1. Verdict
 

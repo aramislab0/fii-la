@@ -157,6 +157,14 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   await D.locator('#bo-setup').getByText('Démarrage guidé de la boutique').waitFor();
   await D.locator('#bo-discover-table').waitFor();
   assert.match(await D.locator('#bo-marketing-use').textContent(), /Ma boutique et Marketing.*Raccourcis de l’accueil : Commandes \d+.*Écran Marketing ouvert : \d+/s);
+  // Suggestions (rétention lot 1) : table, fenêtre incomplète, commandes sans adresse, interrupteur par suggestion.
+  await D.locator('#bo-sugg-table').waitFor();
+  assert.match(await D.locator('#bo-sugg-window').textContent(), /Fenêtre incomplète/);
+  assert.match(await D.locator('#bo-order-address').textContent(), /commandes ouvertes en attente maintenant : \d+/);
+  await D.selectOption('#bo-sugg-table select[data-sugg="shop_team"]', '0');
+  await D.getByText('Suggestion coupée.').waitFor();
+  await D.selectOption('#bo-sugg-table select[data-sugg="shop_team"]', '1');
+  await D.getByText('Suggestion activée.').waitFor();
   assert.match(await D.locator('#bo-premium-line').textContent(), /Modèles Premium \(30 jours\) : Atelier.*Boutiques Premium : \d+/);
   // Messages WhatsApp (WHATSAPP-001) : registre, aperçu, état Meta saisi à la main et journalisé.
   await D.locator('#bo-wa-table').waitFor();

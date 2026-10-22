@@ -1852,3 +1852,11 @@ button.swatch.on{border-color:var(--ink)}
 .vhead>.vprof-txt{align-items:flex-start}
 .vt-comptoir .vhead>.vprof-top .vsocials{justify-content:flex-start}
 .vt-card .vt-mini{width:100%;box-sizing:border-box;flex:none}
+
+/* Rétention lot 1 : commande sans adresse (tâche de la commande, en tête de Ma boutique) */
+.addr-due{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;background:color-mix(in srgb,var(--warn,#C98A1B) 14%,var(--surface));border:1.5px solid color-mix(in srgb,var(--warn,#C98A1B) 45%,transparent);color:var(--ink);text-decoration:none}
+.addr-due-ic{width:40px;height:40px;border-radius:12px;background:var(--surface);display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink)}
+.addr-due-t{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.addr-due-t b{font-size:15px}
+.addr-due-t small{font-size:12.5px;color:var(--muted)}
+.addr-due .chev{display:flex;color:var(--muted)}

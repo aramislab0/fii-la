@@ -1,5 +1,6 @@
-// Découverte progressive : une suggestion discrète à la fois selon l'usage (accueil, boutique), « Plus tard » respecté,
-// suggestion suivie = plus jamais, réglage du back-office qui coupe tout ; mesure anonyme.
+// Rétention lot 1 (v2 validée le 22/10/2026, revue VP R1–R5) : une suggestion à la fois sous un budget commun (une exposition
+// par session, deux sur 7 jours), comptée à la visibilité ; clic ≠ usage ; succès relu dans l'état réel (serveur) ; répétition ;
+// anciens « suivie » non relancés ; commande sans adresse en tête (hors budget) ; interrupteurs général et par suggestion.
 import { createRequire } from 'node:module';
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -35,52 +36,119 @@ async function newPhone(init) {
   return page;
 }
 const shot = async (page, name) => { await page.waitForTimeout(900); return page.screenshot({ path: `${SHOTS}/${ENGINE}-${name}.png`, fullPage: true }); };
-const metric = async (v) => Number((await local.db.query(`select coalesce(sum(n), 0) n from fiila.metrics where event = 'nudge' and variant = $1`, [v])).rows[0].n);
+const metric = async (v, ev = 'retention') => Number((await local.db.query(`select coalesce(sum(n), 0) n from fiila.metrics where event = $2 and variant = $1`, [v, ev])).rows[0].n);
+const ok = async (fn, args) => { const r = await rpc(local.db, fn, args); if (r.status !== 200) throw new Error(fn + ' ' + JSON.stringify(r.body)); return r.body; };
+const shopInit = (k, extra = '') => `localStorage.setItem('fiila.shop', JSON.stringify({ key: ${JSON.stringify(k)} }));` + extra;
+const settle = (P) => P.waitForTimeout(700);
 
-const key = (await rpc(local.db, 'fiila_shop_save', { p_key: null, p: { name: 'Boutique Découverte (test)', business_type: 'mode' } })).body.key;
-await rpc(local.db, 'fiila_product_save', { p_key: key, p: { name: 'Robe (test)', price: 12000 } });
 
-await t('boutique avec 1 article : une seule suggestion (« Encore 2 ou 3 articles ») ; « Plus tard » la fait disparaître et elle ne revient pas', async () => {
-  const P = await newPhone(`localStorage.setItem('fiila.shop', JSON.stringify({ key: ${JSON.stringify(key)} }))`);
+const S1 = await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique Découverte (test)', business_type: 'mode' } });
+await ok('fiila_product_save', { p_key: S1.key, p: { name: 'Robe (test)', price: 12000 } });
+
+await t('boutique à 1 article : une suggestion, comptée une fois à la visibilité ; un rechargement ne recompte pas ; « Plus tard » = silence', async () => {
+  const P = await newPhone(shopInit(S1.key));
   await P.goto(URL0 + '#/boutique');
   await P.locator('#nudge-shop_more_products').waitFor();
   assert.equal(await P.locator('.nudge2').count(), 1, 'une seule suggestion par écran');
+  await settle(P);
   await shot(P, '01-boutique-suggestion');
+  await P.reload(); await P.locator('#nudge-shop_more_products').waitFor(); await settle(P);
+  assert.equal(await metric('shop_more_products:shown'), 1, 'même session : même carte, pas de nouvelle exposition');
   await P.click('#nudge-shop_more_products-later');
   await P.locator('#nudge-shop_more_products').waitFor({ state: 'detached' });
-  await P.reload(); await P.locator('#new-order').waitFor(); await P.waitForTimeout(600);
+  await P.reload(); await P.locator('#new-order').waitFor(); await settle(P);
   assert.equal(await P.locator('.nudge2').count(), 0, '7 jours de silence');
-  assert.equal(await metric('shop_more_products:shown'), 1); assert.equal(await metric('shop_more_products:dismiss'), 1);
+  assert.equal(await metric('shop_more_products:dismiss'), 1);
 });
 
-await t('accueil : après une première adresse, la boutique est suggérée ; suivie = plus jamais proposée', async () => {
-  const P = await newPhone(`localStorage.setItem('fiila.tx', '1')`);
-  await P.goto(URL0 + '#/');
-  await P.locator('#nudge-home_shop').waitFor();
-  await shot(P, '02-accueil-suggestion');
-  await P.click('#nudge-home_shop-go');
-  await P.waitForFunction(() => location.hash === '#/boutique');
-  await P.goto(URL0 + '#/'); await P.locator('#create-address').waitFor(); await P.waitForTimeout(600);
-  assert.equal(await P.locator('#nudge-home_shop').count(), 0);
-  assert.equal(await metric('home_shop:click'), 1);
-  // Premier passage, sans aucune action : aucune suggestion.
+await t('clic sans succès ≠ usage ; succès confirmé par le serveur (article ajouté) sous 7 jours = usage ; nouveau succès un jour plus tard = répétition', async () => {
+  const S = await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique Succès (test)', business_type: 'mode' } });
+  await ok('fiila_product_save', { p_key: S.key, p: { name: 'Pagne (test)', price: 5000 } });
+  const P = await newPhone(shopInit(S.key));
+  await P.goto(URL0 + '#/boutique');
+  await P.locator('#nudge-shop_more_products').waitFor(); await settle(P);
+  await P.click('#nudge-shop_more_products-go');
+  await P.waitForFunction(() => location.hash === '#/boutique/article/nouveau');
+  await P.goto(URL0 + '#/boutique'); await P.locator('#nudge-shop_more_products').waitFor(); await settle(P);
+  assert.equal(await metric('shop_more_products:used'), 0, 'un clic n’est pas un usage');
+  await ok('fiila_product_save', { p_key: S.key, p: { name: 'Sac (test)', price: 7000 } });
+  await P.reload(); await P.locator('#new-order').waitFor(); await settle(P);
+  assert.equal(await metric('shop_more_products:used'), 1, 'succès relu dans l’état réel');
+  assert.equal(await P.locator('#nudge-shop_more_products').count(), 0, 'utilisée : plus proposée');
+  await P.evaluate(() => { const st = JSON.parse(localStorage.getItem('fiila.ret')); st.s.shop_more_products.used -= 2 * 864e5; localStorage.setItem('fiila.ret', JSON.stringify(st)); });
+  await ok('fiila_product_save', { p_key: S.key, p: { name: 'Foulard (test)', price: 3000 } });
+  await P.reload(); await P.locator('#new-order').waitFor(); await settle(P);
+  assert.equal(await metric('shop_more_products:repeat'), 1);
+});
+
+await t('budget commun : deux expositions au plus sur 7 jours, d’une session à l’autre (accueil, boutique, fin de tâche)', async () => {
+  const S = await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique Budget (test)', business_type: 'mode' } });
+  await ok('fiila_product_save', { p_key: S.key, p: { name: 'Robe (test)', price: 9000 } });
+  const P = await newPhone(shopInit(S.key));
+  const ctx = P.context();
+  await P.goto(URL0 + '#/boutique'); await P.locator('#nudge-shop_more_products').waitFor(); await settle(P);
+  await P.click('#nudge-shop_more_products-later');
+  const P2 = await ctx.newPage(); P2.__errors = []; P2.on('pageerror', (e) => P2.__errors.push(String(e))); pages.push(P2);
+  await P2.evaluate(() => 0).catch(() => {});
+  await P2.goto(URL0 + '#/boutique'); await P2.locator('#new-order').waitFor(); await settle(P2);
+  // La seule suggestion éligible est en silence : rien.
+  assert.equal(await P2.locator('.nudge2').count(), 0);
+  await P2.evaluate(() => { const st = JSON.parse(localStorage.getItem('fiila.ret')); st.exp = [Date.now(), Date.now()]; delete st.s.shop_more_products.until; st.s.shop_more_products.d = 0; localStorage.setItem('fiila.ret', JSON.stringify(st)); });
+  const P3 = await ctx.newPage(); pages.push(P3); P3.__errors = [];
+  await P3.goto(URL0 + '#/boutique'); await P3.locator('#new-order').waitFor(); await settle(P3);
+  assert.equal(await P3.locator('.nudge2').count(), 0, 'deux expositions sur 7 jours : plus rien');
+});
+
+await t('R1 : commande sans adresse en tête de Ma boutique, même sans article (hors budget) ; mène à la commande', async () => {
+  const S = await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique Commandes (test)', business_type: 'mode' } });
+  const o = await ok('fiila_order_create', { p_key: S.key, p: { customer: { name: 'Awa (test)', phone: '770000041' }, items: [{ label: 'Robe', qty: 1, price: 5000 }] } });
+  const P = await newPhone(shopInit(S.key, `localStorage.setItem('fiila.ret', JSON.stringify({ s: {}, exp: [Date.now(), Date.now()] }));`));
+  await P.goto(URL0 + '#/boutique');
+  await P.locator('#need-address').getByText('1 commande attend une adresse').waitFor();
+  await settle(P);
+  await shot(P, '02-commande-sans-adresse');
+  assert.equal(await metric('shown', 'order_address'), 1);
+  await P.click('#need-address');
+  await P.waitForFunction(() => /#\/commande\/[0-9a-f-]{36}/.test(location.hash));
+  assert.ok(P.url().includes(o.id || ''), 'la commande concernée');
+});
+
+await t('R1 : site hors ligne → jamais « partager le site » ; anciens « suivie » non relancés ; accueil : boutique suggérée après une action', async () => {
+  const S = await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique Hors ligne (test)', business_type: 'mode' } });
+  for (const n of ['A', 'B', 'C']) await ok('fiila_product_save', { p_key: S.key, p: { name: 'Article ' + n + ' (test)', price: 1000 } });
+  const P = await newPhone(shopInit(S.key));
+  await P.goto(URL0 + '#/boutique'); await P.locator('#new-order').waitFor(); await settle(P);
+  assert.equal(await P.locator('#nudge-shop_share_vitrine').count(), 0);
+  const L = await newPhone(`localStorage.setItem('fiila.tx', '1'); localStorage.setItem('fiila.nudges', JSON.stringify({ ids: { home_shop: { done: true } } }));`);
+  await L.goto(URL0 + '#/'); await L.locator('#create-address').waitFor(); await settle(L);
+  assert.equal(await L.locator('#nudge-home_shop').count(), 0, 'ancien clic : pas de relance au déploiement');
+  const H = await newPhone(`localStorage.setItem('fiila.tx', '1')`);
+  await H.goto(URL0 + '#/'); await H.locator('#nudge-home_shop').waitFor(); await settle(H);
+  await shot(H, '03-accueil-suggestion');
   const N = await newPhone();
-  await N.goto(URL0 + '#/'); await N.locator('#create-address').waitFor(); await N.waitForTimeout(600);
+  await N.goto(URL0 + '#/'); await N.locator('#create-address').waitFor(); await settle(N);
   assert.equal(await N.locator('.nudge2').count(), 0, 'jamais au premier geste');
 });
 
-await t('réglage du back-office « nudges = 0 » : plus aucune suggestion', async () => {
-  await local.db.query(`update fiila.settings set value = '0' where key = 'nudges'`);
+await t('interrupteurs : une suggestion coupée au back-office ; « nudges = 0 » coupe tout', async () => {
+  await local.db.query(`insert into fiila.settings (key, value) values ('sugg_home_shop', '0') on conflict (key) do update set value = '0'`);
   const P = await newPhone(`localStorage.setItem('fiila.tx', '1')`);
   await P.goto(URL0 + '#/'); await P.locator('#create-address').waitFor();
   await P.waitForFunction(() => !!localStorage.getItem('fiila.flags'));
-  await P.reload(); await P.locator('#create-address').waitFor(); await P.waitForTimeout(600);
-  assert.equal(await P.locator('.nudge2').count(), 0);
+  await P.reload(); await P.locator('#create-address').waitFor(); await settle(P);
+  assert.equal(await P.locator('#nudge-home_shop').count(), 0);
+  await local.db.query(`update fiila.settings set value = '1' where key = 'sugg_home_shop'`);
+  await local.db.query(`update fiila.settings set value = '0' where key = 'nudges'`);
+  const Q = await newPhone(`localStorage.setItem('fiila.tx', '1')`);
+  await Q.goto(URL0 + '#/'); await Q.locator('#create-address').waitFor();
+  await Q.waitForFunction(() => !!localStorage.getItem('fiila.flags'));
+  await Q.reload(); await Q.locator('#create-address').waitFor(); await settle(Q);
+  assert.equal(await Q.locator('.nudge2').count(), 0);
   await local.db.query(`update fiila.settings set value = '1' where key = 'nudges'`);
 });
 
-await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors), []); });
+await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors || []), []); });
 await browser.close();
 local.server.close();
-console.log(`\n${passed}/${passed + failed} tests découverte progressive réussis — ${ENGINE} ${version}`);
+console.log(`\n${passed}/${passed + failed} tests rétention (suggestions) réussis — ${ENGINE} ${version}`);
 process.exit(failed ? 1 : 0);

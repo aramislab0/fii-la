@@ -647,39 +647,120 @@
     if (!c || Date.now() - c.at >= 6 * 3600e3) api('fiila_app_flags', {}).then(function (v) { NUDGE_FLAGS = v; LS.set('fiila.flags', { at: Date.now(), v: v }); }, function () {});
     return NUDGE_FLAGS || { nudges: true, onboarding: true, discover: true };
   }
-  function nudgeState() {
-    var st = LS.get('fiila.nudges', null) || {};
-    var today = new Date().toISOString().slice(0, 10);
-    if (st.day !== today) { st.day = today; st.n = 0; st.seen = {}; }
-    st.ids = st.ids || {};
+  /* ----- Rétention, lot 1 (proposition v2 validée par le fondateur le 22/10 19:20, revue VP R1–R5, docs/PROPOSITION-RETENTION.md).
+     Un arbitre commun aux suggestions et à la découverte après une action : une exposition par session, deux au plus sur
+     7 jours glissants par téléphone ; une exposition ne compte que si la carte est vue à 50 % ou plus. États séparés par
+     suggestion : clic, refus (7 jours, puis jamais au deuxième), connu (déjà fait avant toute exposition), utilisé (succès
+     relu dans l'état réel sous 7 jours après une exposition), répété (nouveau succès au moins un jour plus tard).
+     Un clic n'est jamais un usage. Les anciens « suivie = plus jamais » ne sont pas convertis : connus si l'état le montre,
+     sinon gardés comme clics historiques, sans relance. Interrupteur général « nudges » et un par suggestion (sugg_<id>). */
+  var RET_LS = 'fiila.ret', RET_SS = 'fiila.ret.s', RET_WEEK = 7 * 864e5;
+  TRACKABLE.retention = [];
+  NUDGE_IDS.forEach(function (id) { ['shown', 'click', 'dismiss', 'used', 'repeat'].forEach(function (a) { TRACKABLE.retention.push(id + ':' + a); }); });
+  TRACKABLE.order_address = ['shown', 'used'];
+  // Textes des suggestions (une source pour l'application et l'aperçu du back-office).
+  var RET_TEXT = {
+    home_shop: { icon: 'shop', title: 'Vous vendez quelque chose ?', text: 'Votre boutique en ligne est gratuite : commandes, factures et adresse exacte de vos clientes.', cta: 'Créer ma boutique' },
+    shop_more_products: { icon: 'cam', title: 'Encore 2 ou 3 articles', text: 'Un site bien rempli inspire confiance à vos clientes.', cta: 'Ajouter un article' },
+    shop_share_vitrine: { icon: 'share', title: 'Faites connaître votre site', text: 'Un lien dans votre statut WhatsApp suffit pour recevoir vos premières commandes.', cta: 'Partager sur WhatsApp' },
+    shop_photos: { icon: 'cam', title: 'Plusieurs photos par article', text: 'Jusqu’à 5 photos qui défilent : vos articles se vendent mieux.', cta: 'Voir mes articles' },
+    shop_courier: { icon: 'moto', title: 'Un livreur de confiance ?', text: 'Invitez-le : il reçoit l’adresse exacte et le chemin à chaque course.', cta: 'Inviter mon livreur' },
+    shop_team: { icon: 'users', title: 'Vous travaillez à plusieurs ?', text: 'Ajoutez un membre d’équipe : chacun avec son rôle, sans partager de mot de passe.', cta: 'Ajouter un membre' } };
+  function ret(id, extra) { return Object.assign({}, RET_TEXT[id], extra); }
+  function retState() {
+    var st = LS.get(RET_LS, null), now = Date.now();
+    if (!st) {
+      st = { s: {}, exp: [] };
+      var old = (LS.get('fiila.nudges', null) || {}).ids || {};
+      Object.keys(old).forEach(function (id) { var o = old[id] || {}; st.s[id] = { d: o.d || 0, until: o.until || 0, legacy: o.done ? 1 : 0 }; });
+    }
+    st.s = st.s || {};
+    st.exp = (st.exp || []).filter(function (t) { return now - t < RET_WEEK; });
     return st;
   }
-  // o : { icon, title, text, cta, href, external }
-  function nudge(id, o) {
-    if (!nudgeFlags().nudges || NUDGE_SEQ === renderSeq) return null;
-    var st = nudgeState(), me = st.ids[id] || {};
-    if (me.done || (me.d || 0) >= 2 || (me.until && Date.now() < me.until)) return null;
-    if (!st.seen[id] && st.n >= 3) return null;
+  function retSave(st) { LS.set(RET_LS, st); }
+  function retSession() { try { return sessionStorage.getItem(RET_SS); } catch (e) { return null; } }
+  function retSetSession(id) { try { sessionStorage.setItem(RET_SS, id); } catch (e) { /* rien */ } }
+  // Budget commun : la carte déjà exposée dans cette session peut revenir ; une autre, seulement s'il reste du budget.
+  function retBudget(key) {
+    var cur = retSession();
+    if (cur) return cur === key ? 'same' : null;
+    return retState().exp.length < 2 ? 'fresh' : null;
+  }
+  // Exposition réelle : la carte est vue à 50 % ou plus (une fois par session et par carte).
+  function retOnVisible(el, fn) {
+    var done = false;
+    function go() { if (!done) { done = true; fn(); } }
+    try {
+      if (!('IntersectionObserver' in window)) { setTimeout(go, 0); return; }
+      var io = new IntersectionObserver(function (en) { if (en.some(function (x) { return x.isIntersecting; })) { io.disconnect(); go(); } }, { threshold: 0.5 });
+      io.observe(el);
+    } catch (e) { /* ignoré */ }
+  }
+  function retExpose(key, onCount) {
+    if (retSession()) return;
+    var st = retState(); st.exp.push(Date.now()); retSave(st); retSetSession(key);
+    if (onCount) onCount();
+  }
+  // Lecture de l'état réel : connu, utilisé, répété (metric croissant = succès confirmé par le serveur).
+  function retObserve(id, metric, doneNow) {
+    var st = retState(), r = st.s[id] = st.s[id] || {}, now = Date.now(), changed = false;
+    metric = Number(metric) || 0;
+    if (r.used) {
+      if (!r.rep && metric > (r.uv || 0) && now - r.used >= 864e5) { r.rep = now; changed = true; track('retention', id + ':repeat'); }
+    } else if (r.at && now - r.at <= RET_WEEK && metric > (r.base || 0)) {
+      r.used = now; r.uv = metric; changed = true; track('retention', id + ':used');
+    } else if (doneNow && !r.known) { r.known = 1; changed = true; }
+    if (changed) retSave(st);
+  }
+  function retUsable(id) {
+    var off = nudgeFlags().sugg_off || [], r = retState().s[id] || {};
+    return off.indexOf(id) < 0 && !r.used && !r.known && !r.legacy && (r.d || 0) < 2 && !(r.until && Date.now() < r.until);
+  }
+  // Choix : la première suggestion éligible et utilisable, dans l'ordre donné, sous le budget commun.
+  // c : { id, ok (éligible), metric, o: { icon, title, text, cta, href, external } }
+  function retPick(cands) {
+    if (!nudgeFlags().nudges) return null;
+    var cur = retSession();
+    for (var i = 0; i < cands.length; i++) {
+      var c = cands[i];
+      if (!c.ok || !retUsable(c.id)) continue;
+      var b = retBudget(c.id);
+      if (!b && !cur) return null;
+      if (b) return nudge(c.id, c.o, c.metric);
+      if (cur) continue;
+    }
+    return null;
+  }
+  // Carte de suggestion (même apparence qu'avant). L'exposition est comptée à la visibilité, pas au rendu.
+  function nudge(id, o, metric) {
+    if (NUDGE_SEQ === renderSeq) return null;
     NUDGE_SEQ = renderSeq;
-    if (!st.seen[id]) { st.seen[id] = 1; st.n++; track('nudge', id + ':shown'); }
-    LS.set('fiila.nudges', st);
-    function save(fn) { var x = nudgeState(); x.ids[id] = fn(x.ids[id] || {}); LS.set('fiila.nudges', x); }
+    function upd(fn) { var st = retState(); st.s[id] = fn(st.s[id] || {}); retSave(st); }
     var card = h('aside', { class: 'nudge2', id: 'nudge-' + id, 'aria-label': 'Suggestion' },
       h('span', { class: 'nudge2-ic', 'aria-hidden': 'true' }, icon(o.icon || 'star', 18)),
       h('div', { class: 'nudge2-t' }, h('b', null, o.title), o.text ? h('span', null, o.text) : null,
         h('a', { class: 'nudge2-cta', href: o.href, id: 'nudge-' + id + '-go', target: o.external ? '_blank' : null, rel: o.external ? 'noopener noreferrer' : null, onclick: function () {
-          track('nudge', id + ':click'); save(function (m) { m.done = true; return m; }); if (o.external) card.remove();
+          track('retention', id + ':click'); upd(function (m) { m.c = (m.c || 0) + 1; return m; });
         } }, o.cta, icon('chev', 14))),
       h('button', { class: 'nudge2-x', type: 'button', 'aria-label': 'Plus tard', id: 'nudge-' + id + '-later', onclick: function () {
-        track('nudge', id + ':dismiss'); save(function (m) { m.d = (m.d || 0) + 1; m.until = Date.now() + 7 * 864e5; return m; });
+        track('retention', id + ':dismiss'); upd(function (m) { m.d = (m.d || 0) + 1; m.until = Date.now() + RET_WEEK; return m; });
         card.classList.add('out'); setTimeout(function () { card.remove(); }, REDUCED ? 0 : 200);
       } }, icon('close', 16)));
+    retOnVisible(card, function () {
+      retExpose(id, function () {
+        track('retention', id + ':shown');
+        upd(function (m) { var now = Date.now(); if (!m.at || now - m.at > RET_WEEK || m.base == null) m.base = Number(metric) || 0; m.at = now; return m; });
+      });
+    });
     return card;
   }
   // Accueil : quelqu'un qui a déjà créé une adresse et qui n'a pas de boutique découvre la boutique gratuite.
   function homeNudge() {
-    if (CFG.shop === false || shopKey() || (ME && ME.shop) || (LS.get('fiila.tx', 0) || 0) < 1) return null;
-    return nudge('home_shop', { icon: 'shop', title: 'Vous vendez quelque chose ?', text: 'Votre boutique en ligne est gratuite : commandes, factures et adresse exacte de vos clientes.', cta: 'Créer ma boutique', href: '#/boutique' });
+    var has = !!(shopKey() || (ME && ME.shop));
+    retObserve('home_shop', has ? 1 : 0, has);
+    return retPick([{ id: 'home_shop', ok: CFG.shop !== false && !has && !setupPending() && (LS.get('fiila.tx', 0) || 0) >= 1, metric: has ? 1 : 0,
+      o: ret('home_shop', { href: '#/boutique' }) }]);
   }
   /* ----- Parcours d'accueil v2 (proposition validée par le fondateur le 20/10 23:36, docs/PROPOSITION-ONBOARDING.md).
      Rien ne s'« installe » : chaque service est disponible ; son premier usage ajoute son raccourci dans « Mes activités ».
@@ -856,6 +937,7 @@
     if (!afterOn()) return null;
     var st = LS.get(AFTER_LS, null) || {}, me = st[ctx] || {};
     if ((me.d || 0) >= 2 || (me.until && Date.now() < me.until)) return null;
+    if (!retBudget('after_' + ctx)) return null; // budget commun avec les suggestions (une par session, deux sur 7 jours)
     var box = h('aside', { class: 'after', id: 'after-' + ctx, 'aria-label': 'Suggestion' },
       h('span', { class: 'after-ic', 'aria-hidden': 'true' }, icon(o.icon, 20)),
       h('div', { class: 'after-t' }, h('b', null, o.title),
@@ -866,7 +948,7 @@
         var x = LS.get(AFTER_LS, null) || {}; var m = x[ctx] || {}; m.d = (m.d || 0) + 1; m.until = Date.now() + 7 * 864e5; x[ctx] = m; LS.set(AFTER_LS, x);
         track('discover', ctx + ':hide'); box.remove();
       } }, icon('close', 16)));
-    trackWhenVisible(box, 'discover', ctx + ':shown');
+    retOnVisible(box, function () { retExpose('after_' + ctx, function () { track('discover', ctx + ':shown'); }); });
     return box;
   }
   // « Installer l'app » : à partir de la deuxième visite (une visite = une session du navigateur).
@@ -876,15 +958,43 @@
     return n;
   }
   // Tableau de bord de la boutique : la prochaine fonction utile selon l'avancement, une seule à la fois.
+  // Suggestions de la boutique (matrice §3 de la v2). Chaque condition est indépendante ; l'ordre ne sert qu'à départager.
   function shopNudge(shop, st) {
-    var p = st.products || 0, o = st.orders || 0;
-    if (p >= 1 && p < 3) return nudge('shop_more_products', { icon: 'cam', title: 'Encore 2 ou 3 articles', text: 'Un site bien rempli inspire confiance à vos clientes.', cta: 'Ajouter un article', href: '#/boutique/article/nouveau' });
-    if (p >= 3 && shop.public && shop.slug && o === 0) return nudge('shop_share_vitrine', { icon: 'share', title: 'Faites connaître votre site', text: 'Un lien dans votre statut WhatsApp suffit pour recevoir vos premières commandes.', cta: 'Partager sur WhatsApp',
-      href: waLink('Découvrez ma boutique ' + shop.name + ' : ' + baseUrl() + '#/b/' + shop.slug), external: true });
-    if (o >= 2 && !shop.courier && !shop.courier_invite && SHOP_ROLE !== 'editor') return nudge('shop_courier', { icon: 'moto', title: 'Un livreur de confiance ?', text: 'Invitez-le : il reçoit l’adresse exacte et le chemin à chaque course.', cta: 'Inviter mon livreur', href: '#/boutique/reglages' });
-    if (p >= 3 && o >= 1) return nudge('shop_photos', { icon: 'cam', title: 'Plusieurs photos par article', text: 'Jusqu’à 5 photos qui défilent : vos articles se vendent mieux.', cta: 'Voir mes articles', href: '#/boutique/articles' });
-    if (o >= 10 && SHOP_ROLE === 'owner') return nudge('shop_team', { icon: 'users', title: 'Vous travaillez à plusieurs ?', text: 'Ajoutez un membre d’équipe : chacun avec son rôle, sans partager de mot de passe.', cta: 'Ajouter un membre', href: '#/boutique/reglages' });
-    return null;
+    var p = st.products || 0, o = st.orders || 0, role = SHOP_ROLE || shop.role || 'owner';
+    var courier = shop.courier || shop.courier_invite ? 1 : 0;
+    retObserve('shop_more_products', p, p >= 3);
+    retObserve('shop_share_vitrine', st.views || 0, (st.vitrine_orders || 0) > 0);
+    retObserve('shop_photos', st.multi_photos || 0, (st.multi_photos || 0) > 0);
+    retObserve('shop_courier', courier, !!courier);
+    retObserve('shop_team', st.members || 0, (st.members || 0) > 0);
+    if (setupPending()) return null;
+    return retPick([
+      { id: 'shop_more_products', ok: p >= 1 && p < 3, metric: p,
+        o: ret('shop_more_products', { href: '#/boutique/article/nouveau' }) },
+      { id: 'shop_share_vitrine', ok: !!(shop.public && shop.slug) && p >= 1 && !(st.vitrine_orders > 0), metric: st.views || 0,
+        o: ret('shop_share_vitrine', {
+          href: waLink('Découvrez ma boutique ' + shop.name + ' : ' + baseUrl() + '#/b/' + shop.slug), external: true }) },
+      { id: 'shop_photos', ok: p >= 3 && o >= 1 && !(st.multi_photos > 0), metric: st.multi_photos || 0,
+        o: ret('shop_photos', { href: '#/boutique/articles' }) },
+      { id: 'shop_courier', ok: o >= 2 && !courier && role !== 'editor', metric: courier,
+        o: ret('shop_courier', { href: '#/boutique/reglages' }) },
+      { id: 'shop_team', ok: o >= 10 && role === 'owner' && !(st.members > 0), metric: st.members || 0,
+        o: ret('shop_team', { href: '#/boutique/reglages' }) }]);
+  }
+  // S0 : commandes ouvertes qui attendent une adresse. Tâche de la commande : hors budget, montrée à tout membre.
+  function addressDueCard(st) {
+    var n = st.need_address || 0;
+    if (!n || !st.need_address_order) return null;
+    var card = h('a', { class: 'addr-due', id: 'need-address', href: '#/commande/' + st.need_address_order },
+      h('span', { class: 'addr-due-ic', 'aria-hidden': 'true' }, icon('pin', 22)),
+      h('span', { class: 'addr-due-t' }, h('b', null, n > 1 ? n + ' commandes attendent une adresse' : '1 commande attend une adresse'),
+        h('small', null, 'Envoyez le lien à la cliente, ou redemandez l’adresse.')),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)));
+    retOnVisible(card, function () {
+      try { if (sessionStorage.getItem('fiila.ret.s0')) return; sessionStorage.setItem('fiila.ret.s0', '1'); } catch (e) { /* rien */ }
+      track('order_address', 'shown');
+    });
+    return card;
   }
   function privacyOptOut() {
     try { return navigator.globalPrivacyControl === true || navigator.doNotTrack === '1' || window.doNotTrack === '1'; }
@@ -5668,6 +5778,7 @@
         h('p', { class: 'eyebrow' }, 'Ma boutique'),
         h('h1', { class: 'wrapword', id: 'shop-title' }, shop.name)),
       partnerSlot(),
+      addressDueCard(st),
       // Boutique neuve : une seule première étape, pas de tableau de bord vide.
       !st.orders && !st.products ? h('section', { class: 'card', id: 'first-product' },
         h('h2', null, 'Ajoutez votre premier article'),
@@ -5903,7 +6014,7 @@
       addr = [h('span', { class: 'chip wait', style: 'align-self:flex-start' }, icon('clock', 12), 'En attente de l’adresse')];
     } else {
       addr = [h('div', { class: 'notice' }, o.address_state === 'expired' ? 'La demande d’adresse a expiré.' : o.address_state === 'revoked' ? 'Le client a retiré son adresse.' : 'Aucune adresse pour cette commande.'),
-        closed ? null : h('button', { class: 'btn', type: 'button', id: 'ask-address', onclick: function (ev) { ev.currentTarget.disabled = true; call('fiila_order_request_address', null, 'Nouvelle demande prête. Renvoyez le lien au client.').catch(function () {}); } }, 'Redemander l’adresse')];
+        closed ? null : h('button', { class: 'btn', type: 'button', id: 'ask-address', onclick: function (ev) { ev.currentTarget.disabled = true; call('fiila_order_request_address', null, 'Nouvelle demande prête. Renvoyez le lien au client.').then(function () { track('order_address', 'used'); }, function () {}); } }, 'Redemander l’adresse')];
     }
 
     // 2. Envoyer au client
@@ -6036,11 +6147,13 @@
     if (authed() || (LS.get('fiila.tx', 0) || 0) < 3) return null;
     var until = LS.get('fiila.nudge.until', 0) || 0;
     if (Date.now() < until) return null;
-    track('account_nudge', 'shown');
-    return nudgeCard('account-nudge', 'Ne perdez rien', 'Un compte garde vos adresses et votre boutique, même si vous changez de téléphone. Facultatif.',
+    if (!retBudget('account')) return null; // budget commun (rétention v2, R3)
+    var card = nudgeCard('account-nudge', 'Ne perdez rien', 'Un compte garde vos adresses et votre boutique, même si vous changez de téléphone. Facultatif.',
       '#/compte' + qs({ mode: 'inscription', source: 'nudge' }), function () {
         LS.set('fiila.nudge.until', Date.now() + 14 * 864e5); track('account_nudge', 'dismissed');
       });
+    retOnVisible(card, function () { retExpose('account', function () { track('account_nudge', 'shown'); }); });
+    return card;
   }
   function shopAccountCard() {
     if (Date.now() < (LS.get('fiila.nudge.shop', 0) || 0)) return null;
@@ -8312,16 +8425,46 @@
           } }, Object.keys(WA_META).map(function (k) { return h('option', { value: k, selected: k === t.meta }, WA_META[k]); }));
         } }], d.templates || [], { id: 'bo-wa-table' }));
   }
+  // Croissance → Suggestions (rétention lot 1, v2 validée le 22/10 19:20). Nombres bruts, « installations observées »,
+  // 7 derniers jours = fenêtre de succès incomplète. Interrupteur par suggestion (droit « settings », journalisé).
   function boNudgePanel(d) {
     if (!d) return null;
-    return h('section', { class: 'card stack tight bo-panel', id: 'bo-nudges' }, h('div', { class: 'bo-panel-h' }, h('h2', null, 'Découverte progressive'), d.on ? boBadge('ok', 'Active') : boBadge('muted', 'Coupée (Réglages)')),
-      h('p', { class: 'small muted' }, 'Une suggestion à la fois, selon l’usage ; 3 au plus par jour ; « Plus tard » = 7 jours de silence. 30 derniers jours :'),
-      d.items.length ? boTable([
+    var canSet = boCan('settings');
+    var rows = d.suggestions || [];
+    function v(x, k) { return Number((x.d30 || {})[k] || 0); }
+    function sw(x) {
+      if (!canSet) return x.on ? 'Active' : 'Coupée';
+      return h('select', { 'aria-label': 'Suggestion ' + (NUDGE_LABEL[x.id] || x.id), 'data-sugg': x.id, onchange: function (e) {
+        var sel = e.target, val = Number(sel.value);
+        api('fiila_bo_setting_set', { p_key: 'sugg_' + x.id, p_value: val }).then(function () { toast(val ? 'Suggestion activée.' : 'Suggestion coupée.'); x.on = !!val; },
+          function (err) { sel.value = x.on ? '1' : '0'; toast(errText(err)); });
+      } }, h('option', { value: '1', selected: x.on || null }, 'Active'), h('option', { value: '0', selected: !x.on || null }, 'Coupée'));
+    }
+    var oa = d.order_address || {};
+    return h('section', { class: 'card stack tight bo-panel', id: 'bo-nudges' },
+      h('div', { class: 'bo-panel-h' }, h('h2', null, 'Suggestions'), d.on ? boBadge('ok', 'Actives') : boBadge('muted', 'Toutes coupées (Réglages)')),
+      h('p', { class: 'small muted' }, 'Une exposition par session, deux au plus sur 7 jours par téléphone ; comptée seulement si la carte est vue. Un clic n’est jamais un usage : « Succès » = état réel relu sous 7 jours (article ajouté, visite du site, livreur invité, article à plusieurs photos, membre invité, boutique créée). 30 derniers jours, installations observées (pas des personnes ni des boutiques uniques).'),
+      boTable([
         { label: 'Suggestion', get: function (x) { return NUDGE_LABEL[x.id] || x.id; } },
-        { label: 'Vue', get: function (x) { return boNum(x.shown); }, cls: 'num' },
-        { label: 'Suivie', get: function (x) { return boNum(x.click) + ' · ' + (x.shown ? Math.round(x.click / x.shown * 100) : 0) + ' %'; }, cls: 'num' },
-        { label: 'Plus tard', get: function (x) { return boNum(x.dismiss); }, cls: 'num' }], d.items, { id: 'bo-nudges-table' })
-        : h('p', { class: 'muted small' }, 'Aucune suggestion vue pour le moment.'));
+        { label: 'Vues', get: function (x) { return boNum(v(x, 'shown')); }, cls: 'num' },
+        { label: 'Clics', get: function (x) { return boNum(v(x, 'click')); }, cls: 'num' },
+        { label: 'Refus', get: function (x) { return boNum(v(x, 'dismiss')); }, cls: 'num' },
+        { label: 'Succès ≤ 7 j', get: function (x) { return boNum(v(x, 'used')); }, cls: 'num' },
+        { label: 'Répétés', get: function (x) { return boNum(v(x, 'repeat')); }, cls: 'num' },
+        { label: 'État', get: sw }], rows, { id: 'bo-sugg-table' }),
+      h('p', { class: 'small muted', id: 'bo-sugg-window' }, 'Fenêtre incomplète : ' + boNum(rows.reduce(function (n, x) { return n + Number((x.d7 || {}).shown || 0); }, 0)) +
+        ' vue(s) des 7 derniers jours ont encore le temps d’aboutir à un succès.'),
+      h('p', { class: 'small', id: 'bo-order-address' }, 'Commandes sans adresse (tâche de la commande, hors budget) : carte vue ' + boNum(oa.shown || 0) + ' fois, adresse redemandée ' + boNum(oa.used || 0) +
+        ' fois (30 jours) ; adresses reçues pour des commandes sur 30 jours : ' + boNum(oa.received_30 || 0) + ' ; commandes ouvertes en attente maintenant : ' + boNum(oa.waiting_now || 0) + '.'),
+      h('details', { id: 'bo-sugg-preview' }, h('summary', null, 'Aperçu des cartes'),
+        h('div', { class: 'stack tight', style: 'margin-top:10px;max-width:420px' }, NUDGE_IDS.map(function (id) {
+          var t = RET_TEXT[id];
+          return h('aside', { class: 'nudge2' }, h('span', { class: 'nudge2-ic', 'aria-hidden': 'true' }, icon(t.icon, 18)),
+            h('div', { class: 'nudge2-t' }, h('b', null, t.title), h('span', null, t.text), h('span', { class: 'nudge2-cta' }, t.cta, icon('chev', 14))));
+        }))),
+      d.items && d.items.length ? h('details', null, h('summary', null, 'Ancienne mesure (avant le 22/10)'),
+        boTable([{ label: 'Suggestion', get: function (x) { return NUDGE_LABEL[x.id] || x.id; } }, { label: 'Vue', get: function (x) { return boNum(x.shown); }, cls: 'num' },
+          { label: 'Suivie', get: function (x) { return boNum(x.click); }, cls: 'num' }, { label: 'Plus tard', get: function (x) { return boNum(x.dismiss); }, cls: 'num' }], d.items, {})) : null);
   }
   // ----- Ambassadeurs (marques invitées par le fondateur) : invitations, essais, packs versionnés.
   var PTN_STATE = { valid: ['warn', 'Invitation envoyée'], accepted: ['ok', 'Acceptée'], expired: ['muted', 'Expirée'], revoked: ['muted', 'Retirée'] };
