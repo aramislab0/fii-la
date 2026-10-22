@@ -38,7 +38,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium
+      # Installation parfois bloquée côté GitHub (22/10 : plus de 20 min) : 3 essais de 6 min au plus.
+      - name: Navigateurs de test
+        run: for i in 1 2 3; do timeout 360 npx playwright install --with-deps chromium && exit 0; echo "essai $i échoué ou trop long"; done; exit 1
       - name: Suites SQL
         run: scripts/run-suites.sh sql
       - name: Suites navigateur (Chrome)
@@ -134,7 +136,9 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --ignore-scripts
-      - run: npx playwright install --with-deps chromium webkit
+      # Installation parfois bloquée côté GitHub (22/10 : plus de 20 min) : 3 essais de 6 min au plus.
+      - name: Navigateurs de test
+        run: for i in 1 2 3; do timeout 360 npx playwright install --with-deps chromium webkit && exit 0; echo "essai $i échoué ou trop long"; done; exit 1
       - name: Attendre que le site en ligne serve cette version
         run: |
           for i in $(seq 1 60); do

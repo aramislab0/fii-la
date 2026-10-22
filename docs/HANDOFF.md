@@ -261,6 +261,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 22/10 22:05 | CI : l'installation des navigateurs de test s'est bloquée deux fois chez GitHub (plus de 20 min) ; étape bornée à 6 min avec 3 essais (`.github/workflows/pages.yml`) | ce commit |
 | 22/10 22:00 | UX adaptative construite (accueil appris des réussites, contrôles de l'utilisateur, reprises en haut de Ma boutique, réglage `adaptive_home`, back-office) ; tests SQL et navigateur | migration `20261022800000_fiila_adaptive_home` ; `tests/adaptive.test.mjs` (8), `tests/adaptive.sql.test.mjs` (2) |
 | 22/10 21:10 | Avis UX-ADAPTATIVE-001 v1.1 : relu contre le mandat à la demande du fondateur, 4 corrections (surface existante = conforme au mandat ; recalcul à l'arrivée et après une réussite ; commerçants inclus sur le haut de Ma boutique ; contexte compte + boutique + rôle) ; aucun code modifié | `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md` §0 |
 | 22/10 21:15 | Avis du Builder UX-ADAPTATIVE-001 rendu (accord avec changements ; meilleur argument contre : pas assez de répétitions au pilote ; écart relevé : le bouton principal apprend aujourd'hui des écrans ouverts) ; aucun code modifié | `docs/AVIS-BUILDER-UX-ADAPTATIVE-001.md` |
