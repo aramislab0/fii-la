@@ -3,14 +3,28 @@
 > Claude (Builder), 22/10/2026, à la demande du fondateur (« ok go », 20:53).
 > Base lue : commit `0e07469` (= `29fbab8` + l'import du mandat + journal). Lecture du code et des tests uniquement : aucune mesure terrain.
 > **Avis seulement.** Rien n'est implémenté, migré ni activé. L'implémentation attend l'accord explicite du fondateur.
+>
+> **v1.1 (22/10, 21:05)** : relue point par point contre le mandat, à la demande du fondateur. Quatre corrections, détaillées au §0.
+
+## 0. Relecture contre le mandat : corrections de la v1.1
+
+| # | Mandat | v1 | v1.1 |
+|---|---|---|---|
+| C1 | §3 : « à intégrer dans une surface existante si possible ; ne pas ajouter une deuxième action principale » | Présenté comme un changement (« pas de nouveau bloc ») | **C'est ce que demande le mandat.** Ce n'est pas un désaccord : la surface existante est le bouton principal de l'accueil et, pour une boutique, le haut de Ma boutique. |
+| C2 | §3 : « recalculer à des moments stables (arrivée sur l'accueil, retour après une tâche réussie) » | Choix figé pour toute la session | **Recalcul à l'arrivée sur l'accueil et au retour après une tâche réussie**, jamais pendant qu'un écran est affiché. Le figé par session est retiré. |
+| C3 | §3 : « ne pas confondre acheteur, commerçant, livreur ; une même personne peut avoir plusieurs usages » ; §6 : protocole adapté **aux boutiques recrutées** | Commerçants exclus de l'adaptation | **Commerçants inclus**, sur leur surface existante (le haut de Ma boutique), sans toucher au bouton « Ma boutique » ni à l'ordre validé (§3 bis). Le pilote, qui recrute des boutiques, mesure donc bien quelque chose. |
+| C4 | §5 : état « isolé par compte / boutique et rôle » | Isolé par compte seulement | **Contexte = compte (ou « sans compte ») + boutique + rôle.** Changer de boutique ou de rôle change de contexte. |
+
+Le reste de l'avis (signaux, auto-renforcement, contrôles, données, retour arrière) tient tel quel.
+
 
 ## 1. Verdict
 
 **ACCORD AVEC CHANGEMENTS, sur un périmètre plus petit que le mandat.**
 
-- **Pas de nouveau bloc « Votre prochaine action ».** L'accueil a déjà une action principale adaptative : le grand bouton du haut (`homeHero`, `web/app.js:820`). La règle 7 (une seule action principale par écran) interdit d'en ajouter une seconde. La « prochaine action » du mandat, c'est ce bouton : on corrige sa façon d'apprendre au lieu de créer une deuxième surface.
+- **« Votre prochaine action » sur les surfaces existantes**, comme le demande le mandat (§3). Pour un particulier ou un livreur : le grand bouton du haut de l'accueil (`homeHero`, `web/app.js:820`), déjà adaptatif. Pour une boutique : le haut de Ma boutique (§3 bis). Aucun bloc ni action principale en plus (règle 7).
 - **Correction prioritaire.** Ce bouton apprend aujourd'hui des **écrans ouverts** (`noteActivity`, `web/app.js:789`). Le tableau des signaux du mandat (§4) dit précisément qu'une ouverture d'écran est « intérêt possible ; jamais réussite ». Il faut le faire apprendre des **tâches réussies et répétées**.
-- **Pour les commerçants, rien ne bouge.** Leur bouton principal reste « Ma boutique » (décision du 22/10). Leur « prochaine action » est déjà la carte « commandes sans adresse » puis la suggestion du moteur de rétention (`retPick`, `web/app.js:722`), avec l'ordre validé. Je ne propose pas de personnaliser cet ordre.
+- **Commerçants : sur leur surface, sans déplacer leurs commandes.** Leur bouton principal reste « Ma boutique » (décision du 22/10), et « Nouvelle commande » reste l'action de Ma boutique. Le haut de Ma boutique montre la prochaine action dans cet ordre : besoin bloquant (commande sans adresse), puis tâche commencée à reprendre, puis suggestion du moteur de rétention, dans l'ordre validé (§3 bis). Je ne propose pas de personnaliser cet ordre.
 - **Pas de modèle entraîné, pas d'IA, pas de service payant.** Une règle lisible, des paramètres versionnés, l'état sur le téléphone.
 
 ### Le meilleur argument contre
@@ -74,10 +88,27 @@ actionPrincipale(contexte):
 
 **Auto-renforcement évité.** Le score ne compte que des réussites, jamais des expositions ni des clics sur le bouton. Être affiché plus souvent ne fait pas monter un service.
 
-**Stabilité.**
-- Le choix est calculé à l'ouverture de la session et figé jusqu'à la fin de cette session.
+**Stabilité (C2).**
+- Le choix est recalculé à deux moments seulement : à l'arrivée sur l'accueil, et au retour après une tâche réussie.
+- Jamais pendant qu'un écran est affiché, et jamais à la suite d'une simple navigation sans réussite.
 - Le choix épinglé et les tâches commencées passent toujours devant.
-- Une réussite peut changer le bouton à la session suivante, jamais dans la session en cours.
+
+### 3 bis. Surface d'une boutique (C3)
+
+Le haut de Ma boutique existe déjà : carte « commandes sans adresse », puis une suggestion. Il devient la « prochaine action » de la boutique, sans nouvel emplacement.
+
+```
+prochaineActionBoutique(contexte = compte + boutique + rôle):
+  1. besoin bloquant          → commandes sans adresse                 (existe, hors budget)
+  2. tâche commencée          → « Reprendre l'article » (brouillon d'article non enregistré) ;
+                                « Reprendre la commande » (commande en cours de saisie)
+                                — seulement si un brouillon existe dans ce contexte
+  3. sinon                    → suggestion du moteur de rétention (retPick), ordre validé, budget commun
+```
+
+- **Rôle.** Un éditeur ne voit que ce que son rôle peut faire : le moteur filtre déjà le livreur et l'équipe.
+- **Plusieurs usages.** Une personne qui a une boutique et crée aussi des adresses ou des événements garde « Ma boutique » en bouton principal. Ses autres activités restent dans « Mes activités », sans réordonnancement automatique : c'est un invariant du mandat, aucun déplacement sur prédiction.
+- **À l'implémentation, deux brouillons à créer**, uniquement sur le téléphone : l'article en cours de saisie et la commande en cours de saisie. Aucune donnée de client n'est envoyée.
 
 ### Contrôle par l'utilisateur, sans écran de plus (règle 7)
 
@@ -101,7 +132,10 @@ Ces commandes vont dans la feuille « Découvrir les services », déjà existan
 | Panne ou erreur serveur à l'envoi | Aucun effet (pas de réussite, pas de pénalité) |
 | Service retiré de l'accueil | Jamais en bouton principal ; remis par la feuille des services |
 | Choix épinglé | Le service épinglé, sauf tâche commencée ou boutique |
-| Changement de compte sur le même téléphone | Journal séparé par contexte : « sans compte » et chaque compte. Les usages ne se mélangent pas. |
+| Changement de compte sur le même téléphone | Journal séparé par contexte (compte ou « sans compte », boutique, rôle). Les usages ne se mélangent pas. |
+| Changement de boutique, ou éditeur dans une autre boutique | Nouveau contexte : ni reprise ni suggestion d'une autre boutique |
+| Refus d'une suggestion | Pause de 7 jours, arrêt au deuxième refus (règles existantes du moteur, inchangées) |
+| Brouillon d'article abandonné | « Reprendre l'article » en haut de Ma boutique, sauf si une commande attend une adresse |
 | Téléphone partagé sans compte | Un seul contexte local, sans prétendre reconnaître une personne |
 | Stockage bloqué (navigation privée) | Règle fixe actuelle (« Créer mon adresse »), sans erreur |
 | Éditeur d'une boutique | « Ma boutique » ; ses droits limitent déjà les suggestions (inchangé) |
@@ -110,8 +144,9 @@ Ces commandes vont dans la feuille « Découvrir les services », déjà existan
 ## 5. Périmètre minimal, coût, essai et retour arrière
 
 **Périmètre (si accordé) :**
-1. Journal des **réussites** par service et par contexte (compte ou « sans compte »), sur le téléphone. Il se branche sur les créations réussies déjà mesurées : `fiche_created`, `request_created`, course terminée, proposition de vide-dressing.
-2. Le score et la règle du §3, à la place de `topActivity`. Le choix est figé par session.
+1. Journal des **réussites** par service et par contexte (compte ou « sans compte », boutique, rôle), sur le téléphone. Il se branche sur les créations réussies déjà mesurées : `fiche_created`, `request_created`, course terminée, proposition de vide-dressing.
+2. Le score et la règle du §3, à la place de `topActivity`, recalculés à l'arrivée sur l'accueil et après une réussite.
+2 bis. Le haut de Ma boutique selon le §3 bis : reprise d'un article ou d'une commande commencés, sur le téléphone.
 3. Dans la feuille des services : la ligne d'explication, « Mettre en premier », « Revenir au choix automatique », « Remettre à zéro ».
 4. Un réglage `adaptive_home` (0 = règle actuelle) et la version des paramètres affichée.
 5. **Back-office minimal** (règle 8), dans Croissance → Parcours d'accueil :
@@ -127,24 +162,34 @@ Ces commandes vont dans la feuille « Découvrir les services », déjà existan
 - Il est effacé par « Remettre à zéro » ou en vidant les données du navigateur.
 - Les pages reçues par lien n'écrivent toujours rien sur le téléphone sans action.
 
-**Coût estimé (hypothèse).** Environ une demi-journée de construction et de tests (Chrome et WebKit), plus la recette sur téléphone. Aucun service payant, aucune dépendance nouvelle.
+**Coût estimé (hypothèse).** Environ une journée de construction et de tests (Chrome et WebKit) avec la surface de la boutique, plus la recette sur téléphone. Aucun service payant, aucune dépendance nouvelle.
 
 **Essai.**
 - Lancer `adaptive_home` = 1 pour tous, pendant 14 jours.
 - Comparer aux 14 jours précédents, avec les compteurs existants `onboarding` (bouton touché).
 - Ajouter le suivi terrain des boutiques et utilisateurs recrutés, avec leur accord.
-- Critère utile : la part de sessions où le bouton principal mène à une **tâche réussie**.
+- Critères, comparés au comportement actuel :
+  - la part de sessions où l'action proposée mène à une **tâche réussie** ;
+  - les **reprises utiles** (brouillon repris, puis enregistré) ;
+  - les **erreurs et abandons** ;
+  - la **répétition** à une occasion ultérieure.
+- **Pour les boutiques recrutées** : suivi dans la fiche terrain (grille du §5), avec leur accord.
 - Critère d'arrêt : un seul retour terrain « le bouton a changé et je ne m'y retrouve plus » remet `adaptive_home` à 0 le temps d'examiner.
 - Limite : sans tirage au sort et avec ces volumes, aucune conclusion causale. C'est un contrôle de non-dégradation, pas une preuve de gain.
 
 **Retour arrière.** `adaptive_home` = 0 rétablit la règle actuelle. Le journal des réussites est gardé et inutilisé : aucune donnée perdue, rien à migrer.
 
-**Recommandation unique.** Faire seulement le correctif « apprendre des réussites, figé par session, choix de l'utilisateur et remise à zéro », derrière `adaptive_home`. Ne rien personnaliser d'autre avant d'avoir des données terrain.
+**Recommandation unique.** Construire le périmètre ci-dessus, et seulement lui, derrière `adaptive_home` :
+- l'accueil apprend des réussites, avec des moments de recalcul stables ;
+- le haut de Ma boutique propose besoin bloquant → reprise → suggestion ;
+- l'utilisateur garde la main (« Mettre en premier », remise à zéro).
+
+Ne rien personnaliser d'autre avant d'avoir des données terrain.
 
 ## 6. Arbitrages pour le fondateur
 
-1. **Pas de nouveau bloc.** On adapte le bouton principal existant au lieu d'ajouter « Votre prochaine action ». *Recommandé : oui.*
-2. **Commerçants exclus de l'adaptation.** « Ma boutique » reste fixe ; l'ordre des suggestions reste celui validé. *Recommandé : oui.*
+1. **Surfaces existantes** : bouton principal de l'accueil pour les particuliers et livreurs, haut de Ma boutique pour les boutiques (conforme au mandat §3). *Recommandé : oui.*
+2. **Boutiques : besoin bloquant → reprise → suggestion**, sans déplacer « Ma boutique » ni « Nouvelle commande », et avec l'ordre des suggestions validé. *Recommandé : oui.*
 3. **Contrôles dans la feuille des services** (explication, « Mettre en premier », remise à zéro) plutôt qu'un lien « Pourquoi ? » sur l'accueil. *Recommandé : oui (règle 7).*
 4. **Paramètres de départ** : demi-vie de 7 jours, au moins 2 réussites, fenêtre de 30 jours. *À valider comme hypothèses.*
 5. **Essai de 14 jours** sans groupe témoin, arrêt sur un retour terrain négatif. *À valider.*

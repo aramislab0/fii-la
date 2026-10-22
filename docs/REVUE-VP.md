@@ -12,6 +12,7 @@
 - **Écart corrigé en priorité.** Ce bouton apprend aujourd'hui des écrans ouverts (`noteActivity`), alors que le §4 du mandat les classe en « intérêt possible ». Proposition : apprendre des réussites et des réussites répétées, avec la récence, figé par session.
 - **Contrôles de l'utilisateur** (« Mettre en premier », remise à zéro, explication) dans la feuille des services. Commerçants inchangés. Moteur de rétention v2 et ordre validé inchangés. Réglage `adaptive_home` pour revenir en arrière.
 - **Meilleur argument contre** : au pilote, trop peu de répétitions pour apprendre mieux qu'une règle fixe ; l'adaptation doit rester lente et stable.
+- **v1.1 (21:05)**, relue contre le mandat : la surface existante est conforme au §3, pas un désaccord ; recalcul à l'arrivée et après une réussite (§3) ; commerçants inclus sur le haut de Ma boutique : besoin bloquant → reprise → suggestion (§3, §6) ; contexte compte + boutique + rôle (§5).
 - Suite : arbitrage du fondateur (§6 de l'avis) ; aucune implémentation avant son accord.
 
 ---
