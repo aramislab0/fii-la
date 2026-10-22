@@ -236,10 +236,13 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 - **Conservation** : pas de durée maximale pour les adresses (écart art. 35, décision #3).
 - **Nom** : « Fii La » n'est pas la marque de Rali ; ne pas investir dans l'identité de Fii La avant l'arbitrage Rali.
 
+- **Fonctions réservées à la clé de service** : sur Supabase, une nouvelle fonction du schéma public est exécutable par anon et authenticated par défaut. Toujours révoquer explicitement `from public, anon, authenticated` (incident du 22/10, corrigé en ~15 min, `20261022210000_fiila_media_grants`). Le contrôle `verify-db` en CI l'attrape.
+
 ## 7. Journal (le plus récent en haut)
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 22/10 00:45 | Run 39699834472 : migration des photos appliquée, contrôle de la base en échec — les 5 fonctions de la file de copie étaient exécutables par anon / authenticated (privilèges par défaut de Supabase). Droits retirés aussitôt en production (MCP), migration `20261022210000_fiila_media_grants` ; journal vérifié : seules les copies de la fonction (8 photos). Seau `media` créé, copie programmée chaque minute, premières copies réussies | run 39699834472 ; ce commit |
 | 22/10 01:30 | Photos dans le stockage, étape 1 : migration (colonnes d'adresse, file d'attente, orphelines, journal, seau `media`, pg_cron), fonction `fiila-media-sync`, client (CSP, conversion des photos du stockage avant envoi et partage), back-office « Photos (stockage) » + réglage `media_cdn` ; tests `media.sql` 6/6, `mediafn.sql` 5/5, `media` 4/4, `backoffice` 13/13 | ce commit |
 | 22/10 00:10 | Audit avant lancement (base de production en lecture, conseils Supabase sécurité et performance, actions ouvertes, performance) : prêt pour un pilote fermé de 20 boutiques, pas pour l'ouverture publique ; bloquants : CDP, recette 3 téléphones, domaine, e-mails ; chantier technique prioritaire : photos hors de la base | doc https://claude.ai/artifact/SghT4DWHsH6rXHJTcmCBgJ |
 | 21/10 23:50 | Décision paiements Wave + OM (comptes marchands) et étude du paiement client → boutique (Wave Checkout, OM Max it, cadre BCEAO) ; action #60 | conversation |
