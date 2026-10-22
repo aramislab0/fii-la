@@ -27,21 +27,25 @@ const F = await user('assane@example.test', 'super_admin');
 const SUP = await user('aide@example.test', 'support');
 const CLI = await user('cliente@example.test');
 
-await t('registre : les 6 modèles du catalogue, aucun soumis à Meta ; seule la demande d’adresse est en pilote avec une carte', async () => {
+await t('registre : les 6 modèles du catalogue, aucun soumis à Meta ; demande d’adresse et événement en pilote avec une carte', async () => {
   const d = await ok('fiila_bo_wa', {}, F);
   assert.deepEqual(d.templates.map((x) => x.id), ['fiila_address_request_v1', 'fiila_ambassador_invite_v1', 'fiila_agent_invite_v1',
     'fiila_order_recorded_v1', 'fiila_delivery_started_v1', 'fiila_event_invite_v1']);
   assert.ok(d.templates.every((x) => x.meta === 'NOT_SUBMITTED'));
-  assert.deepEqual(d.templates.filter((x) => x.media).map((x) => [x.id, x.integration, x.cta]), [['fiila_address_request_v1', 'MANUAL_PILOT', 'Indiquer mon entrée']]);
+  assert.deepEqual(d.templates.filter((x) => x.media).map((x) => [x.id, x.integration, x.cta]), [['fiila_address_request_v1', 'MANUAL_PILOT', 'Indiquer mon entrée'],
+    ['fiila_event_invite_v1', 'MANUAL_PILOT', 'Voir l’événement']], '22/10 : l’événement passe en pilote avec sa carte');
   assert.equal(d.media_on, true);
 });
 
 await t('mesure : variantes de la carte acceptées, le reste refusé', async () => {
   for (const v of ['request:file', 'request:text', 'request:download', 'request:failed']) await ok('fiila_track', { p_event: 'wa_card', p_variant: v });
+  for (const v of ['address:file', 'event:text', 'vitrine:download', 'address:failed']) await ok('fiila_track', { p_event: 'wa_card', p_variant: v });
+  await ko('fiila_track', { p_event: 'wa_card', p_variant: 'adresse:file' });
   await ko('fiila_track', { p_event: 'wa_card', p_variant: 'request:sent' });
   await ko('fiila_track', { p_event: 'wa_card', p_variant: 'request:file;drop' });
   const d = await ok('fiila_bo_wa', {}, F);
-  assert.deepEqual(d.shares, { 'request:file': 1, 'request:text': 1, 'request:download': 1, 'request:failed': 1 });
+  assert.deepEqual(d.shares, { 'request:file': 1, 'request:text': 1, 'request:download': 1, 'request:failed': 1,
+    'address:file': 1, 'event:text': 1, 'vitrine:download': 1, 'address:failed': 1 });
 });
 
 await t('accès : registre réservé à l’équipe ; état Meta réservé au droit « settings », valeur contrôlée, journalisé', async () => {

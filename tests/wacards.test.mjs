@@ -138,6 +138,65 @@ await t('page d’arrivée du client : le demandeur en titre, entrée courte ; a
   assert.deepEqual([...P.__errors, ...R.__errors], []);
 });
 
+// 22/10 : cartes de l'adresse, de l'événement et de la vitrine ; aperçu des liens (og:image) pour les envois en texte seul.
+const ADDR = (await rpc(local.db, 'fiila_create_place', { p: { kind: 'address', label: 'Maison (test)', entry: { lat: 14.75814, lng: -17.47032, acc: 10 }, vehicle_ok: true, instruction: 'Portail vert (test)' } })).body;
+const MEET = (await rpc(local.db, 'fiila_create_place', { p: { kind: 'meeting', label: 'Baptême (test)', instruction: 'Grande tente (test)', entry: { lat: 14.7, lng: -17.4 },
+  starts_at: new Date(Date.now() + 3600e3).toISOString(), expires_at: new Date(Date.now() + 7200e3).toISOString() } })).body;
+const OWN2 = `localStorage.setItem('fiila.owned', JSON.stringify([
+  { type: 'place', kind: 'address', id: ${JSON.stringify(ADDR.id)}, owner: ${JSON.stringify(ADDR.owner_token)}, share: ${JSON.stringify(ADDR.share_token)}, label: 'Maison (test)' },
+  { type: 'place', kind: 'meeting', id: ${JSON.stringify(MEET.id)}, owner: ${JSON.stringify(MEET.owner_token)}, share: ${JSON.stringify(MEET.share_token)}, label: 'Baptême (test)' }]))`;
+const FILE_SHARE2 = FILE_SHARE.replace(OWN, OWN2);
+
+await t('adresse : la carte « Trouvez la bonne porte » s’affiche et part avec le texte [SIMULÉ partage de fichier]', async () => {
+  const P = await newPhone(FILE_SHARE2);
+  await P.goto(URL0 + '#/m/' + ADDR.id);
+  await P.locator('#wa-card').waitFor();
+  await P.waitForFunction(() => document.querySelector('#wa-card').naturalWidth === 1200);
+  assert.match(await P.locator('#wa-card').getAttribute('src'), /media\/wa\/adresse\.jpg$/);
+  await P.locator('#wa-text-only').waitFor();
+  await P.click('#share-whatsapp');
+  await P.waitForFunction(() => window.__shared.length === 1);
+  const s = await P.evaluate(() => window.__shared[0]);
+  assert.equal(s.files[0].name, 'fii-adresse.jpg');
+  assert.ok(s.text.includes(ADDR.share_token) && !s.text.includes(ADDR.owner_token));
+  assert.equal(await metric('address:file'), 1);
+  await shot(P, '03-adresse-carte');
+  // Accueil : « Envoyer » sur la carte d'adresse part aussi avec l'image.
+  await P.goto(URL0 + '#/');
+  await P.locator('.addr-card .btn.mid').first().waitFor();
+  await P.waitForTimeout(500); // fichier préparé à l'affichage
+  await P.locator('.addr-card .btn.mid').first().click();
+  await P.waitForFunction(() => window.__shared.length >= 1);
+  assert.equal(await metric('address:file'), 2);
+  assert.deepEqual(P.__errors, []);
+});
+
+await t('événement : la carte « On se retrouve au bon endroit » ; sans partage de fichier → texte + « Télécharger l’image »', async () => {
+  const P = await newPhone(NO_FILE_SHARE.replace(OWN, OWN2));
+  await P.goto(URL0 + '#/m/' + MEET.id);
+  await P.locator('#wa-card').waitFor();
+  assert.match(await P.locator('#wa-card').getAttribute('src'), /media\/wa\/evenement\.jpg$/);
+  await P.locator('#wa-card-download').waitFor();
+  assert.equal(await P.locator('#wa-card-download').getAttribute('download'), 'fii-evenement.jpg');
+  await P.click('#share-whatsapp');
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal(await metric('event:text'), 1);
+  await shot(P, '04-evenement-carte');
+  assert.deepEqual(P.__errors, []);
+});
+
+await t('aperçu des liens : og:image 1200 × 630 servie, titre et description présents', async () => {
+  const P = await newPhone();
+  await P.goto(URL0);
+  const og = await P.evaluate(() => Object.fromEntries([...document.querySelectorAll('meta[property^="og:"], meta[name="twitter:card"]')].map((m) => [m.getAttribute('property') || m.name, m.content])));
+  assert.equal(og['og:image'], 'https://aramislab0.github.io/fii-la/media/wa/og-fii.jpg');
+  assert.equal(og['og:image:width'], '1200'); assert.equal(og['og:image:height'], '630');
+  assert.equal(og['twitter:card'], 'summary_large_image');
+  const r = await P.request.get(URL0.replace(/\/?$/, '/') + 'media/wa/og-fii.jpg');
+  assert.equal(r.status(), 200);
+  assert.ok((await r.body()).length < 300000, 'image légère pour l’aperçu');
+});
+
 await browser.close();
 local.server.close();
 console.log(`\n${passed}/${passed + failed} tests carte WhatsApp (${ENGINE}) réussis`);

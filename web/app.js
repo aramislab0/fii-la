@@ -2950,7 +2950,7 @@
             x.cached ? null : active ? chip('ok', 'Lien actif') : chip('off', 'Lien désactivé')),
           active && url ? h('div', { class: 'duo' },
             iconBtn('a', { class: 'btn mid', href: waLink((x.label || 'Mon adresse') + '. L’entrée, avec la photo : ' + url), target: '_blank', rel: 'noopener noreferrer',
-              onclick: function () { track('share_initiated', 'whatsapp_address'); } }, 'chat', 'Envoyer'),
+              onclick: waCardClick('address', (x.label || 'Mon adresse') + '. L’entrée, avec la photo : ' + url, 'address') }, 'chat', 'Envoyer'),
             iconBtn('button', { class: 'btn ghost mid', type: 'button', onclick: function () { copy(url, 'Lien', function () { track('link_copied', 'address'); }); } }, 'link', 'Copier')) : null);
       }
       setKids(listBox, 
@@ -3307,7 +3307,7 @@
           h('span', { class: 'chip ' + (active ? 'ok' : 'off'), style: 'flex:0 0 auto' }, icon(active ? 'check' : expired ? 'hourglass' : 'ban', 12),
             expired ? 'Expiré' : pl.status === 'active' ? 'Lien actif' : 'Lien désactivé'),
           h('span', { class: 'small muted' }, isMeeting && !expired ? 'Visible jusqu’au ' + shortDate(pl.expires_at) : 'Modifiée le ' + shortDate(pl.updated_at)))),
-      active ? sharePanel({ kind: variant, url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null, qr: qrBox,
+      active ? sharePanel({ kind: variant, card: isMeeting ? 'event' : 'address', url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null, qr: qrBox,
         ids: { url: 'share-url', copy: 'copy-link', native: 'share-native' } }) : null,
       pl.has_voice ? voiceOwnerBox(pl, owner) : null,
       isMeeting && active ? guestsPanel(pl, owner) : null,
@@ -3463,7 +3463,13 @@
   /* Cartes WhatsApp (mandat WHATSAPP-001) : image de marque rendue d'avance (scripts/render_wa_cards.py), partagée AVEC le texte
      quand le téléphone sait partager un fichier ; sinon lien WhatsApp texte et « Télécharger l'image ». Aucune donnée personnelle
      dans l'image ; le lien et le nom du demandeur restent dans le texte. Réglage du back-office wa_card_media (0 = texte seul). */
-  var WA_CARDS = { request: { src: 'media/wa/demande-adresse.jpg', file: 'fii-demande-adresse.jpg', alt: 'Carte Fii « Livrer à la bonne porte » : une cliente ouvre son portail à un livreur' } };
+  // Cartes image jointes aux messages WhatsApp (rendu scripts/render_wa_cards.py). 22/10 : adresse, événement et vitrine
+  // s'ajoutent à la demande d'adresse ; l'aperçu de lien (og-fii.jpg) couvre les envois en texte seul.
+  var WA_CARDS = {
+    request: { src: 'media/wa/demande-adresse.jpg', file: 'fii-demande-adresse.jpg', alt: 'Carte Fii « Livrer à la bonne porte » : une cliente ouvre son portail à un livreur' },
+    address: { src: 'media/wa/adresse.jpg', file: 'fii-adresse.jpg', alt: 'Carte Fii « Trouvez la bonne porte » : une cliente ouvre son portail à un livreur' },
+    event: { src: 'media/wa/evenement.jpg', file: 'fii-evenement.jpg', alt: 'Carte Fii « On se retrouve au bon endroit » : une hôte accueille une invitée à son portail' },
+    vitrine: { src: 'media/wa/vitrine.jpg', file: 'fii-boutique.jpg', alt: 'Carte Fii « Commandez en quelques gestes » : une commerçante prépare un colis' } };
   TRACKABLE.wa_card = [];
   Object.keys(WA_CARDS).forEach(function (k) { ['file', 'text', 'download', 'failed'].forEach(function (a) { TRACKABLE.wa_card.push(k + ':' + a); }); });
   var WA_FILES = {};
@@ -3474,6 +3480,26 @@
     return fetch(c.src).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) {
       return b ? (WA_FILES[kind] = new File([b], c.file, { type: 'image/jpeg' })) : null;
     }, function () { return null; });
+  }
+  // Bouton WhatsApp simple (sans aperçu de carte) : image + texte quand le téléphone sait partager un fichier, sinon texte.
+  // Le fichier est préparé à l'affichage : le partage doit partir du toucher lui-même.
+  function waCardClick(card, msg, kind) {
+    var on = !!WA_CARDS[card] && nudgeFlags().wa_card !== false;
+    if (on) waCardFile(card);
+    return function (e) {
+      if (kind) track('share_initiated', 'whatsapp_' + kind);
+      if (!on) return;
+      var f = WA_FILES[card];
+      if (!canShareFile(f)) { track('wa_card', card + ':text'); return; }
+      e.preventDefault();
+      track('wa_card', card + ':file');
+      navigator.share({ files: [f], text: msg }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        track('wa_card', card + ':failed');
+        toast('Envoi avec l’image impossible ici : le texte seul s’ouvre.');
+        location.href = waLink(msg);
+      });
+    };
   }
   function canShareFile(f) { try { return !!(f && navigator.share && navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } }
   function waCardBlock(o) {
@@ -4222,7 +4248,7 @@
         h('h2', null, 'Votre adresse est prête'),
         h('p', { class: 'small muted' }, 'Envoyez-la à vos proches : ils vous trouveront sans appeler.'),
         iconBtn('a', { class: 'btn', id: 'share-relatives', href: waLink('Mon adresse, avec la photo de l’entrée : ' + url), target: '_blank', rel: 'noopener noreferrer',
-          onclick: function () { track('share_initiated', 'whatsapp_address'); } }, 'chat', 'Envoyer sur WhatsApp'),
+          onclick: waCardClick('address', 'Mon adresse, avec la photo de l’entrée : ' + url, 'address') }, 'chat', 'Envoyer sur WhatsApp'),
         h('a', { class: 'btn link', href: '#/m/' + placeId, style: 'align-self:flex-start' }, 'Voir mon adresse')) : null,
       backInvoice ? (shopKey() || (ME && ME.shop) ? null : afterTask('order', { icon: 'shop', title: 'Vous vendez aussi ?', cta: 'Ouvrir ma boutique gratuite', href: '#/boutique' }))
         : afterTask('sent', { icon: 'ask', title: 'Vous livrez ou vendez ?', cta: 'Demander l’adresse de vos clients', href: '#/demande/nouvelle' }),
@@ -5900,7 +5926,7 @@
       var qrBox = h('div', { class: 'stack tight', id: 'mk-qr', hidden: true });
       var share = url ? h('section', { class: 'stack tight', id: 'mk-share' },
         iconBtn('a', { class: 'btn big full', id: 'mk-share-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
-          onclick: function () { track('marketing', 'share:wa'); } }, 'chat', 'Partager ma vitrine sur WhatsApp'),
+          onclick: (function (go) { return function (e) { track('marketing', 'share:wa'); go(e); }; })(waCardClick('vitrine', 'Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url)) }, 'chat', 'Partager ma vitrine sur WhatsApp'),
         h('div', { class: 'rnd-row' },
           roundBtn('button', { type: 'button', id: 'mk-copy', onclick: function () { copy(url, 'Lien', function () { track('marketing', 'share:copy'); }); } }, 'link', 'Copier'),
           roundBtn('button', { type: 'button', id: 'mk-qr-btn', 'aria-expanded': 'false', 'aria-controls': 'mk-qr', onclick: function (e) {
@@ -8055,15 +8081,26 @@
     if (!d) return null;
     var sh = d.shares || {};
     function n(k) { return Number(sh['request:' + k] || 0); }
-    var pilot = (d.templates || []).filter(function (t) { return t.media; })[0];
+    function c(card, k) { return Number(sh[card + ':' + k] || 0); }
+    var CARD_ROWS = [['request', 'Demande d’adresse'], ['address', 'Mon adresse'], ['event', 'Événement'], ['vitrine', 'Vitrine (Marketing)']];
     var canEdit = boCan('settings');
     return h('section', { class: 'card stack tight bo-panel', id: 'bo-wa' },
       h('div', { class: 'bo-panel-h' }, h('h2', null, 'Messages WhatsApp'), d.media_on ? boBadge('ok', 'Carte image active') : boBadge('muted', 'Texte seul (Réglages)')),
       h('p', { class: 'small muted' }, 'Demande d’adresse, 30 derniers jours : ' + boNum(d.requests || 0) + ' demande(s) · image + texte ouverts : ' + boNum(n('file')) +
         ' · texte seul : ' + boNum(n('text')) + ' · image téléchargée : ' + boNum(n('download')) + ' · échecs : ' + boNum(n('failed')) +
         '. Un partage ouvert ne prouve pas qu’un message est parti ni qu’il a été lu. Aucun envoi par l’API : modèles non soumis à Meta.'),
-      pilot ? h('details', { id: 'bo-wa-preview' }, h('summary', null, 'Aperçu de la carte envoyée'),
-        h('img', { class: 'wa-card', src: pilot.media, alt: 'Carte « Livrer à la bonne porte »', width: 1200, height: 800, loading: 'lazy', style: 'margin-top:10px;max-width:420px' })) : null,
+      boTable([
+        { label: 'Carte', get: function (x) { return x[1]; } },
+        { label: 'Image + texte', get: function (x) { return boNum(c(x[0], 'file')); }, cls: 'num' },
+        { label: 'Texte seul', get: function (x) { return boNum(c(x[0], 'text')); }, cls: 'num' },
+        { label: 'Image téléchargée', get: function (x) { return boNum(c(x[0], 'download')); }, cls: 'num' },
+        { label: 'Échecs', get: function (x) { return boNum(c(x[0], 'failed')); }, cls: 'num' }], CARD_ROWS, { id: 'bo-wa-cards' }),
+      h('details', { id: 'bo-wa-preview' }, h('summary', null, 'Aperçu des cartes envoyées'),
+        h('div', { class: 'stack tight', style: 'margin-top:10px' }, CARD_ROWS.map(function (x) {
+          var w = WA_CARDS[x[0]];
+          return h('img', { class: 'wa-card', src: w.src, alt: w.alt, width: 1200, height: 800, loading: 'lazy', style: 'max-width:420px' });
+        }), h('img', { class: 'wa-card', src: 'media/wa/og-fii.jpg', alt: 'Aperçu des liens Fii (og:image)', width: 1200, height: 630, loading: 'lazy', style: 'max-width:420px' }),
+          h('p', { class: 'small muted' }, 'Dernière image : aperçu affiché par WhatsApp sous un lien Fii envoyé en texte seul.'))),
       boTable([
         { label: 'Message', get: function (t) { return t.usage; } },
         { label: 'Action', get: function (t) { return t.cta; } },

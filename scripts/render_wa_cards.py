@@ -27,6 +27,19 @@ CARDS = [
     {'file': 'demande-adresse.jpg', 'template': 'fiila_address_request_v1', 'photo': 'signature.png',
      # Cadrage : la photo garde la porte, la cliente et le livreur à droite ; le portail vert à gauche accueille le texte.
      'focus_x': 0.5},
+    # 22/10 : cartes des autres partages manuels. Les textes ci-dessous ne sont pas dans le catalogue Meta (partages
+    # manuels sans variables) : ils restent courts, véridiques, et suivent la hiérarchie validée (kicker, titre, détail).
+    {'file': 'adresse.jpg', 'photo': 'signature.png', 'focus_x': 0.5,
+     'text': {'kicker': 'MON ADRESSE', 'artwork_title': 'Trouvez la bonne porte.', 'artwork_detail': 'L’entrée en photo, un repère.'}},
+    {'file': 'evenement.jpg', 'template': 'fiila_event_invite_v1', 'photo': 'evenement.png', 'focus_x': 0.5,
+     # Détail du catalogue à variables ({event_name} · {city}) remplacé par un texte fixe : la carte est la même pour tous.
+     'text': {'artwork_detail': 'Le lieu, l’entrée, l’heure.'}},
+    # Personne au centre de la photo : voile vert plus large pour que le texte reste lisible.
+    {'file': 'vitrine.jpg', 'photo': 'commerce.png', 'focus_x': 0.62, 'veil': (0.42, 0.66),
+     'text': {'kicker': 'BOUTIQUE EN LIGNE', 'artwork_title': 'Commandez en quelques gestes.', 'artwork_detail': 'Sans compte. Livré à la bonne porte.'}},
+    # Aperçu des liens (balise og:image) : format 1200 × 630 recommandé par WhatsApp et Facebook.
+    {'file': 'og-fii.jpg', 'photo': 'signature.png', 'focus_x': 0.5, 'size': (1200, 630),
+     'text': {'kicker': 'LIVRER À LA BONNE PORTE', 'artwork_title': 'Votre adresse, en une photo.', 'artwork_detail': 'L’entrée exacte. Un repère utile.'}},
 ]
 
 
@@ -57,13 +70,17 @@ def wrap(draw, text, f, max_w):
 
 
 def render(card, tpl):
+    W, H = card.get('size', (1200, 800))
+    small = H < 700
+    tpl = dict(tpl or {}, **card.get('text', {}))
     photo = Image.open(os.path.join(KIT, 'assets', 'photos', card['photo'])).convert('RGB')
     base = cover(photo, W, H, card.get('focus_x', 0.5)).convert('RGBA')
 
     # Dégradé vert de gauche : opaque sous le texte, transparent avant les personnes.
     grad = Image.new('RGBA', (W, H))
     gd = ImageDraw.Draw(grad)
-    solid, fade = int(W * 0.30), int(W * 0.56)
+    v = card.get('veil', (0.30, 0.56))
+    solid, fade = int(W * v[0]), int(W * v[1])
     for x in range(W):
         if x <= solid:
             a = 236
@@ -79,19 +96,19 @@ def render(card, tpl):
     x0, col = 72, 470
     # Logo Fii validé (web/media/brand/fii-logo.png, dérivé de docs/brand/fii-logo-source.png), sans redessin.
     logo = Image.open(os.path.join(ROOT, 'web', 'media', 'brand', 'fii-logo.png')).convert('RGBA')
-    lh = 88
+    lh = 72 if small else 88
     logo = logo.resize((round(logo.width * lh / logo.height), lh), Image.LANCZOS)
-    img.alpha_composite(logo, (x0, 52))
+    img.alpha_composite(logo, (x0, 44 if small else 52))
     d = ImageDraw.Draw(img)
 
     # Kicker, titre, détail
-    y = 300
+    y = 230 if small else 300
     d.text((x0, y), tpl['kicker'], font=font(700, 22), fill=LIME, spacing=0)
     y += 50
-    ft = font(800, 60)
+    ft = font(800, 56 if small else 60)
     for line in wrap(d, tpl['artwork_title'], ft, col):
         d.text((x0, y), line, font=ft, fill=IVORY)
-        y += 72
+        y += 66 if small else 72
     y += 14
     d.rectangle((x0, y, x0 + 56, y + 5), fill=LIME)
     y += 30
@@ -99,7 +116,7 @@ def render(card, tpl):
     for line in wrap(d, tpl['artwork_detail'], fd, col):
         d.text((x0, y), line, font=fd, fill=IVORY)
         y += 40
-    if y > H - 60:
+    if y > H - 40:
         raise SystemExit(f"{card['file']} : texte trop long pour la carte")
     return img.convert('RGB')
 
@@ -109,7 +126,7 @@ def main():
     tpls = {t['id']: t for t in cat['templates']}
     os.makedirs(OUT, exist_ok=True)
     for card in CARDS:
-        img = render(card, tpls[card['template']])
+        img = render(card, tpls.get(card.get('template')))
         path = os.path.join(OUT, card['file'])
         img.save(path, 'JPEG', quality=84, optimize=True, progressive=True)
         print(path, os.path.getsize(path), 'octets', file=sys.stderr)

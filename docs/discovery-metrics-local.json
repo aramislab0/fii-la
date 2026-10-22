@@ -23,5 +23,10 @@
     "event": "share_initiated",
     "variant": "whatsapp_address",
     "n": 1
+  },
+  {
+    "event": "wa_card",
+    "variant": "address:text",
+    "n": 1
   }
 ]
