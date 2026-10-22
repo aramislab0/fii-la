@@ -38,9 +38,16 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --ignore-scripts
-      # Installation parfois bloquée côté GitHub (22/10 : plus de 20 min) : 3 essais de 6 min au plus.
+      # Installation parfois bloquée côté GitHub (22/10 : plus de 20 min, puis échecs en chaîne) : navigateurs et dépendances
+      # système séparés, chaque partie bornée et réessayée ; un apt interrompu est réparé avant l'essai suivant.
       - name: Navigateurs de test
-        run: for i in 1 2 3; do timeout 360 npx playwright install --with-deps chromium && exit 0; echo "essai $i échoué ou trop long"; done; exit 1
+        run: |
+          for i in 1 2 3; do timeout 300 npx playwright install chromium && break; echo "navigateurs : essai $i"; [ $i = 3 ] && exit 1; done
+          for i in 1 2 3; do
+            timeout 420 sudo npx playwright install-deps chromium && exit 0
+            echo "dépendances : essai $i"; sudo pkill -9 -f 'apt|dpkg' || true; sudo dpkg --configure -a || true; sleep 10
+          done
+          exit 1
       - name: Suites SQL
         run: scripts/run-suites.sh sql
       - name: Suites navigateur (Chrome)
@@ -136,9 +143,16 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --ignore-scripts
-      # Installation parfois bloquée côté GitHub (22/10 : plus de 20 min) : 3 essais de 6 min au plus.
+      # Installation parfois bloquée côté GitHub (22/10 : plus de 20 min, puis échecs en chaîne) : navigateurs et dépendances
+      # système séparés, chaque partie bornée et réessayée ; un apt interrompu est réparé avant l'essai suivant.
       - name: Navigateurs de test
-        run: for i in 1 2 3; do timeout 360 npx playwright install --with-deps chromium webkit && exit 0; echo "essai $i échoué ou trop long"; done; exit 1
+        run: |
+          for i in 1 2 3; do timeout 300 npx playwright install chromium webkit && break; echo "navigateurs : essai $i"; [ $i = 3 ] && exit 1; done
+          for i in 1 2 3; do
+            timeout 420 sudo npx playwright install-deps chromium webkit && exit 0
+            echo "dépendances : essai $i"; sudo pkill -9 -f 'apt|dpkg' || true; sudo dpkg --configure -a || true; sleep 10
+          done
+          exit 1
       - name: Attendre que le site en ligne serve cette version
         run: |
           for i in $(seq 1 60); do
