@@ -255,6 +255,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 22/10 15:00 | « Site » en production : run 39789993217 vert (Chrome + Safari) ; `fiila-manager` v10 déployée | run 39789993217 |
 | 22/10 14:10 | « Vitrine » → « site » dans l'application, les fonctions (migration `20261022600000_fiila_vitrine_site`), les missions et le Manager (fonction `fiila-manager` redéployée) ; proposition de rétention rédigée, en attente de l'avis du VP | `docs/PROPOSITION-RETENTION.md` |
 | 22/10 06:10 | Vitrine premium en production : run 39727740728 vert | run 39727740728 |
 | 22/10 05:30 | Vitrine premium et réglages simplifiés : interrupteur unique, écran Personnaliser avec un seul Enregistrer, logo, Snapchat, réseaux à côté du logo, 3 modèles Premium, abonnement au back-office ; SQL vert | migration `20261022500000_fiila_vitrine_premium` |
