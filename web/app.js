@@ -813,6 +813,60 @@
     });
     return n >= 2 ? best : null;
   }
+  /* ----- Accueil adaptatif (mandat UX-ADAPTATIVE-001, avis du Builder v1.1 validé par le fondateur le 22/10 21:11).
+     Le bouton principal apprend des tâches RÉUSSIES (création confirmée par le serveur), jamais des écrans ouverts ni des clics.
+     Score = Σ 0,5^(âge / demi-vie) + bonus si réussi deux jours différents ; seuil 2 ; fenêtre 30 jours. Hypothèses
+     versionnées (adaptive_v1), à ajuster sur le terrain. Égalité : réussite la plus récente, puis écrans ouverts, puis
+     « Créer mon adresse ». Contexte = compte (ou « sans compte ») ; les boutiques ont leur propre surface (haut de Ma boutique).
+     Recalcul à l'arrivée sur l'accueil et au retour après une réussite, jamais pendant un écran. « Mettre en premier »,
+     « Revenir au choix automatique » et « Remettre à zéro » (efface ce journal, jamais une donnée) dans « Découvrir les services ».
+     Réglage du back-office adaptive_home (0 = règle d'avant : écrans ouverts sur 14 jours). Rien n'est envoyé au serveur
+     hors des compteurs anonymes home_hero / home_pref. */
+  var SUCC_LS = 'fiila.succ', ADAPT = { version: 'adaptive_v1', halfLife: 7, bonus: 1, threshold: 2, windowDays: 30 };
+  var SUCC_SVC = ['adresse', 'demander', 'evenement', 'livreur', 'vide_dressing', 'ambassadeur'];
+  TRACKABLE.home_hero = []; SUCC_SVC.forEach(function (x) { ['shown', 'click', 'success'].forEach(function (a) { TRACKABLE.home_hero.push(x + ':' + a); }); });
+  TRACKABLE.home_pref = ['pin', 'unpin', 'reset'];
+  TRACKABLE.resume = ['order:shown', 'order:click', 'order:success', 'product:shown', 'product:click', 'product:success'];
+  function ctxKey() { return authed() && SESSION && SESSION.user && SESSION.user.id ? 'u:' + SESSION.user.id : 'local'; }
+  function succCtx() { var a = LS.get(SUCC_LS, null) || {}, c = a[ctxKey()] || {}; c.log = c.log || {}; return c; }
+  function succSave(c) { var a = LS.get(SUCC_LS, null) || {}; a[ctxKey()] = c; LS.set(SUCC_LS, a); }
+  // Une tâche a réussi (réponse du serveur) : on la note, et si le bouton de l'accueil y menait dans cette session, on le mesure.
+  function noteSuccess(svc) {
+    if (SUCC_SVC.indexOf(svc) < 0) return;
+    var c = succCtx(), now = Date.now(), win = ADAPT.windowDays * 864e5;
+    c.log[svc] = (c.log[svc] || []).filter(function (t) { return now - t < win; }).concat(now).slice(-50);
+    succSave(c);
+    try { if (sessionStorage.getItem('fiila.hero') === svc && !sessionStorage.getItem('fiila.hero.ok')) { sessionStorage.setItem('fiila.hero.ok', '1'); track('home_hero', svc + ':success'); } } catch (e) { /* rien */ }
+  }
+  // Choix pur (testable, aperçu du back-office) : log { svc: [dates] }, épinglé, retirés, écrans ouverts (départage).
+  function adaptPick(log, pin, hidden, opens, now) {
+    now = now || Date.now();
+    if (pin && SUCC_SVC.indexOf(pin) >= 0 && !(hidden || {})[pin]) return { svc: pin, why: 'pin' };
+    var best = null;
+    SUCC_SVC.forEach(function (k) {
+      if ((hidden || {})[k]) return;
+      var ts = (log[k] || []).filter(function (t) { return now - t < ADAPT.windowDays * 864e5; });
+      if (!ts.length) return;
+      var days = {}; ts.forEach(function (t) { days[new Date(t).toISOString().slice(0, 10)] = 1; });
+      var sc = ts.reduce(function (a, t) { return a + Math.pow(0.5, (now - t) / 864e5 / ADAPT.halfLife); }, 0) + (Object.keys(days).length >= 2 ? ADAPT.bonus : 0);
+      var x = { svc: k, score: sc, n: ts.length, last: Math.max.apply(null, ts), opens: (opens || {})[k] || 0 };
+      if (!best || x.score > best.score + 1e-9 || (Math.abs(x.score - best.score) < 1e-9 && (x.last > best.last || (x.last === best.last && x.opens > best.opens)))) best = x;
+    });
+    return best && best.score >= ADAPT.threshold ? { svc: best.svc, why: 'auto', n: best.n } : null;
+  }
+  function adaptiveTop() {
+    if (nudgeFlags().adaptive === false) { var t = topActivity(); return t ? { svc: t, why: 'legacy' } : null; }
+    var c = succCtx(), st = actState(), now = Date.now(), opens = {};
+    Object.keys(st.log).forEach(function (k) { opens[k] = st.log[k].filter(function (x) { return now - x < 14 * 864e5; }).length; });
+    return adaptPick(c.log, c.pin, st.hidden, opens, now);
+  }
+  function heroTrack(el, svc) {
+    retOnVisible(el, function () {
+      try { var k = 'fiila.hero.shown.' + svc; if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (e) { /* rien */ }
+      track('home_hero', svc + ':shown');
+    });
+  }
+  function heroClick(svc) { try { sessionStorage.setItem('fiila.hero', svc); sessionStorage.removeItem('fiila.hero.ok'); } catch (e) { /* rien */ } track('home_hero', svc + ':click'); }
   function addressDraftStarted() {
     var d = LS.get(DRAFT_KEY, null);
     return !!(d && (d.entry || d.photo || (d.label || '').trim() || (d.instruction || '').trim()));
@@ -828,15 +882,21 @@
       h('span', null, h('b', null, 'Reprendre ma boutique'), h('small', null, 'Encore quelques secondes pour l’ouvrir')));
     // Commerçant : « Ma boutique » est l'action principale ; ses raccourcis suivent (fondateur, 22/10).
     if (hasShop()) return shopHero();
-    var top = topActivity(), s = top && top !== 'adresse' ? svcOf(top) : null;
-    if (s && myActivities().indexOf(s) >= 0) return h('a', { class: 'hero', href: s.href, id: 'home-hero', 'data-hero': s.id,
-      onclick: function () { track('onboarding', 'hero_' + s.id + ':click'); } },
-      h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon(s.icon, 32)),
-      h('span', null, h('b', null, s.hero), h('small', null, s.sub)));
-    return h('a', { class: 'hero', href: '#/new', id: 'create-address', 'data-hero': 'adresse', 'aria-label': 'Créer mon adresse',
-      onclick: function () { track('onboarding', 'hero_adresse:click'); } },
+    var pick = adaptiveTop(), top = pick && pick.svc, s = top && top !== 'adresse' ? svcOf(top) : null;
+    if (s && (pick.why !== 'legacy' || myActivities().indexOf(s) >= 0)) { // réussite ou choix : c'est une activité de la personne
+      var el = h('a', { class: 'hero', href: s.href, id: 'home-hero', 'data-hero': s.id, 'data-why': pick.why,
+        onclick: function () { track('onboarding', 'hero_' + s.id + ':click'); heroClick(s.id); } },
+        h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon(s.icon, 32)),
+        h('span', null, h('b', null, s.hero), h('small', null, s.sub)));
+      heroTrack(el, s.id);
+      return el;
+    }
+    var def = h('a', { class: 'hero', href: '#/new', id: 'create-address', 'data-hero': 'adresse', 'aria-label': 'Créer mon adresse',
+      onclick: function () { track('onboarding', 'hero_adresse:click'); heroClick('adresse'); } },
       h('span', { class: 'hero-ic', 'aria-hidden': 'true' }, icon('cam', 32)),
       h('span', null, h('b', null, 'Créer mon adresse'), h('small', null, 'Photo de la porte · repère · lien')));
+    heroTrack(def, 'adresse');
+    return def;
   }
   function hasShop() { return CFG.shop !== false && !!(shopKey() || (ME && ME.shop)); }
   // Accueil du commerçant : « Ma boutique » (nom et commandes en cours), puis « Mon commerce » : Commandes, Articles,
@@ -902,18 +962,42 @@
     var back = h('div', { class: 'sheet-back', id: 'services-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'services-h',
       onclick: function (e) { if (e.target === back) close(); } });
     var list = SERVICES.filter(function (s) { return !(s.id === 'boutique' && CFG.shop === false); });
+    var pin = succCtx().pin || null;
     var close;
+    // Explication du bouton principal, et la main à l'utilisateur (avis UX-ADAPTATIVE-001 v1.1).
+    function homeWhy() {
+      if (hasShop() || nudgeFlags().adaptive === false) return null;
+      var p = adaptiveTop(), sv = p && svcOf(p.svc);
+      var line = !p ? 'Action principale de l’accueil : « Créer mon adresse » (par défaut).'
+        : p.why === 'pin' ? 'Action principale de l’accueil : « ' + sv.hero + ' », choisie par vous.'
+        : 'Action principale de l’accueil : « ' + sv.hero + ' », d’après vos ' + p.n + ' réussites récentes.';
+      return h('div', { class: 'home-why', id: 'home-why' }, h('p', { class: 'small muted' }, line),
+        h('div', { class: 'row' },
+          pin ? h('button', { class: 'btn link small', type: 'button', id: 'home-unpin', onclick: function () {
+            var c = succCtx(); delete c.pin; succSave(c); track('home_pref', 'unpin'); close(); toast('Choix automatique rétabli.'); render();
+          } }, 'Revenir au choix automatique') : null,
+          h('button', { class: 'btn link small', type: 'button', id: 'home-reset', onclick: function () {
+            succSave({ log: {} }); track('home_pref', 'reset'); close(); toast('Accueil remis à zéro. Vos adresses et commandes ne changent pas.'); render();
+          } }, 'Remettre à zéro')));
+    }
     back.append(h('div', { class: 'sheet svc-sheet' },
       h('div', { class: 'svc-head' }, h('h2', { id: 'services-h' }, 'Les services Fii'),
         h('button', { class: 'svc-x', type: 'button', 'aria-label': 'Fermer', id: 'services-close', onclick: function () { close(); } }, icon('close', 18))),
+      homeWhy(),
       h('div', { class: 'svc-list' }, list.map(function (s) {
         var on = mine.indexOf(s) >= 0;
         return h('div', { class: 'svc-card', id: 'svc-' + s.id },
           h('span', { class: 'svc-ic', 'aria-hidden': 'true' }, icon(s.icon, 24)),
           h('div', { class: 'svc-t' }, h('b', null, s.hero), h('span', null, s.text),
-            on ? h('button', { class: 'svc-hide', type: 'button', onclick: function () {
-              var st = actState(); st.hidden[s.id] = 1; LS.set(ACT_LS, st); track('onboarding', 'svc_' + s.id + ':hide'); close(); toast('Retiré de l’accueil. Le service reste ici.'); render();
-            } }, 'Retirer de l’accueil') : null),
+            on || SUCC_SVC.indexOf(s.id) >= 0 ? h('div', { class: 'svc-acts' },
+              SUCC_SVC.indexOf(s.id) >= 0 && !hasShop() ? (pin === s.id ? h('span', { class: 'chip ok', id: 'svc-' + s.id + '-pinned' }, icon('check', 12), 'En premier')
+                : h('button', { class: 'svc-hide', type: 'button', id: 'svc-' + s.id + '-pin', onclick: function () {
+                  var c = succCtx(); c.pin = s.id; succSave(c); var st = actState(); delete st.hidden[s.id]; LS.set(ACT_LS, st);
+                  track('home_pref', 'pin'); close(); toast('« ' + s.hero + ' » est en premier sur l’accueil.'); render();
+                } }, 'Mettre en premier')) : null,
+              on ? h('button', { class: 'svc-hide', type: 'button', onclick: function () {
+                var st = actState(); st.hidden[s.id] = 1; LS.set(ACT_LS, st); track('onboarding', 'svc_' + s.id + ':hide'); close(); toast('Retiré de l’accueil. Le service reste ici.'); render();
+              } }, 'Retirer de l’accueil') : null) : null),
           h('a', { class: 'btn small svc-go', id: 'svc-' + s.id + '-go', href: s.href, onclick: function () { track('onboarding', 'svc_' + s.id + ':click'); close(); } }, 'Ouvrir'));
       })),
       h('a', { class: 'invite-row', id: 'invite-link', href: '#/parrainer', onclick: function () { close(); } }, icon('gift', 24), h('span', null, 'Inviter un proche'),
@@ -981,6 +1065,32 @@
       { id: 'shop_team', ok: o >= 10 && role === 'owner' && !(st.members > 0), metric: st.members || 0,
         o: ret('shop_team', { href: '#/boutique/reglages' }) }]);
   }
+  // Contexte d'une boutique : compte (ou « sans compte ») + boutique + rôle (avis UX-ADAPTATIVE-001, C4).
+  var SHOP_ID_CUR = null;
+  function curShopId() { return SHOP_ID_CUR || ((LS.get(SHOP_LS, null) || {}).id) || ''; }
+  function shopCtx(shop) { return ctxKey() + '|' + ((shop && shop.id) || curShopId()) + '|' + (SHOP_ROLE || (shop && shop.role) || 'owner'); }
+  var PRODUCT_DRAFT = 'fiila.draft.product';
+  function draftOf(key, shop) { var d = LS.get(key, null); return d && d.ctx === shopCtx(shop) ? d : null; }
+  // Haut de Ma boutique, 2ᵉ rang : une tâche commencée à reprendre (commande, puis article). Jamais devant une commande sans adresse.
+  function resumeCard(shop) {
+    var o = draftOf(ORDER_DRAFT, shop), pr = draftOf(PRODUCT_DRAFT, shop), kind = null;
+    if (o && (o.cust || (o.name || '').trim() || (o.items || []).some(function (it) { return (it.label || '').trim(); }))) kind = 'order';
+    else if (pr && ((pr.name || '').trim() || (pr.price || '').trim())) kind = 'product';
+    if (!kind) return null;
+    var who = kind === 'order' ? (o.cust ? o.cust.name : (o.name || '').trim()) : (pr.name || '').trim();
+    var card = h('a', { class: 'addr-due resume-card', id: 'resume-' + kind, href: kind === 'order' ? '#/commande/nouvelle' : '#/boutique/article/nouveau',
+      onclick: function () { try { sessionStorage.setItem('fiila.resume', kind); } catch (e) { /* rien */ } track('resume', kind + ':click'); } },
+      h('span', { class: 'addr-due-ic', 'aria-hidden': 'true' }, icon(kind === 'order' ? 'box' : 'cam', 22)),
+      h('span', { class: 'addr-due-t' }, h('b', null, kind === 'order' ? 'Reprendre la commande en cours' : 'Reprendre l’article en cours'),
+        h('small', { class: 'wrapword' }, who ? who + ' · là où vous vous étiez arrêté' : 'Là où vous vous étiez arrêté')),
+      h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18)));
+    retOnVisible(card, function () {
+      try { var k = 'fiila.resume.shown.' + kind; if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (e) { /* rien */ }
+      track('resume', kind + ':shown');
+    });
+    return card;
+  }
+  function resumeDone(kind) { try { if (sessionStorage.getItem('fiila.resume') === kind) { sessionStorage.removeItem('fiila.resume'); track('resume', kind + ':success'); } } catch (e) { /* rien */ } }
   // S0 : commandes ouvertes qui attendent une adresse. Tâche de la commande : hors budget, montrée à tout membre.
   function addressDueCard(st) {
     var n = st.need_address || 0;
@@ -1002,6 +1112,12 @@
   }
   function track(event, variant) {
     if (event === 'fiche_created' || event === 'request_created' || event === 'order_created') bumpTx();
+    // Réussites confirmées par le serveur → journal de l'accueil adaptatif (sur le téléphone seulement).
+    try {
+      if (event === 'fiche_created') noteSuccess(/^meeting/.test(variant) ? 'evenement' : 'adresse');
+      else if (event === 'request_created') noteSuccess('demander');
+      else if (event === 'courier_done') noteSuccess('livreur');
+    } catch (e) { /* stockage indisponible */ }
     try {
       if (!API_URL || CFG.analytics === false || privacyOptOut()) return;
       if (!TRACKABLE[event] || TRACKABLE[event].indexOf(variant) < 0) return;
@@ -5144,7 +5260,7 @@
   var SHOP_ROLE = null;
   function viewShop(q) {
     return sapi('fiila_shop_get', {}).then(function (r) {
-      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null;
+      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null; SHOP_ID_CUR = r.shop ? r.shop.id : SHOP_ID_CUR;
       return r.shop ? shopDashboard(r, q || {}) : onboardingOn() ? setupStepName() : shopForm(null);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
@@ -5156,7 +5272,7 @@
   function typeLabel(k) { var t = BUSINESS_TYPES.filter(function (x) { return x[0] === k; })[0]; return t ? t[1] : ''; }
   function viewShopSettings() {
     return sapi('fiila_shop_get', {}).then(function (r) {
-      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null;
+      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null; SHOP_ID_CUR = r.shop ? r.shop.id : SHOP_ID_CUR;
       return r.shop && SHOP_ROLE === 'editor' ? memberSettings(r.shop) : shopForm(r.shop);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
@@ -5704,7 +5820,7 @@
               h('button', { class: 'btn danger-fill', type: 'button', id: 'shop-delete-confirm', onclick: function (ev) {
                 ev.currentTarget.disabled = true;
                 sapi('fiila_shop_delete', {}).then(function () {
-                  LS.del(SHOP_LS); LS.del(ORDER_DRAFT); ME = null; track('shop_deleted', 'shop'); toast('Boutique supprimée.'); go('#/');
+                  LS.del(SHOP_LS); LS.del(ORDER_DRAFT); LS.del(PRODUCT_DRAFT); ME = null; track('shop_deleted', 'shop'); toast('Boutique supprimée.'); go('#/');
                 }, function (e) { errBox(zone, e); });
               } }, 'Supprimer'),
               h('button', { class: 'btn ghost', type: 'button', onclick: function () { setKids(zone); } }, 'Annuler'))));
@@ -5761,6 +5877,8 @@
   }
   function shopDashboard(r, q) {
     var shop = r.shop, st = r.stats || {};
+    // Prochaine action de la boutique (UX-ADAPTATIVE-001 v1.1) : besoin bloquant → reprise d'une tâche → suggestion.
+    var due = addressDueCard(st), resume = due ? null : resumeCard(shop), sugg = shopNudge(shop, st);
     var vue = ['open', 'unpaid', 'done', 'all'].indexOf(q.vue) >= 0 ? q.vue : 'open';
     var listBox = h('div', { class: 'list', id: 'orders' }, loading('Chargement des commandes…'));
     var seq = 0;
@@ -5778,7 +5896,8 @@
         h('p', { class: 'eyebrow' }, 'Ma boutique'),
         h('h1', { class: 'wrapword', id: 'shop-title' }, shop.name)),
       partnerSlot(),
-      addressDueCard(st),
+      due,
+      resume,
       // Boutique neuve : une seule première étape, pas de tableau de bord vide.
       !st.orders && !st.products ? h('section', { class: 'card', id: 'first-product' },
         h('h2', null, 'Ajoutez votre premier article'),
@@ -5786,7 +5905,7 @@
         iconBtn('a', { class: 'btn', href: '#/boutique/article/nouveau' }, 'cam', 'Ajouter un article')) : null,
       iconBtn('a', { class: !st.orders && !st.products ? 'btn ghost full' : 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'plus', 'Nouvelle commande'),
       // Compte proposé quand la boutique tourne (3 commandes), pas dès sa création.
-      (shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard()) || shopNudge(shop, st),
+      (shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard()) || (resume ? null : sugg),
       // Les compteurs sont dans les onglets (plus de tuiles qui répètent la même chose).
       st.orders ? segField({ name: 'vue', id: 'orders-filter', value: vue,
         options: [['open', 'En cours' + (st.open ? ' · ' + st.open : '')], ['unpaid', 'À encaisser' + (st.unpaid ? ' · ' + st.unpaid : '')], ['done', 'Terminées'], ['all', 'Toutes']],
@@ -5880,7 +5999,7 @@
     var totalEl = h('strong', { id: 'order-total' });
     var err = h('div', { role: 'alert' });
     var btn = iconBtn('button', { class: 'btn', type: 'button', id: 'order-create', onclick: submit }, 'check', 'Créer la commande');
-    function keep() { LS.set(ORDER_DRAFT, d); }
+    function keep() { d.ctx = shopCtx({ id: curShopId(), role: SHOP_ROLE }); LS.set(ORDER_DRAFT, d); }
     function num(v) { var n = parseInt(String(v).replace(/[\s  .]/g, ''), 10); return isFinite(n) ? n : NaN; }
     function total() {
       return d.items.reduce(function (a, it) { var q = num(it.qty), p = num(it.price); return a + (q > 0 && p >= 0 ? q * p : 0); }, 0);
@@ -5963,7 +6082,7 @@
       var p = { items: items, note: d.note.trim() || null };
       if (d.cust) p.customer_id = d.cust.id; else p.customer = { name: d.name.trim(), phone: d.phone.trim() || null };
       sapi('fiila_order_create', { p: p }).then(function (o) {
-        LS.del(ORDER_DRAFT);
+        LS.del(ORDER_DRAFT); resumeDone('order');
         track('order_created', o.address_state === 'received' ? 'known_address' : d.cust ? 'known_customer' : 'new_customer');
         go('#/commande/' + o.id + '?nouveau=1');
       }, function (e) { btn.disabled = false; btn.textContent = 'Réessayer'; errBox(err, e); });
@@ -6345,6 +6464,10 @@
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
     f.category = pr && pr.category || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');
     f.stock = pr && pr.stock != null ? String(pr.stock) : '';
+    // Nouvel article : brouillon (nom, prix, description) gardé sur le téléphone, par boutique et rôle, pour « Reprendre l'article ».
+    var pd = pr ? null : draftOf(PRODUCT_DRAFT, shop);
+    if (pd) { f.name = pd.name || ''; f.price = pd.price || ''; f.description = pd.description || ''; }
+    function keepP() { if (!pr) LS.set(PRODUCT_DRAFT, { ctx: shopCtx(shop), name: f.name, price: f.price, description: f.description }); }
     var err = h('div', { role: 'alert' });
     var zone = h('div', { class: 'stack' });
     var photos = productPhotos(pr);
@@ -6363,7 +6486,7 @@
         if (pp) { p.photo = pp.photo; p.photos = pp.photos; }
         return sapi('fiila_product_save', { p: p });
       }).then(function (res) {
-        if (!pr) track('product_created', photos.count() ? 'photo' : 'no_photo');
+        if (!pr) { track('product_created', photos.count() ? 'photo' : 'no_photo'); LS.del(PRODUCT_DRAFT); resumeDone('product'); }
         var nid = res && (res.id || (res.product && res.product.id));
         if (!pr && nid && p.active !== false) { go('#/boutique/article/' + nid + '?publier=1'); return; }
         toast(pr ? 'Article mis à jour.' : 'Article ajouté.'); go('#/boutique/articles');
@@ -6374,9 +6497,9 @@
       h('h1', null, pr ? 'Modifier l’article' : 'Nouvel article'),
       pr ? productStats(pr.id) : null,
       photoBox,
-      textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; } }),
-      textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; } }),
-      textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, onInput: function (v) { f.description = v; } }),
+      textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; keepP(); } }),
+      textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; keepP(); } }),
+      textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, onInput: function (v) { f.description = v; keepP(); } }),
       productDetails(f),
       pr ? segField({ name: 'product-active', id: 'product-active', value: f.active ? 'on' : 'off', options: [['on', 'Visible'], ['off', 'Masqué']], onChange: function (v) { f.active = v === 'on'; } }) : null,
       err, btn,
@@ -7360,7 +7483,7 @@
         var p = { id: ed ? ed.id : undefined, category: f.cat, title: f.title.trim(), gender: kid ? f.gender : null, age_band: kid ? f.age : null, size: f.size.trim() || null, condition: f.condition,
           price: parseInt(String(f.price).replace(/\D/g, ''), 10), quartier: f.quartier.trim() || null, photo_ok: true };
         if (f.photo !== original) p.photo = f.photo.replace(/^data:[^,]+,/, '');
-        api('fiila_vd_submit', { p: p }).then(function () { toast('Article envoyé. Fii le vérifie avant de le publier.'); go('#/vide-dressing'); },
+        api('fiila_vd_submit', { p: p }).then(function () { noteSuccess('vide_dressing'); toast('Article envoyé. Fii le vérifie avant de le publier.'); go('#/vide-dressing'); },
           function (e) { send.disabled = false; errBox(err, e); });
       } }, 'send', ed ? 'Renvoyer l’article corrigé' : 'Envoyer pour vérification');
       return page(backBtn('Vide-dressing', '#/vide-dressing'),
@@ -8347,6 +8470,36 @@
             return h('div', { class: 'stack tight' }, h('div', { class: 'total-row' }, h('span', { class: 'small' }, x[0]), h('b', { class: 'small' }, boNum(n) + (top ? ' · ' + pct + ' %' : ''))),
               h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, h('i', { class: 'paid', style: 'width:' + pct + '%' })));
           }));
+      })(),
+      (function () {
+        var ad = d.adaptive;
+        if (!ad) return null;
+        var hr = ad.hero || {}, pf = ad.pref || {}, rs = ad.resume || {};
+        function q(o, k) { return boNum(Number(o[k] || 0)); }
+        var now = Date.now(), day = 864e5;
+        // Aperçu sur cas fictifs : même fonction que l'application (adaptPick), paramètres en vigueur.
+        var cases = [
+          ['Nouvel utilisateur, rien fait', {}, null],
+          ['3 événements créés en 10 jours', { evenement: [now - 9 * day, now - 4 * day, now - day] }, null],
+          ['Ouvre « Demander » 6 fois sans rien envoyer', {}, null],
+          ['2 adresses et 2 demandes réussies (la demande plus récente)', { adresse: [now - 6 * day, now - 5 * day], demander: [now - 3 * day, now - 2 * day] }, null],
+          ['A épinglé « Livreur »', { adresse: [now - 2 * day, now - day] }, 'livreur']];
+        return h('div', { class: 'stack tight', id: 'bo-adaptive' },
+          h('div', { class: 'bo-panel-h' }, h('h3', null, 'Accueil adaptatif (UX-ADAPTATIVE-001)'), ad.on ? boBadge('ok', 'Actif · ' + ad.version) : boBadge('muted', 'Coupé (Réglages) · règle d’avant')),
+          h('p', { class: 'small muted' }, 'Le bouton principal apprend des tâches réussies, pas des écrans ouverts. Paramètres (hypothèses) : demi-vie ' + ADAPT.halfLife + ' j, bonus de répétition ' + ADAPT.bonus + ', seuil ' + ADAPT.threshold + ', fenêtre ' + ADAPT.windowDays + ' j. 30 derniers jours, installations observées :'),
+          boTable([
+            { label: 'Bouton principal', get: function (x) { var sv = svcOf(x); return sv ? sv.hero : x; } },
+            { label: 'Vu', get: function (x) { return q(hr, x + ':shown'); }, cls: 'num' },
+            { label: 'Touché', get: function (x) { return q(hr, x + ':click'); }, cls: 'num' },
+            { label: 'Tâche réussie ensuite', get: function (x) { return q(hr, x + ':success'); }, cls: 'num' }], SUCC_SVC, { id: 'bo-adaptive-table' }),
+          h('p', { class: 'small', id: 'bo-adaptive-pref' }, '« Mettre en premier » : ' + q(pf, 'pin') + ' · retour au choix automatique : ' + q(pf, 'unpin') + ' · remises à zéro : ' + q(pf, 'reset') +
+            '. Reprises en haut de Ma boutique : commande vue ' + q(rs, 'order:shown') + ', reprise ' + q(rs, 'order:click') + ', enregistrée ' + q(rs, 'order:success') +
+            ' · article vu ' + q(rs, 'product:shown') + ', repris ' + q(rs, 'product:click') + ', enregistré ' + q(rs, 'product:success') + '.'),
+          h('details', { id: 'bo-adaptive-preview' }, h('summary', null, 'Aperçu sur 5 cas fictifs'),
+            h('ul', { class: 'small', style: 'margin:8px 0 0;padding-left:18px' }, cases.map(function (c) {
+              var p = adaptPick(c[1], c[2], {}, c[0].indexOf('Demander') >= 0 ? { demander: 6 } : {}, now);
+              return h('li', null, c[0] + ' → ' + (p ? svcOf(p.svc).hero + (p.why === 'pin' ? ' (épinglé)' : '') : 'Créer mon adresse (par défaut)'));
+            }))));
       })(),
       (function () {
         var mk = d.marketing || {};

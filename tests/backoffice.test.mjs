@@ -156,6 +156,12 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   assert.match(await D.locator('#bo-onboarding').textContent(), /Nouvel accueil actif/);
   await D.locator('#bo-setup').getByText('Démarrage guidé de la boutique').waitFor();
   await D.locator('#bo-discover-table').waitFor();
+  // Accueil adaptatif (UX-ADAPTATIVE-001) : état, version, table, aperçu sur cas fictifs.
+  assert.match(await D.locator('#bo-adaptive').textContent(), /Accueil adaptatif.*adaptive_v1/s);
+  await D.locator('#bo-adaptive-table').waitFor();
+  await D.click('#bo-adaptive-preview summary');
+  await D.locator('#bo-adaptive-preview').getByText('3 événements créés en 10 jours → Créer un événement').waitFor();
+  await D.locator('#bo-adaptive-preview').getByText('Ouvre « Demander » 6 fois sans rien envoyer → Créer mon adresse (par défaut)').waitFor();
   assert.match(await D.locator('#bo-marketing-use').textContent(), /Ma boutique et Marketing.*Raccourcis de l’accueil : Commandes \d+.*Écran Marketing ouvert : \d+/s);
   // Suggestions (rétention lot 1) : table, fenêtre incomplète, commandes sans adresse, interrupteur par suggestion.
   await D.locator('#bo-sugg-table').waitFor();

@@ -4,6 +4,8 @@
 > Base lue : commit `0e07469` (= `29fbab8` + l'import du mandat + journal). Lecture du code et des tests uniquement : aucune mesure terrain.
 > **Avis seulement.** Rien n'est implémenté, migré ni activé. L'implémentation attend l'accord explicite du fondateur.
 >
+> **Validé par le fondateur le 22/10 à 21:11 (« ok ») ; construit le 22/10 (voir HANDOFF).**
+>
 > **v1.1 (22/10, 21:05)** : relue point par point contre le mandat, à la demande du fondateur. Quatre corrections, détaillées au §0.
 
 ## 0. Relecture contre le mandat : corrections de la v1.1
