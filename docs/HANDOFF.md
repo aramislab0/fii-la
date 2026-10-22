@@ -145,6 +145,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 21/10 23:18 | **Paiements : Wave et Orange Money via les comptes marchands correspondants.** À régler aussi : le paiement entre utilisateurs (client → boutique), avec sortie vers Wave / OM au montant prérempli et retour dans l'application avec le paiement enregistré. Point de vigilance du Builder : l'argent des commandes doit arriver directement chez la boutique (Fii ne détient pas les fonds de tiers sans agrément BCEAO) | Fondateur |
 | 22/10 00:08 | Photos publiques (articles, couvertures) déplacées vers Supabase Storage avec mise en cache ; photos privées (porte, vocal) gardées dans la base derrière les contrôles actuels | Fondateur |
 | 22/10 13:34 | **« Vitrine » devient « site »** partout dans le vocabulaire de Fii (« Mon site », « Site en ligne / hors ligne », « Personnaliser mon site », « Visites du site »…), y compris les réponses du Manager, le quiz et les missions des Agents. Noms techniques (`fiila_vitrine`, `#/b/…`, mesures `vitrine:…`) inchangés : les liens déjà partagés marchent | Fondateur |
+| 22/10 23:48 | **Algorithmes** : proposition `docs/PROPOSITION-ALGORITHMES.md` (maintenant : fiabilité d'adresse, entrée confirmée par les livraisons, fraude des Agents, acompte suggéré, notes justes ; plus tard avec déclencheurs chiffrés), **à faire relire par ChatGPT avant toute exécution** | Fondateur |
 | 22/10 21:11 | **UX adaptative (avis v1.1) validée** : surfaces existantes (bouton principal de l'accueil ; haut de Ma boutique : besoin bloquant → reprise → suggestion), commandes de l'utilisateur dans la liste des services, paramètres `adaptive_v1` comme hypothèses, essai de 14 jours sans groupe témoin, arrêt sur retour terrain négatif | Fondateur |
 | 22/10 19:20 | **Rétention v2 validée** : lot 1 = 6 suggestions existantes réécrites + commande sans adresse, arbitre commun ; règle du pilote : ≥ 5 boutiques distinctes ayant vu une suggestion et 7 jours complets → zéro succès = une réécriture, puis retrait ; ordre d'affichage articles → partage du site → photos → livreur → membre | Fondateur |
 | 22/10 13:34 | **Stratégie de rétention** par découverte progressive des fonctions : proposition `docs/PROPOSITION-RETENTION.md`, **à faire relire par ChatGPT (VP) avant toute exécution** | Fondateur |
@@ -156,6 +157,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | # | Action | Qui | Bloquant pour |
 |---|---|---|---|
+| 67 | Algorithmes : transmettre à ChatGPT le message en bas de `docs/PROPOSITION-ALGORITHMES.md` ; son avis va en haut de `docs/REVUE-VP.md` ; le Builder intègre (v2), puis le fondateur valide. Rien n'est construit avant | Fondateur → VP → Builder | Premier algorithme (A3 proposé) |
 | 66 | UX-ADAPTATIVE-001 : ~~avis~~, ~~validation (22/10 21:11)~~, ~~construction~~ ; reste : essai de 14 jours (jusqu'au 05/11), recette sur téléphone, retours terrain (un « je ne m'y retrouve plus » → `adaptive_home` = 0 le temps d'examiner) | Fondateur, Builder | Bilan de l'essai |
 | 1 | Re-tester sur iPhone : « Utiliser ma position », « Depuis Google Maps » avec un **vrai** lien partagé, « Itinéraire » | Fondateur | Validation des correctifs du 17/10 (lien court réel jamais testé) |
 | 2 | Communiquer l'identité et le contact du responsable du traitement déclaré à la CDP | Fondateur | Page confidentialité (art. 58), fiche art. 22 |
@@ -261,6 +263,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 22/10 23:58 | Proposition d'algorithmes rédigée (5 maintenant, 5 plus tard, à éviter, ordre, 5 questions pour le VP) ; aucun code modifié | `docs/PROPOSITION-ALGORITHMES.md` |
 | 22/10 22:45 | Accueil adaptatif en production : run 39865394872 vert. CI rendue robuste : navigateurs et dépendances système installés séparément, bornés et réessayés (apt réparé entre deux essais) ; un échec isolé du test back-office (invitation de marque) ne s'est pas reproduit, ni en local ni au passage suivant | run 39865394872 |
 | 22/10 22:05 | CI : l'installation des navigateurs de test s'est bloquée deux fois chez GitHub (plus de 20 min) ; étape bornée à 6 min avec 3 essais (`.github/workflows/pages.yml`) | ce commit |
 | 22/10 22:00 | UX adaptative construite (accueil appris des réussites, contrôles de l'utilisateur, reprises en haut de Ma boutique, réglage `adaptive_home`, back-office) ; tests SQL et navigateur | migration `20261022800000_fiila_adaptive_home` ; `tests/adaptive.test.mjs` (8), `tests/adaptive.sql.test.mjs` (2) |
