@@ -1,149 +1,143 @@
-# Proposition — Rétention par découverte progressive des fonctions
+# Proposition — Rétention par suggestions au bon moment (v2)
 
-> v1 rédigée par le Builder (Claude), 22/10/2026, à la demande du fondateur (13:34) : « une stratégie de rétention qui va
-> proposer ou mettre en avant certaines fonctionnalités inconnues de l'utilisateur, selon ses besoins et ses usages, pour
-> faire adopter petit à petit toutes les fonctionnalités ». **Rien n'est construit avant l'avis de ChatGPT (VP) et la
-> validation du fondateur.** L'avis du VP s'ajoute en haut de `docs/REVUE-VP.md` ; la v2 intègre ses changements.
+> **v2, 22/10/2026**, par le Builder (Claude). Elle intègre les cinq changements R1 à R5 de la revue du VP (ChatGPT) du 22/10, verdict « ALIGNÉ AVEC RÉSERVES » (`docs/REVUE-VP.md`).
+> La v1 (moteur et échelles complètes) reste lisible dans l'historique Git (`fb2bf8c`).
+>
+> **Statut : à valider par le fondateur. Rien n'est construit.** Les seuils ci-dessous sont des règles de pilote proposées. Ce ne sont ni des références externes ni des performances prouvées.
 
 ## 1. Verdict
 
-Remplacer les suggestions dispersées par **un seul moteur « prochaine étape »** :
-- un **catalogue** d'une vingtaine de fonctions, chacune avec qui elle concerne, quand elle devient utile, son bénéfice en une phrase et son bouton ;
-- **une seule suggestion à la fois**, au bon moment ;
-- un ordre d'adoption par profil (**échelle**) ;
-- des **limites de fréquence** ;
-- une mesure « vue → touchée → **utilisée** ».
+Le but n'est pas de faire adopter toutes les fonctions. Il est de **faire réussir puis répéter une tâche utile** : une commande traitée, une adresse obtenue, une adresse réutilisée.
 
-Pour les commerçants, un **parcours visible** (« Votre boutique : 5 étapes sur 9 ») rend la progression concrète.
+Le lot 1 se limite à trois choses :
+- **les 6 suggestions qui existent déjà**, réécrites avec des conditions indépendantes et une mesure honnête ;
+- **la demande d'adresse d'une commande**, traitée comme une tâche de la commande et non comme une découverte ;
+- **un arbitre commun** avec un budget d'expositions.
 
-Ce qui existe déjà et sert de base (FAIT, dans `web/app.js`) :
-- les cartes de suggestion `nudge()` :
-  - 6 suggestions (boutique, articles, partage du site, livreur, photos, équipe) ;
-  - « × » vaut 7 jours de silence, deux « × » valent plus jamais ;
-  - au plus 3 suggestions nouvelles ;
-- la découverte après une action, `afterTask()` ;
-- « Mes activités » et « Découvrir les services » ;
-- les badges du démarrage de la boutique ;
-- les compteurs anonymes et le back-office Croissance.
+Restent en dehors du lot 1 :
+- le catalogue élargi et le parcours « 5 étapes sur 9 » ;
+- les parcours particulier et livreur ;
+- la synchronisation avec le compte ;
+- la mise en avant du Premium.
 
-Le problème actuel (ANALYSE) :
-- chaque suggestion est codée à la main, dans un écran différent ;
-- aucune vue d'ensemble de ce que la personne connaît déjà ;
-- aucune mesure de l'adoption réelle : on compte « touché », pas « utilisé ensuite » ;
-- une bonne moitié des fonctions n'est jamais proposée : repère vocal, événement, acompte, Marketing, réseaux, publication d'un article, QR code, vide-dressing, parrainage, Premium.
+Les fonctions restent toutes accessibles dans « Découvrir les services ».
 
-## 2. Principes
+| Changement du VP | Réponse de la v2 |
+|---|---|
+| R1 — conditions indépendantes, priorité au besoin réel | Plus d'échelle obligatoire. Chaque suggestion a sa condition propre. La demande d'adresse d'une commande passe avant tout, même sans article, sans site ni logo. Les droits du membre sont vérifiés avant d'afficher (§3). |
+| R2 — clic ≠ refus ≠ connu ≠ utilisé | Quatre états séparés. « Utilisé » = un succès confirmé par le serveur ou par l'état réel ; ouvrir un écran ou WhatsApp ne compte pas. Les anciens « done » ne sont pas convertis (§4). |
+| R3 — arbitre et budget communs | Une exposition par session, deux au plus sur 7 jours glissants par téléphone, partagées entre les suggestions et la découverte après une action. Une exposition n'est comptée que si la carte est vue à 50 % ou plus. L'état d'une commande est hors budget (§5). |
+| R4 — lot 1 réduit | 6 suggestions + l'adresse de commande, sans « 5/9 », avec un back-office minimal (§7). |
+| R5 — mesure | Exposition visible, clic, premier succès sous 7 jours, répétition. Agrégats seulement. Fenêtre de 7 jours marquée incomplète tant qu'elle n'est pas écoulée. Seuil 200 vues / 3 % retiré ; règle du pilote fondée sur les boutiques suivies sur le terrain (§6). |
 
-1. **La tâche d'abord.** Une suggestion n'interrompt jamais une action en cours. Elle arrive après une réussite, sur l'accueil, ou dans l'écran où la fonction sert.
-2. **Une seule à la fois.** Une suggestion au plus par écran, et deux au plus par jour.
-3. **Selon l'usage réel, pas le profil supposé.** Une fonction n'est proposée que si la précédente de l'échelle est faite et si le contexte la rend utile. Exemple : l'acompte après 3 commandes, pas avant.
-4. **Bénéfice concret, jamais de promesse.** « Vos clientes vous trouvent sans appeler », pas « boostez vos ventes ».
-5. **Respect du refus.** « × » vaut 7 jours de silence ; deux « × » valent plus jamais pour cette fonction ; « Je connais déjà » la retire. On ne relance jamais une fonction déjà utilisée.
-6. **Rien de personnel ne sort du téléphone.**
-   - L'état « connu / utilisé » vit sur le téléphone, et dans le compte s'il existe (lot 3).
-   - Les mesures restent anonymes et agrégées.
+## 2. Ce qui existe (FAIT, `web/app.js` au commit `240317f`)
 
-## 3. Les échelles d'adoption (ordre proposé)
+- **`nudge()`**
+  - Il affiche une carte au plus par rendu.
+  - Le clic pose `done = true`, et la carte disparaît pour toujours.
+  - « × » donne 7 jours de silence ; deux « × » valent plus jamais.
+  - Au plus 3 nouveaux identifiants par jour, mais leurs réaffichages ne sont pas limités.
+  - « Vue » est comptée au rendu.
+- **`afterTask()`**
+  - Son état est séparé (`fiila.after`), sans plafond commun avec `nudge()`.
+  - « Vue » n'est comptée que si la carte est visible (`trackWhenVisible`, seuil de 50 %).
+- **La demande d'adresse d'une commande** existe déjà dans la commande :
+  - adresse en attente → le lien de la facture la demande ;
+  - adresse expirée, retirée ou absente → bouton « Redemander l'adresse » (`fiila_order_request_address`, ouvert aussi aux éditeurs).
+  - Le tableau de bord marque « Adresse attendue » ou « Adresse à redemander ».
 
-### Commerçant (cœur de la rétention)
+## 3. Matrice du lot 1 : conditions, succès, mesure
 
-| # | Fonction | Devient proposée quand | Bénéfice affiché | Où |
-|---|---|---|---|---|
-| 1 | Premier article | boutique créée, 0 article | « Une photo, un prix : prêt pour vos commandes » | Ma boutique (existe) |
-| 2 | Mettre le site en ligne | ≥ 1 article, site hors ligne | « Vos clientes commandent sans vous appeler » | Ma boutique |
-| 3 | Partager le site (WhatsApp, statut) | site en ligne, 0 visite sur 7 jours | « Mettez le lien dans votre statut » | Accueil, Marketing |
-| 4 | 5 articles avec photo | < 5 articles, 3 jours après la création | « Un site bien rempli rassure » | Articles (existe) |
-| 5 | Demander l'adresse d'une cliente | 1re commande sans adresse | « L'adresse exacte, en une photo » | Après la commande |
-| 6 | Logo et personnalisation | site en ligne depuis 3 jours, sans logo | « Votre logo à la place de l'initiale » | Réglages, accueil |
-| 7 | Réseaux sur le site | logo fait, aucun réseau | « Vos clientes vous suivent en un toucher » | Personnaliser |
-| 8 | Plusieurs photos par article | ≥ 3 articles à une seule photo | « Jusqu'à 5 photos qui défilent » | Articles (existe) |
-| 9 | Paiement et acompte | ≥ 3 commandes, aucun paiement noté | « Suivez ce qui reste à encaisser » | Commande |
-| 10 | Publier un article (Story, statut) | ≥ 1 vente sur un article | « Republiez ce qui se vend » | Marketing |
-| 11 | Statistiques Marketing | 7 jours après la mise en ligne | « Vos visites et ventes de la semaine » | Accueil (pastille) |
-| 12 | Livreur attitré | ≥ 3 commandes livrées | « Vos courses avec l'adresse exacte » | Après une livraison (existe) |
-| 13 | Équipe de la boutique | ≥ 10 commandes, ou boutique tenue depuis 2 téléphones | « Un membre, ses droits » | Réglages (existe) |
-| 14 | Fil Fii | site en ligne et place gratuite libre | « Apparaissez dans le fil » | Réglages |
-| 15 | Compte | 3 actions réussies sans compte | « Ne perdez rien en changeant de téléphone » | Accueil (existe) |
-| 16 | Modèles Premium | logo et 10 articles, site actif depuis 14 jours | « Une mise en page haut de gamme » | Personnaliser |
+Les conditions sont lues dans l'état réel, sur le téléphone et dans `fiila_shop_get`. Aucune nouvelle donnée personnelle n'est créée.
 
-### Particulier
+| # | Suggestion | Montrée quand (toutes les conditions) | Jamais quand | Où | « Utilisé » = succès confirmé | Résultat métier (distinct) |
+|---|---|---|---|---|---|---|
+| S0 | **Adresse d'une commande** (état de la commande, hors budget) | Au moins une commande ouverte avec l'adresse en attente, expirée, retirée ou absente | Commande fermée ou annulée | En tête de Ma boutique : « 2 commandes attendent une adresse » → la première commande concernée ; dans la commande, comme aujourd'hui | Demande enregistrée par le serveur (`fiila_order_request_address` réussi), ou facture envoyée au client (WhatsApp ouvert = `share_initiated` seulement) | Adresse reçue (`address_state = received`) |
+| S1 | Ouvrir sa boutique (`home_shop`) | Pas de boutique sur ce téléphone ni dans le compte ; au moins une action réussie (adresse, demande ou commande) ; boutique activée | Démarrage guidé en cours | Accueil | Boutique créée (réponse du serveur) | Premier article enregistré |
+| S2 | Ajouter des articles (`shop_more_products`) | De 1 à 2 articles actifs | Rôle sans droit d'ajout ; démarrage en cours | Ma boutique | Article enregistré après l'exposition | Article commandé |
+| S3 | Partager le site (`shop_share_vitrine`) | Site en ligne ; au moins 1 article ; aucune commande passée par le site | Site hors ligne : la boutique peut travailler par commandes, sans site public ; on ne la pousse pas | Ma boutique | **Au moins une visite du site** dans les 7 jours (`shop_views`, état réel). Le clic WhatsApp reste un clic | Commande passée par le site |
+| S4 | Inviter un livreur (`shop_courier`) | Au moins 2 commandes ; ni livreur ni invitation en cours ; rôle propriétaire ou administrateur | Éditeur | Ma boutique | Invitation créée (serveur) | Livreur rattaché |
+| S5 | Plusieurs photos (`shop_photos`) | Au moins 3 articles et au moins 1 commande ; **aucun article** n'a encore 2 photos ou plus | Éditeur sans droit sur les articles | Ma boutique | Article enregistré avec 2 photos ou plus | — |
+| S6 | Ajouter un membre (`shop_team`) | Au moins 10 commandes ; rôle propriétaire ; aucun membre ni invitation | Tout rôle autre que propriétaire | Ma boutique | Invitation créée (serveur) | Membre ayant rejoint |
 
-| # | Fonction | Devient proposée quand | Où |
-|---|---|---|---|
-| 1 | Créer mon adresse | première visite | Accueil (existe) |
-| 2 | Envoyer mon adresse | adresse créée, jamais envoyée | Fiche (existe) |
-| 3 | Repère vocal | adresse envoyée 2 fois, sans repère vocal | Fiche |
-| 4 | Événement | 2e visite, aucun événement | Accueil |
-| 5 | Installer l'app | 2e visite (existe) | Accueil |
-| 6 | Demander une adresse | après avoir reçu une demande, ou 3 adresses envoyées | Après une action (existe) |
-| 7 | Inviter un proche | 3 actions réussies | Après une action |
-| 8 | Vide-dressing | compte créé, 14 jours d'usage | Accueil |
-| 9 | Ouvrir une boutique | adresse donnée pour une commande (existe) | Après une action |
+Une seule suggestion du budget est affichée par écran, dans l'ordre S2 → S3 → S5 → S4 → S6. S0 s'affiche **en plus**, puisque c'est une tâche de la commande. Cet ordre n'est pas une échelle : chaque suggestion reste éligible sans que les autres soient faites.
 
-### Livreur
-Courses reçues → partager son lien à d'autres boutiques → compte.
+Scénarios de test exigés par R1, sous Chrome et WebKit :
+- commande sans adresse alors que la boutique n'a aucun article : S0 visible ;
+- boutique sans site public : S3 jamais affichée ; S0, S2, S4 et S5 restent possibles ;
+- site prêt sans logo : rien ne demande de logo ;
+- éditeur : ni S4 ni S6 ; S0 visible ;
+- démarrage guidé ou création de commande en cours : aucune carte du budget.
 
-## 4. Le mécanisme (MVP)
+## 4. États et compatibilité (R2)
 
-- **Catalogue dans le code**, avec pour chaque fonction :
-  - `id`, profil, échelle et rang ;
-  - la condition d'éligibilité ;
-  - la condition « déjà utilisée » ;
-  - les textes et le lien ;
-  - les écrans où elle peut apparaître.
-- **Choix de la suggestion** : sur un écran donné, la première fonction éligible de l'échelle qui n'est ni utilisée, ni écartée, ni en pause.
-- **Données utilisées.**
-  - Déjà disponibles :
-    - l'activité locale (`fiila.acts`, `fiila.tx`) ;
-    - les fiches du téléphone ;
-    - les compteurs de la boutique (`fiila_shop_get`, `fiila_shop_stats`) ;
-    - l'état du site (logo, réseaux, modèle).
-  - Aucune nouvelle donnée personnelle.
-- **« Utilisée »** est déduit de l'état réel (le site a un logo, une commande a un acompte) ou du premier usage de l'écran. Ce n'est pas le clic sur la suggestion.
-- **Parcours commerçant visible** : sur Ma boutique, une carte repliée affiche « Votre boutique : 5 étapes sur 9 », avec la prochaine étape en un bouton. Les 9 étapes sont les rangs 1 à 9 de l'échelle. La carte disparaît quand tout est fait. Les badges existants se prolongent.
-- **Limites** : une suggestion par écran ; 2 par jour ; 7 jours après « × » ; jamais après deux « × » ; jamais pendant un démarrage guidé ou une commande en cours.
+- **Par suggestion et par téléphone :**
+  - `shown` (dernière exposition visible) ;
+  - `clicked` ;
+  - `dismissed` (nombre de refus et date de fin du silence) ;
+  - `known` ;
+  - `used` (date du premier succès) ;
+  - `repeated` (un deuxième succès, au moins un jour plus tard).
+- **`known`** : la fonction était déjà utilisée avant la première exposition (état réel), par exemple un article à plusieurs photos existe déjà. Elle n'est jamais montrée et n'entre pas dans les nouvelles adoptions.
+- **`used`** n'est posé que par la réponse réussie du serveur ou par l'état réel relu. Il compte une seule fois, localement, et seulement dans les 7 jours qui suivent une exposition. Au-delà, il vaut `known`, sans attribution.
+- **Une erreur du serveur n'est pas un succès.** Un clic suivi d'un abandon laisse la suggestion éligible, sous le budget.
+- **Anciens `done` (clics d'avant la v2).** Ils ne sont pas convertis en usages.
+  - Si l'état réel montre la fonction utilisée, elle devient `known`.
+  - Sinon, le clic est gardé comme historique et la suggestion n'est **pas relancée** au déploiement.
+- **Les tests actuels « clic = terminé »** (`tests/nudges.test.mjs`) sont réécrits selon ces règles.
 
-## 5. Mesure (pour décider)
+## 5. Arbitre et budget communs (R3)
 
-- Par fonction, sur 30 jours : vue → touchée → **utilisée dans les 7 jours** (l'adoption).
-- Par profil :
-  - nombre moyen de fonctions utilisées par personne active ;
-  - retour à 7 et à 30 jours des personnes qui ont adopté au moins 3 fonctions, comparé aux autres.
-- **Critère d'arrêt** : une suggestion vue 200 fois et utilisée moins de 3 % du temps est réécrite une fois, puis retirée.
-- **Back-office** : Croissance → **Adoption**.
-  - Voir : catalogue, entonnoir par fonction, fonctions les moins connues.
-  - Agir : interrupteur par fonction, et un interrupteur général « suggestions ».
-  - Tracer : changements journalisés.
-  - Tester : aperçu de la suggestion.
+- **Une seule fonction décide** de ce qui s'affiche, pour `nudge()`, pour `afterTask()` et pour toute autre invitation à découvrir. « Voir tous les services » ne change pas.
+- **Budget par téléphone :**
+  - une exposition par session (`sessionStorage`) ;
+  - deux expositions au plus sur 7 jours glissants (`localStorage`).
+  - Une carte compte seulement quand elle est visible à 50 % ou plus. Une carte affichée hors écran ne compte pas, et un rechargement ne la remontre pas dans la même session.
+- **Silences** : un refus vaut 7 jours ; deux refus, plus jamais.
+- **Jamais** pendant le démarrage guidé, la création d'une commande, un formulaire en cours, ni sur une page reçue par lien. Ces pages ne doivent rien écrire sur le téléphone sans action de la personne.
+- **Interrupteurs existants respectés** : `nudges`, `discover_after`, et le refus des mesures (signal de confidentialité du navigateur). S0 reste hors budget, car c'est l'état de la commande.
 
-## 6. Découpage
+## 6. Mesure et règle de décision du pilote (R5)
 
-| Lot | Contenu | Effort |
-|---|---|---|
-| 1 | Moteur + catalogue + échelle commerçant (rangs 1 à 11) + carte « parcours » sur Ma boutique + mesure d'adoption + back-office Adoption. Les 6 suggestions actuelles migrent dans le moteur. | ≈ 1 jour |
-| 2 | Échelle particulier et livreur, suggestions après une action reliées au moteur | ≈ ½ jour |
-| 3 | État « connu / utilisé » gardé dans le compte (d'un téléphone à l'autre), rangs 12 à 16 | ≈ ½ jour |
-| Plus tard | Rappels hors de l'app (WhatsApp ou e-mail) : dépendent de l'envoi par l'API (#51), écarté pour l'instant le 22/10 | — |
+- **Événements anonymes**, sans clé de boutique, sans client et sans identifiant stable :
+  - `retention` × (`S1`…`S6`) × (`shown`, `click`, `dismiss`, `used`, `repeat`) ;
+  - pour S0 : `order_address` × (`shown`, `used`).
+- **L'attribution** (exposition suivie d'un succès sous 7 jours) est calculée sur le téléphone. Seuls des agrégats quotidiens sont envoyés.
+- **Back-office**, Croissance → **Suggestions** :
+  - par suggestion : expositions visibles, clics, refus, premiers succès sous 7 jours, répétitions ;
+  - toujours en nombres bruts, avec la mention « installations observées » (pas des personnes ni des boutiques uniques) ;
+  - les 7 derniers jours marqués « fenêtre incomplète ».
+  - S0 : nombre de commandes passées d'une adresse attendue ou expirée à une adresse reçue sur 30 jours. C'est un agrégat calculé par le serveur sur les commandes, sans aucune donnée de client.
+- **Règle du pilote (hypothèse, sans valeur statistique)**, suivie dans `docs/FICHE-TEST-TERRAIN.md` avec l'accord des boutiques, hors des compteurs anonymes :
+  - condition : au moins **5 boutiques distinctes** éligibles ont réellement vu une suggestion, et 7 jours complets d'observation se sont écoulés ;
+  - si **aucun succès** : diagnostic, une seule réécriture, nouvelle observation ;
+  - si encore aucun succès : retrait de la suggestion du pilote.
+- **Indicateur suivi** : nouvelle commande traitée, ou adresse réutilisée à une occasion ultérieure. Le nombre de fonctions utilisées sert au diagnostic, pas d'indicateur principal.
 
-## 7. Questions pour le VP (ChatGPT)
+## 7. Lot 1 : périmètre et back-office (R4)
 
-1. **L'ordre de l'échelle commerçant.** Faut-il faire passer « Demander l'adresse » (rang 5) avant « Partager le site » (rang 3) ? La demande d'adresse est le cœur historique de Fii.
-2. **Le parcours visible** (« 5 étapes sur 9 ») sur Ma boutique : utile ou pression de trop pour une vendeuse débutante ?
-3. **Les limites de fréquence** : une par écran et deux par jour, est-ce assez discret ?
-4. **Le critère d'arrêt** (200 vues, moins de 3 % d'usage) : adapté au volume du pilote (20 boutiques), ou faut-il un seuil en nombre de boutiques ?
-5. **Ce qui manque ou ce qui est en trop** dans le catalogue au stade MVP.
+- **Code :**
+  - l'arbitre ;
+  - les 6 suggestions migrées selon la matrice du §3 ;
+  - la carte S0 en tête de Ma boutique ;
+  - les états du §4 ;
+  - la reprise des anciens `done`.
+  - Le démarrage guidé existant est conservé tel quel.
+- **Base :**
+  - mesure `retention` et `order_address` (liste blanche de `fiila_track`) ;
+  - agrégat S0 ;
+  - interrupteur par suggestion (réglages bornés 0/1) en plus de l'interrupteur général `nudges`.
+- **Back-office :**
+  - **Voir** : la matrice et les compteurs.
+  - **Agir** : interrupteurs par suggestion et général.
+  - **Tracer** : chaque changement dans le journal de l'équipe.
+  - **Tester** : aperçu de chaque carte.
+- **Tests** : scénarios du §3, budget et rechargements (§5), clic sans succès et erreur du serveur (§4), sous Chrome et WebKit ; recette sur téléphone réel avant tout élargissement.
+- **Retour arrière** : l'interrupteur général coupe tout ; les anciennes cartes ne reviennent pas.
+- **Hors lot 1** : catalogue élargi, « 5/9 », parcours particulier et livreur, synchronisation avec le compte, Premium, rappels WhatsApp ou e-mail.
 
----
+## 8. À valider par le fondateur
 
-## Message à transmettre à ChatGPT (copier-coller)
-
-> Tu es VP produit de Fii (ex-Fii La), avec le Builder (Claude Code). Le fondateur demande une stratégie de rétention
-> par découverte progressive des fonctions. Lis la proposition du Builder :
-> https://raw.githubusercontent.com/aramislab0/fii-la/main/docs/PROPOSITION-RETENTION.md
-> Contexte et décisions en vigueur : https://raw.githubusercontent.com/aramislab0/fii-la/main/docs/HANDOFF.md
-> Ne rouvre pas les décisions de HANDOFF §3. Rends un avis au format de `docs/REVUE-VP.md` :
-> - un verdict (valider / valider avec changements / refaire) ;
-> - au plus 5 changements, classés bloquant / important / plus tard, chacun exécutable sans deviner ;
-> - une réponse courte aux 5 questions du §7.
->
-> Distingue FAIT / ANALYSE / HYPOTHÈSE. Défends la solution simple (stade pilote, 20 boutiques). Français, registre direct.
+1. Le périmètre du lot 1 (§7) et la matrice (§3).
+2. La règle du pilote (§6) : 5 boutiques distinctes, 7 jours, une réécriture, puis retrait.
+3. L'ordre d'affichage S2 → S3 → S5 → S4 → S6 quand plusieurs suggestions sont possibles.
