@@ -101,6 +101,8 @@ await t('« Publier » : la photo du stockage est préparée pour l’enregistre
   await S.locator('#publish-box').waitFor();
   await S.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); });
   await S.click('#product-publish');
+  await S.waitForFunction(() => { const b = document.getElementById('pub-go'); return b && !b.disabled; });
+  await S.click('#pub-go');
   const a = S.locator('#post-download');
   await a.waitFor();
   await S.waitForFunction(() => /^data:image\//.test(document.getElementById('post-download').getAttribute('href') || ''));

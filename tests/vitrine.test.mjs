@@ -106,6 +106,8 @@ await t('publication d’un article : la légende renvoie vers la vitrine', asyn
   await S.goto(URL0 + '#/boutique/article/' + P1.id);
   await S.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); });
   await S.click('#product-publish');
+  await S.waitForFunction(() => { const b = document.getElementById('pub-go'); return b && !b.disabled; });
+  await S.click('#pub-go');
   await S.locator('#post-caption').getByText(/Pour commander : .*#\/b\/boutique-awa-test\?a=/).waitFor();
 });
 
