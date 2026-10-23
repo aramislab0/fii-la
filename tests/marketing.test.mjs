@@ -72,10 +72,11 @@ await t('Marketing : chiffres de la période, comparaison, panier moyen ; change
   await P.click('#tab-marketing');
   await P.locator('#mk-revenue').waitFor();
   assert.equal(await P.locator('#tab-marketing').getAttribute('aria-current'), 'page');
-  assert.match(await P.locator('#mk-revenue').textContent(), /^24\s000 FCFAVentes$/);
-  assert.match(await P.locator('#mk-orders').textContent(), /^1Commande/);
-  assert.match(await P.locator('#mk-views').textContent(), /^1Visite du site/);
-  assert.match(await P.locator('#mk-line').textContent(), /Panier moyen 24\s000 FCFA · 1 via le site/);
+  assert.match(await P.locator('#mk-revenue').textContent(), /^Ventes.*24\s000\sFCFA/);
+  await P.locator('#mk-revenue svg.mk-spark').waitFor();
+  assert.match(await P.locator('#mk-orders').textContent(), /^Commande1/);
+  assert.match(await P.locator('#mk-views').textContent(), /^Visite1/);
+  assert.match(await P.locator('#mk-line').textContent(), /Panier moyen24\s000\sFCFA.*Via le site1/);
   // Publier : on touche la photo de l'article ; les plus vendus d'abord.
   assert.match(await P.locator('#mk-pub-' + A.id).textContent(), /Robe Ndella \(test\).*2 vendus/s);
   assert.equal(await P.locator('#mk-strip .mk-pp').first().getAttribute('id'), 'mk-pub-' + A.id);

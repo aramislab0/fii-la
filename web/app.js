@@ -30,7 +30,28 @@
   function add(el, c) {
     if (c == null || c === false) return;
     if (Array.isArray(c)) { c.forEach(function (x) { add(el, x); }); return; }
-    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+    el.append(c instanceof Node ? c : /^(OPTION|TEXTAREA|PRE|TITLE|STYLE|SCRIPT)$/.test(el.tagName) ? document.createTextNode(String(c)) : typo(String(c)));
+  }
+  /* Typographie française à l'affichage (fondateur, 23/10 : « des guillemets à la ligne ») : « mot », « mot : », un montant
+     (24 000 FCFA) ne se coupent jamais en fin de ligne. Le texte reste identique (copie, lecteurs d'écran) : seuls les
+     groupes à garder ensemble sont mis dans un <span class="nb"> (white-space:nowrap). */
+  // Sans expression régulière à rebours (anciens Safari) : on regroupe les mots à garder ensemble, 18 caractères au plus
+  // par mot pour qu'un mot très long reste libre de se couper (aucun débordement à 320 px).
+  function typoGlue(prev, next) {
+    if (prev.length > 18 || next.length > 18) return false;
+    return (/^[»:;!?]/.test(next) && next.length <= 3) || /«$/.test(prev) || (/\d$/.test(prev) && /^(\d{3}\b|FCFA|%)/.test(next));
+  }
+  function typo(t) {
+    if (t.length < 3 || !/[«»:;!?]|\d /.test(t)) return document.createTextNode(t);
+    var parts = t.split(/( +)/), frag = document.createDocumentFragment(), buf = '';
+    for (var i = 0; i < parts.length; i += 2) {
+      var w = parts[i], sp = parts[i + 1] || '', g = w, j = i;
+      while (j + 2 < parts.length && parts[j + 2] !== '' && typoGlue(parts[j], parts[j + 2])) { g += parts[j + 1] + parts[j + 2]; j += 2; }
+      if (j > i) { if (buf) { frag.append(buf); buf = ''; } var el = document.createElement('span'); el.className = 'nb'; el.textContent = g; frag.append(el); buf = parts[j + 1] || ''; i = j; }
+      else buf += w + sp;
+    }
+    if (buf) frag.append(buf);
+    return frag;
   }
   function setKids(el) {
     el.replaceChildren();
@@ -1656,7 +1677,7 @@
         function finish(v) { if (done) return; done = true; closeSheet(); resolve(v); }
         var back = h('div', { class: 'sheet-back', id: 'crop-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'crop-h', onclick: function (e) { if (e.target === back) finish(null); } },
           h('div', { class: 'sheet crop-sheet' }, h('h2', { id: 'crop-h' }, 'Recadrer la photo'),
-            h('p', { class: 'small muted' }, 'Format des cartes du site (4:5). Glissez pour cadrer, zoomez avec le curseur.'),
+            h('p', { class: 'small muted' }, 'Glissez pour cadrer.'),
             frame, h('label', { class: 'crop-zoom' }, icon('plus', 18), zoom),
             iconBtn('button', { class: 'btn', type: 'button', id: 'crop-ok', onclick: function () {
               var s = base * z;
@@ -2268,7 +2289,7 @@
         icon('cam', 24), h('span', null, st.list.length ? 'Ajouter' : 'Ajouter des photos')));
       var offN = st.list.filter(function (x) { return x.off; }).length;
       setKids(box,
-        h('span', { class: 'label' }, 'Photos de l’article ', h('span', { class: 'hint' }, '(facultatif, 5 au plus, format 4:5)')),
+        h('span', { class: 'label' }, 'Photos de l’article ', h('span', { class: 'hint' }, '(5 au plus)')),
         h('div', { class: 'pp-grid', id: 'product-photo-grid' }, tiles),
         st.failed ? h('p', { class: 'msg err' }, 'Photos supplémentaires indisponibles : rechargez la page pour les modifier.') : null,
         offN ? h('p', { class: 'hint', id: 'product-photo-off' }, offN === 1 ? 'Une photo n’est pas au format des cartes : elle sera recadrée au centre à l’enregistrement, ou recadrez-la vous-même.'
@@ -2681,10 +2702,10 @@
       setKids(box,
         h('div', { class: 'vs-head' }, shopLogo({ name: shop.name, logo: state.logo }, 'vs-logo'),
           h('div', null, h('h2', { class: 'wrapword' }, 'Mon site'),
-            h('p', { class: 'small muted' }, state.plan === 'premium' ? 'Abonnement Premium' : 'Vos articles sur une page à partager'))),
+            state.plan === 'premium' ? h('p', { class: 'small muted' }, 'Abonnement Premium') : null)),
         h('button', { class: 'switch-row' + (state.public ? ' on' : ''), type: 'button', role: 'switch', id: 'vitrine-switch', 'aria-checked': state.public ? 'true' : 'false', onclick: toggle },
           h('span', { class: 'sw-t' }, h('b', null, state.public ? 'Site en ligne' : 'Site hors ligne'),
-            h('small', null, state.public ? 'Visible par vos clientes. Touchez pour le mettre hors ligne.' : 'Personne ne le voit. Touchez pour le mettre en ligne.')),
+            h('small', null, state.public ? 'Visible par vos clientes.' : 'Personne ne le voit.')),
           h('span', { class: 'sw', 'aria-hidden': 'true' }, h('i'))),
         state.public && url ? [
           h('p', { class: 'sharelink', id: 'vitrine-url' }, url),
@@ -2805,7 +2826,7 @@
         setKids(themesBox,
           h('div', { class: 'vt-cards', id: 'vitrine-theme' }, VT_THEMES.map(function (t) { return themeCard(t, false); })),
           h('div', { class: 'prem-h' }, h('h3', null, 'Modèles Premium'), premium ? h('span', { class: 'chip ok' }, icon('check', 12), 'Inclus dans votre abonnement')
-            : h('span', { class: 'small muted' }, 'Réservés aux abonnés Premium')),
+            : null),
           h('div', { class: 'vt-cards', id: 'vitrine-theme-premium' }, VT_PREMIUM.map(function (t) { return themeCard(t, !premium); })));
       }
       function drawColors() {
@@ -2826,7 +2847,7 @@
           h('div', { class: 'stack tight' },
             h('button', { class: 'btn ghost small', type: 'button', id: 'look-logo-pick', onclick: function () { logoInput.click(); } }, icon('cam', 18), h('span', null, d.logo ? 'Changer le logo' : 'Ajouter un logo')),
             d.logo ? h('button', { class: 'btn link small', type: 'button', id: 'look-logo-remove', onclick: function () { d.logo = null; drawLogo(); refresh(); } }, 'Retirer le logo')
-              : h('p', { class: 'small muted' }, 'Sans logo, l’initiale de la boutique s’affiche.')),
+              : null),
           logoInput);
       }
       function drawAll() { drawLogo(); drawThemes(); drawColors(); refresh(); setKids(socialFields, socialInputs()); setKids(aboutBox, aboutField()); setKids(coverBox, coverField()); }
@@ -2853,7 +2874,7 @@
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couleur'), colorsBox),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couverture et présentation'), coverBox, aboutBox),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Réseaux sociaux'),
-          h('p', { class: 'small muted' }, 'Affichés en ronds à côté de votre logo. Le nom du compte ou son lien.'), socialFields),
+          h('p', { class: 'small muted' }, 'Le nom du compte ou son lien.'), socialFields),
         err, h('div', { style: 'height:96px' }), footer());
       pg.appendChild(bar);
       pg.classList.add('has-savebar');
@@ -2873,7 +2894,7 @@
         h('button', { class: 'btn ghost full', type: 'button', id: 'premium-interest', onclick: function () {
           track('premium', t[0] + ':interest'); close(); toast('C’est noté. L’abonnement Premium arrive bientôt.');
         } }, 'Je veux ce modèle'),
-        h('p', { class: 'small muted' }, 'L’aperçu ne change rien à votre site : vos clientes voient toujours votre modèle actuel.')));
+        h('p', { class: 'small muted' }, 'Aperçu seulement : votre site ne change pas.')));
     var closeSheet; function close() { closeSheet(); }
     closeSheet = openSheet(back);
   }
@@ -3178,7 +3199,6 @@
       h('div', { class: 'sheet pub-sheet' },
         h('div', { class: 'svc-head' }, h('h2', { id: 'pub-h', class: 'wrapword' }, 'Publier « ' + pr.name + ' »'),
           h('button', { class: 'svc-x', type: 'button', 'aria-label': 'Fermer', id: 'pub-close', onclick: function () { closeSheet(); } }, icon('close', 18))),
-        h('p', { class: 'small muted' }, 'Choisissez le format. L’image et le texte sont prêts.'),
         h('div', { class: 'pub-fmts', role: 'radiogroup', 'aria-label': 'Format' }, card('post'), card('story')),
         guide, go, status, more,
         h('details', { class: 'pub-text' }, h('summary', null, 'Voir le texte'), h('pre', { class: 'caption' }, text))));
@@ -3195,7 +3215,6 @@
     var countEl = h('p', { class: 'small muted', id: 'post-count' }, pubCountText(count));
     return h('section', { class: 'card stack tight', id: 'publish-box' },
       h('h2', null, fresh ? 'Article ajouté. Publiez-le' : 'Publier sur vos réseaux'),
-      h('p', { class: 'small muted' }, 'Une publication ou une story, prête pour Instagram, Facebook, TikTok ou votre statut WhatsApp.'),
       iconBtn('button', { class: 'btn', type: 'button', id: 'product-publish', onclick: function () {
         publishSheet(pr, shop, function (n) { count = n; countEl.textContent = pubCountText(n); });
       } }, 'share', 'Publier'),
@@ -3652,7 +3671,6 @@
           fiche({ kind: 'address', label: d.label.trim(), locality: d.locality.trim(), instruction: d.instruction.trim(), entry: d.entry, vehicle_ok: d.vehicle_ok, stop: d.stop, walk: d.walk.trim(), photo: d.photo },
             { voice: voice.action === 'set' || (voice.action === 'keep' && voice.existing) ? h('div', { class: 'voice' }, h('span', { class: 'btn vbtn', 'aria-hidden': 'true' }, icon('play', 24)),
               h('div', { class: 'vtxt' }, h('strong', null, 'Écouter le repère'), h('span', { class: 'muted' }, secsText(voice.action === 'set' ? voice.secs : voice.existing.secs)))) : null }),
-          h('p', { class: 'hint' }, 'Modifiable à tout moment.'),
           refAsk ? refAsk.el : null];
       }
       function onNext() {
@@ -4069,7 +4087,7 @@
             fbHelp.hidden = false;
           } }, 'facebook', 'Facebook', 18);
     var qrWrap = o.qr ? h('div', { class: 'stack tight', id: 'share-qr-box', hidden: true },
-      o.qr, h('p', { class: 'small muted' }, 'À imprimer près de la porte.')) : null;
+      o.qr) : null;
     var moreBox = h('div', { class: 'chan-grid', id: 'share-more-box', hidden: true },
       o.qr ? channelBtn('tiktok', 'TikTok') : null, facebook, nativeShare);
     function toggle(btn, box) {
@@ -4748,7 +4766,6 @@
         backInvoice ? iconBtn('a', { class: 'btn', id: 'back-invoice', href: '#/f/' + backInvoice }, 'back', 'Revenir à ma commande') : null),
       url ? h('section', { class: 'card', id: 'share-close' },
         h('h2', null, 'Votre adresse est prête'),
-        h('p', { class: 'small muted' }, 'Envoyez-la à vos proches : ils vous trouveront sans appeler.'),
         iconBtn('a', { class: 'btn', id: 'share-relatives', href: waLink('Mon adresse, avec la photo de l’entrée : ' + url), target: '_blank', rel: 'noopener noreferrer',
           onclick: waCardClick('address', 'Mon adresse, avec la photo de l’entrée : ' + url, 'address') }, 'chat', 'Envoyer sur WhatsApp'),
         h('a', { class: 'btn link', href: '#/m/' + placeId, style: 'align-self:flex-start' }, 'Voir mon adresse')) : null,
@@ -4981,7 +4998,7 @@
           h('option', { value: '24', selected: f.exp === '24' }, '24 heures après le début'),
           h('option', { value: '168', selected: f.exp === '168' }, '7 jours après le début'))),
       err, btn, why,
-      h('p', { class: 'hint' }, 'Les invités voient vos modifications en rouvrant le lien. Aucune notification n’est envoyée.'),
+      h('p', { class: 'hint' }, 'Aucune notification n’est envoyée aux invités.'),
       footer());
   }
 
@@ -5419,7 +5436,6 @@
         h('h1', null, 'Réglages'),
         vitrineSection(shop),
         h('section', { class: 'card stack', id: 'shop-info' }, h('h2', null, 'Informations de la boutique'),
-          h('p', { class: 'small muted' }, 'Elles apparaissent sur vos factures.'),
           textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
           textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
           h('div', { class: 'field' }, h('label', { for: 'shop-type' }, 'Type de commerce'),
@@ -5443,7 +5459,7 @@
       h('div', { class: 'field' }, h('label', { for: 'shop-type' }, 'Type de commerce'),
         h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
           h('option', { value: '' }, 'Choisir…'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: f.type === t[0] || null }, t[1]); })),
-        h('p', { class: 'hint' }, 'Il nous permet de vous proposer les outils adaptés à votre métier.')),
+        null),
       shop ? null : textField({ id: 'shop-amb', label: 'Code agent', optional: true, max: 10, placeholder: 'Si un agent Fii vous aide', onInput: function (v) { ambCode = v; } }),
       ask ? ask.el : null,
       err, btn,
@@ -5591,7 +5607,6 @@
             x.photo ? h('img', { src: x.photo, alt: '' }) : h('span', { class: 'setup-pv-ph', 'aria-hidden': 'true' }, icon('cam', 26)),
             h('span', { class: 'wrapword' }, x.name), h('b', null, fcfa(x.price)));
         }))),
-      first && !first.photo ? h('p', { class: 'small muted' }, 'Astuce : un article avec photo se vend mieux. Vous pourrez en ajouter une dans « Mes articles ».') : null,
       err, btn,
       h('a', { class: 'setup-later', id: 'setup-later', href: '#/boutique' }, 'Plus tard')));
   }
@@ -6019,11 +6034,10 @@
       // Boutique neuve : une seule première étape, pas de tableau de bord vide.
       !st.orders && !st.products ? h('section', { class: 'card', id: 'first-product' },
         h('h2', null, 'Ajoutez votre premier article'),
-        h('p', { class: 'small muted' }, 'Une photo, un prix. Il sera prêt pour vos commandes.'),
         iconBtn('a', { class: 'btn', href: '#/boutique/article/nouveau' }, 'cam', 'Ajouter un article')) : null,
       iconBtn('a', { class: !st.orders && !st.products ? 'btn ghost full' : 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'plus', 'Nouvelle commande'),
       // Compte proposé quand la boutique tourne (3 commandes), pas dès sa création.
-      (shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard()) || (resume ? null : sugg),
+      (shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard()) || (resume || due ? null : sugg), // une seule carte en haut (23/10)
       // Les compteurs sont dans les onglets (plus de tuiles qui répètent la même chose).
       st.orders ? segField({ name: 'vue', id: 'orders-filter', value: vue,
         options: [['open', 'En cours' + (st.open ? ' · ' + st.open : '')], ['unpaid', 'À encaisser' + (st.unpaid ? ' · ' + st.unpaid : '')], ['done', 'Terminées'], ['all', 'Toutes']],
@@ -6359,13 +6373,17 @@
       send, deliv, paySec, items, endActions, zone, footer());
   }
 
+  // Lignes lisibles sur téléphone : l'article (photo, nom, « 2 × 12 000 FCFA ») à gauche, le montant à droite.
   function invoiceTable(items, total) {
     return h('table', { class: 'inv' },
-      h('thead', null, h('tr', null, h('th', null, 'Article'), h('th', { class: 'n' }, 'Qté'), h('th', { class: 'n' }, 'Prix'), h('th', { class: 'n' }, 'Montant'))),
+      h('thead', null, h('tr', null, h('th', null, 'Article'), h('th', { class: 'n' }, 'Montant'))),
       h('tbody', null, (items || []).map(function (it) {
-        return h('tr', null, h('td', { class: 'wrapword' }, it.photo ? h('span', { class: 'lbl' }, h('img', { class: 'inv-photo', src: it.photo, alt: '' }), h('span', null, it.label)) : it.label), h('td', { class: 'n' }, String(it.qty)), h('td', { class: 'n' }, fcfa(it.price)), h('td', { class: 'n' }, fcfa(it.qty * it.price)));
+        return h('tr', null,
+          h('td', null, h('span', { class: 'lbl' }, it.photo ? h('img', { class: 'inv-photo', src: it.photo, alt: '' }) : null,
+            h('span', { class: 'inv-it' }, h('span', { class: 'inv-name' }, it.label), h('small', { class: 'muted' }, it.qty + ' × ' + fcfa(it.price))))),
+          h('td', { class: 'n' }, fcfa(it.qty * it.price)));
       })),
-      h('tfoot', null, h('tr', null, h('td', { colspan: '3' }, 'Total'), h('td', { class: 'n' }, fcfa(total)))));
+      h('tfoot', null, h('tr', null, h('td', null, 'Total'), h('td', { class: 'n' }, fcfa(total)))));
   }
 
   /* ----- compte proposé, jamais imposé */
@@ -6428,19 +6446,51 @@
       var socials = Object.assign({}, r.socials || {});
       var socialBox = h('div', { class: 'mk-nets', id: 'mk-socials' });
       var canEdit = r.role !== 'editor';
-      function kpi(id, value, label, sub) {
-        return h('div', { class: 'tile mk-kpi', id: id }, h('strong', null, value), h('span', null, label), sub ? h('small', { class: 'mk-trend' }, sub) : null);
+      // Résultats « premium » (fondateur, 23/10 06:05) : le chiffre des ventes en grand avec sa tendance et sa courbe,
+      // trois indicateurs compacts, puis une ligne de faits. La courbe : jour par jour (7 et 30 jours), par semaine (90 jours).
+      function trend(cur, prev) {
+        if (!prev) return null;
+        var d = Math.round((cur - prev) * 100 / prev);
+        return h('span', { class: 'mk-chip ' + (d > 0 ? 'up' : d < 0 ? 'down' : 'flat'), title: 'Par rapport aux ' + days + ' jours précédents' },
+          d === 0 ? 'Stable' : (d > 0 ? '+' : '−') + Math.abs(d) + ' %');
+      }
+      function kpi(id, value, label, chip) {
+        return h('div', { class: 'mk-kpi', id: id }, h('span', { class: 'mk-kpi-l' }, label), h('strong', null, value), chip || h('span', { class: 'mk-chip none' }, ' '));
+      }
+      function spark(series) {
+        var pts = (series || []).map(function (x) { return [x[0], Number(x[1]) || 0]; });
+        if (days === 90) { var w = []; pts.forEach(function (p, i) { var k = Math.floor((pts.length - 1 - i) / 7); w[k] = w[k] ? [w[k][0], w[k][1] + p[1]] : [p[0], p[1]]; }); pts = w.reverse(); }
+        if (pts.length < 2) return null;
+        var W = 320, H = 92, P = 6, max = Math.max.apply(null, pts.map(function (p) { return p[1]; }));
+        var X = function (i) { return P + i * (W - 2 * P) / (pts.length - 1); }, Y = function (v) { return max ? H - P - v * (H - 2 * P - 8) / max : H - P - 2; };
+        var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p[1]).toFixed(1); }).join(' ');
+        var ns = 'http://www.w3.org/2000/svg';
+        function el(tag, at) { var e = document.createElementNS(ns, tag); for (var k in at) e.setAttribute(k, at[k]); return e; }
+        var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'mk-spark', preserveAspectRatio: 'none', role: 'img',
+          'aria-label': 'Ventes ' + (days === 90 ? 'par semaine' : 'par jour') + ' sur ' + days + ' jours' });
+        var gid = 'mkg' + days, defs = el('defs', {}), grad = el('linearGradient', { id: gid, x1: '0', y1: '0', x2: '0', y2: '1' });
+        grad.append(el('stop', { offset: '0', class: 'mk-g1' }), el('stop', { offset: '1', class: 'mk-g2' })); defs.append(grad);
+        svg.append(defs, el('path', { d: line + ' L' + X(pts.length - 1).toFixed(1) + ' ' + (H - P) + ' L' + X(0).toFixed(1) + ' ' + (H - P) + ' Z', fill: 'url(#' + gid + ')', class: 'mk-area' }),
+          el('path', { d: line, class: max ? 'mk-line' : 'mk-line empty', fill: 'none' }),
+          el('circle', { cx: X(pts.length - 1).toFixed(1), cy: Y(pts[pts.length - 1][1]).toFixed(1), r: '4', class: 'mk-dot' }));
+        var lab = function (d) { return new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); };
+        return h('div', { class: 'mk-spark-box' }, svg,
+          h('div', { class: 'mk-spark-x' }, h('span', null, lab(pts[0][0])), h('span', null, max ? 'Aujourd’hui' : 'Pas encore de vente sur la période')));
       }
       function drawStats(x) {
+        var facts = [x.orders ? ['Panier moyen', fcfa(x.basket)] : null, x.vitrine_orders ? ['Via le site', String(x.vitrine_orders)] : null,
+          x.posts ? [x.posts > 1 ? 'Publications' : 'Publication', String(x.posts)] : null].filter(Boolean);
         setKids(statsBox,
-          h('div', { class: 'tiles mk-kpis' },
-            kpi('mk-revenue', fcfa(x.revenue), 'Ventes', trendText(x.revenue, x.prev_revenue)),
-            kpi('mk-orders', String(x.orders), x.orders > 1 ? 'Commandes' : 'Commande', trendText(x.orders, x.prev_orders)),
-            kpi('mk-views', String(x.views), x.views > 1 ? 'Visites du site' : 'Visite du site', trendText(x.views, x.prev_views)),
-            kpi('mk-customers', String(x.new_customers), x.new_customers > 1 ? 'Nouveaux clients' : 'Nouveau client')),
-          h('p', { class: 'small muted', id: 'mk-line' }, [x.orders ? 'Panier moyen ' + fcfa(x.basket) : null,
-            x.vitrine_orders ? x.vitrine_orders + ' via le site' : null,
-            x.posts ? x.posts + (x.posts > 1 ? ' publications' : ' publication') : null].filter(Boolean).join(' · ') || 'Les chiffres se remplissent avec vos premières commandes.'));
+          h('div', { class: 'mk-hero', id: 'mk-revenue' },
+            h('div', { class: 'mk-hero-top' }, h('span', { class: 'mk-kpi-l' }, 'Ventes'), trend(x.revenue, x.prev_revenue)),
+            h('strong', { class: 'mk-hero-v' }, fcfa(x.revenue)),
+            spark(x.series)),
+          h('div', { class: 'mk-kpis' },
+            kpi('mk-orders', String(x.orders), x.orders > 1 ? 'Commandes' : 'Commande', trend(x.orders, x.prev_orders)),
+            kpi('mk-views', String(x.views), x.views > 1 ? 'Visites' : 'Visite', trend(x.views, x.prev_views)),
+            kpi('mk-customers', String(x.new_customers), x.new_customers > 1 ? 'Nouveaux clients' : 'Nouveau client', trend(x.new_customers, x.prev_customers))),
+          facts.length ? h('div', { class: 'mk-facts', id: 'mk-line' }, facts.map(function (f) { return h('span', { class: 'mk-fact' }, h('span', null, f[0]), h('b', null, f[1])); }))
+            : h('p', { class: 'small muted', id: 'mk-line' }, 'Les chiffres se remplissent avec vos premières commandes.'));
       }
       drawStats(r);
       var seq = 0;
@@ -6459,7 +6509,7 @@
       }).slice(0, 12);
       var publish = h('section', { class: 'card stack tight mk-publish', id: 'mk-publish' },
         h('h2', null, 'Publier sur mes réseaux'),
-        prods.length ? [h('p', { class: 'small muted' }, 'Touchez un article : la photo et le texte sont prêts pour Instagram, Facebook, TikTok ou votre statut.'),
+        prods.length ? [h('p', { class: 'small muted' }, 'Touchez un article pour le publier.'),
           h('div', { class: 'mk-strip', id: 'mk-strip' }, prods.map(function (pr) {
             return h('button', { type: 'button', class: 'mk-pp', id: 'mk-pub-' + pr.id, 'aria-label': 'Publier ' + pr.name, onclick: function () {
               track('marketing', 'publish:click'); publishSheet(pr, shop, null);
@@ -6489,7 +6539,7 @@
               loadQr().then(function (qrcode) {
                 var qr = qrcode(0, 'M'); qr.addData(url); qr.make();
                 setKids(qrBox, h('div', { class: 'qr' }, h('img', { src: qr.createDataURL(6), alt: 'QR code du site : ' + url, id: 'mk-qr-img' })),
-                  h('p', { class: 'small muted' }, 'À imprimer près de la caisse ou sur vos sacs.'));
+                  null);
               }, function () { setKids(qrBox, h('p', { class: 'small muted' }, 'QR code indisponible pour le moment.')); });
             }
           } }, 'qr', 'QR code'),
@@ -6520,7 +6570,7 @@
         } }, 'Enregistrer');
         var back = h('div', { class: 'sheet-back', id: 'mk-socials-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mk-socials-h', onclick: function (e) { if (e.target === back) close(); } },
           h('div', { class: 'sheet' }, h('h2', { id: 'mk-socials-h' }, 'Mes réseaux'),
-            h('p', { class: 'small muted' }, 'Le nom de chaque compte, ou son lien. Laissez vide pour retirer. Ils s’affichent à côté de votre logo sur votre site.'),
+            h('p', { class: 'small muted' }, 'Le nom du compte ou son lien.'),
             SOCIALS.map(function (o) {
               return textField({ id: 'mk-in-' + o[0], label: o[1], optional: true, max: 120, value: draft[o[0]] ? '@' + draft[o[0]] : '', placeholder: '@maboutique',
                 autocomplete: 'off', onInput: function (v) { draft[o[0]] = v; } });
@@ -6584,7 +6634,7 @@
         h('div', { class: 'row' }, preset('Tailles S à XL', 'S, M, L, XL'), preset('Pointures 38 à 45', '38, 39, 40, 41, 42, 43, 44, 45')),
         textField({ id: 'product-colors', label: 'Couleurs', optional: true, max: 160, value: f.colors, placeholder: 'Ex. : Rouge, Bleu nuit', onInput: function (v) { f.colors = v; } }),
         textField({ id: 'product-stock', label: 'Stock', optional: true, inputmode: 'numeric', value: f.stock, placeholder: 'Laisser vide si vous ne comptez pas', onInput: function (v) { f.stock = v; } }),
-        h('p', { class: 'hint' }, 'Vos clientes choisissent leur taille et leur couleur en commandant. Avec un stock, l’article passe « Épuisé » à zéro.')));
+        h('p', { class: 'hint' }, 'À zéro en stock, l’article passe « Épuisé ».')));
   }
   // Une ligne discrète : ce que le fil dit de l'article (j'aime, commentaires, enregistrements, ventes livrées sur 30 jours).
   function productStats(id) {

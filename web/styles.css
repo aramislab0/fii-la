@@ -1708,13 +1708,9 @@ a.brand-home{display:inline-flex}
 .ttile-ic{position:relative}
 .tbadge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--lime);color:var(--on-lime);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--bg)}
 .tbadge[hidden]{display:none}
-.mk-kpis{grid-template-columns:repeat(2,1fr)}
-.mk-kpi strong{font-size:21px;overflow-wrap:anywhere}
-.mk-kpi small.mk-trend{font-size:11.5px;color:var(--muted);margin-top:2px}
 .loading-dim{opacity:.55;transition:opacity .2s}
 .irow-t small.mk-handle{display:block;font-weight:500;font-size:13px;margin-top:1px}
 button.irow{width:100%;background:none;border:0;border-radius:0;box-shadow:none;color:var(--ink);border-bottom:1px solid var(--line);font:inherit;font-weight:600;font-size:15px;text-align:left;cursor:pointer;padding:0}
-.mk-pub{color:var(--green);font-weight:700}
 .vsocials{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;padding:4px 0}
 .vsoc{width:44px;height:44px;border-radius:22px;background:var(--surface-2);color:var(--ink);display:flex;align-items:center;justify-content:center}
 
@@ -1900,3 +1896,40 @@ button.swatch.on{border-color:var(--ink)}
 .pub-text summary{font-size:14px;color:var(--muted);cursor:pointer}
 @media (max-width:350px){.pub-frame{height:160px}.pub-thumb.post{width:112px;height:140px}.pub-thumb.story{width:80px;height:142px}}
 .mk-pp-go{position:absolute;top:100px;right:8px;width:32px;height:32px;border-radius:50%;background:var(--green);color:var(--on-green);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+
+/* Résultats premium (23/10) */
+h1,h2,h3{text-wrap:balance}
+p,li,.hint,.small{text-wrap:pretty}
+.mk-hero{background:var(--green);color:var(--on-green);border-radius:var(--radius-card);padding:18px 18px 12px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--shadow-card)}
+.mk-hero-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mk-hero .mk-kpi-l{color:rgba(255,255,255,.78)}
+.mk-hero-v{font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1.1;font-variant-numeric:tabular-nums}
+.mk-hero .mk-chip.up{background:var(--lime);color:var(--on-lime)}
+.mk-hero .mk-chip.down{background:rgba(255,255,255,.16);color:#FFFFFF}
+.mk-hero .mk-chip.flat{background:rgba(255,255,255,.16);color:#FFFFFF}
+.mk-spark-box{margin-top:8px}
+.mk-spark{display:block;width:100%;height:84px;overflow:visible}
+.mk-g1{stop-color:var(--lime);stop-opacity:.45}
+.mk-g2{stop-color:var(--lime);stop-opacity:0}
+.mk-line{stroke:var(--lime);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.mk-line.empty{stroke:rgba(255,255,255,.35);stroke-dasharray:4 5}
+.mk-dot{fill:var(--lime);stroke:var(--green);stroke-width:2}
+.mk-spark-x{display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,.72);margin-top:4px}
+.mk-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mk-kpi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.mk-kpi strong{font-size:22px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;margin-top:auto}
+.mk-kpi-l{font-size:12.5px;font-weight:600;color:var(--muted);line-height:1.2}
+.mk-chip{display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mk-chip.up{background:var(--soft);color:var(--ok)}
+.mk-chip.down{background:color-mix(in srgb,var(--danger) 12%,transparent);color:var(--danger)}
+.mk-chip.flat{background:var(--surface-2);color:var(--muted)}
+.mk-chip.none{display:none}
+.mk-facts{display:flex;flex-wrap:wrap;gap:8px}
+.mk-fact{display:inline-flex;gap:6px;align-items:baseline;padding:6px 12px;border-radius:999px;background:var(--surface-2);font-size:13px;color:var(--muted)}
+.mk-fact b{color:var(--ink);font-weight:700}
+@media (max-width:350px){.mk-kpis{grid-template-columns:1fr 1fr}.mk-hero-v{font-size:28px}}
+.inv-it{display:flex;flex-direction:column;gap:2px;min-width:0}
+.inv-name{font-weight:600;overflow-wrap:break-word}
+.inv-it small{font-size:12.5px}
+.inv td.n{vertical-align:top;padding-top:8px}
+.nb{white-space:nowrap}

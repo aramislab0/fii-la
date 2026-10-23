@@ -2,39 +2,39 @@
   "moteur": "chromium",
   "version": "141.0.7390.37",
   "cible": "locale",
-  "date": "2026-10-23T05:35:29.269Z",
+  "date": "2026-10-23T06:25:34.125Z",
   "reussis": 38,
   "total": 38,
   "results": [
     {
       "ok": true,
       "name": "accueil (nouveau visiteur) : une action principale, « Découvrir les services », rien d’autre",
-      "ms": 904
+      "ms": 1013
     },
     {
       "ok": true,
       "name": "création : géolocalisation après action explicite, précision affichée, point validé",
-      "ms": 534
+      "ms": 586
     },
     {
       "ok": true,
       "name": "correction manuelle : déplacer la carte invalide le point et change les coordonnées",
-      "ms": 916
+      "ms": 927
     },
     {
       "ok": true,
       "name": "arrêt voiture distinct + instructions à pied",
-      "ms": 322
+      "ms": 306
     },
     {
       "ok": true,
       "name": "photo : compressée, métadonnées GPS retirées avant envoi ; fichier non image refusé",
-      "ms": 489
+      "ms": 473
     },
     {
       "ok": true,
       "name": "enregistrement en échec réseau : message clair, saisie conservée, puis réussite",
-      "ms": 281
+      "ms": 234
     },
     {
       "ok": true,
@@ -44,27 +44,27 @@
     {
       "ok": true,
       "name": "lien de partage sans clé propriétaire ; clé gardée localement",
-      "ms": 257
+      "ms": 269
     },
     {
       "ok": true,
       "name": "QR code : se décode exactement en lien de la fiche",
-      "ms": 2461
+      "ms": 2510
     },
     {
       "ok": true,
       "name": "copie du lien (presse-papiers) et lien WhatsApp avec la vraie URL",
-      "ms": 51
+      "ms": 59
     },
     {
       "ok": true,
       "name": "2e téléphone : la fiche s’ouvre sans compte, photo et instructions visibles",
-      "ms": 434
+      "ms": 483
     },
     {
       "ok": true,
       "name": "destinataire : aucune demande de position, aucun script injecté exécuté",
-      "ms": 9
+      "ms": 11
     },
     {
       "ok": true,
@@ -74,127 +74,127 @@
     {
       "ok": true,
       "name": "itinéraires et coordonnées copiées = points enregistrés",
-      "ms": 63
+      "ms": 70
     },
     {
       "ok": true,
       "name": "le destinataire ne peut ni gérer ni modifier la fiche",
-      "ms": 218
+      "ms": 250
     },
     {
       "ok": true,
       "name": "modification : même lien, contenu mis à jour chez le destinataire",
-      "ms": 1077
+      "ms": 1107
     },
     {
       "ok": true,
       "name": "clé de gestion : restaurée sur un autre téléphone, elle donne la gestion",
-      "ms": 255
+      "ms": 343
     },
     {
       "ok": true,
       "name": "géolocalisation refusée : marche à suivre iPhone, réessayer, et point pris dans Google Maps",
-      "ms": 708
+      "ms": 812
     },
     {
       "ok": true,
       "name": "Google Maps : lien sans point précis → consigne claire ; coordonnées et lien long acceptés",
-      "ms": 486
+      "ms": 615
     },
     {
       "ok": true,
       "name": "Android : itinéraire par lien Google Maps https (ouvre l’application), sans Plans",
-      "ms": 223
+      "ms": 285
     },
     {
       "ok": true,
       "name": "géolocalisation trop lente : message de délai dépassé",
-      "ms": 458
+      "ms": 480
     },
     {
       "ok": true,
       "name": "géolocalisation imprécise : avertissement",
-      "ms": 435
+      "ms": 409
     },
     {
       "ok": true,
       "name": "demande : le commerçant crée la demande",
-      "ms": 573
+      "ms": 538
     },
     {
       "ok": true,
       "name": "demande : le client voit qui demande, crée son adresse, prévisualise et envoie",
-      "ms": 1022
+      "ms": 1018
     },
     {
       "ok": true,
       "name": "demande : un visiteur du lien public ne voit jamais la réponse",
-      "ms": 216
+      "ms": 246
     },
     {
       "ok": true,
       "name": "demande : le commerçant récupère l’adresse dans sa vue privée",
-      "ms": 220
+      "ms": 230
     },
     {
       "ok": true,
       "name": "rendez-vous : création avec date, lieu et expiration",
-      "ms": 847
+      "ms": 687
     },
     {
       "ok": true,
       "name": "rendez-vous : mise à jour visible sur le même lien",
-      "ms": 1118
+      "ms": 1143
     },
     {
       "ok": true,
       "name": "rendez-vous expiré : le serveur ne renvoie plus le lieu",
-      "ms": 225
+      "ms": 257
     },
     {
       "ok": true,
       "name": "désactivation : la fiche et sa photo ne sont plus servies",
-      "ms": 625
+      "ms": 710
     },
     {
       "ok": true,
       "name": "nouveau lien : l’ancien affiche « remplacé »",
-      "ms": 435
+      "ms": 483
     },
     {
       "ok": true,
       "name": "suppression : confirmation, puis fiche et photo inaccessibles",
-      "ms": 277
+      "ms": 509
     },
     {
       "ok": true,
       "name": "liens invalides : réponse sûre",
-      "ms": 763
+      "ms": 1131
     },
     {
       "ok": true,
       "name": "hors connexion : message clair sur la page destinataire",
-      "ms": 216
+      "ms": 306
     },
     {
       "ok": true,
       "name": "thème : suit le réglage du téléphone, sans sélecteur ; ancien choix « Sombre » effacé",
-      "ms": 375
+      "ms": 409
     },
     {
       "ok": true,
       "name": "presse-papiers refusé : texte à copier affiché",
-      "ms": 655
+      "ms": 715
     },
     {
       "ok": true,
       "name": "aucune erreur JavaScript pendant les parcours",
-      "ms": 0
+      "ms": 1
     },
     {
       "ok": true,
       "name": "page destinataire sur réseau lent (3G simulée) : poids et temps mesurés",
-      "ms": 4268
+      "ms": 4315
     }
   ]
 }
