@@ -110,7 +110,8 @@ await t('Publier : une carte par article, logos des réseaux en couleur ; un tou
   const sh = await P.evaluate(() => window.__shared);
   assert.match(sh[0].files[0], /^robe-ndella-test\.jpg\|image\/jpeg$/, 'Instagram : publication 4:5');
   assert.match(sh[1].files[0], /^robe-ndella-test-story\.jpg\|image\/jpeg$/, 'statut WhatsApp : 9:16');
-  assert.match(sh[0].text, /Robe Ndella \(test\)[\s\S]*12\s000 FCFA[\s\S]*Pour commander : .*#\/b\//);
+  assert.equal(sh[0].text, undefined, 'Instagram : image seule (le texte est copié)');
+  assert.match(sh[1].text, /Robe Ndella \(test\)[\s\S]*12\s000 FCFA[\s\S]*Pour commander : .*#\/b\//, 'WhatsApp : légende du statut');
   await P.waitForTimeout(600);
   assert.equal((await local.db.query(`select count(*)::int n from fiila.posts where product_id = $1`, [A.id])).rows[0].n, posts0 + 2, 'publications comptées');
   await card.scrollIntoViewIfNeeded();

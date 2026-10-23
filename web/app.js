@@ -3193,7 +3193,9 @@
       var canFiles = false;
       try { canFiles = !!(f && f.file && navigator.canShare && navigator.canShare({ files: [f.file] })); } catch (e) { canFiles = false; }
       if (navigator.share && canFiles) {
-        navigator.share({ files: [f.file], text: text }).then(function () { logged(net); toast('Texte copié : collez-le dans ' + net.label + '.'); },
+        // Image seule : avec un texte, l'appli Facebook ne garde que le lien et perd la photo (constaté sur iPhone, 23/10).
+        // Le texte est déjà copié ; WhatsApp seul le reprend comme légende du statut.
+        navigator.share(net.k === 'whatsapp' ? { files: [f.file], text: text } : { files: [f.file] }).then(function () { logged(net); toast('Texte copié : collez-le dans ' + net.label + '.'); },
           function (e) { if (e && e.name === 'AbortError') return; fallback(net); });
       } else if (f) fallback(net);
       else prepare().then(function () { fallback(net); });

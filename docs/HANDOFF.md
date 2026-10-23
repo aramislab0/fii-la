@@ -167,6 +167,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 |---|---|---|---|
 | 67 | Algorithmes lot 1 **construit** (23/10). Reste : recette téléphone par le fondateur (fiche Agent : historique, réintégrer, rétablir ; page « Mon adresse » sans photo → suggestion) ; aucun versement tant que l'agent n'a pas confirmé son numéro par SMS. Motif facultatif à l'annulation d'une commande : validé pour un lot ultérieur (#68) | Fondateur | `docs/PROPOSITION-ALGORITHMES.md` v2.1 |
 | 68 | Motif facultatif à l'annulation d'une commande (rupture, boutique, livraison, cliente, inconnu ; modifiable par la boutique) : préparation d'A4, à construire dans un lot ultérieur, sur demande | Builder (quand le fondateur lance le lot) | `docs/PROPOSITION-ALGORITHMES.md` §3 A4 |
+| 69 | Publication directe Instagram + Page Facebook (sans quitter Fii) : proposition à faire relire par le VP, puis décisions du fondateur (dossier Meta, V1, TikTok). Aucun code avant | Fondateur → VP | `docs/PROPOSITION-PUBLICATION-DIRECTE.md` |
 | 66 | UX-ADAPTATIVE-001 : ~~avis~~, ~~validation (22/10 21:11)~~, ~~construction~~ ; reste : essai de 14 jours (jusqu'au 05/11), recette sur téléphone, retours terrain (un « je ne m'y retrouve plus » → `adaptive_home` = 0 le temps d'examiner) | Fondateur, Builder | Bilan de l'essai |
 | 1 | Re-tester sur iPhone : « Utiliser ma position », « Depuis Google Maps » avec un **vrai** lien partagé, « Itinéraire » | Fondateur | Validation des correctifs du 17/10 (lien court réel jamais testé) |
 | 2 | Communiquer l'identité et le contact du responsable du traitement déclaré à la CDP | Fondateur | Page confidentialité (art. 58), fiche art. 22 |
@@ -272,6 +273,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 23/10 15:20 | Correctif Publier : l'image seule part vers Instagram, Facebook, TikTok, Snapchat (Facebook perdait la photo quand le texte était joint, capture du fondateur) ; le texte reste copié ; WhatsApp garde la légende. Proposition de publication directe (Meta) rédigée pour le VP | `docs/PROPOSITION-PUBLICATION-DIRECTE.md` ; tests `marketing`, `shop` |
 | 23/10 10:55 | Tests en production Chrome + Safari **verts** à la 3ᵉ tentative (les deux premières : échec de l'installation des navigateurs sur GitHub, sans lien avec le code) | run 39926711444 |
 | 23/10 10:05 | Publier v3 et signes distinctifs **en production** (tests, migration, mise en ligne verts). Tests en production Safari en échec à l'installation de WebKit sur GitHub (pas le code) : job relancé. Ligne précédente corrigée (elle annonçait tout vert à tort) | run 39926711444 ; `72659a7` |
 | 23/10 09:30 | Publier v3 (cartes + logos colorés), couleurs et icônes par espace, test d'aller-retour. Tests ciblés verts ; suites complètes et CI en cours | migration `20261023500000` |

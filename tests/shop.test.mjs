@@ -333,7 +333,7 @@ await t('articles : ajout avec photo et prix', async () => {
   await pub();
   await P.locator('#post-count').getByText('Publié 1 fois.').waitFor();
   const shared = await P.evaluate(() => window.__shared);
-  if (!/Bissap 1 L/.test(shared.text) || !/1 500 FCFA/.test(shared.text)) throw new Error('légende : ' + shared.text);
+  if (shared.text !== undefined) throw new Error('Instagram : image seule attendue, texte copié à part');
   if (!/^bissap-1-l\.jpg\|image\/jpeg$/.test(shared.files[0] || '')) throw new Error('photo non partagée : ' + JSON.stringify(shared.files));
   // Partage annulé : rien n'est compté.
   await P.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: () => Promise.reject(Object.assign(new Error('x'), { name: 'AbortError' })) }));
