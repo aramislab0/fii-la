@@ -4,6 +4,52 @@
 > Une entrée par revue, la plus récente en haut. Statuts : **ALIGNÉ** / **ALIGNÉ AVEC RÉSERVES** / **NON ALIGNÉ**.
 > Chaque point : FAIT (vérifié, avec la preuve) / ANALYSE / RECOMMANDATION / priorité (bloquant, important, plus tard).
 
+## 23/10/2026 — Contre-lecture VP : algorithmes v2
+
+**Verdict : ALIGNÉ AVEC RÉSERVES — orientation acceptée, mais le lot A3 n'est pas prêt à être validé sur son diagnostic actuel.** Deux affirmations de la matrice sont contredites par le code. Corriger la proposition et compléter les critères de recette ; pas de nouveau chantier ni de remise en cause des arbitrages précédents.
+
+**Base vérifiée :** `8a3ebf471c10ba9df2b2ed073a03e812e110003d`. Depuis la revue `b2303be`, seul un commit documentaire a changé HANDOFF, PROPOSITION-ALGORITHMES et REVUE-VP : **aucun code modifié**. Sources relues : migrations Agents, back-office, vérification du téléphone, gestion des profils, Manager et rétention ; tests SQL Agents/back-office ; fonctions de rétention dans `web/app.js`. Lecture statique uniquement : **aucun test exécuté ni état de production interrogé**.
+
+### État des réserves R1–R5
+
+- **R1 : levée sur le principe.** Aide au créateur, sans certification ni score ; réutilisation du budget commun. Les critères de recette restent à préciser ci-dessous.
+- **R2 : partiellement levée.** Le score est retiré et la matrice existe, mais deux constats sont faux ou trop absolus ; voir C1–C2.
+- **R3, R4 et R5 : levées au niveau de la proposition.** A2/A4 différés avec conditions ; moyenne et nombre conservés ; feuille de route soumise à réexamen. Cela ne valide aucune implémentation future.
+
+### Corrections ciblées avant validation du lot
+
+**C1 — Bloquant pour le périmètre A3 : le journal existe déjà.**
+
+**FAIT.** Dans `supabase/migrations/20261020000000_fiila_backoffice.sql`, `fiila.bo_audit_trg` (vers 627–654) est attaché par le trigger `bo_audit` à `fiila.ambassador_rewards`. Lorsqu'un membre de l'équipe change effectivement le statut, il appelle `bo_log('reward_' || new.status, ...)` avec l'identifiant du gain, le montant et la boutique. `bo_log` enregistre l'auteur ; `admin_log` horodate la ligne. L'absence d'appel direct dans `fiila_admin_reward` ne signifie donc pas absence de journalisation.
+
+**ANALYSE.** Ajouter un second appel sans traiter le trigger doublerait les événements. Le manque précis dans ce détail de journal est le **motif** et, si nécessaire pour la lecture de la transition, l'ancien statut. Les tests consultés ne vérifient pas explicitement l'unicité de ces événements de gain.
+
+**RECOMMANDATION.** Remplacer « journal absent » par « journal existant à compléter et tester ». Conserver un seul mécanisme. Critères : un événement par gain dont le statut change ; auteur, date, identifiant, montant, ancien/nouveau statut et motif approprié ; aucune fausse transition lors d'une répétition sans effet ; traitement d'un lot mixte sans journaliser des gains inchangés. Présenter séparément la visibilité dans la fiche Agent et l'existence du journal serveur. Ne pas élargir l'accès au journal global réservé au super admin pour résoudre un besoin d'affichage local.
+
+**C2 — Bloquant pour A3 : encadrer les transitions, pas seulement ajouter « réintégrer ».**
+
+**FAIT.** Dans `20261019700000_fiila_ambassadors.sql`, `fiila_admin_ambassador_decide` (vers 320–324), `suspend` ne vérifie pas le statut d'origine ; `reactivate` accepte `suspended`. La lecture permet donc le chemin **excluded → suspend → suspended → reactivate → active** pour un appelant autorisé. La migration `20261020800000_fiila_bo_ambassadors.sql` ajoute formation/suppression mais ne ferme pas ce chemin. Cela ne rétablit pas les gains annulés. Ce chemin n'a pas été exécuté pendant cette revue.
+
+**ANALYSE.** « Pas de retour possible » est inexact côté serveur. Une nouvelle action avec motif obligatoire serait contournable si ce chemin reste ouvert.
+
+**RECOMMANDATION.** Décrire une matrice des transitions autorisées, avec motifs et droits. Le test doit appeler directement les fonctions : un exclu ne redevient actif que par la procédure explicite de réintégration retenue, sans détour par suspend/approve/training. Pour la restauration d'un gain : conserver le même gain, montant et dates d'origine ; ne pas créer un second droit ni remettre automatiquement tous les gains ; respecter `validate_after` et les dépendances de niveaux ; un gain payé reste intouchable. Tester répétition et concurrence des demandes de restauration/versement. Cette précision vise la correction humaine proposée par Claude, sans changer les barèmes.
+
+**C3 — Important pour A1 et la recette : préciser les scénarios et l'attribution.**
+
+**FAIT.** La v2 attend « aucune suggestion » pour une photo présente ou un point manuel avec photo et repère, alors que sa règle propose aussi l'arrêt voiture si celui-ci manque. `retObserve` / `retUsable` mémorisent utilisé/connu par identifiant de suggestion : une réutilisation sans préciser la portée peut confondre plusieurs adresses ou plusieurs manques.
+
+**RECOMMANDATION.** Pour chaque fixture, renseigner photo, texte, vocal, accessibilité/arrêt et droits de gestion. Préciser : un point manuel ne déclenche **aucun conseil sur sa précision**, mais peut déclencher un conseil photo/repère/arrêt réellement manquant. La photo fausse ne reçoit aucune certification ; elle n'empêche pas un conseil sur un autre champ. Définir explicitement la portée de `addr_complete` (apprentissage global ou suivi d'une fiche) ; succès = ajout confirmé du champ conseillé sur la fiche concernée, jamais un clic ou l'édition d'une autre adresse. Ne transmettre aucun identifiant d'adresse aux compteurs agrégés. Tester budget partagé, refus 7 jours puis arrêt au second refus, absence de suggestion/écriture automatique sur un lien reçu, et propriétaire qui est aussi commerçant : c'est son droit sur la fiche qui décide, pas son métier.
+
+### Précisions documentaires et SMS
+
+- Référence d'inscription : `fiila_ambassador_register`, pas `fiila_ambassador_join`. La v1 de la proposition a été introduite par `a2e1cd5`, pas `0988e5d`.
+- Écrire « sans donnée métier nouvelle » avec précision : enrichir un journal ou conserver une preuve SMS ajoute bien des informations de contrôle.
+- Le principe de vérification avant récompense figure déjà dans HANDOFF #34. Décrire la portée proposée aux deux numéros et le cas où ils sont identiques ou différents ; toute modification du numéro de versement doit invalider sa vérification précédente. Le contrôle doit porter sur le numéro effectivement utilisé pour le versement. L'état réel du fournisseur SMS et de `sms_verify` n'a pas été vérifié par le VP ; aucun service payant n'est activé par cet avis.
+
+**Prochaine action unique :** le Builder apporte ces corrections ciblées dans une v2.1, puis le fondateur arbitre le lot. Inutile de refaire la stratégie : conserver A1 réduit, A2/A4 différés et A5 inchangé. **Aucun code, migration ou activation autorisé par cette contre-lecture.**
+
+---
+
 ## 23/10/2026 — Algorithmes v2 rendue (note du Builder)
 
 Réponse à la revue du 22/10. Détail dans `docs/PROPOSITION-ALGORITHMES.md` v2.
