@@ -1,156 +1,161 @@
 # Proposition — Algorithmes utiles à Fii, maintenant et plus tard
 
-> v1, 22/10/2026, par le Builder (Claude), à la demande du fondateur (23:48) : « les algorithmes pertinents maintenant et plus tard ; j'ai besoin de l'avis de ChatGPT ».
-> **Rien n'est construit avant l'avis du VP (ChatGPT) et la validation du fondateur.** L'avis du VP s'ajoute en haut de `docs/REVUE-VP.md`, et la v2 intègre ses changements.
-> Base lue : `main` au commit `0988e5d`. Les seuils et les poids sont des hypothèses de départ, pas des valeurs démontrées.
+> **v2, 23/10/2026**, par le Builder (Claude). Intègre les cinq changements R1–R5 de la revue VP du 22/10 (`docs/REVUE-VP.md`, verdict ALIGNÉ AVEC RÉSERVES). La v1 (commit `0988e5d`) reste dans l'historique git.
+> **Rien n'est construit avant la validation du fondateur.** Ce document n'autorise aucun code, migration, collecte ni activation.
+> Base lue : `main` après `b2303be`. Chaque affirmation est marquée **FAIT** (vérifié dans le dépôt, avec la référence), **HYPOTHÈSE** (à éprouver) ou **À VÉRIFIER**.
 
 ## 1. Verdict
 
-**Maintenant : des règles explicites et un peu de statistique, pas d'apprentissage automatique.** Au pilote (une vingtaine de boutiques), aucun modèle entraîné ne battrait une règle lisible. Il serait impossible à vérifier et à expliquer à une commerçante comme à la CDP.
+**Au pilote : pas de score.** On renforce les contrôles humains qui existent et on aide la personne qui crée l'adresse. Les scores (fiabilité /100, fraude, risque client, note lissée) sont retirés ou différés : les signaux ne sont pas assez sûrs et le volume ne permet pas de les vérifier.
 
-Deux familles d'algorithmes ont de la valeur dès maintenant :
-- **ceux qui rendent l'adresse plus sûre** : le cœur de la promesse de Fii, et un avantage difficile à copier ;
-- **ceux qui protègent l'argent** : les récompenses des Agents, et les commandes payées à la livraison qui ne sont pas honorées.
+**Premier lot proposé (§2)** — petit, réversible, sans donnée nouvelle :
+1. **A3 — audit des contrôles des Agents** et correction des manques trouvés, avant tout versement.
+2. **A1 réduit — aide de complétude** pour celui qui crée l'adresse, dans le moteur de suggestions existant.
 
-**Plus tard**, quand le volume le justifiera, viendront :
-- l'ordre de passage d'un livreur ;
-- les délais estimés ;
-- les recommandations d'articles ;
-- les prévisions.
+**Différé avec conditions de réouverture (§3)** : A2 (entrée confirmée), A4 (acompte). **Conservé tel quel** : A5 (moyenne brute + nombre d'avis).
 
-Chaque algorithme a un **déclencheur chiffré**. On ne le construit pas avant.
+Ce qui a changé depuis la v1 :
 
-Règles communes à tous :
-- résultat **explicable en une phrase** à la personne concernée ;
-- **aucune décision automatique défavorable** : on propose, on signale, l'humain décide ;
-- **back-office** à chaque fois (règle 8) : voir, agir, tracer, régler, tester ;
-- **un interrupteur** de retour arrière.
+| v1 | v2 | Raison (revue VP) |
+|---|---|---|
+| A1 : note de fiabilité /100, « Adresse sûre », malus si note ≤ 2/5 | Une suggestion au créateur, rien d'autre | R1 : `courier_reviews` est la note **de la livraison par la cliente**, pas de l'adresse (FAIT, `courierRateRow`, app.js ~6657) ; une précision GPS ne prouve pas la bonne porte |
+| A3 : score de risque, gain « en vérification » au-delà d'un seuil | Matrice des contrôles existants, correction des manques, revue humaine | R2 : des indices (3 boutiques en 1 h, niveau rapide) peuvent être légitimes |
+| A2 : construire maintenant, seuils 2 points / 25 m / 15 m | Différé, conditions de réouverture | R3 : besoin non prouvé ; seuils non démontrés ; traitement à cadrer |
+| A4 : estimation de risque + suggestion d'acompte | Retiré ; d'abord documenter les motifs d'annulation | R4 : l'annulation n'a pas de motif (FAIT, app.js ~6226, `p_status: 'cancelled'` seul) |
+| A5 : moyenne ajustée | Moyenne brute + nombre conservés | R5 : le fil n'est pas classé par note (FAIT, `md5(id ‖ date)`) ; pas de problème démontré |
+| « Plus tard » : déclencheurs chiffrés = feu vert | Seuils **de réexamen** avec problème, source, règle de référence, mesure | R5 |
 
-## 2. Maintenant (pilote)
+Affirmations de la v1 retirées : « aucun modèle ne battrait une règle lisible », « GPS souvent à 20–60 m », « personne d'autre ne l'a », « ne se copie pas ». Elles n'étaient pas démontrées.
 
-### A1. Note de fiabilité d'une adresse
+## 2. Premier lot (proposé à la validation)
 
-- **Problème.** Le commerçant et le livreur ne savent pas si une adresse est bonne avant de partir. Celui qui la crée ne sait pas ce qui la rendrait meilleure.
-- **Données disponibles (FAIT, table `fiila.places`) :** `entry_acc` (précision du point), `photo`, `instruction`, `voice`, `stop_lat`/`stop_lng` (arrêt voiture), `vehicle_ok`. Livraisons liées : `fiila.orders` (`place_id`, `delivered_at`), `fiila.courier_reviews`.
-- **Calcul proposé (sur 100, poids à valider) :**
+### A3. Contrôles des Agents avant tout versement
 
-  | Élément | Points |
-  |---|---|
-  | Précision du point ≤ 15 m | 25 |
-  | Précision de 15 à 40 m | 15 |
-  | Photo de l'entrée | 25 |
-  | Repère écrit (au moins 20 caractères) | 15 |
-  | Repère vocal | 10 |
-  | Arrêt voiture distinct ou « accessible en voiture » renseigné | 5 |
-  | Livraisons réussies (5 par livraison, au plus 20) | 20 |
+**Matrice : règle existante → preuve → manque réel.**
 
-  Une note de livreur de 2/5 ou moins sur cette adresse retire 10 points.
-- **Affichage :**
-  - pour celui qui crée l'adresse, une seule suggestion, la plus utile (« Ajoutez une photo de l'entrée ») ;
-  - pour le commerçant et le livreur, une mention sobre : « Adresse sûre · livrée 3 fois ».
-
-  Pas de note chiffrée affichée au public.
-- **Back-office.** Répartition des notes ; adresses fragiles qui portent des commandes ouvertes ; poids réglables (bornés) et journalisés ; aperçu sur cas fictifs.
-- **CDP.** Aucune donnée nouvelle : le calcul se fait sur des champs existants.
-- **Mesure.** Part des commandes livrées sans « adresse à redemander », selon la note de l'adresse.
-- **Effort (hypothèse).** Environ une demi-journée.
-
-### A2. Entrée confirmée par les livraisons
-
-- **Problème.** À Dakar, le point GPS d'une adresse est souvent à 20 à 60 m de la vraie porte. Le livreur qui trouve la bonne entrée ne transmet ce savoir à personne.
-- **Contrainte (FAIT).** `fiila.trackers` garde la position du livreur pendant la course seulement. Elle est **effacée à l'arrivée**, et c'est l'engagement pris dans `docs/CONFORMITE-CDP.md` (ligne « Suivi en direct »). **Je ne propose pas de conserver ces traces.**
-- **Mécanisme proposé :**
-  1. À l'arrivée, le livreur touche **« Je suis à la bonne porte »**. C'est un geste explicite, une seule fois.
-  2. Ce point est enregistré **sur l'adresse**, sans identifiant de livreur ni trace, comme « point d'arrivée confirmé ».
-  3. Quand au moins 2 points confirmés, à des dates différentes, se regroupent à plus de 25 m du point de l'adresse, Fii propose au **propriétaire de l'adresse** : « Les livreurs trouvent votre porte ici. Mettre à jour ? ».
-  4. **Rien n'est déplacé automatiquement.**
-- **Algorithme.** Regroupement par distance : médiane géographique des points confirmés, écart des points inférieur à 15 m.
-- **Valeur stratégique.** Avec le temps, une carte des vraies entrées de Dakar. Personne d'autre ne l'a ; elle se construit par l'usage et ne se copie pas.
-- **CDP.** **Nouveau traitement à déclarer avant toute utilisation réelle** : le point d'arrivée confirmé par un livreur, rattaché à une adresse, ni à une personne ni à une trace. Prévoir la durée de conservation (proposition : 12 mois, ou effacement avec l'adresse).
-- **Back-office.** Propositions de correction en attente, acceptées et refusées ; écart moyen avant et après ; interrupteur.
-- **Mesure.** Écart entre le point initial et le point confirmé ; livraisons sans appel après correction.
-- **Effort (hypothèse).** Environ une journée, plus le complément au dossier CDP.
-
-### A3. Détection de fraude avant toute récompense en argent (Agents)
-
-- **Problème.** Le programme Agents paie au niveau atteint par les boutiques accompagnées. Les fraudes simples sont faciles : fausses boutiques, commandes passées à soi-même, clientes qui sont toutes la même personne. L'action #34 interdit déjà toute récompense en argent avant la vérification du numéro.
-- **Données (FAIT) :** `ambassador_shops`, `shops` (`phone`, `created_at`), `customers` (`phone`), `orders`, `referrals` (`phone_key`), normalisation du numéro existante (`fiila.phone_key`).
-- **Règles proposées.** Chaque règle ajoute des points à un score de risque :
-  - même numéro pour la boutique et pour l'Agent ou une autre boutique de cet Agent ;
-  - au moins 3 boutiques créées par le même Agent en moins d'une heure ;
-  - plus de 50 % des clientes d'une boutique qui partagent un numéro avec l'Agent ou la boutique ;
-  - des commandes livrées sans adresse reçue ni livreur, en série ;
-  - un niveau atteint en moins de 48 h après la création.
-- **Effet.** Au-delà d'un seuil, le gain passe **« en vérification »** dans la file existante du back-office, avec la liste des règles déclenchées. **Jamais de refus ni d'exclusion automatique** : l'équipe décide.
-- **Back-office.** File « À vérifier » avec les motifs ; seuils réglables et journalisés ; taux de faux positifs suivi.
-- **CDP.** Aucune donnée nouvelle. Un traitement de contrôle sur des données existantes, à mentionner dans le dossier (finalité : prévention de la fraude).
-- **Effort (hypothèse).** Environ une demi-journée. **À faire avant le premier versement.**
-
-### A4. Risque de commande non honorée et proposition d'acompte
-
-- **Problème.** Le paiement à la livraison domine, et une commande annulée à l'arrivée coûte une course.
-- **Données (FAIT) :** `orders` (`status`, `cancelled_at`, `customer_id`), paiements enregistrés. **Seulement à l'intérieur d'une boutique** : jamais d'historique partagé entre boutiques.
-- **Calcul.** Estimation lissée : (annulations + 1) / (commandes + 4). Au début, une cliente inconnue est donc à 25 %. Au-delà de 40 %, avec au moins 2 annulations, le commerçant voit : « Cette cliente a annulé 2 commandes sur 3 : demander un acompte ? ».
-- **Garde-fous.**
-  - Le message n'est vu que par la boutique, jamais par la cliente.
-  - Aucune liste noire.
-  - Aucun partage entre boutiques.
-  - Le commerçant reste libre.
-- **CDP.** Un profilage léger, limité à la relation entre une boutique et sa cliente : à décrire au dossier.
-- **Mesure.** Annulations sur les commandes qui ont reçu un acompte, comparées à celles qui n'en ont pas reçu.
-- **Effort (hypothèse).** Environ une demi-journée.
-
-### A5. Notes justes (avis)
-
-- **Problème (FAIT).** La note affichée est une moyenne brute (`round(avg(rating))`, vitrine et fiche boutique). Une boutique à 5/5 sur un seul avis passe devant une 4,6/5 sur 40 avis.
-- **Calcul.** Moyenne ajustée : (somme des notes + 4 × m) / (nombre d'avis + 4), où m est la moyenne de toutes les boutiques. On affiche toujours le nombre d'avis.
-- **Le fil Fii ne change pas.** L'ordre des 25 places gratuites reste un tirage du jour (`md5(id || date)`) : c'est la règle d'équité actuelle, et cette proposition ne la touche pas.
-- **Effort (hypothèse).** Une heure.
-
-## 3. Plus tard (déclencheurs chiffrés)
-
-| Algorithme | Déclencheur | Méthode envisagée | Pourquoi pas avant |
+| Domaine | Règle existante (FAIT) | Preuve | Manque |
 |---|---|---|---|
-| Ordre de passage d'un livreur | Au moins 20 % des livreurs actifs avec 3 courses ou plus en même temps | Le plus proche d'abord, puis amélioration par échange de deux étapes, sur les points des adresses | Aujourd'hui, une course à la fois |
-| Délai de livraison estimé | 200 livraisons avec heure de départ et heure d'arrivée | Durée médiane par quartier et par tranche horaire, puis régression simple | Pas assez de livraisons |
-| « Souvent commandés ensemble » | 50 commandes à plusieurs articles dans une même boutique | Articles commandés ensemble, avec un minimum de 3 occurrences | Recommandations vides ou absurdes |
-| Prévision de demande et de stock | Boutiques avec stock suivi et 3 mois d'historique | Moyenne mobile et saisonnalité de la semaine | Rien à apprendre |
-| Zones de livraison et tarifs suggérés | 100 livraisons par commune | Grille par quartier à partir des livraisons réelles | Il faut d'abord des livraisons réelles |
+| Inscription | Compte et charte obligatoires ; un numéro = un Agent | `fiila_ambassador_join` (migration `20261019700000`) ; test `ambassadors.sql` « inscription » | **Numéro de l'Agent et numéro de versement non vérifiés par SMS** (action #34 ouverte ; le code SMS existe, `20261020300000_fiila_phone_verify.sql`, mais ne couvre que l'entrée dans une équipe) |
+| Activation | Validation par le fondateur seulement ; avant, le code ne marche pas | `fiila_admin_ambassador_decide` ; test « validation par le fondateur » | — |
+| Rattachement | Par le commerçant, 7 jours au plus, une seule fois, jamais à soi-même (compte ou numéro), démo exclue | `fiila_ambassador_link` ; tests « lien » et `agents.sql` « pas d'auto-rémunération » | — |
+| Commandes admissibles | Commandes au numéro de l'Agent ou de la boutique exclues ; clientes distinctes | `fiila.amb_orders` ; test « niveau 2 » | **À VÉRIFIER** : une commande en retrait ou livrée hors Fii compte-t-elle comme « livrée » au niveau 2 ? Pas de test dédié |
+| Plafond | 20 boutiques par mois (`amb_monthly_cap`) | Test « plafond mensuel » | — |
+| Gains | En attente 30 jours, puis validés ; jamais recréés une fois acquis | `amb_refresh` ; tests « gains » et `agents.sql` « migration » | — |
+| Versement | Manuel (Wave / Orange Money), puis « marqué versé » au back-office ; un gain versé ne peut plus être annulé (`status in ('pending','validated')`) | `fiila_admin_reward` ; test « gains » | **Ni « versé » ni « annulé » ne sont tracés dans `bo_log`** : on ne sait pas qui a marqué, quand, ni pour quel motif |
+| Exclusion | Annule les gains non versés, avec motif facultatif | `fiila_admin_ambassador_decide` ('exclude') | **Pas de retour possible** : aucune action « réintégrer », et les gains annulés ne peuvent pas être rétablis. Motif facultatif |
 
-## 4. À éviter
+**Proposition (lot 1) :**
+- tracer `paid` et `cancel` de `fiila_admin_reward` dans `bo_log` (qui, quand, montant, motif) ;
+- rendre le motif d'exclusion obligatoire ; ajouter « réintégrer » (exclu → suspendu) **sans** rétablir automatiquement les gains : l'équipe les rétablit un par un, avec motif tracé ;
+- ajouter les tests manquants sur données synthétiques : numéro partagé légitime (boutique familiale) ; recrutement groupé légitime ; retrait ou livraison hors Fii ; gain déjà versé intouchable ; réintégration ; transitions de statut vérifiées **côté serveur**, pas seulement par le bouton ;
+- **aucun score, aucun nouveau seuil** ; montants, délais et conditions inchangés.
 
-- **Apprentissage profond, recommandations par IA, « score client » opaque.** Sans volume, c'est du bruit présenté comme de l'intelligence. Un score sur des personnes est aussi un traitement à déclarer, et il n'est pas défendable s'il n'est pas explicable.
-- **Toute décision automatique défavorable à une personne** : exclusion, refus de gain, liste noire.
-- **Tout historique de clientes partagé entre boutiques.**
-- **Toute conservation des traces GPS des livreurs** au-delà de l'engagement actuel (effacement à l'arrivée).
+**Décision qui reste au fondateur (#34)** : SMS obligatoire pour le numéro de l'Agent et le numéro de versement avant le premier versement. L'envoi SMS n'est pas encore confirmé en réel (`sms_verify = 0`). Sans cette décision, je recommande de **ne faire aucun versement**.
 
-## 5. Ordre proposé
+**Anomalies (plus tard, seulement si un cas réel se présente)** : elles s'afficheront comme motifs à examiner dans la file existante, jamais comme verdict. Pour chacune : source, preuve consultable par le rôle autorisé, responsable de revue, délai proposé au fondateur, décision motivée, rectification possible. Un gain acquis ne disparaît pas et ne reste pas bloqué indéfiniment.
 
-1. **A3, fraude des Agents** : avant le premier versement (bloquant pour l'argent).
-2. **A1, note de fiabilité**, puis **A5, notes justes** : sans donnée nouvelle, faible effort.
-3. **A2, entrée confirmée par les livraisons** : après le complément au dossier CDP.
-4. **A4, acompte suggéré** : quand les boutiques du pilote auront au moins 10 commandes chacune.
+**Back-office (règle 8)** : voir — journal des versements et annulations dans la fiche Agent ; agir — réintégrer, rétablir un gain ; tracer — `bo_log` ; régler — rien de nouveau ; tester — les cas ci-dessus.
 
-## 6. Questions pour le VP (ChatGPT)
+**Critères de recette :**
+- chaque « versé » et chaque « annulé » apparaît dans le journal avec auteur, date, montant et motif ;
+- un gain versé reste versé, quelle que soit l'action suivante (exclusion comprise) ;
+- un Agent exclu peut être réintégré ; ses gains annulés ne reviennent qu'un par un, avec motif ;
+- les six cas synthétiques passent ; aucune donnée réelle touchée.
 
-1. **Ordre.** A3 avant A1 est-il le bon arbitrage, sachant qu'aucun Agent n'est encore payé ?
-2. **A2.** Le geste explicite « Je suis à la bonne porte » est-il suffisant pour la CDP et pour la confiance ? Le seuil de 2 points confirmés à des dates différentes est-il raisonnable ?
-3. **A4.** Le message d'acompte risque-t-il d'abîmer la relation entre la commerçante et sa cliente, ou de créer une discrimination de fait ? Faut-il le garder pour plus tard ?
-4. **A1.** Faut-il montrer la note de fiabilité au livreur et au commerçant, ou seulement des conseils à celui qui crée l'adresse ?
-5. **Ce qui manque ou ce qui est en trop**, au stade pilote.
+**Effort (HYPOTHÈSE)** : une demi-journée.
 
----
+### A1 réduit. Aide de complétude pour le créateur de l'adresse
+
+**Ce que c'est** : une seule suggestion, facultative, à la personne qui a créé l'adresse, pour ce qui manque. Pas de note, pas de « Adresse sûre », pas de compteur, rien pour le public.
+
+**Données (FAIT, table `fiila.places`)** : `photo`, `instruction`, `voice`, `vehicle_ok`, `stop_lat`/`stop_lng`, `entry_acc`. L'origine du point (GPS, manuel, collé) n'est **pas** enregistrée : seul `entry_acc` est gardé, et il vaut `null` pour un point manuel (FAIT, app.js ~1383).
+
+**Règle (ordre fixe, on montre seulement le premier manque) :**
+1. pas de photo de l'entrée → « Ajoutez une photo de l'entrée » ;
+2. ni repère écrit, ni repère vocal → « Ajoutez un repère, écrit ou vocal » (l'un **ou** l'autre suffit ; aucune longueur minimale) ;
+3. « accessible en voiture » non renseigné et pas d'arrêt voiture → « Indiquez où une voiture peut s'arrêter ».
+
+Ce que la règle **ne fait pas** :
+- elle ne regarde pas la précision GPS : un point manuel exact sans précision ne déclenche rien et n'est jamais pénalisé ; la précision est déjà signalée au moment de la création (`accInfo`, app.js ~1303) ;
+- elle ne lit pas `courier_reviews` ;
+- elle ne juge pas le contenu : une photo fausse ou un repère court ne sont ni validés ni pénalisés ;
+- elle ne bloque ni le partage ni la livraison.
+
+**Où** : sur la page de l'adresse, vue par son propriétaire (surface existante), comme une suggestion du moteur de rétention du lot 1. Elle obéit donc au même budget : une exposition par session, deux par 7 jours, fin après refus, « déjà fait » ou usage (`retPick`, `nudge`). Aucun bloc nouveau à côté de l'action principale.
+
+**Livreur et commerçant** : rien de nouveau au lot 1. Ils voient déjà la photo et les repères quand ils existent.
+
+**Back-office (règle 8)** : voir — ligne « Adresse incomplète » dans le panneau Suggestions (affichée, touchée, faite, refusée sur 30 jours) ; régler — interrupteur `sugg_addr_complete` ; tracer — changements de réglage déjà journalisés ; tester — cas fictifs ci-dessous.
+
+**Critères de recette (cas fictifs) :**
+- point manuel exact sans précision, photo et repère présents → aucune suggestion ;
+- photo présente mais fausse → aucune suggestion, aucune mention « vérifiée » ;
+- repère court utile (« portail vert ») → compte comme repère ;
+- vocal sans texte → compte comme repère ;
+- adresse ayant une mauvaise note de livraison pour retard → aucun effet ;
+- aucune suggestion vue par un livreur, un commerçant ou un visiteur ;
+- interrupteur à 0 → plus aucune suggestion, sans autre changement ;
+- capture d'écran conforme à la règle 7 (une seule action principale).
+
+**Mesure (HYPOTHÈSE à éprouver)** : une adresse plus complète réduit les demandes de précision à la livraison. Mesure : part des suggestions suivies d'un ajout ; sur le terrain, les cas où le livreur a dû appeler, notés dans la fiche de test (`FICHE-TEST-TERRAIN.md`). Trop peu de cas = « non concluant », pas « validé ».
+
+**Effort (HYPOTHÈSE)** : une demi-journée.
+
+### Ordre
+
+1. A3 (avant tout versement) ; 2. A1 réduit. Pas en parallèle. Les recettes déjà attendues (#63, #65, #66) restent prioritaires sur le terrain.
+
+## 3. Différés : conditions de réouverture
+
+### A2. Entrée confirmée par les livraisons — différé, bloquant avant toute collecte réelle
+
+Réouverture seulement si les trois conditions sont réunies :
+1. **Besoin prouvé sur le terrain** : des livraisons du pilote où le point de l'adresse menait à la mauvaise entrée, notées dans la fiche de test, et l'intérêt d'une correction confirmée par le propriétaire ;
+2. **Cadrage du traitement** : qualification et formalité auprès de la CDP vérifiées (loi 2008-12, art. 4, 35, 58). Retirer l'identifiant du livreur ne suffit pas à rendre le point anonyme ;
+3. **Proposition complète** : geste informé distinct du suivi ; précision et fraîcheur du relevé ; une contribution par livraison ; protection contre la répétition ; provenance minimale ; durée justifiée ; accès restreint ; suppression et remise à zéro quand l'entrée change ; aucune trace de suivi conservée.
+
+Les seuils de la v1 (2 points, 25 m, 15 m) sont des **hypothèses**, pas des valeurs acquises. Rien ne déplace jamais une adresse automatiquement. Scénarios de test à prévoir : même livreur deux jours ; GPS imprécis ; arrêt voiture au lieu de la porte ; deux entrées voisines ; porte déplacée ; contribution malveillante ; refus du propriétaire.
+
+### A4. Commandes non honorées — score et acompte retirés
+
+Avant tout algorithme, il faut savoir **pourquoi** une commande est annulée. Proposition pour plus tard (hors lot 1, à valider séparément) : un motif facultatif à l'annulation — rupture de stock, boutique, livraison, cliente, inconnu — modifiable par la boutique.
+
+Réouverture seulement si : un coût réel observé (courses perdues) ; des motifs exploitables ; un protocole prospectif. Comparer « avec / sans acompte » ne prouve pas l'effet de l'acompte, car les groupes ne sont pas choisis au hasard. Rupture, retard du livreur, annulation technique et motif inconnu ne sont jamais des fautes de la cliente. Aucun historique entre boutiques.
+
+### A5. Notes — conservé tel quel
+
+- **FAIT** : les avis affichés sont des avis **d'articles**, uniques par commande et article ; une même commande peut donc donner plusieurs avis. L'interface affiche moyenne et nombre (`ratingEl`, app.js ~6286), et n'affiche rien quand il n'y a aucun avis.
+- On garde : moyenne brute + nombre d'avis, avec l'unité « avis d'article » dite clairement si on l'affiche ailleurs. Zéro avis = « aucun avis », jamais une moyenne inventée.
+- Un score ajusté ne sera étudié que pour un vrai besoin de classement, séparé de la note publique.
+
+## 4. Plus tard : seuils de réexamen (pas de feu vert automatique)
+
+Atteindre un seuil ouvre **une étude**, pas une construction. Chaque ligne précise le problème à observer, la source, la règle simple qui sert de référence et la mesure qui décide.
+
+| Algorithme | Problème à observer d'abord | Seuil de réexamen | Source | Règle de référence | Mesure de réussite ou d'abandon |
+|---|---|---|---|---|---|
+| Ordre de passage | Livreurs qui portent plusieurs courses à la fois et perdent du temps | Courses simultanées fréquentes chez les livreurs actifs | `orders`, statuts de course | L'ordre choisi par le livreur | Temps total réel, avec trajet routier et contraintes (créneaux, retrait), pas la distance à vol d'oiseau |
+| Délai estimé | Clientes qui demandent « il arrive quand ? » | Couverture suffisante **par zone et par créneau**, pas un total de courses | Départ et arrivée des courses | Délai fixe annoncé par la boutique | Écart entre délai annoncé et réel, par zone |
+| « Souvent commandés ensemble » | Boutiques qui vendent des articles complémentaires | Assez de **commandes distinctes** à plusieurs articles dans une boutique | `orders`, lignes | Articles les plus vendus de la boutique | Gain sur la popularité de base, pas seulement des cooccurrences |
+| Prévision de stock | Ruptures fréquentes signalées par les boutiques | Stock suivi sur une durée suffisante | Stock, ventes | Reprendre les ventes de la semaine précédente | Ruptures évitées |
+| Zones et tarifs | Tarifs de livraison contestés ou à perte | Livraisons réelles par commune | Courses, tarifs | Grille fixe actuelle | Courses à perte, litiges |
+
+Aucun délai de réalisation n'est annoncé pour ces lignes.
+
+## 5. À éviter (inchangé, précisé)
+
+- Score opaque sur des personnes, apprentissage automatique sans volume ni vérification possible.
+- Toute décision automatique défavorable : exclusion, refus ou blocage de gain, liste noire.
+- Tout historique de clientes partagé entre boutiques.
+- Toute conservation des positions des livreurs au-delà de l'engagement actuel (effacement à l'arrivée, `CONFORMITE-CDP.md`).
+- Toute « certification » d'adresse tirée de la précision GPS ou d'une note de livraison.
+
+## 6. Décisions demandées au fondateur
+
+1. **Valider le premier lot** : A3 (journal des versements, réintégration, tests) puis A1 réduit (suggestion au créateur). Oui / non / modifier.
+2. **#34** : SMS obligatoire pour le numéro de l'Agent et le numéro de versement avant le premier versement. Je recommande oui, et aucun versement d'ici là.
+3. **Motif d'annulation facultatif** (préparation d'A4) : à mettre dans un lot ultérieur, ou à laisser de côté.
 
 ## Message à transmettre à ChatGPT (copier-coller)
 
-> Tu es VP produit de Fii, avec le Builder (Claude Code). Le fondateur demande ton avis sur les algorithmes à construire maintenant et plus tard. Lis la proposition :
-> https://raw.githubusercontent.com/aramislab0/fii-la/main/docs/PROPOSITION-ALGORITHMES.md
-> Contexte et décisions en vigueur : https://raw.githubusercontent.com/aramislab0/fii-la/main/docs/HANDOFF.md
-> et `docs/CONFORMITE-CDP.md` pour la position des livreurs.
->
-> Rends un avis au format de `docs/REVUE-VP.md` :
-> - un verdict (valider / valider avec changements / refaire) ;
-> - au plus 5 changements, classés bloquant / important / plus tard, chacun exécutable sans deviner ;
-> - une réponse courte aux 5 questions du §6.
->
-> Distingue FAIT / ANALYSE / HYPOTHÈSE. Défends la solution simple (pilote, une vingtaine de boutiques). Ne rouvre pas les décisions de HANDOFF §3. Français, registre direct.
+> Bonjour. La v2 de `docs/PROPOSITION-ALGORITHMES.md` intègre tes cinq réserves R1–R5. Résumé : aucun score au pilote. Premier lot : (1) A3 — matrice des contrôles Agents existants avec références et tests ; trois manques trouvés (versé/annulé non tracés dans `bo_log` ; numéro Agent et numéro de versement non vérifiés par SMS, #34 ; exclusion sans retour possible ni motif obligatoire) ; correction et six tests synthétiques, sans score ni changement de montant. (2) A1 réduit — une suggestion au créateur de l'adresse (photo, repère écrit ou vocal, arrêt voiture), dans le moteur de rétention existant, sans lecture de la précision GPS ni de `courier_reviews`. A2 et A4 différés avec conditions de réouverture ; A5 inchangé ; « plus tard » transformé en seuils de réexamen. Peux-tu vérifier que la v2 lève tes réserves et que les critères de recette sont suffisants ? Ajoute ton avis en haut de `docs/REVUE-VP.md`.

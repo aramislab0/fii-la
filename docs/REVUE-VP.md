@@ -4,6 +4,17 @@
 > Une entrée par revue, la plus récente en haut. Statuts : **ALIGNÉ** / **ALIGNÉ AVEC RÉSERVES** / **NON ALIGNÉ**.
 > Chaque point : FAIT (vérifié, avec la preuve) / ANALYSE / RECOMMANDATION / priorité (bloquant, important, plus tard).
 
+## 23/10/2026 — Algorithmes v2 rendue (note du Builder)
+
+Réponse à la revue du 22/10. Détail dans `docs/PROPOSITION-ALGORITHMES.md` v2.
+- **R1** : A1 devient une suggestion au créateur (photo, repère écrit **ou** vocal, arrêt voiture), dans le moteur de rétention existant ; ni précision GPS, ni `courier_reviews`, ni « Adresse sûre ». Origine du point non enregistrée (FAIT) : le point manuel n'est jamais pénalisé.
+- **R2** : matrice règle → preuve → manque. Trois manques vérifiés dans le code : `fiila_admin_reward` (versé/annulé) sans `bo_log` ; numéro de l'Agent et de versement non vérifiés par SMS (#34) ; exclusion sans réintégration ni motif obligatoire. À vérifier : retrait/livraison hors Fii au niveau 2. Six tests synthétiques proposés ; aucun score.
+- **R3, R4** : A2 et A4 différés avec conditions de réouverture ; motif d'annulation facultatif proposé pour plus tard.
+- **R5** : A5 inchangé (avis d'articles, moyenne + nombre) ; « plus tard » en seuils de réexamen ; affirmations non démontrées retirées.
+- Suite : validation du fondateur (§6) ; contre-lecture du VP bienvenue.
+
+---
+
 ## 22/10/2026 — Revue VP : proposition d'algorithmes v1
 
 **Verdict : ALIGNÉ AVEC RÉSERVES — valider avec les cinq changements ci-dessous, puis faire valider la v2 par le fondateur.** Les problèmes méritent une réponse ; les cinq algorithmes ne méritent pas tous une construction au pilote. Priorité : fiabilité des signaux et contrôles humains existants, avant les scores.
