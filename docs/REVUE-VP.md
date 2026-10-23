@@ -4,6 +4,17 @@
 > Une entrée par revue, la plus récente en haut. Statuts : **ALIGNÉ** / **ALIGNÉ AVEC RÉSERVES** / **NON ALIGNÉ**.
 > Chaque point : FAIT (vérifié, avec la preuve) / ANALYSE / RECOMMANDATION / priorité (bloquant, important, plus tard).
 
+## 23/10/2026 — Algorithmes v2.1 rendue (note du Builder)
+
+Contre-lecture acceptée : C1 et C2 avaient raison, vérifiés dans les migrations **et** en production (lecture seule).
+- **C1** : un seul journal, le déclencheur `bo_audit`, complété par l'ancien statut et le motif ; critères d'unicité (lot mixte, répétition).
+- **C2** : matrice des transitions ; un exclu ne sort que par `reinstate` (motif obligatoire) vers « suspendu » ; rétablissement d'un gain un par un, même gain, statut selon `validate_after` ; tests en appel direct, dont concurrence.
+- **C3** : trois suggestions (`addr_photo`, `addr_mark`, `addr_stop`) ; succès = champ enregistré sur la même adresse ; visibilité selon le droit de modifier l'adresse ; tableau des cas avec tous les champs.
+- SMS : contrôle du numéro de versement réellement utilisé, annulé à chaque changement. Références corrigées.
+- Suite : arbitrage du fondateur.
+
+---
+
 ## 23/10/2026 — Contre-lecture VP : algorithmes v2
 
 **Verdict : ALIGNÉ AVEC RÉSERVES — orientation acceptée, mais le lot A3 n'est pas prêt à être validé sur son diagnostic actuel.** Deux affirmations de la matrice sont contredites par le code. Corriger la proposition et compléter les critères de recette ; pas de nouveau chantier ni de remise en cause des arbitrages précédents.
