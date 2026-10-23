@@ -1865,13 +1865,6 @@ button.swatch.on{border-color:var(--ink)}
 
 /* Marketing v2 (23/10) : publier un article en touchant sa photo ; feuille « Publier » à deux formats en vrai aperçu. */
 .mk-publish h2{margin:0}
-.mk-strip{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;margin:2px -20px 0;padding:2px 20px 6px;scrollbar-width:none}
-.mk-strip::-webkit-scrollbar{display:none}
-.mk-pp{flex:0 0 112px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:flex-start;gap:4px;position:relative;background:none;border:0;padding:0;margin:0;min-height:0;text-align:left;color:var(--ink);font:inherit;cursor:pointer}
-.mk-pp img,.mk-pp-empty{width:112px;height:140px;border-radius:14px;object-fit:cover;background:var(--surface-2);display:flex;align-items:center;justify-content:center;color:var(--muted)}
-.mk-pp:active img{transform:scale(.97)}
-.mk-pp-t{font-size:13.5px;font-weight:600;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:112px}
-.mk-pp small{font-size:12px;color:var(--muted)}
 .mk-site-row{grid-template-columns:repeat(4,minmax(0,1fr))}
 .mk-nets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .mk-net{display:flex;align-items:center;justify-content:flex-start;gap:10px;min-height:56px;padding:8px 12px;border-radius:14px;background:var(--surface);border:1px solid var(--line);color:var(--ink);font:inherit;text-align:left;cursor:pointer;margin:0}
@@ -1895,7 +1888,6 @@ button.swatch.on{border-color:var(--ink)}
 .pub-guide svg{flex:0 0 18px;margin-top:2px;color:var(--green)}
 .pub-text summary{font-size:14px;color:var(--muted);cursor:pointer}
 @media (max-width:350px){.pub-frame{height:160px}.pub-thumb.post{width:112px;height:140px}.pub-thumb.story{width:80px;height:142px}}
-.mk-pp-go{position:absolute;top:100px;right:8px;width:32px;height:32px;border-radius:50%;background:var(--green);color:var(--on-green);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 
 /* Résultats premium (23/10) */
 h1,h2,h3{text-wrap:balance}
@@ -1933,3 +1925,70 @@ p,li,.hint,.small{text-wrap:pretty}
 .inv-it small{font-size:12.5px}
 .inv td.n{vertical-align:top;padding-top:8px}
 .nb{white-space:nowrap}
+
+/* ---------- Signes distinctifs (23/10) : une couleur par espace, en clair et en sombre ---------- */
+:root{
+  --c-boutique:#1E4A34; --c-adresse:#1E4A34; --c-orders:#1F5FD1; --c-products:#C2410C; --c-marketing:#BE185D; --c-customers:#6D28D9;
+  --c-settings:#475569; --c-demander:#0E7490; --c-evenement:#C81E3A; --c-livreur:#B45309; --c-vide_dressing:#7E22CE; --c-ambassadeur:#A16207;
+  /* Couleurs des réseaux (logos reconnus) */
+  --b-wa:#25D366; --b-fb:#1877F2; --b-sc:#FFFC00; --b-tt:#111111; --b-ig:linear-gradient(45deg,#F58529 0%,#DD2A7B 45%,#8134AF 75%,#515BD4 100%);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --c-boutique:#7FCB9C; --c-adresse:#7FCB9C; --c-orders:#7AA7F5; --c-products:#F59E61; --c-marketing:#F472B6; --c-customers:#B197FC;
+    --c-settings:#A8B4C4; --c-demander:#5CC6D8; --c-evenement:#F47C8E; --c-livreur:#F2B05E; --c-vide_dressing:#D19BF5; --c-ambassadeur:#E6C35C;
+  }
+}
+:root[data-theme="dark"]{
+  --c-boutique:#7FCB9C; --c-adresse:#7FCB9C; --c-orders:#7AA7F5; --c-products:#F59E61; --c-marketing:#F472B6; --c-customers:#B197FC;
+  --c-settings:#A8B4C4; --c-demander:#5CC6D8; --c-evenement:#F47C8E; --c-livreur:#F2B05E; --c-vide_dressing:#D19BF5; --c-ambassadeur:#E6C35C;
+}
+[data-c="boutique"]{--c:var(--c-boutique)} [data-c="adresse"]{--c:var(--c-adresse)} [data-c="orders"]{--c:var(--c-orders)}
+[data-c="products"]{--c:var(--c-products)} [data-c="marketing"]{--c:var(--c-marketing)} [data-c="customers"]{--c:var(--c-customers)}
+[data-c="settings"]{--c:var(--c-settings)} [data-c="demander"]{--c:var(--c-demander)} [data-c="evenement"]{--c:var(--c-evenement)}
+[data-c="livreur"]{--c:var(--c-livreur)} [data-c="vide_dressing"]{--c:var(--c-vide_dressing)} [data-c="ambassadeur"]{--c:var(--c-ambassadeur)}
+.ttile[data-c] .ttile-ic,.svc-ic[data-c]{color:var(--c);background:var(--surface);background:color-mix(in srgb,var(--c) 13%,var(--surface))}
+.tab[data-c] .p{color:var(--c)}
+.tab[data-c][aria-current="page"]{color:var(--c)}
+.tab[data-c][aria-current="page"] .p{background:color-mix(in srgb,var(--c) 15%,var(--surface))}
+.sec-head{display:flex;align-items:center;gap:12px;min-width:0}
+.sec-head h1{margin:0;min-width:0}
+.sec-ic{flex:0 0 44px;width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--c,var(--green));background:var(--surface-2);background:color-mix(in srgb,var(--c,var(--green)) 14%,var(--surface))}
+.brand-row .sec-head{flex:1}
+
+/* Publier (23/10, v3) : cartes d'articles avec les logos des réseaux dans leurs couleurs */
+.mk-pub-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.mk-pub-h h2{margin:0}
+.mk-pub-logos{display:flex;gap:4px}
+.pub-net{width:46px;height:46px;border-radius:50%;border:0;margin:0;padding:0;min-height:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:#FFFFFF;background:var(--surface-3);box-shadow:0 2px 6px rgba(0,0,0,.18);transition:transform .12s}
+.pub-net:active{transform:scale(.92)}
+.pub-net .ico path{stroke-width:2}
+.pub-net[data-net="instagram"]{background:var(--b-ig)}
+.pub-net[data-net="facebook"]{background:var(--b-fb)}
+.pub-net[data-net="whatsapp"]{background:var(--b-wa)}
+.pub-net[data-net="tiktok"]{background:var(--b-tt)}
+.pub-net[data-net="snapchat"]{background:var(--b-sc);color:#111111}
+.pub-net.mini{width:24px;height:24px;box-shadow:none;cursor:default}
+.pub-net.big{width:52px;height:52px}
+.pub-card{flex:0 0 78%;max-width:300px;scroll-snap-align:start;background:var(--surface);border:1px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:var(--shadow-card);display:flex;flex-direction:column}
+.pub-card.single{flex:none;max-width:none;width:100%}
+.pub-card.single .pub-photo{max-height:420px}
+.pub-photo{position:relative;aspect-ratio:4/5;background:var(--surface-2);overflow:hidden}
+.pub-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.pub-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.pub-tag{position:absolute;left:0;right:0;bottom:0;padding:40px 14px 12px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.62));color:#FFFFFF;display:flex;flex-direction:column;gap:2px}
+.pub-tag b{font-size:16px;line-height:1.25}
+.pub-tag span{font-weight:800;font-size:15px;color:var(--lime)}
+.pub-badge{position:absolute;top:10px;left:10px;padding:4px 10px;border-radius:999px;background:var(--lime);color:var(--on-lime);font-size:12px;font-weight:800}
+.pub-nets{display:flex;justify-content:space-between;gap:6px;padding:12px}
+.mk-strip{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:4px 16px 10px;scrollbar-width:none}
+.mk-strip::-webkit-scrollbar{display:none}
+.pub-sheet .svc-head{align-items:center}
+.pub-prev{display:block;margin:0 auto;border-radius:14px;max-height:280px;max-width:100%;box-shadow:var(--shadow-card)}
+.pub-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.pub-steps .btn{width:100%;justify-content:flex-start;gap:10px}
+.rnd.net-wa .rnd-ic{background:var(--b-wa);color:#FFFFFF}
+.mk-net.on .mk-net-ic[data-net="instagram"]{background:var(--b-ig);color:#FFFFFF}
+.mk-net.on .mk-net-ic[data-net="facebook"]{background:var(--b-fb);color:#FFFFFF}
+.mk-net.on .mk-net-ic[data-net="tiktok"]{background:var(--b-tt);color:#FFFFFF}
+.mk-net.on .mk-net-ic[data-net="snapchat"]{background:var(--b-sc);color:#111111}

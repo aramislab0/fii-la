@@ -107,6 +107,25 @@ await t('parcours enchaîné : accueil → boutique → article → retour → r
   await P.locator('.back').first().click(); await P.getByRole('heading', { name: 'Mes articles' }).waitFor();
 });
 
+await t('aller-retour dans Ma boutique : chaque flèche ramène au bon écran, et le retour du téléphone aussi', async () => {
+  const back = async (re) => { await P.locator('.back').first().click(); await P.waitForFunction((r) => new RegExp(r).test(location.hash), re); };
+  await P.goto(URL0 + '#/boutique'); await P.locator('#shop-title').waitFor();
+  await P.locator('#orders a').first().click(); await P.waitForFunction(() => location.hash.startsWith('#/commande/'));
+  await back('^#/boutique$');
+  await P.locator('#tab-customers').click(); await P.getByRole('heading', { name: 'Clients' }).waitFor();
+  await P.locator('#customers a, .list a.item').first().click(); await P.waitForFunction(() => /^#\/clients\/.+/.test(location.hash));
+  await back('^#/clients$');
+  await P.locator('#tab-marketing').click(); await P.getByRole('heading', { name: 'Marketing' }).waitFor();
+  await back('^#/boutique$');
+  await P.locator('#tab-settings').click(); await P.getByRole('heading', { name: 'Réglages' }).waitFor();
+  await P.goto(URL0 + '#/boutique/vitrine'); await P.getByRole('heading', { name: 'Personnaliser mon site' }).waitFor();
+  await back('^#/boutique/reglages$');
+  // Retour du téléphone (historique du navigateur) : écran précédent, puis encore le précédent.
+  await P.goBack(); await P.getByRole('heading', { name: 'Personnaliser mon site' }).waitFor();
+  await P.goBack(); await P.getByRole('heading', { name: 'Réglages' }).waitFor();
+  await P.goForward(); await P.getByRole('heading', { name: 'Personnaliser mon site' }).waitFor();
+});
+
 await t('parcours vitrine → facture : la flèche de l’en-tête revient à la vitrine', async () => {
   const C = await phone(false);
   await C.goto(URL0 + '#/b/' + vit.slug);

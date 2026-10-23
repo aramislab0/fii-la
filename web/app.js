@@ -63,6 +63,12 @@
     for (var i = 0; i < arguments.length; i++) add(w, arguments[i]);
     return w;
   }
+  /* Signes distinctifs (fondateur, 23/10 08:36 : « des signes que les gens reconnaissent, pas des textes ») : chaque
+     espace a sa couleur et son icône, partout (accueil, barre d'onglets, titre de page). Couleurs : tokens --c-* de styles.css. */
+  function secHead(c, name, title, attrs) {
+    return h('div', { class: 'sec-head', 'data-c': c }, h('span', { class: 'sec-ic', 'aria-hidden': 'true' }, icon(name, 24)),
+      h('h1', Object.assign({ class: 'wrapword' }, attrs || {}), title));
+  }
   function backBtn(label, href) {
     return h('a', { class: 'btn back', href: href || '#/' }, '← ' + (label || 'Accueil'));
   }
@@ -971,7 +977,7 @@
   }
   function shopHomeTiles() {
     function tile(id, href, name, label, badge) {
-      return h('a', { class: 'ttile', href: href, id: 'biz-' + id, onclick: function () { track('onboarding', 'biz_' + id + ':click'); } },
+      return h('a', { class: 'ttile', href: href, id: 'biz-' + id, 'data-c': id, onclick: function () { track('onboarding', 'biz_' + id + ':click'); } },
         h('span', { class: 'ttile-ic', 'aria-hidden': 'true' }, icon(name, 26), badge || null), h('span', { class: 'pro-name' }, label));
     }
     var n = SHOP_HOME ? SHOP_HOME.open : 0;
@@ -979,7 +985,7 @@
       h('h2', { id: 'h-biz', class: 'acts-h' }, 'Mon commerce'),
       h('nav', { class: 'tiles4 acts', 'aria-label': 'Mon commerce' },
         tile('orders', '#/boutique?vue=open', 'box', 'Commandes', h('span', { class: 'tbadge', id: 'biz-orders-n', hidden: !n || null }, n > 99 ? '99+' : String(n))),
-        tile('products', '#/boutique/articles', 'cam', 'Articles'),
+        tile('products', '#/boutique/articles', 'tag', 'Articles'),
         tile('marketing', '#/boutique/marketing', 'megaphone', 'Marketing'),
         tile('customers', '#/clients', 'users', 'Clients')));
   }
@@ -988,12 +994,12 @@
     var heroId = hero.getAttribute('data-hero');
     var acts = myActivities().filter(function (s) { return s.id !== heroId; });
     var tiles = acts.map(function (s) {
-      return h('a', { class: 'ttile', href: s.href, id: 'act-' + s.id, onclick: function () { track('onboarding', 'act_' + s.id + ':click'); } },
+      return h('a', { class: 'ttile', href: s.href, id: 'act-' + s.id, 'data-c': s.id, onclick: function () { track('onboarding', 'act_' + s.id + ':click'); } },
         h('span', { class: 'ttile-ic', 'aria-hidden': 'true' }, icon(s.icon, 26)), h('span', { class: 'pro-name' }, s.label));
     });
     // L'adresse reste à portée quand l'action principale est une autre activité.
-    if (heroId !== 'adresse' && heroId !== 'reprendre') tiles.unshift(h('a', { class: 'ttile', href: '#/new', id: 'create-address' },
-      h('span', { class: 'ttile-ic', 'aria-hidden': 'true' }, icon('cam', 26)), h('span', { class: 'pro-name' }, 'Mon adresse')));
+    if (heroId !== 'adresse' && heroId !== 'reprendre') tiles.unshift(h('a', { class: 'ttile', href: '#/new', id: 'create-address', 'data-c': 'adresse' },
+      h('span', { class: 'ttile-ic', 'aria-hidden': 'true' }, icon('pin', 26)), h('span', { class: 'pro-name' }, 'Mon adresse')));
     return tiles.length ? h('section', { class: 'stack tight', id: 'my-acts', 'aria-labelledby': 'h-acts' },
       h('h2', { id: 'h-acts', class: 'acts-h' }, 'Mes activités'), h('nav', { class: 'tiles4 acts', 'aria-label': 'Mes activités' }, tiles)) : null;
   }
@@ -1032,7 +1038,7 @@
       h('div', { class: 'svc-list' }, list.map(function (s) {
         var on = mine.indexOf(s) >= 0;
         return h('div', { class: 'svc-card', id: 'svc-' + s.id },
-          h('span', { class: 'svc-ic', 'aria-hidden': 'true' }, icon(s.icon, 24)),
+          h('span', { class: 'svc-ic', 'data-c': s.id, 'aria-hidden': 'true' }, icon(s.icon, 24)),
           h('div', { class: 'svc-t' }, h('b', null, s.hero), h('span', null, s.text),
             on || SUCC_SVC.indexOf(s.id) >= 0 ? h('div', { class: 'svc-acts' },
               SUCC_SVC.indexOf(s.id) >= 0 && !hasShop() ? (pin === s.id ? h('span', { class: 'chip ok', id: 'svc-' + s.id + '-pinned' }, icon('check', 12), 'En premier')
@@ -3090,13 +3096,16 @@
     } catch (e) { return null; }
   }
   function slugName(s) { return String(s || 'article').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 40) || 'article'; }
-  /* ----- Publier un article (fondateur, 23/10 : « pour faire mes posts sur Instagram je ne pouvais pas deviner ; l'écran
-     pour choisir la nature du post est illisible »). Une feuille : deux formats en vrai aperçu (Publication 4:5, Story /
-     Statut 9:16), une seule action « Publier ». Le texte est copié avec l'image ; une consigne dit quoi toucher ensuite dans
-     Instagram (son propre écran de choix n'est pas modifiable par Fii). Sans partage de fichiers : image à enregistrer + texte. */
-  var PUB_FMT = {
-    post: { label: 'Publication', sub: 'Fil Instagram, Facebook', guide: 'Dans Instagram, choisissez « Publication », puis collez le texte : il est déjà copié.' },
-    story: { label: 'Story ou statut', sub: 'Story Instagram, statut WhatsApp, TikTok', guide: 'Dans Instagram, choisissez « Story ». Le lien de votre site est copié : ajoutez le sticker « Lien » et collez-le.' } };
+  /* ----- Publier un article (fondateur, 23/10 08:36 : « une belle carte où on voit l'article et les boutons des réseaux
+     colorés ; on clique directement dessus »). Chaque logo prépare l'image au bon format (Instagram, Facebook : 4:5 ;
+     statut WhatsApp, TikTok, Snapchat : 9:16), copie le texte et ouvre le partage du téléphone, où l'on touche l'appli.
+     Sans partage de fichiers (ordinateur) : une petite feuille « Enregistrer l'image » + « Copier le texte » + « Ouvrir ». */
+  var PUB_NETS = [
+    { k: 'instagram', label: 'Instagram', fmt: 'post', url: 'https://www.instagram.com/' },
+    { k: 'facebook', label: 'Facebook', fmt: 'post', url: 'https://www.facebook.com/' },
+    { k: 'whatsapp', label: 'WhatsApp', fmt: 'story', url: 'https://wa.me/' },
+    { k: 'tiktok', label: 'TikTok', fmt: 'story', url: 'https://www.tiktok.com/' },
+    { k: 'snapchat', label: 'Snapchat', fmt: 'story', url: 'https://www.snapchat.com/' }];
   function pubLoadImg(src) { return new Promise(function (res) { if (!src) return res(null); var img = new Image(); img.onload = function () { res(img); }; img.onerror = function () { res(null); }; img.src = src; }); }
   // Image de l'article au format choisi : Publication = la photo 4:5 telle quelle (1080 × 1350) ; Story = 1080 × 1920 composée.
   function productVisual(pr, shop, fmt, photoData) {
@@ -3141,84 +3150,73 @@
       return cv;
     });
   }
-  function pubCountText(n) { return n ? 'Publié ' + n + ' fois.' : ''; }
-  function publishSheet(pr, shop, onLogged) {
-    track('marketing', 'publish:open');
-    var fmt = 'post', canvases = {}, photoData = null, closeSheet;
-    var text = productCaption(pr, shop);
-    var link = shop && shop.public && shop.slug ? vitrineUrl(shop.slug, pr.id) : null;
-    var cards = {}, status = h('p', { class: 'small muted', role: 'status', id: 'pub-status' });
-    var guide = h('p', { class: 'pub-guide', id: 'pub-guide' }, icon('instagram', 18), h('span', null, PUB_FMT.post.guide));
-    var more = h('div', { class: 'stack', id: 'pub-fallback' });
-    var go = iconBtn('button', { class: 'btn big full', type: 'button', id: 'pub-go', disabled: true, onclick: publish }, 'share', 'Publier');
-    function name() { return slugName(pr.name) + (fmt === 'story' ? '-story' : ''); }
-    function pick(f) {
-      fmt = f;
-      Object.keys(cards).forEach(function (k) { cards[k].setAttribute('aria-checked', k === f ? 'true' : 'false'); cards[k].classList.toggle('on', k === f); });
-      guide.lastChild.textContent = PUB_FMT[f].guide;
-      if (f === 'story' && !link) guide.lastChild.textContent = 'Dans Instagram, choisissez « Story ». Mettez votre site en ligne pour y ajouter un lien.';
-      setKids(more);
+  // Carte d'un article : la photo, le nom et le prix, puis les logos des réseaux. Les images sont préparées dès que la carte
+  // est visible : le partage doit partir du geste même (Safari).
+  function pubCard(pr, shop, opts) {
+    opts = opts || {};
+    var text = productCaption(pr, shop), link = shop && shop.public && shop.slug ? vitrineUrl(shop.slug, pr.id) : null;
+    var files = {}, ready = null, card;
+    function prepare() {
+      if (ready) return ready;
+      ready = (pr.photo ? srcToDataUrl(pr.photo).then(null, function () { return null; }) : Promise.resolve(null)).then(function (d) {
+        return Promise.all(['post', 'story'].map(function (f) {
+          return productVisual(pr, shop, f, d).then(function (cv) {
+            var href = cv.toDataURL('image/jpeg', 0.92); files[f] = { href: href, file: dataUrlFile(href, slugName(pr.name) + (f === 'story' ? '-story' : '')) };
+          });
+        }));
+      }).then(function () { card.classList.add('ready'); });
+      return ready;
     }
-    function card(f) {
-      var img = h('img', { alt: '', class: 'pub-thumb ' + f });
-      var b = h('button', { type: 'button', role: 'radio', class: 'pub-fmt' + (f === fmt ? ' on' : ''), 'aria-checked': f === fmt ? 'true' : 'false', id: 'pub-fmt-' + f,
-        onclick: function () { pick(f); } },
-        h('span', { class: 'pub-frame ' + f }, img),
-        h('span', { class: 'pub-fmt-t' }, h('b', null, PUB_FMT[f].label), h('small', null, PUB_FMT[f].sub)));
-      b.__img = img; cards[f] = b; return b;
-    }
-    function logged() {
+    function logged(net) {
       track('marketing', 'publish:shared');
-      sapi('fiila_post_log', { p_product_id: pr.id }).then(function (r) { if (onLogged) onLogged(r.posts); }, function () { /* sans effet */ });
+      sapi('fiila_post_log', { p_product_id: pr.id }).then(function (r) { if (opts.onLogged) opts.onLogged(r.posts); }, function () { /* sans effet */ });
     }
-    function fileOf(cv) { try { var d = cv.toDataURL('image/jpeg', 0.92); return { file: dataUrlFile(d, name()), href: d }; } catch (e) { return null; } }
-    function fallback(f) {
+    function fallback(net) {
       track('marketing', 'publish:saved');
-      setKids(more,
-        h('p', { class: 'small' }, 'Enregistrez l’image, puis collez le texte dans votre publication.'),
-        h('div', { class: 'row' },
-          f ? h('a', { class: 'btn ghost', id: 'post-download', href: f.href, download: name() + '.jpg', onclick: logged }, 'Enregistrer l’image') : null,
-          h('button', { class: 'btn ghost', type: 'button', id: 'post-copy', onclick: function () { copy(fmt === 'story' && link ? link : text, fmt === 'story' && link ? 'Lien' : 'Texte'); } },
-            fmt === 'story' && link ? 'Copier le lien' : 'Copier le texte')),
-        h('pre', { class: 'caption', id: 'post-caption' }, text));
+      var f = files[net.fmt], closeSheet;
+      var back = h('div', { class: 'sheet-back', id: 'pub-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': net.label, onclick: function (e) { if (e.target === back) closeSheet(); } },
+        h('div', { class: 'sheet pub-sheet' },
+          h('div', { class: 'svc-head' }, h('span', { class: 'pub-net big', 'data-net': net.k, 'aria-hidden': 'true' }, icon(net.k, 26)),
+            h('button', { class: 'svc-x', type: 'button', 'aria-label': 'Fermer', id: 'pub-close', onclick: function () { closeSheet(); } }, icon('close', 18))),
+          f ? h('img', { class: 'pub-prev ' + net.fmt, src: f.href, alt: '' }) : null,
+          h('ol', { class: 'pub-steps' },
+            f ? h('li', null, h('a', { class: 'btn', id: 'post-download', href: f.href, download: slugName(pr.name) + (net.fmt === 'story' ? '-story' : '') + '.jpg', onclick: function () { logged(net); } }, icon('down', 20), h('span', null, 'Enregistrer l’image'))) : null,
+            h('li', null, h('button', { class: 'btn ghost', type: 'button', id: 'post-copy', onclick: function () { copy(text, 'Texte'); } }, icon('link', 20), h('span', null, 'Copier le texte'))),
+            h('li', null, h('a', { class: 'btn ghost', id: 'post-open', href: net.url, target: '_blank', rel: 'noopener noreferrer' }, icon(net.k, 20), h('span', null, 'Ouvrir ' + net.label)))),
+          h('pre', { class: 'caption', id: 'post-caption' }, text)));
+      closeSheet = openSheet(back);
     }
-    function publish() {
-      var cv = canvases[fmt]; if (!cv) return;
-      track('marketing', 'publish:' + fmt);
-      var toCopy = fmt === 'story' && link ? link : text;
-      try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(toCopy).then(null, function () { /* rien */ }); } catch (e) { /* rien */ }
-      var f = fileOf(cv), canFiles = false;
+    function go(net) {
+      track('marketing', 'publish:' + net.k);
+      var f = files[net.fmt];
+      try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(null, function () { /* rien */ }); } catch (e) { /* rien */ }
+      var canFiles = false;
       try { canFiles = !!(f && f.file && navigator.canShare && navigator.canShare({ files: [f.file] })); } catch (e) { canFiles = false; }
       if (navigator.share && canFiles) {
-        navigator.share({ files: [f.file], text: text }).then(function () {
-          logged(); toast(fmt === 'story' && link ? 'Publié. Le lien est copié pour le sticker.' : 'Publié. Le texte est copié.'); closeSheet();
-        }, function (e) { if (e && e.name === 'AbortError') return; fallback(f); });
-      } else fallback(f);
+        navigator.share({ files: [f.file], text: text }).then(function () { logged(net); toast('Texte copié : collez-le dans ' + net.label + '.'); },
+          function (e) { if (e && e.name === 'AbortError') return; fallback(net); });
+      } else if (f) fallback(net);
+      else prepare().then(function () { fallback(net); });
     }
-    var back = h('div', { class: 'sheet-back', id: 'pub-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pub-h', onclick: function (e) { if (e.target === back) closeSheet(); } },
-      h('div', { class: 'sheet pub-sheet' },
-        h('div', { class: 'svc-head' }, h('h2', { id: 'pub-h', class: 'wrapword' }, 'Publier « ' + pr.name + ' »'),
-          h('button', { class: 'svc-x', type: 'button', 'aria-label': 'Fermer', id: 'pub-close', onclick: function () { closeSheet(); } }, icon('close', 18))),
-        h('div', { class: 'pub-fmts', role: 'radiogroup', 'aria-label': 'Format' }, card('post'), card('story')),
-        guide, go, status, more,
-        h('details', { class: 'pub-text' }, h('summary', null, 'Voir le texte'), h('pre', { class: 'caption' }, text))));
-    closeSheet = openSheet(back);
-    status.textContent = 'Préparation des images…';
-    (pr.photo ? srcToDataUrl(pr.photo).then(null, function () { return null; }) : Promise.resolve(null)).then(function (d) {
-      photoData = d;
-      return Promise.all(['post', 'story'].map(function (f) { return productVisual(pr, shop, f, photoData).then(function (cv) { canvases[f] = cv; cards[f].__img.src = cv.toDataURL('image/jpeg', 0.8); }); }));
-    }).then(function () { status.textContent = ''; go.disabled = false; }, function () { status.textContent = 'Image indisponible sur ce téléphone : copiez le texte.'; fallback(null); });
+    card = h('article', { class: 'pub-card' + (opts.single ? ' single' : ''), id: (opts.id || 'pub-') + pr.id },
+      h('div', { class: 'pub-photo' },
+        pr.photo ? h('img', { src: pr.photo, alt: '', loading: 'lazy' }) : h('span', { class: 'pub-empty', 'aria-hidden': 'true' }, icon('cam', 32)),
+        h('div', { class: 'pub-tag' }, h('b', { class: 'wrapword' }, pr.name), h('span', null, fcfa(pr.price))),
+        opts.badge ? h('span', { class: 'pub-badge' }, opts.badge) : null),
+      h('div', { class: 'pub-nets', role: 'group', 'aria-label': 'Publier sur' }, PUB_NETS.map(function (n) {
+        return h('button', { type: 'button', class: 'pub-net', 'data-net': n.k, id: 'pub-' + n.k + '-' + pr.id, 'aria-label': 'Publier sur ' + n.label, title: n.label,
+          onclick: function () { go(n); } }, icon(n.k, 22));
+      })));
+    retOnVisible(card, prepare);
+    return card;
   }
-  // Fiche article : un encadré discret qui ouvre la même feuille.
+  function pubCountText(n) { return n ? 'Publié ' + n + ' fois.' : ''; }
+  // Fiche article : la même carte, avec le nombre de publications.
   function publishBox(pr, shop, fresh) {
-    var count = pr.posts || 0;
-    var countEl = h('p', { class: 'small muted', id: 'post-count' }, pubCountText(count));
-    return h('section', { class: 'card stack tight', id: 'publish-box' },
-      h('h2', null, fresh ? 'Article ajouté. Publiez-le' : 'Publier sur vos réseaux'),
-      iconBtn('button', { class: 'btn', type: 'button', id: 'product-publish', onclick: function () {
-        publishSheet(pr, shop, function (n) { count = n; countEl.textContent = pubCountText(n); });
-      } }, 'share', 'Publier'),
-      countEl);
+    var countEl = h('p', { class: 'small muted', id: 'post-count' }, pubCountText(pr.posts || 0));
+    return h('section', { class: 'stack tight', id: 'publish-box' },
+      fresh ? h('p', { class: 'saved-ok', role: 'status' }, icon('check', 18), 'Article ajouté') : null,
+      pubCard(pr, shop, { single: true, id: 'pubone-', onLogged: function (n) { countEl.textContent = pubCountText(n); } }), countEl);
   }
 
   /* ----- statistiques de croissance (compte administrateur seulement) */
@@ -3867,6 +3865,8 @@
      sinon une simple copie du lien, nommée comme telle ; aucun message prérempli, aucun SDK.
      Instagram / TikTok : pas de partage de lien par URL ; image verticale + lien à copier + consigne honnête. */
   var ICONS = {
+    tag: 'M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8a1.5 1.5 0 0 1 0 2.1l-6.9 6.9a1.5 1.5 0 0 1-2.1 0l-8-8ZM8 8h.01',
+    whatsapp: 'M4 20l1.3-3.9A8 8 0 1 1 8.2 19L4 20ZM9.2 8.4c.2-.4.5-.4.8-.4l.6 1.4c.1.3 0 .5-.2.7l-.4.5c.6 1.1 1.4 1.9 2.5 2.5l.5-.4c.2-.2.4-.3.7-.2l1.4.6c0 .3 0 .6-.4.8-.9.7-2.3.6-4-.7-1.7-1.3-2.4-3-1.5-4.8Z',
     telegram: 'M21 4 3 11l6 2 2 6 3-4 5 4 2-15ZM9 13l9-6-7 8',
     facebook: 'M14 8h3V4h-3a4 4 0 0 0-4 4v2H8v4h2v6h4v-6h3l1-4h-4V8Z',
     instagram: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm5 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm5.5-1.5h.01',
@@ -4686,7 +4686,7 @@
         });
     }
     return page(backBtn(),
-      h('h1', null, 'Demander une adresse'),
+      secHead('demander', 'ask', 'Demander une adresse'),
       h('p', { class: 'muted' }, 'Pour une livraison, un rendez-vous client ou une visite : la personne répond avec sa fiche, et vous seul la voyez.'),
       textField({ id: 'rq-name', label: 'Votre nom ou celui de votre commerce', max: 60, value: f.requester_name, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.requester_name = v; chk(); } }),
       textField({ id: 'rq-purpose', label: 'Pourquoi demandez-vous l’adresse ?', max: 80, value: f.purpose, placeholder: 'Ex. : Livraison de votre commande', onInput: function (v) { f.purpose = v; chk(); } }),
@@ -4972,7 +4972,7 @@
     return page(ctx.retour ? backBtn('Revenir à la fiche reçue', '#/a/' + ctx.retour)
       : ctx.similarOf ? backBtn('Retour à l’événement d’origine', '#/m/' + ctx.similarOf)
       : backBtn(ctx.editId ? 'Retour à l’événement' : 'Accueil', ctx.editId ? '#/m/' + ctx.editId : '#/'),
-      h('h1', null, ctx.editId ? 'Modifier l’événement' : ctx.similarOf ? 'Événement similaire' : 'Créer un événement'),
+      secHead('evenement', 'cal', ctx.editId ? 'Modifier l’événement' : ctx.similarOf ? 'Événement similaire' : 'Créer un événement'),
       ctx.similarOf
         ? h('div', { class: 'notice', id: 'similar-notice' }, 'À partir de « ' + ctx.sourceLabel + ' ». Le lieu, l’arrêt voiture, les indications et la photo sont repris. Choisissez un nom, une nouvelle date et confirmez le lieu sur la carte. L’événement d’origine ne change pas.')
         : h('p', { class: 'muted' }, 'Mariage, baptême, anniversaire, réunion : un seul lien pour que tous vos invités trouvent le lieu. Il cesse de s’afficher après la date.'),
@@ -5433,7 +5433,7 @@
       btn.textContent = 'Enregistrer les informations';
       var ambBox = ambassadorShopBox();
       return shopTabs(page(backBtn('Ma boutique', '#/boutique'),
-        h('h1', null, 'Réglages'),
+        secHead('settings', 'settings', 'Réglages'),
         vitrineSection(shop),
         h('section', { class: 'card stack', id: 'shop-info' }, h('h2', null, 'Informations de la boutique'),
           textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, onInput: function (v) { f.name = v; } }),
@@ -5901,7 +5901,7 @@
   // Réglages vus par un éditeur : son rôle, et la sortie.
   function memberSettings(shop) {
     var pg = page(backBtn('Ma boutique', '#/boutique'),
-      h('div', { class: 'stack tight' }, h('h1', null, 'Réglages'),
+      h('div', { class: 'stack tight' }, secHead('settings', 'settings', 'Réglages'),
         h('p', { class: 'muted', id: 'member-role' }, 'Vous êtes ' + ROLE_LABEL.editor.toLowerCase() + ' de ' + shop.name + '.')),
       h('p', { class: 'small muted' }, 'Les réglages sont gérés par le propriétaire et les administrateurs de la boutique.'),
       leaveShopBox(), footer());
@@ -5985,12 +5985,12 @@
   // Barre d'onglets de la boutique (pages principales).
   function shopTabs(pg, active) {
     function tab(key, href, name, label) {
-      return h('a', { class: 'tab', href: href, id: 'tab-' + key, 'aria-current': active === key ? 'page' : null },
+      return h('a', { class: 'tab', href: href, id: 'tab-' + key, 'data-c': key, 'aria-current': active === key ? 'page' : null },
         h('span', { class: 'p', 'aria-hidden': 'true' }, icon(name, 22)), label);
     }
     pg.classList.add('has-tabs');
     pg.appendChild(h('div', { class: 'tabbar' }, h('nav', { 'aria-label': 'Boutique' },
-      tab('orders', '#/boutique', 'box', 'Commandes'), tab('products', '#/boutique/articles', 'shop', 'Articles'),
+      tab('orders', '#/boutique', 'box', 'Commandes'), tab('products', '#/boutique/articles', 'tag', 'Articles'),
       tab('marketing', '#/boutique/marketing', 'megaphone', 'Marketing'),
       tab('customers', '#/clients', 'users', 'Clients'), tab('settings', '#/boutique/reglages', 'settings', 'Réglages'))));
     return pg;
@@ -6025,9 +6025,7 @@
     }
     if (st.orders) load();
     return shopTabs(page(backBtn(),
-      h('div', { class: 'stack tight' },
-        h('p', { class: 'eyebrow' }, 'Ma boutique'),
-        h('h1', { class: 'wrapword', id: 'shop-title' }, shop.name)),
+      secHead('boutique', 'shop', shop.name, { id: 'shop-title' }),
       partnerSlot(),
       due,
       resume,
@@ -6071,7 +6069,7 @@
     load();
     var search = h('input', { type: 'search', id: 'customer-search', placeholder: 'Nom ou téléphone', value: term, 'aria-label': 'Rechercher un client',
       oninput: function (e) { term = e.target.value; clearTimeout(timer); timer = setTimeout(load, 250); } });
-    return shopTabs(page(backBtn('Ma boutique', '#/boutique'), h('h1', null, 'Clients'), search, listBox, footer()), 'customers');
+    return shopTabs(page(backBtn('Ma boutique', '#/boutique'), secHead('customers', 'users', 'Clients'), search, listBox, footer()), 'customers');
   }
 
   function viewCustomer(id) {
@@ -6222,7 +6220,7 @@
 
     drawCustomer(); drawItems(); refreshTotal();
     setKids(root, backBtn('Ma boutique', '#/boutique'),
-      h('h1', null, 'Nouvelle commande'),
+      secHead('orders', 'box', 'Nouvelle commande'),
       h('section', { class: 'card' }, h('h2', null, 'Client'), custBox),
       h('section', { class: 'card' }, h('h2', null, 'Articles'), picker,
         h('div', { class: 'line-head', 'aria-hidden': 'true' }, h('span', null, 'Article'), h('span', null, 'Qté'), h('span', null, 'Prix (FCFA)'), h('span')),
@@ -6427,7 +6425,8 @@
     ['facebook', 'Facebook', 'https://www.facebook.com/']];
   function socialUrl(k, v) { var x = SOCIALS.filter(function (o) { return o[0] === k; })[0]; return x && v ? x[2] + encodeURIComponent(v) : null; }
   TRACKABLE.marketing = ['open', 'period:7', 'period:30', 'period:90', 'share:wa', 'share:copy', 'share:qr', 'socials:open', 'socials:save', 'publish:click', 'vitrine:open',
-    'publish:open', 'publish:post', 'publish:story', 'publish:shared', 'publish:saved'];
+    'publish:open', 'publish:post', 'publish:story', 'publish:shared', 'publish:saved',
+    'publish:instagram', 'publish:facebook', 'publish:whatsapp', 'publish:tiktok', 'publish:snapchat'];
   function trendText(cur, prev) {
     if (!prev) return ''; // rien à comparer : pas de mention (une ligne discrète plutôt que trois)
     var d = Math.round((cur - prev) * 100 / prev);
@@ -6507,20 +6506,14 @@
       var prods = (rr[1] || []).filter(function (p) { return p.active !== false; }).sort(function (a, b) {
         var x = sold[a.id], y = sold[b.id]; return x && y ? x.rank - y.rank : x ? -1 : y ? 1 : 0;
       }).slice(0, 12);
-      var publish = h('section', { class: 'card stack tight mk-publish', id: 'mk-publish' },
-        h('h2', null, 'Publier sur mes réseaux'),
-        prods.length ? [h('p', { class: 'small muted' }, 'Touchez un article pour le publier.'),
-          h('div', { class: 'mk-strip', id: 'mk-strip' }, prods.map(function (pr) {
-            return h('button', { type: 'button', class: 'mk-pp', id: 'mk-pub-' + pr.id, 'aria-label': 'Publier ' + pr.name, onclick: function () {
-              track('marketing', 'publish:click'); publishSheet(pr, shop, null);
-            } },
-              pr.photo ? h('img', { src: pr.photo, alt: '', loading: 'lazy' }) : h('span', { class: 'mk-pp-empty', 'aria-hidden': 'true' }, icon('cam', 24)),
-              h('span', { class: 'mk-pp-go', 'aria-hidden': 'true' }, icon('share', 16)),
-              h('span', { class: 'mk-pp-t' }, pr.name),
-              h('small', null, sold[pr.id] ? sold[pr.id].qty + (sold[pr.id].qty > 1 ? ' vendus' : ' vendu') : fcfa(pr.price)));
-          }))]
-          : [h('p', { class: 'small muted' }, 'Ajoutez un article avec sa photo : vous pourrez le publier en un geste.'),
-            iconBtn('a', { class: 'btn', id: 'mk-first-product', href: '#/boutique/article/nouveau' }, 'plus', 'Ajouter un article')]);
+      // Le titre montre les logos (pas d'explication) ; chaque article est une carte avec ses boutons de réseaux.
+      var publish = h('section', { class: 'stack tight mk-publish', id: 'mk-publish' },
+        h('div', { class: 'mk-pub-h' }, h('h2', null, 'Publier'),
+          h('span', { class: 'mk-pub-logos', 'aria-hidden': 'true' }, PUB_NETS.map(function (n) { return h('span', { class: 'pub-net mini', 'data-net': n.k }, icon(n.k, 14)); }))),
+        prods.length ? h('div', { class: 'mk-strip', id: 'mk-strip' }, prods.map(function (pr) {
+            return pubCard(pr, shop, { id: 'mk-pub-', badge: sold[pr.id] ? sold[pr.id].qty + (sold[pr.id].qty > 1 ? ' vendus' : ' vendu') : null });
+          }))
+          : iconBtn('a', { class: 'btn', id: 'mk-first-product', href: '#/boutique/article/nouveau' }, 'plus', 'Ajouter un article'));
       // 2. Mon site : le lien et quatre gestes, sans grand bouton (l'action principale est au-dessus).
       var url = r.vitrine && r.vitrine.public && r.vitrine.slug ? vitrineUrl(r.vitrine.slug) : null;
       var qrBox = h('div', { class: 'stack tight', id: 'mk-qr', hidden: true });
@@ -6529,8 +6522,8 @@
         h('h2', null, 'Mon site'),
         h('p', { class: 'sharelink', id: 'mk-url' }, url),
         h('div', { class: 'rnd-row mk-site-row' },
-          roundBtn('a', { id: 'mk-share-wa', href: waLink(waMsg), target: '_blank', rel: 'noopener noreferrer',
-            onclick: (function (go) { return function (e) { track('marketing', 'share:wa'); go(e); }; })(waCardClick('vitrine', waMsg)) }, 'chat', 'WhatsApp'),
+          roundBtn('a', { id: 'mk-share-wa', class: 'net-wa', href: waLink(waMsg), target: '_blank', rel: 'noopener noreferrer',
+            onclick: (function (go) { return function (e) { track('marketing', 'share:wa'); go(e); }; })(waCardClick('vitrine', waMsg)) }, 'whatsapp', 'WhatsApp'),
           roundBtn('button', { type: 'button', id: 'mk-copy', onclick: function () { copy(url, 'Lien', function () { track('marketing', 'share:copy'); }); } }, 'link', 'Copier'),
           roundBtn('button', { type: 'button', id: 'mk-qr-btn', 'aria-expanded': 'false', 'aria-controls': 'mk-qr', onclick: function (e) {
             var btn = e.currentTarget, open = qrBox.hidden; qrBox.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -6552,7 +6545,7 @@
       function drawSocials() {
         setKids(socialBox, SOCIALS.map(function (o) {
           var v = socials[o[0]];
-          var inner = [h('span', { class: 'mk-net-ic', 'aria-hidden': 'true' }, icon(o[0], 20)),
+          var inner = [h('span', { class: 'mk-net-ic', 'data-net': o[0], 'aria-hidden': 'true' }, icon(o[0], 20)),
             h('span', { class: 'mk-net-t' }, h('span', null, o[1]), h('small', { class: 'muted mk-handle' }, v ? '@' + v : canEdit ? 'Ajouter' : '—'))];
           return canEdit ? h('button', { class: 'mk-net' + (v ? ' on' : ''), type: 'button', id: 'mk-social-' + o[0], onclick: socialSheet }, inner)
             : h('div', { class: 'mk-net' + (v ? ' on' : ''), id: 'mk-social-' + o[0] }, inner);
@@ -6581,7 +6574,7 @@
       }
       drawSocials();
       return shopTabs(page(backBtn('Ma boutique', '#/boutique'),
-        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow wrapword' }, r.name || 'Ma boutique'), h('h1', null, 'Marketing')),
+        secHead('marketing', 'megaphone', 'Marketing'),
         publish,
         share,
         h('section', { class: 'stack tight', id: 'mk-results' }, h('h2', null, 'Résultats'),
@@ -6594,7 +6587,7 @@
   function viewProducts() {
     return sapi('fiila_products', { p_all: true }).then(function (rows) {
       return shopTabs(page(backBtn('Ma boutique', '#/boutique'),
-        h('div', { class: 'brand-row' }, h('h1', null, 'Mes articles'), iconBtn('a', { class: 'btn small', id: 'product-new', href: '#/boutique/article/nouveau' }, 'plus', 'Ajouter', 18)),
+        h('div', { class: 'brand-row' }, secHead('products', 'tag', 'Mes articles'), iconBtn('a', { class: 'btn small', id: 'product-new', href: '#/boutique/article/nouveau' }, 'plus', 'Ajouter', 18)),
         rows.length ? h('div', { class: 'list', id: 'products' }, rows.map(function (pr) {
           return h('a', { class: 'item product-item', href: '#/boutique/article/' + pr.id },
             pr.photo ? h('img', { class: 'thumb', src: pr.photo, alt: '' }) : h('span', { class: 'thumb empty', 'aria-hidden': 'true' }),
@@ -6680,7 +6673,7 @@
     } }, pr ? 'Enregistrer' : 'Ajouter l’article');
     return page(backBtn('Mes articles', '#/boutique/articles'),
       pr && pr.active ? publishBox(pr, shop, fresh) : null,
-      h('h1', null, pr ? 'Modifier l’article' : 'Nouvel article'),
+      secHead('products', 'tag', pr ? 'Modifier l’article' : 'Nouvel article'),
       pr ? productStats(pr.id) : null,
       photoBox,
       textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; keepP(); } }),
@@ -6756,7 +6749,7 @@
     if (!courierKey()) {
       var wrap = h('div', { class: 'wrap' });
       setKids(wrap, backBtn(),
-        h('div', { class: 'stack tight' }, h('h1', null, 'Espace livreur'),
+        h('div', { class: 'stack tight' }, secHead('livreur', 'moto', 'Espace livreur'),
           h('p', { class: 'muted' }, 'Recevez les courses de vos boutiques, avec l’adresse exacte et la photo de l’entrée. Sans compte.')),
         courierForm(null, function () { render(); }), footer());
       return wrap;
@@ -7563,7 +7556,7 @@
     var moments = ambMoments(a);
     if (moments.length) setTimeout(function () { ambCelebrate(a, moments); }, REDUCED ? 50 : 500);
     return page(backBtn(),
-      h('h1', null, 'Mon espace agent'),
+      secHead('ambassadeur', 'cash', 'Mon espace agent'),
       a.status === 'suspended' ? h('div', { class: 'notice' }, 'Compte suspendu : vos nouveaux gains sont en pause.' + (a.note ? ' Motif : ' + a.note : '')) : null,
       ambAgentCard(a, { id: 'amb-code', cta: h('div', { class: 'stack tight' },
         h('div', { class: 'ivc-cta' }, ivcBtn('a', { href: waLink(codeMsg), target: '_blank', rel: 'noopener noreferrer', id: 'amb-send' }, 'Envoyer mon code')),
@@ -8728,8 +8721,9 @@
             ' · Marketing ' + boNum(n('biz_marketing:click')) + ' · Clients ' + boNum(n('biz_customers:click')) + '. Écran Marketing ouvert : ' + m('open') +
             ' · partage WhatsApp touché : ' + m('share:wa') + ' · lien copié : ' + m('share:copy') + ' · QR code : ' + m('share:qr') +
             ' · réseaux enregistrés : ' + m('socials:save') + ' · « Publier » touché : ' + m('publish:click') + '.'),
-          h('p', { class: 'small', id: 'bo-publish-line' }, 'Publier un article (23/10) : feuille ouverte ' + m('publish:open') + ' · « Publier » en Publication ' + m('publish:post') +
-            ', en Story ou statut ' + m('publish:story') + ' · partage envoyé au téléphone ' + m('publish:shared') + ' · image à enregistrer (sans partage) ' + m('publish:saved') + '.'),
+          h('p', { class: 'small', id: 'bo-publish-line' }, 'Publier un article (cartes et logos, 23/10) : Instagram ' + m('publish:instagram') + ' · Facebook ' + m('publish:facebook') +
+            ' · statut WhatsApp ' + m('publish:whatsapp') + ' · TikTok ' + m('publish:tiktok') + ' · Snapchat ' + m('publish:snapchat') +
+            ' · partage envoyé au téléphone ' + m('publish:shared') + ' · image à enregistrer (sans partage) ' + m('publish:saved') + '.'),
           h('p', { class: 'small', id: 'bo-premium-line' }, 'Modèles Premium (30 jours) : ' + VT_PREMIUM.map(function (t) {
             var pm = d.premium || {}; function q(a) { return boNum(Number(pm[t[0] + ':' + a] || 0)); }
             return t[1] + ' — touché verrouillé ' + q('locked') + ', aperçu ' + q('preview') + ', « Je veux ce modèle » ' + q('interest') + ', appliqué ' + q('applied');

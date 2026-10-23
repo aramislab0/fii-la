@@ -76,7 +76,7 @@ await t('back-office : fiche boutique → marketing (visites, commandes vitrine,
 
 await t('mesure anonyme « marketing » : variantes prévues acceptées, le reste refusé', async () => {
   for (const v of ['open', 'period:7', 'period:90', 'share:wa', 'share:copy', 'share:qr', 'socials:open', 'socials:save', 'publish:click', 'vitrine:open',
-    'publish:open', 'publish:post', 'publish:story', 'publish:shared', 'publish:saved']) {
+    'publish:open', 'publish:post', 'publish:story', 'publish:shared', 'publish:saved', 'publish:instagram', 'publish:facebook', 'publish:whatsapp', 'publish:tiktok', 'publish:snapchat']) {
     await ok('fiila_track', { p_event: 'marketing', p_variant: v });
   }
   await ko('fiila_track', { p_event: 'marketing', p_variant: 'period:365' });

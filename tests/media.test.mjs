@@ -100,9 +100,8 @@ await t('« Publier » : la photo du stockage est préparée pour l’enregistre
   await S.reload();
   await S.locator('#publish-box').waitFor();
   await S.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); });
-  await S.click('#product-publish');
-  await S.waitForFunction(() => { const b = document.getElementById('pub-go'); return b && !b.disabled; });
-  await S.click('#pub-go');
+  await S.waitForFunction(() => document.querySelector('#publish-box .pub-card.ready'));
+  await S.locator('#publish-box .pub-net[data-net="instagram"]').click();
   const a = S.locator('#post-download');
   await a.waitFor();
   await S.waitForFunction(() => /^data:image\//.test(document.getElementById('post-download').getAttribute('href') || ''));

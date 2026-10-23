@@ -320,7 +320,8 @@ await t('articles : ajout avec photo et prix', async () => {
   await P.fill('#product-name', 'Bissap 1 L');
   await P.fill('#product-price', '1500');
   await P.click('#product-save');
-  await P.locator('#publish-box').getByText('Article ajouté. Publiez-le').waitFor();
+  await P.locator('#publish-box').getByText('Article ajouté').waitFor();
+  await P.waitForFunction(() => document.querySelector('#publish-box .pub-card.ready'));
   await shot(P, '09a-article-publier');
   // Partage natif simulé : photo et légende transmises, publication comptée.
   await P.evaluate(() => {
@@ -328,18 +329,17 @@ await t('articles : ajout avec photo et prix', async () => {
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true });
     Object.defineProperty(navigator, 'share', { configurable: true, value: (d) => { window.__shared = { text: d.text, files: (d.files || []).map((f) => f.name + '|' + f.type) }; return Promise.resolve(); } });
   });
-  const pub = async () => { await P.click('#product-publish'); await P.waitForFunction(() => { const b = document.getElementById('pub-go'); return b && !b.disabled; }); await P.click('#pub-go'); };
+  const pub = async () => { await P.locator('#publish-box .pub-net[data-net="instagram"]').click(); };
   await pub();
   await P.locator('#post-count').getByText('Publié 1 fois.').waitFor();
   const shared = await P.evaluate(() => window.__shared);
   if (!/Bissap 1 L/.test(shared.text) || !/1 500 FCFA/.test(shared.text)) throw new Error('légende : ' + shared.text);
   if (!/^bissap-1-l\.jpg\|image\/jpeg$/.test(shared.files[0] || '')) throw new Error('photo non partagée : ' + JSON.stringify(shared.files));
-  // Partage annulé : rien n'est compté, la feuille reste ouverte.
+  // Partage annulé : rien n'est compté.
   await P.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: () => Promise.reject(Object.assign(new Error('x'), { name: 'AbortError' })) }));
   await pub();
   await P.waitForTimeout(400);
   if (await P.locator('#post-count').textContent() !== 'Publié 1 fois.') throw new Error('annulation comptée');
-  await P.click('#pub-close'); await P.locator('#pub-sheet').waitFor({ state: 'detached' });
   // Sans partage de fichiers (ordinateur) : image à enregistrer et texte à copier.
   await P.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined }); });
   await pub();

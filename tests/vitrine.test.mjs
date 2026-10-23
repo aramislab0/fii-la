@@ -105,9 +105,8 @@ await t('boutique : la commande en ligne apparaît, prix de la base, adresse att
 await t('publication d’un article : la légende renvoie vers la vitrine', async () => {
   await S.goto(URL0 + '#/boutique/article/' + P1.id);
   await S.evaluate(() => { Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }); });
-  await S.click('#product-publish');
-  await S.waitForFunction(() => { const b = document.getElementById('pub-go'); return b && !b.disabled; });
-  await S.click('#pub-go');
+  await S.waitForFunction(() => document.querySelector('#publish-box .pub-card.ready'));
+  await S.locator('#publish-box .pub-net[data-net="facebook"]').click();
   await S.locator('#post-caption').getByText(/Pour commander : .*#\/b\/boutique-awa-test\?a=/).waitFor();
 });
 
