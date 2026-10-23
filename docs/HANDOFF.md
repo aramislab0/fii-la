@@ -273,6 +273,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 23/10 16:10 | Correctif Publier (image seule) **en production**, Chrome + Safari verts après une relance (installation des navigateurs en échec sur GitHub, 3ᵉ fois aujourd'hui : à durcir si cela se répète) | run 39974543604 ; `3893f57` |
 | 23/10 15:20 | Correctif Publier : l'image seule part vers Instagram, Facebook, TikTok, Snapchat (Facebook perdait la photo quand le texte était joint, capture du fondateur) ; le texte reste copié ; WhatsApp garde la légende. Proposition de publication directe (Meta) rédigée pour le VP | `docs/PROPOSITION-PUBLICATION-DIRECTE.md` ; tests `marketing`, `shop` |
 | 23/10 10:55 | Tests en production Chrome + Safari **verts** à la 3ᵉ tentative (les deux premières : échec de l'installation des navigateurs sur GitHub, sans lien avec le code) | run 39926711444 |
 | 23/10 10:05 | Publier v3 et signes distinctifs **en production** (tests, migration, mise en ligne verts). Tests en production Safari en échec à l'installation de WebKit sur GitHub (pas le code) : job relancé. Ligne précédente corrigée (elle annonçait tout vert à tort) | run 39926711444 ; `72659a7` |
