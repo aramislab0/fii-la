@@ -140,6 +140,11 @@ await t('gains : validés après 30 jours ; le fondateur les marque versés ; an
   assert.deepEqual(me.rewards, { pending: 5000, validated: 2000, paid: 0 });
   const adm = await ok('fiila_admin_ambassadors', {}, ADMIN);
   assert.equal(adm.to_pay.length, 1); assert.equal(adm.to_pay[0].payout_phone, '77 500 00 01');
+  // #34 : versement refusé tant que le numéro de versement n'est pas le numéro du compte confirmé par SMS.
+  assert.equal(adm.to_pay[0].payout_verified, false);
+  await ko('fiila_admin_reward', { p_ids: [adm.to_pay[0].id], p_action: 'paid', p_reason: null }, 'payout_unverified', ADMIN);
+  await db.query(`update auth.users set phone = '221775000001', phone_confirmed_at = now() where id = $1`, [A.uid]);
+  assert.equal((await ok('fiila_admin_ambassadors', {}, ADMIN)).to_pay[0].payout_verified, true);
   await ok('fiila_admin_reward', { p_ids: [adm.to_pay[0].id], p_action: 'paid', p_reason: null }, ADMIN);
   const pend = (await ok('fiila_admin_ambassadors', {}, ADMIN)).pending[0];
   await ko('fiila_admin_reward', { p_ids: [pend.id], p_action: 'cancel', p_reason: '' }, 'reason_required', ADMIN);

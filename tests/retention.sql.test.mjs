@@ -64,6 +64,19 @@ await t('interrupteurs par suggestion : bornés 0/1, listés, lus par l’applic
   await ko('fiila_bo_nudges', {}, null, await user('cliente@example.test'));
 });
 
+await t('aide de complétude d’adresse (A1) : addr_photo et addr_mark mesurés sans identifiant d’adresse, interrupteurs, panneau', async () => {
+  for (const v of ['addr_photo:shown', 'addr_photo:used', 'addr_mark:dismiss']) await ok('fiila_track', { p_event: 'retention', p_variant: v });
+  await ko('fiila_track', { p_event: 'retention', p_variant: 'addr_stop:shown' });
+  await ko('fiila_track', { p_event: 'retention', p_variant: 'addr_photo:12345' });
+  assert.equal((await one(`select count(*)::int n from fiila.metrics where event = 'retention' and variant ~ '^addr_' and variant !~ '^addr_(photo|mark):(shown|click|dismiss|used|repeat)$'`)).n, 0);
+  await ok('fiila_bo_setting_set', { p_key: 'sugg_addr_mark', p_value: 0 }, F);
+  assert.deepEqual((await ok('fiila_app_flags', {})).sugg_off, ['shop_team', 'addr_mark']);
+  const d = await ok('fiila_bo_nudges', {}, F);
+  assert.deepEqual(d.suggestions.find((x) => x.id === 'addr_photo').d30, { shown: 1, used: 1 });
+  assert.equal(d.suggestions.find((x) => x.id === 'addr_mark').on, false);
+  assert.ok(JSON.stringify(await ok('fiila_bo_settings', {}, F)).includes('sugg_addr_photo'));
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL rétention réussis`);
 process.exit(passed === results.length ? 0 : 1);

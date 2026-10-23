@@ -252,6 +252,7 @@
     ambassador_cap: 'Cet agent a atteint son nombre de commerçants pour ce mois.',
     invalid_state: 'Action impossible dans cet état.',
     ambassador_has_payouts: 'Cet agent a déjà reçu un versement : la trace doit rester. Excluez-le plutôt.',
+    payout_unverified: 'Numéro de versement pas encore confirmé par code SMS : aucun versement possible.',
     reason_required: 'Indiquez un motif.',
     vd_photo_rule: 'Confirmez qu’aucune personne n’est reconnaissable sur la photo.',
     vd_photo_required: 'Ajoutez une photo de l’article.',
@@ -636,7 +637,7 @@
      à mesure tout le potentiel de l'app selon ses usages ; des appels à l'action incitatifs sans être agressifs »).
      Règles : une seule suggestion par écran, jamais au premier geste ; 3 au plus par jour ; « Plus tard » = 7 jours de silence,
      deux fois = plus jamais ; suggestion suivie = plus jamais. Réglable dans le back-office (nudges = 0 coupe tout). */
-  var NUDGE_IDS = ['home_shop', 'shop_more_products', 'shop_share_vitrine', 'shop_courier', 'shop_team', 'shop_photos'];
+  var NUDGE_IDS = ['home_shop', 'shop_more_products', 'shop_share_vitrine', 'shop_courier', 'shop_team', 'shop_photos', 'addr_photo', 'addr_mark'];
   NUDGE_IDS.forEach(function (id) { ['shown', 'click', 'dismiss'].forEach(function (a) { TRACKABLE.nudge.push(id + ':' + a); }); });
   var NUDGE_SEQ = -1, NUDGE_FLAGS = null;
   // passive : lecture du cache seulement (pages reçues par lien : rien n'est écrit sur le téléphone sans action).
@@ -665,7 +666,10 @@
     shop_share_vitrine: { icon: 'share', title: 'Faites connaître votre site', text: 'Un lien dans votre statut WhatsApp suffit pour recevoir vos premières commandes.', cta: 'Partager sur WhatsApp' },
     shop_photos: { icon: 'cam', title: 'Plusieurs photos par article', text: 'Jusqu’à 5 photos qui défilent : vos articles se vendent mieux.', cta: 'Voir mes articles' },
     shop_courier: { icon: 'moto', title: 'Un livreur de confiance ?', text: 'Invitez-le : il reçoit l’adresse exacte et le chemin à chaque course.', cta: 'Inviter mon livreur' },
-    shop_team: { icon: 'users', title: 'Vous travaillez à plusieurs ?', text: 'Ajoutez un membre d’équipe : chacun avec son rôle, sans partager de mot de passe.', cta: 'Ajouter un membre' } };
+    shop_team: { icon: 'users', title: 'Vous travaillez à plusieurs ?', text: 'Ajoutez un membre d’équipe : chacun avec son rôle, sans partager de mot de passe.', cta: 'Ajouter un membre' },
+    // Aide au créateur d'une adresse (algorithmes v2.1, A1 réduit, validé le 23/10) : jamais une note ni une certification.
+    addr_photo: { icon: 'cam', title: 'Une photo de l’entrée', text: 'Le livreur reconnaît la porte du premier coup.', cta: 'Ajouter une photo' },
+    addr_mark: { icon: 'mic', title: 'Un repère pour trouver la porte', text: 'Quelques mots ou un message vocal : « portail vert », « 2e étage ».', cta: 'Ajouter un repère' } };
   function ret(id, extra) { return Object.assign({}, RET_TEXT[id], extra); }
   function retState() {
     var st = LS.get(RET_LS, null), now = Date.now();
@@ -750,10 +754,30 @@
     retOnVisible(card, function () {
       retExpose(id, function () {
         track('retention', id + ':shown');
-        upd(function (m) { var now = Date.now(); if (!m.at || now - m.at > RET_WEEK || m.base == null) m.base = Number(metric) || 0; m.at = now; return m; });
+        upd(function (m) {
+          var now = Date.now();
+          if (!m.at || now - m.at > RET_WEEK || m.base == null || (o.scope && m.pid !== o.scope)) { m.base = Number(metric) || 0; m.pid = o.scope || undefined; }
+          m.at = now; return m;
+        });
       });
     });
     return card;
+  }
+  /* Aide de complétude d'une adresse (A1 réduit) : seulement sur la page de gestion (#/m/…), donc pour qui a le droit de la
+     modifier ; jamais sur un lien reçu. L'identifiant de l'adresse reste sur le téléphone (m.pid) : « utilisé » = le champ
+     conseillé est enregistré sur l'adresse où la suggestion a été vue ; un clic ou une autre adresse ne comptent pas.
+     Un champ déjà rempli avant toute exposition = fonction connue (apprentissage par téléphone, pas par adresse). */
+  function addrObserve(id, pid, has) {
+    var r = retState().s[id] || {};
+    if (r.at) { if (r.pid === pid) retObserve(id, has ? 1 : 0, false); return; }
+    if (has) retObserve(id, 1, true);
+  }
+  function addrNudge(pl) {
+    var photo = !!pl.photo, mark = !!((pl.instruction || '').trim() || pl.has_voice);
+    addrObserve('addr_photo', pl.id, photo); addrObserve('addr_mark', pl.id, mark);
+    return retPick([
+      { id: 'addr_photo', ok: !photo, metric: photo ? 1 : 0, o: ret('addr_photo', { href: '#/edit/' + pl.id, scope: pl.id }) },
+      { id: 'addr_mark', ok: !mark, metric: mark ? 1 : 0, o: ret('addr_mark', { href: '#/edit/' + pl.id, scope: pl.id }) }]);
   }
   // Accueil : quelqu'un qui a déjà créé une adresse et qui n'a pas de boutique découvre la boutique gratuite.
   function homeNudge() {
@@ -3692,6 +3716,7 @@
           h('span', { class: 'small muted' }, isMeeting && !expired ? 'Visible jusqu’au ' + shortDate(pl.expires_at) : 'Modifiée le ' + shortDate(pl.updated_at)))),
       active ? sharePanel({ kind: variant, card: isMeeting ? 'event' : 'address', url: url, msg: msg, title: pl.label, when: isMeeting ? whenText(pl.starts_at) : '', photo: pl.photo || null, qr: qrBox,
         ids: { url: 'share-url', copy: 'copy-link', native: 'share-native' } }) : null,
+      active && !isMeeting ? addrNudge(pl) : null,
       pl.has_voice ? voiceOwnerBox(pl, owner) : null,
       isMeeting && active ? guestsPanel(pl, owner) : null,
       installSlot(),
@@ -7367,7 +7392,8 @@
       h('div', { class: 'wal-total' }, countUp(h('b'), total, fcfa), h('span', null, 'gagnés au total')),
       total ? h('div', { class: 'wal-bar', 'aria-hidden': 'true' }, bars) : h('p', { class: 'small muted' }, 'Votre premier gain arrive quand votre premier commerçant atteint le niveau 1 : ' + fcfa(amounts[0]) + '.'),
       h('ul', { class: 'wal-leg' }, segs.map(function (x) { return h('li', null, h('span', { class: 'dot ' + x[0], 'aria-hidden': 'true' }), h('span', null, x[1]), h('b', null, fcfa(x[2]))); })),
-      h('p', { class: 'small muted' }, 'Versements une fois par mois sur ' + (PAYOUT[a.payout_method] || '') + ' ' + a.payout_phone + '.'),
+      h('p', { class: 'small muted', id: 'amb-payout' }, 'Versements une fois par mois sur ' + (PAYOUT[a.payout_method] || '') + ' ' + a.payout_phone + '.',
+        a.payout_verified ? null : [' ', h('button', { class: 'btn link small', type: 'button', id: 'amb-payout-verify', onclick: function () { payoutVerifySheet(a); } }, 'Confirmer ce numéro par SMS')]),
       (a.history || []).length ? h('details', { class: 'more-details' }, h('summary', null, 'Historique'),
         h('div', { class: 'stack tight' }, a.history.map(function (x) {
           var st = { pending: 'en vérification jusqu’au ' + shortDate(x.validate_after), validated: 'à verser', paid: 'versé', cancelled: 'annulé' + (x.reason ? ' : ' + x.reason : '') }[x.status];
@@ -7392,6 +7418,16 @@
       board,
       h('details', { class: 'card more-sec' }, h('summary', null, 'Comment je suis payé'), ambLevels(a.amounts)),
       footer());
+  }
+  // #34 (fondateur, 23/10) : aucun versement vers un numéro non confirmé par code SMS. Le numéro confirmé devient celui du compte.
+  function payoutVerifySheet(a) {
+    var close;
+    var back = h('div', { class: 'sheet-back', id: 'payout-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'payout-h' },
+      h('div', { class: 'sheet stack' }, h('h2', { id: 'payout-h' }, 'Confirmer mon numéro de versement'),
+        h('p', { class: 'small muted' }, 'Fii verse vos gains seulement sur un numéro confirmé par code SMS. Ce numéro devient aussi celui de votre compte.'),
+        phoneVerifyBox({ id: 'payout-verify', prefill: a.payout_phone, onDone: function () { setTimeout(function () { close(); render(); }, 900); } }),
+        h('button', { class: 'btn link small', type: 'button', onclick: function () { close(); } }, 'Plus tard')));
+    close = openSheet(back);
   }
   // Boutique : rattacher son ambassadeur (7 jours au plus après la création).
   function ambassadorShopBox() {
@@ -8176,7 +8212,7 @@
       var all = d.ambassadors, review = all.filter(function (a) { return a.status === 'review'; });
       var toPay = d.to_pay.reduce(function (n, r) { return n + r.amount; }, 0);
       var paid = all.reduce(function (n, a) { return n + (a.paid || 0); }, 0);
-      var byAmb = {}; d.to_pay.forEach(function (r) { var k = r.ambassador + '|' + r.payout_method + '|' + r.payout_phone; (byAmb[k] = byAmb[k] || []).push(r); });
+      var byAmb = {}; d.to_pay.forEach(function (r) { var k = r.ambassador + '|' + r.payout_method + '|' + r.payout_phone + '|' + (r.payout_verified ? 1 : 0); (byAmb[k] = byAmb[k] || []).push(r); });
       var FILTERS = [['', 'Tous'], ['active', 'Actifs'], ['review', 'À valider'], ['training', 'En formation'], ['suspended', 'Suspendus'], ['excluded', 'Exclus']];
       var listBox = h('div', { class: 'stack tight' }), chips = h('div');
       function draw() {
@@ -8218,8 +8254,9 @@
             var l = byAmb[k], p = k.split('|'), sum = l.reduce(function (n, r) { return n + r.amount; }, 0);
             return h('div', { class: 'bo-req' }, boAv(p[0]),
               h('div', { class: 'stack tight', style: 'flex:1;min-width:0' }, h('b', null, p[0] + ' · ' + fcfa(sum)), h('span', { class: 'small muted' }, (PAYOUT[p[1]] || p[1]) + ' ' + p[2]),
+                p[3] === '1' ? null : h('span', { class: 'small' }, boBadge('warn', 'Numéro non confirmé par SMS'), ' L’agent le confirme depuis son espace.'),
                 l.map(function (r) { return h('span', { class: 'small' }, r.shop + ' · niveau ' + r.level + ' · ' + fcfa(r.amount)); }),
-                h('button', { class: 'btn small', type: 'button', style: 'align-self:flex-start', onclick: function () {
+                h('button', { class: 'btn small', type: 'button', style: 'align-self:flex-start', disabled: p[3] === '1' ? null : true, onclick: function () {
                   if (window.confirm && !window.confirm('Confirmer le versement de ' + fcfa(sum) + ' à ' + p[0] + ' sur ' + (PAYOUT[p[1]] || p[1]) + ' ' + p[2] + ' ?')) return;
                   boAct(function () { return api('fiila_admin_reward', { p_ids: l.map(function (r) { return r.id; }), p_action: 'paid', p_reason: null }); }, 'Marqué versé.', null, null, this);
                 } }, 'J’ai versé ' + fcfa(sum))));
@@ -8256,6 +8293,7 @@
       var note = h('input', { type: 'text', id: 'bo-amb-note', maxlength: 200, placeholder: 'Motif ou note (visible par l’agent)' });
       function btn(decision, label, cls, ask, okText, idx) {
         return h('button', { class: 'btn ' + cls, type: 'button', id: 'bo-amb-' + (idx || decision), onclick: function () {
+          if (['suspend', 'exclude', 'reinstate'].indexOf(decision) >= 0 && !note.value.trim()) { toast('Indiquez un motif.'); note.focus(); return; }
           if (ask && window.confirm && !window.confirm(ask)) return;
           boAmbDecide(a, decision, note.value, this, okText);
         } }, label);
@@ -8265,7 +8303,25 @@
       if (a.status === 'active') acts.push(btn('suspend', 'Suspendre', 'ghost', 'Suspendre ' + a.name + ' ? Ses nouveaux gains sont mis en pause.', 'Agent suspendu.'));
       if (a.status === 'suspended') acts.push(btn('reactivate', 'Réactiver', '', null, 'Agent réactivé.'));
       if (['review', 'active', 'suspended'].indexOf(a.status) >= 0) acts.push(btn('training', 'Renvoyer en formation', 'ghost', a.name + ' devra refaire la formation et le test. Continuer ?', 'Renvoyé en formation.'));
-      if (a.status === 'active' || a.status === 'suspended') acts.push(btn('exclude', 'Exclure', 'quiet danger-text', 'Exclure ' + a.name + ' ? Les gains non versés seront annulés.', 'Agent exclu.', 'exclude2'));
+      if (['training', 'active', 'suspended'].indexOf(a.status) >= 0) acts.push(btn('exclude', 'Exclure', 'quiet danger-text', 'Exclure ' + a.name + ' ? Les gains non versés seront annulés.', 'Agent exclu.', 'exclude2'));
+      if (a.status === 'excluded') acts.push(btn('reinstate', 'Réintégrer', 'ghost', 'Réintégrer ' + a.name + ' ? Le profil passe en « suspendu » ; la réactivation reste une seconde décision. Les gains annulés ne reviennent pas d’eux-mêmes.', 'Agent réintégré (suspendu).'));
+      // Historique de l'agent : décisions et gains (journal du serveur), gains annulés à rétablir un par un, avec motif.
+      var hist = h('section', { class: 'card stack tight', id: 'bo-amb-history' }, h('h2', null, 'Historique'), loading());
+      api('fiila_bo_ambassador_history', { p_id: a.id }).then(function (x) {
+        setKids(hist, h('h2', null, 'Historique'),
+          x.cancelled.length ? h('div', { class: 'stack tight', id: 'bo-amb-cancelled' }, h('p', { class: 'eyebrow' }, 'Gains annulés'),
+            x.cancelled.map(function (r) {
+              var why = h('input', { type: 'text', maxlength: 200, placeholder: 'Motif du rétablissement', 'aria-label': 'Motif du rétablissement', style: 'max-width:200px' });
+              return h('div', { class: 'item', id: 'bo-rw-' + r.id }, h('span', { class: 'small wrapword', style: 'flex:1' }, r.shop + ' · niveau ' + r.level + ' · ' + fcfa(r.amount) + (r.reason ? ' · ' + r.reason : '')),
+                a.status === 'excluded' ? null : [why, h('button', { class: 'btn ghost small', type: 'button', onclick: function () {
+                  if (!why.value.trim()) { toast('Indiquez un motif.'); why.focus(); return; }
+                  boAct(function () { return api('fiila_admin_reward', { p_ids: [r.id], p_action: 'restore', p_reason: why.value }); }, 'Gain rétabli.', null, null, this);
+                } }, 'Rétablir')]);
+            }), a.status === 'excluded' ? h('p', { class: 'small muted' }, 'Réintégrez d’abord l’agent pour rétablir un gain.') : null) : null,
+          x.events.length ? h('ul', { class: 'stack tight bo-hist' }, x.events.map(function (e) {
+            return h('li', { class: 'small' }, h('span', { class: 'muted' }, boDate(e.at, true) + ' · ' + boActor(e.actor) + ' '), boActionLabel(e.action, e.detail));
+          })) : h('p', { class: 'small muted' }, 'Aucune décision enregistrée pour cet agent.'));
+      }, function (e) { setKids(hist, h('h2', null, 'Historique'), h('p', { class: 'small muted' }, errText(e))); });
       var canDelete = !(a.paid > 0);
       var del = h('section', { class: 'card stack tight bo-danger', id: 'bo-amb-danger' }, h('h2', null, 'Zone sensible'),
         canDelete ? [h('p', { class: 'small' }, 'Supprimer le profil efface l’inscription, les tests, les liens avec les commerçants et les gains non versés. Le compte de la personne reste : elle pourra recommencer l’inscription.'),
@@ -8284,13 +8340,14 @@
         h('div', { class: 'bo-grid2' },
           h('section', { class: 'card stack tight', id: 'bo-amb-info' }, h('h2', null, 'Profil'),
             row('Code', a.code), row('E-mail du compte', a.email || '—'), row('Téléphone', a.phone), row('Quartier', a.zone || '—'),
-            row('Versements', (PAYOUT[a.payout_method] || a.payout_method) + ' ' + a.payout_phone),
+            row('Versements', [(PAYOUT[a.payout_method] || a.payout_method) + ' ' + a.payout_phone + ' ', a.payout_verified ? boBadge('ok', 'confirmé par SMS') : boBadge('warn', 'non confirmé')]),
             row('Inscrit', boDate(a.created_at, true)), row('Validé', a.approved_at ? boDate(a.approved_at, true) : '—'),
             row('Test', a.quiz_score != null ? a.quiz_score + '/10 · ' + (a.attempts || 0) + ' essai(s)' : (a.attempts ? a.attempts + ' essai(s), pas encore réussi' : 'pas encore passé')),
             a.note ? row('Note', a.note) : null),
           h('section', { class: 'card stack tight', id: 'bo-amb-actions' }, h('h2', null, 'Actions'),
-            acts.length ? [h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif ou note'), note), h('div', { class: 'row wrap' }, acts)]
-              : h('p', { class: 'small muted' }, a.status === 'training' ? 'En formation : rien à décider tant que le test n’est pas réussi.' : 'Profil exclu : aucune action possible.'))),
+            acts.length ? [h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif ou note'), note), h('div', { class: 'row' }, acts)]
+              : h('p', { class: 'small muted' }, 'Rien à décider pour l’instant.'))),
+        hist,
         del
       ], { back: back });
     }, function (e) { return boShell('agents', 'Agent', stateCard('!', 'Chargement impossible', errText(e)), { back: back }); });
@@ -8538,7 +8595,8 @@
   }
   // Croissance : la découverte progressive (suggestions dans l'application), taux de suivi sur 30 jours.
   var NUDGE_LABEL = { home_shop: 'Accueil → créer sa boutique', shop_more_products: 'Boutique → ajouter des articles', shop_share_vitrine: 'Boutique → partager le site',
-    shop_courier: 'Boutique → inviter un livreur', shop_team: 'Boutique → ajouter un membre', shop_photos: 'Boutique → plusieurs photos' };
+    shop_courier: 'Boutique → inviter un livreur', shop_team: 'Boutique → ajouter un membre', shop_photos: 'Boutique → plusieurs photos',
+    addr_photo: 'Mon adresse → photo de l’entrée', addr_mark: 'Mon adresse → repère écrit ou vocal' };
   // Messages WhatsApp (mandat WHATSAPP-001) : registre des modèles, aperçu de la carte, mesures du partage, état Meta saisi à la main.
   var WA_META = { NOT_SUBMITTED: 'Non soumis', SUBMITTED: 'Soumis à Meta', APPROVED: 'Approuvé', REJECTED: 'Refusé', PAUSED: 'En pause' };
   var WA_INTEG = { TO_IMPLEMENT: 'À intégrer', MANUAL_PILOT: 'Pilote (partage manuel)', MANUAL: 'Partage manuel', API: 'API' };
@@ -8596,7 +8654,7 @@
     var oa = d.order_address || {};
     return h('section', { class: 'card stack tight bo-panel', id: 'bo-nudges' },
       h('div', { class: 'bo-panel-h' }, h('h2', null, 'Suggestions'), d.on ? boBadge('ok', 'Actives') : boBadge('muted', 'Toutes coupées (Réglages)')),
-      h('p', { class: 'small muted' }, 'Une exposition par session, deux au plus sur 7 jours par téléphone ; comptée seulement si la carte est vue. Un clic n’est jamais un usage : « Succès » = état réel relu sous 7 jours (article ajouté, visite du site, livreur invité, article à plusieurs photos, membre invité, boutique créée). 30 derniers jours, installations observées (pas des personnes ni des boutiques uniques).'),
+      h('p', { class: 'small muted' }, 'Une exposition par session, deux au plus sur 7 jours par téléphone ; comptée seulement si la carte est vue. Un clic n’est jamais un usage : « Succès » = état réel relu sous 7 jours (article ajouté, visite du site, livreur invité, article à plusieurs photos, membre invité, boutique créée, photo ou repère enregistré sur l’adresse où la suggestion a été vue). 30 derniers jours, installations observées (pas des personnes ni des boutiques uniques).'),
       boTable([
         { label: 'Suggestion', get: function (x) { return NUDGE_LABEL[x.id] || x.id; } },
         { label: 'Vues', get: function (x) { return boNum(v(x, 'shown')); }, cls: 'num' },
@@ -8866,7 +8924,7 @@
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’agent versé',
     reward_cancelled: 'a annulé un gain d’agent', reward_validated: 'a validé un gain d’agent', ambassador_active: 'a activé un agent',
-    ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
+    ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
     view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique',
     career_reply: 'a répondu à l’agent', career_objective: 'a fixé le cap du mois :', career_mission: 'a modifié la mission', career_note_accepted: 'a accepté la proposition du Manager', career_note_rejected: 'a écarté la proposition du Manager' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain agent, niveau 1', 'FCFA'], amb_reward_2: ['Gain agent, niveau 2', 'FCFA'],
@@ -8889,6 +8947,8 @@
     if (a === 'team_invite' && d.role) txt += ' (' + (BO_ROLES[d.role] || d.role) + ')';
     if (a === 'shop_suspend' && d.value) txt += ' : ' + d.value;
     if (a === 'shop_set_type' && d.value) txt += ' : ' + (typeLabel(d.value) || d.value);
+    if (/^reward_/.test(a) && d.amount) txt += ' (' + fcfa(d.amount) + (d.level ? ', niveau ' + d.level : '') + ')';
+    if (/^(reward_|ambassador_)/.test(a) && (d.reason || d.note)) txt += ' : ' + (d.reason || d.note);
     return txt;
   }
   function boAudit(q) {

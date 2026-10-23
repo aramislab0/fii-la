@@ -214,9 +214,15 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   await shot(A, '04b-niveau');
   await A.click('#cel-close');
   await A.locator('#amb-wallet').getByText('2 000 FCFA').first().waitFor();
+  await A.locator('#amb-payout-verify').getByText('Confirmer ce numéro par SMS').waitFor(); // #34 : numéro de versement pas encore confirmé
   await local.db.query(`update fiila.ambassador_rewards set validate_after = now() - interval '1 minute'`);
   await F.goto(URL0 + '#/'); await F.goto(URL0 + '#/admin/ambassadeurs');
   await F.locator('#adm-pay').getByText('Wave 77 500 00 01').waitFor();
+  // #34 : numéro de versement pas encore confirmé par SMS → bouton de versement indisponible.
+  await F.locator('#adm-pay').getByText('Numéro non confirmé par SMS').waitFor();
+  assert.equal(await F.locator('#adm-pay').getByRole('button', { name: /J’ai versé 2 000/ }).isDisabled(), true);
+  await local.db.query(`update auth.users set phone = '221775000001', phone_confirmed_at = now() where id = (select user_id from fiila.ambassadors where payout_phone = '77 500 00 01')`);
+  await F.reload(); await F.locator('#adm-pay').getByText('Wave 77 500 00 01').waitFor();
   F.once('dialog', (d) => d.accept());
   await F.locator('#adm-pay').getByRole('button', { name: /J’ai versé 2 000/ }).click();
   await F.getByText('Marqué versé.').waitFor();
@@ -225,12 +231,41 @@ await t('niveau 1 atteint → gain en vérification ; après 30 jours le fondate
   await A.click('#cel-close');
   const w = (await A.locator('#amb-wallet').textContent()).replace(/\s/g, ' ');
   assert.match(w, /Déjà reçu\s*2 000 FCFA/);
+  assert.equal(await A.locator('#amb-payout-verify').count(), 0, 'numéro confirmé : plus de lien');
   // Depuis le compte : l'entrée « Fii Carrière » montre l'état de l'ambassadeur
   await A.goto(URL0 + '#/compte');
   await A.locator('#amb-entry').getByText('Fii Carrière · agent actif').waitFor();
   await A.click('#amb-entry');
   await A.locator('#amb-code').waitFor();
   await shot(A, '05-portefeuille');
+});
+
+await t('back-office : motif obligatoire, exclusion puis réintégration (suspendu), historique de l’agent avec motifs', async () => {
+  const id = (await local.db.query(`select id from fiila.ambassadors where name = 'Moussa Diop'`)).rows[0].id;
+  await F.goto(URL0 + '#/bo/agents/' + id);
+  await F.locator('#bo-amb-info').getByText('confirmé par SMS').waitFor();
+  await F.click('#bo-amb-suspend');
+  await F.getByText('Indiquez un motif.').first().waitFor();
+  assert.equal((await local.db.query(`select status from fiila.ambassadors where id = $1`, [id])).rows[0].status, 'active');
+  await F.fill('#bo-amb-note', 'Vérification des commandes (test)');
+  F.once('dialog', (d) => d.accept());
+  await F.click('#bo-amb-suspend');
+  await F.getByText('Agent suspendu.').waitFor(); await F.locator('#bo-amb-reactivate').waitFor();
+  await F.fill('#bo-amb-note', 'Boutique fictive (test)');
+  F.once('dialog', (d) => d.accept());
+  await F.click('#bo-amb-exclude2');
+  await F.getByText('Agent exclu.').waitFor(); await F.locator('#bo-amb-reinstate').waitFor();
+  await F.locator('#bo-amb-history').getByText(/a exclu un agent Moussa Diop : Boutique fictive \(test\)/).waitFor();
+  await F.fill('#bo-amb-note', 'Erreur de contrôle (test)');
+  F.once('dialog', (d) => d.accept());
+  await F.click('#bo-amb-reinstate');
+  await F.getByText('Agent réintégré (suspendu).').waitFor();
+  await F.locator('#bo-amb-history').getByText(/a réintégré un agent Moussa Diop : Erreur de contrôle/).waitFor();
+  await F.locator('#bo-amb-history').getByText(/a marqué un gain d’agent versé .*2 000 FCFA/).waitFor();
+  await shot(F, '07b-bo-historique-agent');
+  await F.click('#bo-amb-reactivate');
+  await F.getByText('Agent réactivé.').waitFor();
+  assert.equal((await local.db.query(`select status from fiila.ambassadors where id = $1`, [id])).rows[0].status, 'active');
 });
 
 await t('back-office : Manager Carrière — cap du mois, conversation de l’ambassadeur, réponse de l’équipe', async () => {

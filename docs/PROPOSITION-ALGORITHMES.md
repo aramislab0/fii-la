@@ -1,6 +1,7 @@
 # Proposition — Algorithmes utiles à Fii, maintenant et plus tard
 
 > **v2.1, 23/10/2026**, par le Builder (Claude). Intègre les cinq changements R1–R5 de la revue VP du 22/10 et les corrections C1–C3 de sa contre-lecture du 23/10 (`docs/REVUE-VP.md`). La v1 (commit `a2e1cd5`) et la v2 (`8a3ebf4`) restent dans l'historique git.
+> **Validé par le fondateur le 23/10/2026 04:16 (« Ok pour tout ») et construit le même jour.** Écart de construction, fondé sur le code : la suggestion « arrêt voiture » (`addr_stop`) n'est pas construite, car le formulaire d'adresse impose déjà « accessible en voiture » ou un arrêt (`valid()`, étape 2) et `vehicle_ok` n'est jamais vide en base ; elle ne se montrerait jamais. Le numéro de versement est confirmé quand il est le numéro du compte vérifié par code SMS : un autre numéro se confirme par le même parcours, et devient celui du compte.
 > **Corrigé en v2.1 :** deux constats de la v2 étaient faux. Le journal des gains existe déjà (déclencheur `bo_audit`), et un Agent exclu peut redevenir actif par un détour. Les deux sont vérifiés dans les migrations et dans la définition en production.
 > **Rien n'est construit avant la validation du fondateur.** Ce document n'autorise aucun code, migration, collecte ni activation.
 > Base lue : `main` après `b2303be`. Chaque affirmation est marquée **FAIT** (vérifié dans le dépôt, avec la référence), **HYPOTHÈSE** (à éprouver) ou **À VÉRIFIER**.
