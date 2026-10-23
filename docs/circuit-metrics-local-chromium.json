@@ -10,13 +10,13 @@
     "n": 2
   },
   {
-    "event": "link_copied",
-    "variant": "meeting",
-    "n": 1
+    "event": "home_hero",
+    "variant": "adresse:shown",
+    "n": 3
   },
   {
-    "event": "nudge",
-    "variant": "home_shop:shown",
+    "event": "link_copied",
+    "variant": "meeting",
     "n": 1
   },
   {
@@ -28,6 +28,11 @@
     "event": "request_created",
     "variant": "request",
     "n": 2
+  },
+  {
+    "event": "retention",
+    "variant": "home_shop:shown",
+    "n": 1
   },
   {
     "event": "share_initiated",

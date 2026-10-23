@@ -20,6 +20,11 @@
     "n": 1
   },
   {
+    "event": "retention",
+    "variant": "addr_photo:shown",
+    "n": 1
+  },
+  {
     "event": "share_initiated",
     "variant": "whatsapp_address",
     "n": 1
