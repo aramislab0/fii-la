@@ -235,9 +235,20 @@ export async function startServer(port = 0) {
       const c = loc ? (ex.extractFromUrl(loc) || ex.extractFromUrl(new URL(loc).searchParams.get('continue') || '')) : null;
       return c ? send(200, c) : send(422, { error: 'not_found' });
     }
+    // Fonction fiila-domains : le vrai code, sans secrets Cloudflare (réponse « configured: false », aucun appel extérieur).
+    if (url.pathname === '/functions/v1/fiila-domains') {
+      let body = '';
+      for await (const c of req) body += c;
+      const { makeHandler } = await import('../supabase/functions/fiila-domains/handler.mjs');
+      const origin = `http://127.0.0.1:${server.address().port}`;
+      const h = makeHandler({ env: (k) => ({ SUPABASE_URL: origin, SUPABASE_ANON_KEY: 'local-test-key' })[k], fetch: globalThis.fetch });
+      const r = await h(new Request(origin + url.pathname, { method: req.method, headers: { authorization: req.headers.authorization || '' }, body: req.method === 'POST' ? body : undefined }));
+      res.writeHead(r.status, { 'Content-Type': 'application/json' });
+      return res.end(await r.text());
+    }
     if (url.pathname === '/config.js') {
       res.writeHead(200, { 'Content-Type': 'text/javascript' });
-      return res.end(`window.FIILA_CONFIG={supabaseUrl:location.origin,supabaseKey:'local-test-key',publicUrl:''};`);
+      return res.end(`window.FIILA_CONFIG={supabaseUrl:location.origin,supabaseKey:'local-test-key',publicUrl:'',domainsLive:true};`);
     }
     let path = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
     if (path.endsWith('/')) path += 'index.html';

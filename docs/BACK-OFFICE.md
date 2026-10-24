@@ -25,6 +25,7 @@
 |---|---|
 | Super admin | Tout, dont l'équipe, les réglages et le journal |
 | Opérations | Boutiques (lecture et actions), commandes, comptes, fil, modération, vide-dressing, ambassadeurs, finances |
+| Domaines (24/10) | Domaines propres des boutiques Premium : nom, boutique (gratuite signalée), statut (en attente, vérification, actif, erreur, expiré, déconnecté), certificat, dernière erreur de Cloudflare, date. « Revérifier » (relit Cloudflare) ; « Déconnecter » avec motif obligatoire (droit `shops_write`, journal `domain_disconnect`, nom retiré chez Cloudflare). Interrupteurs `custom_domains` et `shop_subdomains` (adresses `<lien>.fii.shop`) dans Réglages. Test : `backoffice` (16 sections), `domains.sql` |
 | Modération | Commentaires, vérification du vide-dressing (sans téléphones), suspension et réactivation des boutiques |
 | Support | Lecture des boutiques, commandes et comptes |
 | Finances | Commandes, finances, versements des ambassadeurs, « livré » et « reversé » du vide-dressing |
