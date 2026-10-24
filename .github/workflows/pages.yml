@@ -118,11 +118,13 @@ jobs:
           APP_HOSTS: ${{ vars.APP_HOSTS }}
           MOVED_TO: ${{ vars.MOVED_TO }}
           LEGACY_ORIGINS: ${{ vars.LEGACY_ORIGINS }}
+          SHOP_ZONE: ${{ vars.SHOP_ZONE }}
+          DOMAINS_LIVE: ${{ vars.DOMAINS_LIVE }}
           FACEBOOK_APP_ID: ${{ vars.FACEBOOK_APP_ID }}
         run: |
           test -n "$SUPABASE_URL" || { echo "Variable SUPABASE_URL manquante"; exit 1; }
           test -n "$SUPABASE_KEY" || { echo "Variable SUPABASE_PUBLISHABLE_KEY manquante"; exit 1; }
-          node -e 'const L=(v)=>String(v||"").split(",").map((x)=>x.trim()).filter(Boolean);const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:process.env.PUBLIC_URL||"",facebookAppId:process.env.FACEBOOK_APP_ID||"",appHosts:L(process.env.APP_HOSTS),movedTo:process.env.MOVED_TO||"",legacyOrigins:L(process.env.LEGACY_ORIGINS)};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
+          node -e 'const L=(v)=>String(v||"").split(",").map((x)=>x.trim()).filter(Boolean);const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:process.env.PUBLIC_URL||"",facebookAppId:process.env.FACEBOOK_APP_ID||"",appHosts:L(process.env.APP_HOSTS),movedTo:process.env.MOVED_TO||"",legacyOrigins:L(process.env.LEGACY_ORIGINS),shopZone:process.env.SHOP_ZONE||"",domainsLive:process.env.DOMAINS_LIVE==="1"};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
           echo "<!-- build ${GITHUB_SHA} -->" >> web/index.html
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }

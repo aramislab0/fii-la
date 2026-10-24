@@ -5,6 +5,8 @@
 -- Les échanges avec Cloudflare passent par la fonction serveur fiila-domains (clé de service) : fiila.domain_cf_update
 -- n'est appelable que par elle. Le Worker lit fiila_domain_resolve (public) : la boutique d'un nom d'hôte actif, rien d'autre.
 -- Interrupteur du back-office : custom_domains (1 = ouvert, 0 = aucun domaine propre ne sert de site).
+-- Domaines de Fii (fondateur, 24/10 16:51) : fii.app (application) et fii.shop (sites des boutiques). Chaque boutique en ligne
+-- a aussi son adresse <lien>.fii.shop (interrupteur shop_subdomains), servie par le même Worker.
 
 create table fiila.shop_domains (
   id            uuid primary key default gen_random_uuid(),
@@ -28,6 +30,7 @@ create index shop_domains_shop on fiila.shop_domains (shop_id, created_at desc);
 revoke all on fiila.shop_domains from public;
 
 insert into fiila.settings (key, value) values ('custom_domains', '1') on conflict (key) do nothing;
+insert into fiila.settings (key, value) values ('shop_subdomains', '1') on conflict (key) do nothing;
 
 -- Nom d'hôte normalisé (minuscules, sans protocole ni chemin ni port ni point final), ou null s'il est inacceptable.
 create or replace function fiila.domain_norm(p text) returns text
@@ -40,7 +43,7 @@ begin
   h := regexp_replace(h, '\.$', '');
   if h = '' or char_length(h) > 253 or h !~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$' then return null; end if;
   if h ~ '^[0-9.]+$' then return null; end if;                                         -- adresse IP
-  if h ~ '(^|\.)(fiila\.app|fii-la\.com|github\.io|supabase\.co|workers\.dev|localhost|local|test|example|invalid)$' then return null; end if;
+  if h ~ '(^|\.)(fii\.app|fii\.com|fii\.shop|fiila\.app|fii-la\.com|github\.io|supabase\.co|workers\.dev|localhost|local|test|example|invalid)$' then return null; end if;
   if h !~ '\.[a-z]{2,63}$' then return null; end if;                                    -- extension alphabétique
   return h;
 end $$;
@@ -150,8 +153,16 @@ end $$;
 -- la boutique Premium, en ligne et non suspendue. Rien d'autre n'est renvoyé.
 create or replace function public.fiila_domain_resolve(p_host text) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
-declare h text := fiila.domain_norm(p_host); r record;
+declare h text := fiila.domain_norm(p_host); r record; v_sub text;
 begin
+  -- <lien>.fii.shop : toute boutique en ligne et non suspendue (le lien de la boutique, en minuscules).
+  v_sub := substring(lower(trim(coalesce(p_host, ''))) from '^([a-z0-9]([a-z0-9-]{1,38}[a-z0-9]))\.fii\.shop\.?$');
+  if v_sub is not null then
+    if coalesce(fiila.setting_int('shop_subdomains'), 1) <> 1 then return jsonb_build_object('state', 'unknown'); end if;
+    select s.slug, s.name into r from fiila.shops s where s.slug = v_sub and s.public and s.suspended_at is null;
+    if not found then return jsonb_build_object('state', 'unknown'); end if;
+    return jsonb_build_object('state', 'ok', 'slug', r.slug, 'name', r.name, 'host', v_sub || '.fii.shop');
+  end if;
   if h is null or coalesce(fiila.setting_int('custom_domains'), 1) <> 1 then return jsonb_build_object('state', 'unknown'); end if;
   select s.slug, s.name into r from fiila.shop_domains d join fiila.shops s on s.id = d.shop_id
    where d.hostname = h and d.status = 'active' and s.plan = 'premium' and s.public and s.suspended_at is null and s.slug is not null;
@@ -203,11 +214,11 @@ begin
   select pg_get_functiondef('fiila.bo_setting_bounds(text)'::regprocedure) into v_def;
   v_new := replace(v_def, $s$when 'sugg_addr_photo' then array[0, 1] when 'sugg_addr_mark' then array[0, 1] end$s$,
     $s$when 'sugg_addr_photo' then array[0, 1] when 'sugg_addr_mark' then array[0, 1]
-    when 'custom_domains' then array[0, 1] end$s$);
+    when 'custom_domains' then array[0, 1] when 'shop_subdomains' then array[0, 1] end$s$);
   if v_new = v_def then raise exception 'shop_domains: bo_setting_bounds non modifiée'; end if;
   execute v_new;
   select pg_get_functiondef('public.fiila_bo_settings()'::regprocedure) into v_def;
-  v_new := replace(v_def, $s$'sugg_addr_photo', 'sugg_addr_mark']$s$, $s$'sugg_addr_photo', 'sugg_addr_mark', 'custom_domains']$s$);
+  v_new := replace(v_def, $s$'sugg_addr_photo', 'sugg_addr_mark']$s$, $s$'sugg_addr_photo', 'sugg_addr_mark', 'custom_domains', 'shop_subdomains']$s$);
   if v_new = v_def then raise exception 'shop_domains: fiila_bo_settings non modifiée'; end if;
   execute v_new;
 end $$;

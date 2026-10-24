@@ -3,6 +3,7 @@
 //   - domaine principal (FII_HOSTS) : l'application complète ; www.<principal> renvoie vers le principal ;
 //   - domaine de boutique vérifié et actif (fiila_domain_resolve) : le site de cette boutique seulement (la page porte
 //     <meta name="fii-site">, l'application démarre alors en mode « site » : vitrine, panier, commande, facture) ;
+//   - <lien>.fii.shop (SHOP_ZONE) : le site de la boutique au lien correspondant ; fii.shop et www.fii.shop → domaine principal ;
 //   - tout autre hôte : « Site introuvable », sans l'application ni aucune donnée.
 // La page HTML d'un domaine de boutique n'est jamais mise en cache partagé ; la correspondance hôte → boutique est gardée
 // 60 secondes, indexée par nom d'hôte. Aucun secret ici : SUPABASE_ANON_KEY est la clé publique déjà servie par config.js.
@@ -71,6 +72,8 @@ export async function handle(req, env, deps = {}) {
   const url = new URL(req.url), host = url.hostname.toLowerCase(), path = url.pathname;
   const hosts = hostsOf(env), canonical = String(env.CANONICAL_HOST || '').toLowerCase();
   if (canonical && host === 'www.' + canonical) return Response.redirect(`https://${canonical}${path}${url.search}`, 301);
+  const zone = String(env.SHOP_ZONE || '').toLowerCase();
+  if (zone && canonical && (host === zone || host === 'www.' + zone)) return Response.redirect(`https://${canonical}/`, 301);
   const isMain = hosts.includes(host) || host.endsWith('.workers.dev');
   if (isMain) {
     if (path === '/' || path === '/index.html') {

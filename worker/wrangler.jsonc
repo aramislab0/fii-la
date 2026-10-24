@@ -14,11 +14,13 @@
     "not_found_handling": "none"
   },
   "vars": {
-    "FII_HOSTS": "fiila.app",
-    "CANONICAL_HOST": "fiila.app",
+    "FII_HOSTS": "fii.app",
+    "CANONICAL_HOST": "fii.app",
+    "SHOP_ZONE": "fii.shop",
     "LEGACY_PREFIX": "https://aramislab0.github.io/fii-la/",
     "SUPABASE_URL": "https://lkvulwocirttozfnyxck.supabase.co",
     "SUPABASE_ANON_KEY": "REMPLACÉ_PAR_LA_CI"
   }
-  // Routes (à la bascule) : fiila.app/* , www.fiila.app/* et */* (domaines des boutiques, Cloudflare for SaaS).
+  // Routes (à la bascule) : fii.app/*, www.fii.app/* ; fii.shop/*, *.fii.shop/* (sites des boutiques) ; */* (domaines propres,
+  // Cloudflare for SaaS sur la zone fii.shop, cible sites.fii.shop). Domaine principal : fii.app, ou fii.com si acquis (à confirmer).
 }

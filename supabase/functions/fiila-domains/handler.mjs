@@ -8,8 +8,8 @@
 // Les enregistrements affichés à la boutique sont ceux que Cloudflare renvoie, plus le CNAME vers la cible : rien n'est inventé.
 // Secrets (Supabase → Edge Functions → Secrets, saisis par le fondateur ; jamais dans le dépôt) :
 //   CF_API_TOKEN      jeton d'API limité à la zone (Custom Hostnames et SSL : édition)
-//   CF_ZONE_ID        identifiant de la zone du domaine principal
-//   CF_SAAS_TARGET    cible du CNAME des boutiques, par exemple sites.fiila.app
+//   CF_ZONE_ID        identifiant de la zone des sites (fii.shop)
+//   CF_SAAS_TARGET    cible du CNAME des boutiques : sites.fii.shop
 // Sans ces secrets : { configured: false } et la demande reste « en attente » (rien n'est envoyé nulle part).
 // SUPABASE_URL, SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase.
 

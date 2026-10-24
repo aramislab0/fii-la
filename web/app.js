@@ -1980,6 +1980,8 @@
     bordeaux: ['Bordeaux', '#7A1F3D'], terre: ['Terre', '#8A4B1F'] };
   function vitrineUrl(slug, productId) {
     if (SITE && slug === SITE.slug) return 'https://' + SITE.host + '/#/b/' + slug + (productId ? '?a=' + productId : '');
+    // Adresse courte de la boutique (<lien>.fii.shop) dès que la zone des sites est en ligne (CFG.shopZone).
+    if (CFG.shopZone && /^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])$/.test(slug)) return 'https://' + slug + '.' + CFG.shopZone + '/#/b/' + slug + (productId ? '?a=' + productId : '');
     return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : '');
   }
   function viewVitrine(slug, q) {
@@ -2749,7 +2751,8 @@
           h('span', { class: 'look-ic', 'aria-hidden': 'true' }, icon('edit', 22)),
           h('span', { class: 'look-t' }, h('b', null, 'Personnaliser mon site'), h('small', null, 'Logo, modèle, couleur, couverture, réseaux')),
           h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 20))),
-        h('a', { class: 'irow', id: 'vitrine-domain', href: '#/boutique/domaine' },
+        // Visible seulement quand les domaines propres sont en service (CFG.domainsLive, posé à la mise en ligne de Cloudflare).
+        !CFG.domainsLive ? null : h('a', { class: 'irow', id: 'vitrine-domain', href: '#/boutique/domaine' },
           h('span', { class: 'irow-ic', 'aria-hidden': 'true' }, icon('globe', 20)),
           h('span', { class: 'irow-t' }, 'Mon domaine', h('small', { class: 'muted' }, state.plan === 'premium' ? 'www.maboutique.com' : 'Premium')),
           h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
@@ -9256,7 +9259,8 @@
     discover_after: ['Suggestion discrète après une action (commande, adresse envoyée, course)', '0 = non, 1 = oui'],
     wa_card_media: ['Carte image avec la demande d’adresse sur WhatsApp', '0 = texte seul, 1 = image + texte'],
     media_cdn: ['Photos servies par le stockage (adresse fixe, mise en cache)', '0 = servies par la base, 1 = stockage'],
-    custom_domains: ['Domaines propres des boutiques Premium (Site Pro)', '0 = coupés, 1 = ouverts'] };
+    custom_domains: ['Domaines propres des boutiques Premium (Site Pro)', '0 = coupés, 1 = ouverts'],
+    shop_subdomains: ['Adresses <lien>.fii.shop des boutiques', '0 = coupées, 1 = ouvertes'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

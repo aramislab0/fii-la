@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 let passed = 0, failed = 0;
 async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
 const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test', SUPABASE_SERVICE_ROLE_KEY: 'service-test' };
-const CF_ENV = { ...ENV, CF_API_TOKEN: 'cf-test', CF_ZONE_ID: 'zone1', CF_SAAS_TARGET: 'sites.fiila.app' };
+const CF_ENV = { ...ENV, CF_API_TOKEN: 'cf-test', CF_ZONE_ID: 'zone1', CF_SAAS_TARGET: 'sites.fii.shop' };
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
 const DOM = { id: 'd1', hostname: 'www.maison-awa.sn', status: 'pending', by: 'shop' };
 const CF_PENDING = { id: 'cf-1', hostname: 'www.maison-awa.sn', status: 'pending', ownership_verification: { type: 'txt', name: '_cf-custom-hostname.www.maison-awa.sn', value: 'abc' },
@@ -61,7 +61,7 @@ await t('fonction : crée le nom chez Cloudflare (validation HTTP, TLS 1.2), éc
   assert.equal(up.init.headers.Authorization, 'Bearer service-test');
   assert.equal(up.body.p.cf_id, 'cf-1'); assert.equal(up.body.p.cf_status, 'pending'); assert.equal(up.body.p.ssl_status, 'pending_validation');
   assert.deepEqual(up.body.p.records.map((x) => x.purpose), ['route', 'ownership', 'certificate']);
-  assert.equal(up.body.p.records[0].value, 'sites.fiila.app');
+  assert.equal(up.body.p.records[0].value, 'sites.fii.shop');
 });
 
 await t('fonction : nom déjà présent chez Cloudflare → reprise de l’entrée existante ; création refusée sans entrée → erreur lisible', async () => {
@@ -106,9 +106,9 @@ await t('enregistrements : seulement ceux renvoyés par Cloudflare ; erreurs reg
 
 // ------------------------------------------------------------------ Worker
 const HTML = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
-const WENV = { FII_HOSTS: 'fiila.app', CANONICAL_HOST: 'fiila.app', LEGACY_PREFIX: 'https://aramislab0.github.io/fii-la/', SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test',
+const WENV = { FII_HOSTS: 'fii.app', CANONICAL_HOST: 'fii.app', SHOP_ZONE: 'fii.shop', LEGACY_PREFIX: 'https://aramislab0.github.io/fii-la/', SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test',
   ASSETS: { fetch: async (r) => { const p = new URL(r.url).pathname; return p === '/index.html' ? new Response(HTML, { headers: { 'Content-Type': 'text/html' } }) : new Response('asset ' + p); } } };
-const SITES = { 'www.maison-awa.sn': { slug: 'maison-awa', name: 'Maison <Awa> & Co' }, 'shop.binta.sn': { slug: 'binta', name: 'Binta' } };
+const SITES = { 'www.maison-awa.sn': { slug: 'maison-awa', name: 'Maison <Awa> & Co' }, 'shop.binta.sn': { slug: 'binta', name: 'Binta' }, 'binta.fii.shop': { slug: 'binta', name: 'Binta' } };
 function wsim({ down = false } = {}) {
   const calls = [], store = new Map();
   const cache = { match: async (k) => { const v = store.get(k.url); return v ? new Response(v) : undefined; }, put: async (k, r) => { store.set(k.url, await r.text()); } };
@@ -123,13 +123,16 @@ const get = (u, d) => handle(new Request(u), WENV, d);
 
 await t('Worker : domaine principal → l’application, aperçus vers l’adresse canonique ; www → redirection 301', async () => {
   const w = wsim();
-  const r = await get('https://fiila.app/', w.deps);
+  const r = await get('https://fii.app/', w.deps);
   const body = await r.text();
   assert.equal(r.status, 200); assert.ok(!body.includes('aramislab0.github.io'), 'ancienne adresse remplacée');
   assert.ok(!body.includes('fii-site'));
-  assert.equal((await get('https://fiila.app/app.js', w.deps)).status, 200);
-  const red = await get('https://www.fiila.app/x?y=1', w.deps);
-  assert.equal(red.status, 301); assert.equal(red.headers.get('location'), 'https://fiila.app/x?y=1');
+  assert.equal((await get('https://fii.app/app.js', w.deps)).status, 200);
+  const red = await get('https://www.fii.app/x?y=1', w.deps);
+  assert.equal(red.status, 301); assert.equal(red.headers.get('location'), 'https://fii.app/x?y=1');
+  for (const z of ['https://fii.shop/', 'https://www.fii.shop/abc']) {
+    const rz = await get(z, w.deps); assert.equal(rz.status, 301); assert.equal(rz.headers.get('location'), 'https://fii.app/');
+  }
   assert.equal(w.calls.length, 0, 'le domaine principal ne consulte pas la base');
 });
 
@@ -150,6 +153,7 @@ await t('Worker : domaine de boutique → page au nom de la boutique (échappé)
   const meta = JSON.parse(/<meta name="fii-site" content="([^"]+)">/.exec(b)[1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
   assert.deepEqual(meta, { slug: 'maison-awa', name: 'Maison <Awa> & Co', host: 'www.maison-awa.sn' });
   assert.equal((await get('https://www.maison-awa.sn/sw.js', w.deps)).status, 404, 'pas de service worker');
+  assert.match(await (await get('https://binta.fii.shop/', w.deps)).text(), /<title>Binta<\/title>/, 'adresse <lien>.fii.shop');
   assert.equal((await get('https://www.maison-awa.sn/manifest.webmanifest', w.deps)).status, 404);
   assert.equal(await (await get('https://www.maison-awa.sn/styles.css', w.deps)).text(), 'asset /styles.css');
 });
@@ -168,7 +172,7 @@ await t('Worker : cache par nom d’hôte (aucun mélange entre boutiques) ; bas
 });
 
 await t('Worker : remplacement de l’ancienne adresse et page de site pures (fonctions exportées)', async () => {
-  assert.equal(mainIndex('<a href="https://aramislab0.github.io/fii-la/x">', WENV), '<a href="https://fiila.app/x">');
+  assert.equal(mainIndex('<a href="https://aramislab0.github.io/fii-la/x">', WENV), '<a href="https://fii.app/x">');
   const s = siteIndex('<head><title>Fii</title></head>', { slug: 'a', name: 'A"B', host: 'a.sn' });
   assert.match(s, /<title>A&quot;B<\/title>/); assert.match(s, /og:url" content="https:\/\/a.sn\/"/);
 });

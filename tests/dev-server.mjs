@@ -248,7 +248,7 @@ export async function startServer(port = 0) {
     }
     if (url.pathname === '/config.js') {
       res.writeHead(200, { 'Content-Type': 'text/javascript' });
-      return res.end(`window.FIILA_CONFIG={supabaseUrl:location.origin,supabaseKey:'local-test-key',publicUrl:''};`);
+      return res.end(`window.FIILA_CONFIG={supabaseUrl:location.origin,supabaseKey:'local-test-key',publicUrl:'',domainsLive:true};`);
     }
     let path = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
     if (path.endsWith('/')) path += 'index.html';
