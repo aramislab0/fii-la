@@ -277,6 +277,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 24/10 18:05 | Domaines **en production sans effet visible** (variables vides) : migration appliquée, tests en production Chrome + Safari verts, dont `domains` sous Safari. 1ʳᵉ passe : un échec Safari sur `feed` (mode démo : 14 boutiques fictives visibles hors mode démo), sans lien avec les domaines, vert à la relance ; à surveiller s'il revient | run 40113965641 ; `95ffdf4` |
 | 24/10 17:10 | Domaines passés à `fii.app` + `fii.shop` : adresses `<lien>.fii.shop` (base, Worker, interrupteur `shop_subdomains`), liens partagés courts dès `SHOP_ZONE`, « Mon domaine » caché tant que `DOMAINS_LIVE` est vide ; tests 14/14, 12/12, 8/8 ; plan et guide v2 ; fusion dans `main` | voir commit |
 | 24/10 16:40 | Domaines : implémentation, tests (SQL 13/13, fonction + Worker 12/12, navigateur 7/7 Chrome ; toutes les suites SQL et navigateur relancées), guide d'exploitation et instructions DNS ; branche `domaines`, rien en production | branche `domaines` |
 | 23/10 16:10 | Correctif Publier (image seule) **en production**, Chrome + Safari verts après une relance (installation des navigateurs en échec sur GitHub, 3ᵉ fois aujourd'hui : à durcir si cela se répète) | run 39974543604 ; `3893f57` |
