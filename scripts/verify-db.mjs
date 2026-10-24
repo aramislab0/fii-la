@@ -35,6 +35,8 @@ const EXPECTED_FUNCTIONS = [
   'fiila_bo_media',
   // Ma boutique → Marketing (20261022300000)
   'fiila_shop_stats',
+  // domaine propre d'une boutique (20261024100000) — fiila_domain_cf_update : clé de service seulement
+  'fiila_domains', 'fiila_domain_add', 'fiila_domain_remove', 'fiila_domain_target', 'fiila_domain_resolve', 'fiila_bo_domains', 'fiila_bo_domain_action',
 ].sort();
 const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();

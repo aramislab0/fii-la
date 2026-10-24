@@ -8,6 +8,18 @@
   var API_URL = (CFG.supabaseUrl || '').replace(/\/$/, '');
   var API_KEY = CFG.supabaseKey || '';
   var app = document.getElementById('app');
+  /* Domaines (docs/PLAN-DOMAINES-FII.md) :
+     - SITE : la page sert le site d'une boutique sur son propre domaine (balise fii-site posée par le Worker, après
+       vérification du domaine). Seuls sa vitrine, sa commande et sa facture s'affichent ; tout le reste part sur le domaine
+       principal. Aucune clé de gestion n'est créée ni lue sur ce domaine.
+     - CFG.appHosts : noms d'hôte où l'application complète a le droit de tourner. Ailleurs, sans balise fii-site :
+       « Site introuvable » (défense en profondeur, en plus du Worker). Absent : aucune restriction (dev, tests, aujourd'hui). */
+  var SITE = (function () {
+    try { var m = document.querySelector('meta[name="fii-site"]'); var v = m && JSON.parse(m.getAttribute('content'));
+      return v && /^[a-z0-9-]{3,40}$/.test(v.slug || '') ? v : null; } catch (e) { return null; }
+  })();
+  var APP_HOSTS = Array.isArray(CFG.appHosts) && CFG.appHosts.length ? CFG.appHosts : null;
+  function mainUrl() { return (CFG.publicUrl || (location.origin + location.pathname)).replace(/\/?$/, '/'); }
 
   /* ================================================================ outils DOM */
   function h(tag, props) {
@@ -74,6 +86,8 @@
   }
   // Pied de page : complet sur les écrans de gestion ; réduit sur les pages reçues par lien.
   function footer(minimal) {
+    if (SITE) return h('footer', { class: 'foot foot-min' }, h('div', { class: 'foot-links' },
+      h('a', { href: mainUrl() + '#/confidentialite', target: '_blank', rel: 'noopener' }, 'Confidentialité')));
     if (minimal) return h('footer', { class: 'foot foot-min' },
       h('div', { class: 'foot-links' }, h('a', { href: '#/', class: 'foot-brand' }, 'Fii'), h('a', { href: '#/confidentialite' }, 'Données et confidentialité')));
     return h('footer', { class: 'foot' },
@@ -93,6 +107,7 @@
     return h('span', { class: 'logo' + (size ? ' ' + size : ''), role: named ? 'img' : null, 'aria-label': named ? (label || 'Fii') : null, 'aria-hidden': named ? null : 'true' });
   }
   function brandBar(kind) {
+    if (SITE) return h('div', { class: 'brand-bar site-bar' }); // Site Pro : aucune marque Fii
     return h('div', { class: 'brand-bar' }, brandLogo('small'), kind ? h('span', { class: 'brand-kind' }, kind) : null);
   }
   var STATE_ICONS = { '?': 'help', '!': 'alert', '⦸': 'ban', '⌛': 'hourglass', '✓': 'check' };
@@ -281,6 +296,10 @@
     ambassador_has_payouts: 'Cet agent a déjà reçu un versement : la trace doit rester. Excluez-le plutôt.',
     payout_unverified: 'Numéro de versement pas encore confirmé par code SMS : aucun versement possible.',
     reason_required: 'Indiquez un motif.',
+    domain_invalid: 'Nom de domaine non valide. Exemple : www.maboutique.com',
+    domain_taken: 'Ce domaine est déjà relié à une boutique.',
+    domain_limit: 'Deux domaines au plus par boutique.',
+    domains_off: 'Les domaines propres sont indisponibles pour le moment.',
     vd_photo_rule: 'Confirmez qu’aucune personne n’est reconnaissable sur la photo.',
     vd_photo_required: 'Ajoutez une photo de l’article.',
     vd_category_required: 'Choisissez la catégorie de l’article.',
@@ -365,6 +384,10 @@
     invalid_value: 'Valeur hors des limites autorisées.',
     invalid_setting: 'Réglage inconnu.',
     reason_required: 'Indiquez un motif.',
+    domain_invalid: 'Nom de domaine non valide. Exemple : www.maboutique.com',
+    domain_taken: 'Ce domaine est déjà relié à une boutique.',
+    domain_limit: 'Deux domaines au plus par boutique.',
+    domains_off: 'Les domaines propres sont indisponibles pour le moment.',
     shop_suspended: 'Votre boutique est suspendue par l’équipe Fii. Contactez-nous pour la réactiver.',
     invite_invalid: 'Invitation expirée, annulée ou déjà utilisée.',
     invite_email_mismatch: 'Cette invitation a été créée pour une autre adresse e-mail.',
@@ -1955,7 +1978,10 @@
     ['magazine', 'Magazine', 'Une grande photo par article']];
   var VT_ACCENTS = { foret: ['Forêt', '#1E4A34'], nuit: ['Nuit', '#1F2A37'], indigo: ['Indigo', '#2F3E9E'], prune: ['Prune', '#5B2A86'],
     bordeaux: ['Bordeaux', '#7A1F3D'], terre: ['Terre', '#8A4B1F'] };
-  function vitrineUrl(slug, productId) { return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : ''); }
+  function vitrineUrl(slug, productId) {
+    if (SITE && slug === SITE.slug) return 'https://' + SITE.host + '/#/b/' + slug + (productId ? '?a=' + productId : '');
+    return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : '');
+  }
   function viewVitrine(slug, q) {
     if (!/^[a-z0-9-]{3,40}$/.test(slug)) return page(brandBar('Boutique'), stateCard('?', 'Site introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
     return api('fiila_vitrine', { p_slug: slug }).then(function (r) {
@@ -2723,10 +2749,86 @@
           h('span', { class: 'look-ic', 'aria-hidden': 'true' }, icon('edit', 22)),
           h('span', { class: 'look-t' }, h('b', null, 'Personnaliser mon site'), h('small', null, 'Logo, modèle, couleur, couverture, réseaux')),
           h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 20))),
+        h('a', { class: 'irow', id: 'vitrine-domain', href: '#/boutique/domaine' },
+          h('span', { class: 'irow-ic', 'aria-hidden': 'true' }, icon('globe', 20)),
+          h('span', { class: 'irow-t' }, 'Mon domaine', h('small', { class: 'muted' }, state.plan === 'premium' ? 'www.maboutique.com' : 'Premium')),
+          h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))),
         err, feedBox);
     }
     draw();
     return box;
+  }
+  /* ----- Mon domaine (Site Pro, docs/PLAN-DOMAINES-FII.md §4) : relier www.maboutique.com à son site.
+     Les enregistrements affichés sont ceux renvoyés par Cloudflare (fonction fiila-domains) : rien n'est inventé. */
+  var DOMAIN_ST = { pending: ['wait', 'En attente du DNS'], verifying: ['wait', 'Vérification'], active: ['ok', 'Actif'], failed: ['off', 'Erreur'] };
+  function domainCall(action, id) {
+    return freshToken().then(function () {
+      return fetch(API_URL + '/functions/v1/fiila-domains', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ action: action, id: id, key: shopKey() }) });
+    }).then(function (r) { return r.json().catch(function () { return {}; }); }, function () { return {}; });
+  }
+  function viewShopDomain() {
+    var back = backBtn('Réglages', '#/boutique/reglages');
+    return sapi('fiila_domains', {}).then(function (r) {
+      var box = h('div', { class: 'stack', id: 'domain-box' }), err = h('div', { role: 'alert' });
+      function draw() {
+        if (r.plan !== 'premium') {
+          setKids(box, h('section', { class: 'card stack tight', id: 'domain-premium' }, h('span', { class: 'chip neutral' }, icon('lock', 12), 'Premium'),
+            h('p', null, 'Votre site sur votre propre adresse, sans la marque Fii.'),
+            h('a', { class: 'btn ghost', href: '#/boutique/vitrine' }, 'Voir le Premium')));
+          return;
+        }
+        if (!r.enabled) { setKids(box, stateCard('⦸', 'Indisponible pour le moment', 'Réessayez plus tard.')); return; }
+        var live = r.domains || [];
+        setKids(box, live.map(card), live.length < 2 && r.can_edit ? addForm(live.length) : null, err);
+      }
+      function addForm(n) {
+        var val = '';
+        var btn = h('button', { class: 'btn', type: 'button', id: 'domain-add', onclick: function () {
+          setKids(err); btn.disabled = true;
+          sapi('fiila_domain_add', { p_host: val }).then(function (d) { r.domains = [d].concat(r.domains || []); draw(); check(d); },
+            function (e) { btn.disabled = false; errBox(err, e); });
+        } }, 'Relier');
+        return h('section', { class: 'card stack tight', id: 'domain-form' },
+          textField({ id: 'domain-in', label: n ? 'Autre nom' : 'Votre domaine', placeholder: 'www.maboutique.com', autocomplete: 'off', inputmode: 'url', max: 253,
+            onInput: function (v) { val = v; } }), btn);
+      }
+      function check(d, btn) {
+        if (btn) btn.disabled = true;
+        domainCall('sync', d.id).then(function (x) {
+          var nd = Object.assign({}, d, x.domain || {}, x.configured === false ? { notReady: true } : {});
+          r.domains = (r.domains || []).map(function (y) { return y.id === d.id ? nd : y; });
+          draw();
+        });
+      }
+      function card(d) {
+        var st = DOMAIN_ST[d.status] || ['wait', d.status];
+        var recs = (d.records || []).length ? d.records : [];
+        var rows = recs.map(function (x, i) {
+          return h('tr', null, h('td', null, h('b', null, x.type)), h('td', { class: 'wrapword' }, x.name),
+            h('td', { class: 'wrapword' }, h('code', { id: 'domain-val-' + i }, x.value)),
+            h('td', null, h('button', { class: 'btn link small', type: 'button', 'aria-label': 'Copier', onclick: function () { copy(x.value, 'Valeur'); } }, icon('copy', 16))));
+        });
+        var chk = h('button', { class: 'btn ghost small', type: 'button', id: 'domain-check', onclick: function () { check(d, chk); } }, icon('clock', 16), h('span', null, 'Vérifier'));
+        return h('section', { class: 'card stack tight domain-card', id: 'domain-' + d.id },
+          h('div', { class: 'brand-row' }, h('b', { class: 'wrapword', style: 'font-size:18px' }, d.hostname), h('span', { class: 'chip ' + st[0], id: 'domain-status' }, st[1])),
+          d.status === 'active' ? h('a', { class: 'sharelink', href: 'https://' + d.hostname + '/', target: '_blank', rel: 'noopener' }, 'https://' + d.hostname) : null,
+          d.status !== 'active' ? (rows.length ? h('table', { class: 'inv domain-recs', id: 'domain-recs' },
+            h('thead', null, h('tr', null, h('th', null, 'Type'), h('th', null, 'Nom'), h('th', null, 'Valeur'), h('th', null, ''))), h('tbody', null, rows))
+            : h('p', { class: 'small muted', id: 'domain-wait' }, d.notReady ? 'Mise en service prochainement : les enregistrements à ajouter s’afficheront ici.' : 'Préparation des enregistrements…')) : null,
+          d.apex && d.status !== 'active' ? h('p', { class: 'hint' }, 'Sans « www » : votre DNS doit accepter un CNAME à la racine. Sinon, reliez plutôt www.') : null,
+          d.last_error ? h('p', { class: 'small', style: 'color:var(--danger)' }, d.last_error) : null,
+          r.can_edit ? h('div', { class: 'row' }, d.status !== 'active' ? chk : null,
+            h('button', { class: 'btn quiet danger-text small', type: 'button', id: 'domain-remove', onclick: function () {
+              if (window.confirm && !window.confirm('Déconnecter ' + d.hostname + ' ? Votre site restera à son adresse Fii.')) return;
+              sapi('fiila_domain_remove', { p_id: d.id }).then(function () {
+                domainCall('cleanup', d.id); r.domains = r.domains.filter(function (y) { return y.id !== d.id; }); toast('Domaine déconnecté.'); draw();
+              }, function (e) { errBox(err, e); });
+            } }, 'Déconnecter')) : null);
+      }
+      draw();
+      (r.domains || []).filter(function (d) { return d.status !== 'active'; }).forEach(function (d) { check(d); });
+      return shopTabs(page(back, secHead('settings', 'globe', 'Mon domaine'), box, footer()), 'settings');
+    }, failPage('Impossible de charger le domaine', 'boutique/domaine'));
   }
   // Logo de la boutique : carré aux bords arrondis ; l'initiale quand il n'y a pas de logo.
   function shopLogo(shop, cls) {
@@ -3282,6 +3384,7 @@
     setTimeout(render, 0);
   }
   function render() {
+    if (siteGate()) return;
     var seq = ++renderSeq;
     document.documentElement.removeAttribute('data-vt'); // palette d'un modèle de vitrine premium : seulement sur la vitrine
     stopMedia();
@@ -3293,6 +3396,7 @@
       if (!p.length) view = viewHome();
       else if (p[0] === 'r' && p[1]) { try { history.replaceState(null, '', location.pathname + location.search + '#/'); } catch (e) { /* rien */ } checkTouchCode(); view = viewHome(); }
       else if (p[0] === 'parrainer') view = viewReferral(r.q);
+      else if (p[0] === 'migrer') view = viewMigrate();
       else if (p[0] === 'bo') view = viewBo(p, r.q);
       // Anciennes adresses d'administration : elles mènent au back-office.
       else if (p[0] === 'stats' || (p[0] === 'admin' && p[1])) { var boSec = p[0] === 'stats' ? 'croissance' : p[1] === 'ambassadeurs' ? 'agents' : p[1]; try { history.replaceState(null, '', location.pathname + location.search + '#/bo/' + boSec); } catch (e) { /* rien */ } view = viewBo(['bo', boSec], r.q); }
@@ -3322,6 +3426,7 @@
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'marketing') view = viewShopMarketing(r.q || {});
       else if (p[0] === 'boutique' && p[1] === 'vitrine') view = viewVitrineLook();
+      else if (p[0] === 'boutique' && p[1] === 'domaine') view = viewShopDomain();
       else if (p[0] === 'boutique' && p[1] === 'demarrer') view = viewShopSetup();
       else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
@@ -3370,6 +3475,22 @@
     focusNext = true;
     render();
   });
+  // Mode « site » (domaine d'une boutique) et domaines non reconnus : décidé avant tout affichage.
+  function siteGate() {
+    var p = parseHash().parts;
+    if (SITE) {
+      if (!p.length || (p[0] === 'b' && p[1] !== SITE.slug) || p[0] === 'r') { redirect('#/b/' + SITE.slug); return true; }
+      if ((p[0] === 'b' && p[1] === SITE.slug) || (p[0] === 'f' && p[1])) return false;
+      // Tout le reste (adresse de livraison, compte, gestion…) se fait sur le domaine principal, au même écran.
+      // Garde-fou : sans adresse principale distincte (configuration incomplète), on reste sur la vitrine plutôt que de boucler.
+      if (mainUrl().indexOf(location.origin + '/') === 0) { redirect('#/b/' + SITE.slug); return true; }
+      location.replace(mainUrl() + location.hash); return true;
+    }
+    if (APP_HOSTS && APP_HOSTS.indexOf(location.hostname) < 0) {
+      setKids(app, h('div', { class: 'wrap' }, stateCard('?', 'Site introuvable', 'Cette adresse n’est reliée à aucune boutique.'))); return true;
+    }
+    return false;
+  }
   function parentOf(parts, q) {
     var a = parts[0], b = parts[1];
     if (!a) return null;
@@ -3405,6 +3526,7 @@
     }
     var prev = NAV.length ? NAV[NAV.length - 1] : null;
     var bar = node.querySelector('.brand-bar');
+    if (SITE) return; // site d'une boutique : ni logo Fii ni retour vers l'application
     // Pages reçues par lien : le logo ramène à l'accueil ; une flèche apparaît si l'on vient d'un autre écran de l'application.
     if (bar) {
       var mark = bar.querySelector('.logo');
@@ -3867,6 +3989,8 @@
      sinon une simple copie du lien, nommée comme telle ; aucun message prérempli, aucun SDK.
      Instagram / TikTok : pas de partage de lien par URL ; image verticale + lien à copier + consigne honnête. */
   var ICONS = {
+    globe: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3.5 9h17M3.5 15h17M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9s1.2-6.4 3.7-9Z',
+    copy: 'M9 9h10v12H9zM5 15V3h10',
     tag: 'M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8a1.5 1.5 0 0 1 0 2.1l-6.9 6.9a1.5 1.5 0 0 1-2.1 0l-8-8ZM8 8h.01',
     whatsapp: 'M4 20l1.3-3.9A8 8 0 1 1 8.2 19L4 20ZM9.2 8.4c.2-.4.5-.4.8-.4l.6 1.4c.1.3 0 .5-.2.7l-.4.5c.6 1.1 1.4 1.9 2.5 2.5l.5-.4c.2-.2.4-.3.7-.2l1.4.6c0 .3 0 .6-.4.8-.9.7-2.3.6-4-.7-1.7-1.3-2.4-3-1.5-4.8Z',
     telegram: 'M21 4 3 11l6 2 2 6 3-4 5 4 2-15ZM9 13l9-6-7 8',
@@ -7719,6 +7843,7 @@
     ['finances', 'cash', 'Finances', 'finance', null, 'Pilotage'],
     ['boutiques', 'shop', 'Boutiques', 'shops', 'suspended', 'Opérations'],
     ['commandes', 'box', 'Commandes', 'orders', null, 'Opérations'],
+    ['domaines', 'globe', 'Domaines', 'shops', null, 'Opérations'],
     ['comptes', 'user', 'Comptes', 'accounts', null, 'Opérations'],
     ['fil', 'heart', 'Fil (25 places)', 'feed', null, 'Opérations'],
     ['ambassadeurs', 'star', 'Ambassadeurs', 'partners', null, 'Programmes'],
@@ -7982,6 +8107,7 @@
           case '': return boDashboard();
           case 'boutiques': return id ? boShop(id) : boShops(q);
           case 'commandes': return id ? boOrder(id) : boOrders(q);
+          case 'domaines': return boDomains();
           case 'comptes': return id ? boAccount(id) : boAccounts(q);
           case 'moderation': return boEmbed(viewAdminComments).then(function (b) { return boShell(sec, 'Modération', b); });
           case 'vide-dressing': return boEmbed(viewAdminVd).then(function (b) { return boShell(sec, 'Vide-dressing', b); });
@@ -8187,6 +8313,41 @@
     function drawChips() { if (chips) setKids(chips, boChips(filters, st.f, function (v) { st.f = v; drawChips(); load(true); }, 'bo-filters')); }
     drawChips(); load(true);
     return boShell(sec, title, [h('div', { class: 'bo-tools' }, boSearch(st.q, placeholder, function (v) { st.q = v; load(true); }), chips), box, more]);
+  }
+  // ----- Domaines des boutiques (Site Pro) : nom d'hôte, boutique, statut de vérification et de certificat, erreur ;
+  // revérifier (fonction fiila-domains) et déconnecter avec motif (journal). docs/PLAN-DOMAINES-FII.md §4.
+  function boDomains() {
+    return api('fiila_bo_domains', {}).then(function (d) {
+      var ST = { pending: ['warn', 'En attente du DNS'], verifying: ['warn', 'Vérification'], active: ['ok', 'Actif'], failed: ['danger', 'Erreur'],
+        expired: ['muted', 'Expiré'], disconnected: ['muted', 'Déconnecté'] };
+      var reason = h('input', { type: 'text', id: 'bo-dom-reason', maxlength: 200, placeholder: 'Motif (journal)' });
+      return boShell('domaines', 'Domaines', [
+        d.enabled ? null : h('p', { class: 'notice' }, 'Domaines propres coupés (Réglages → custom_domains).'),
+        h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif d’une déconnexion'), reason),
+        boTable([
+          { label: 'Domaine', get: function (x) { return h('span', { class: 'stack tight', style: 'gap:0' }, h('b', { class: 'wrapword' }, x.hostname), x.last_error ? h('small', { style: 'color:var(--danger)' }, x.last_error) : null); } },
+          { label: 'Boutique', get: function (x) { return h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop + (x.plan === 'premium' ? '' : ' (gratuit)')); } },
+          { label: 'Statut', get: function (x) { var t = ST[x.status] || ['muted', x.status]; return boBadge(t[0], t[1]); } },
+          { label: 'Certificat', get: function (x) { return x.ssl_status || '—'; }, cls: 'hide-s' },
+          { label: 'Depuis', get: function (x) { return boDate(x.verified_at || x.created_at); }, cls: 'hide-s' },
+          { label: '', get: function (x) {
+            if (['pending', 'verifying', 'active', 'failed'].indexOf(x.status) < 0) return x.ended_reason || '';
+            return h('span', { class: 'row', style: 'gap:6px' },
+              h('button', { class: 'btn ghost small', type: 'button', onclick: function () {
+                var b = this; b.disabled = true;
+                freshToken().then(function () { return fetch(API_URL + '/functions/v1/fiila-domains', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ action: 'sync', id: x.id }) }); })
+                  .then(function (r) { return r.json(); }).then(function (o) { toast(o.configured === false ? 'Cloudflare pas encore relié.' : 'Revérifié.'); render(); }, function () { b.disabled = false; toast('Vérification impossible.'); });
+              } }, 'Revérifier'),
+              boCan('shops_write') ? h('button', { class: 'btn quiet danger-text small', type: 'button', onclick: function () {
+                if (!reason.value.trim()) { toast('Indiquez un motif.'); reason.focus(); return; }
+                boAct(function () { return api('fiila_bo_domain_action', { p_id: x.id, p_action: 'disconnect', p_reason: reason.value }); }, 'Domaine déconnecté.', function () {
+                  freshToken().then(function () { return fetch(API_URL + '/functions/v1/fiila-domains', { method: 'POST', headers: apiHeaders(), body: JSON.stringify({ action: 'cleanup', id: x.id }) }); }).catch(function () {});
+                  render();
+                }, null, this);
+              } }, 'Déconnecter') : null);
+          } }], d.domains, { id: 'bo-domains', empty: 'Aucun domaine relié pour le moment.' })
+      ]);
+    }, function (e) { return boShell('domaines', 'Domaines', stateCard('!', 'Chargement impossible', errText(e))); });
   }
   function boShops(q) {
     return boList('boutiques', 'Boutiques', 'fiila_bo_shops', function (st) { return { p_q: st.q || null, p_filter: st.f || null }; }, 'shops', [
@@ -9083,7 +9244,7 @@
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’agent versé',
     reward_cancelled: 'a annulé un gain d’agent', reward_validated: 'a validé un gain d’agent', ambassador_active: 'a activé un agent',
-    ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
+    domain_disconnect: 'a déconnecté le domaine', ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
     view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique',
     career_reply: 'a répondu à l’agent', career_objective: 'a fixé le cap du mois :', career_mission: 'a modifié la mission', career_note_accepted: 'a accepté la proposition du Manager', career_note_rejected: 'a écarté la proposition du Manager' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain agent, niveau 1', 'FCFA'], amb_reward_2: ['Gain agent, niveau 2', 'FCFA'],
@@ -9094,7 +9255,8 @@
     onboarding_v2: ['Nouvel accueil (mes activités, « Découvrir les services »)', '1 = nouvel accueil, 0 = ancien'],
     discover_after: ['Suggestion discrète après une action (commande, adresse envoyée, course)', '0 = non, 1 = oui'],
     wa_card_media: ['Carte image avec la demande d’adresse sur WhatsApp', '0 = texte seul, 1 = image + texte'],
-    media_cdn: ['Photos servies par le stockage (adresse fixe, mise en cache)', '0 = servies par la base, 1 = stockage'] };
+    media_cdn: ['Photos servies par le stockage (adresse fixe, mise en cache)', '0 = servies par la base, 1 = stockage'],
+    custom_domains: ['Domaines propres des boutiques Premium (Site Pro)', '0 = coupés, 1 = ouverts'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {
@@ -9299,11 +9461,90 @@
   // Service worker : coquille de l'application disponible hors ligne, condition d'installation.
   // Il ne met jamais en cache les appels à l'API ni le contenu des fiches.
   try {
-    if ('serviceWorker' in navigator && CFG.serviceWorker !== false &&
+    if ('serviceWorker' in navigator && CFG.serviceWorker !== false && !SITE &&
         (location.protocol === 'https:' || location.hostname === '127.0.0.1' || location.hostname === 'localhost')) {
       window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () { /* facultatif */ }); });
     }
   } catch (e) { /* facultatif */ }
 
-  authBoot.then(render, render);
+  /* ================================================================ changement de domaine principal
+     docs/PLAN-DOMAINES-FII.md §5. Les clés de gestion vivent dans le navigateur, par origine : la nouvelle adresse ne voit
+     pas celles de l'ancienne. L'ancienne adresse (CFG.movedTo) transmet les données locales de Fii à la nouvelle par un
+     message direct entre deux fenêtres, origines vérifiées des deux côtés ; jamais dans une adresse, un journal ou une mesure.
+     Les sessions de connexion ne sont pas transmises. Rien n'est effacé sur l'ancienne adresse (retour arrière possible). */
+  var MIGRATE_SKIP = /^fiila\.(session|pkce|flags|visits|moved|ret\.s|install\.)/;
+  function originOf(u) { try { return new URL(u).origin; } catch (e) { return null; } }
+  function localFiiData() {
+    var out = {};
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf('fiila.') === 0 && !MIGRATE_SKIP.test(k)) out[k] = localStorage.getItem(k); } } catch (e) { /* rien */ }
+    return out;
+  }
+  // Fusion à l'arrivée : la liste des fiches est réunie ; une valeur déjà présente ici n'est jamais écrasée.
+  function mergeFiiData(data) {
+    var n = 0;
+    Object.keys(data || {}).forEach(function (k) {
+      var v = data[k];
+      if (typeof k !== 'string' || k.indexOf('fiila.') !== 0 || MIGRATE_SKIP.test(k) || typeof v !== 'string' || v.length > 2e6) return;
+      try {
+        if (k === 'fiila.owned') {
+          var mine = LS.get('fiila.owned', []), theirs = JSON.parse(v);
+          if (!Array.isArray(theirs)) return;
+          theirs.forEach(function (r) { if (r && r.type && r.id && !mine.some(function (m) { return m.type === r.type && m.id === r.id; })) { mine.push(r); n++; } });
+          LS.set('fiila.owned', mine);
+        } else if (localStorage.getItem(k) == null) { localStorage.setItem(k, v); n++; }
+      } catch (e) { /* valeur illisible : ignorée */ }
+    });
+    return n;
+  }
+  // Ancienne adresse : renvoi immédiat s'il n'y a rien à emporter, sinon un seul bouton « Continuer ».
+  function legacyMove() {
+    var target = CFG.movedTo && CFG.movedTo.replace(/\/?$/, '/'), tOrigin = originOf(target);
+    if (!target || !tOrigin || tOrigin === location.origin) return false;
+    var hash = location.hash || '#/';
+    var data = localFiiData(), keys = Object.keys(data).filter(function (k) { return k !== 'fiila.moved'; });
+    if (!keys.length || LS.get('fiila.moved', 0)) { location.replace(target + hash); return true; }
+    var status = h('p', { class: 'small muted', role: 'status', id: 'move-status' });
+    function done() { LS.set('fiila.moved', Date.now()); location.replace(target + hash); }
+    var btn = iconBtn('button', { class: 'btn big full', type: 'button', id: 'move-go', onclick: function () {
+      btn.disabled = true;
+      var w = window.open(target + '#/migrer', '_blank');
+      if (!w) { btn.disabled = false; status.textContent = 'Autorisez l’ouverture d’une fenêtre, puis touchez de nouveau « Continuer ».'; return; }
+      status.textContent = 'Transfert en cours…';
+      var timer = setTimeout(function () { btn.disabled = false; status.textContent = 'Le transfert n’a pas abouti. Touchez de nouveau « Continuer ».'; }, 20000);
+      window.addEventListener('message', function onMsg(e) {
+        if (e.origin !== tOrigin || e.source !== w || !e.data) return;
+        if (e.data.type === 'fii-migrate-ready') w.postMessage({ type: 'fii-migrate', data: data }, tOrigin);
+        if (e.data.type === 'fii-migrate-done') { clearTimeout(timer); window.removeEventListener('message', onMsg); done(); }
+      });
+    } }, 'chev', 'Continuer');
+    setKids(app, h('div', { class: 'wrap stack', id: 'move' },
+      h('div', { class: 'stack tight' }, brandLogo(''), h('h1', null, 'Fii change d’adresse')),
+      h('p', null, 'Vos fiches, votre boutique et vos réglages vous suivent sur ', h('strong', null, tOrigin.replace(/^https:\/\//, '')), '.'),
+      btn, status));
+    return true;
+  }
+  // Nouvelle adresse, écran #/migrer : reçoit les données de l'ancienne adresse (origines autorisées seulement).
+  function viewMigrate() {
+    var allowed = (Array.isArray(CFG.legacyOrigins) ? CFG.legacyOrigins : []).filter(Boolean);
+    var box = h('div', { class: 'stack', id: 'migrate' }, stateCard('⌛', 'Transfert de vos fiches', 'Un instant…'));
+    if (!window.opener || !allowed.length) {
+      setKids(box, stateCard('?', 'Rien à transférer', 'Ouvrez Fii depuis l’ancienne adresse pour retrouver vos fiches ici.', h('a', { class: 'btn', href: '#/' }, 'Accueil')));
+      return page(box, footer());
+    }
+    window.addEventListener('message', function onMsg(e) {
+      if (allowed.indexOf(e.origin) < 0 || e.source !== window.opener || !e.data || e.data.type !== 'fii-migrate') return;
+      window.removeEventListener('message', onMsg);
+      var n = mergeFiiData(e.data.data);
+      try { e.source.postMessage({ type: 'fii-migrate-done' }, e.origin); } catch (x) { /* rien */ }
+      track('migrate', n ? 'merged' : 'empty');
+      setKids(box, stateCard('✓', 'C’est fait', 'Vos fiches et votre boutique sont sur cette adresse.', h('a', { class: 'btn', href: '#/', id: 'migrate-home' }, 'Continuer')));
+      // L'ancienne fenêtre s'ouvre ensuite ici même : celle-ci, ouverte pour le transfert, se ferme.
+      setTimeout(function () { try { window.close(); } catch (x) { /* rien */ } }, 600);
+    });
+    allowed.forEach(function (o) { try { window.opener.postMessage({ type: 'fii-migrate-ready' }, o); } catch (x) { /* rien */ } });
+    return page(box, footer());
+  }
+  TRACKABLE.migrate = ['merged', 'empty'];
+
+  if (!legacyMove()) authBoot.then(render, render);
 })();

@@ -1,0 +1,24 @@
+// Fii — Worker Cloudflare (docs/PLAN-DOMAINES-FII.md). Pas encore en ligne : la mise en ligne attend le compte Cloudflare
+// d'Aramis Lab et l'accord du fondateur. Aucun secret ici (la clé Supabase est la clé publique, déjà servie par config.js).
+{
+  "name": "fii",
+  "main": "index.mjs",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "../web",
+    "binding": "ASSETS",
+    // Le Worker décide pour la page d'accueil et les fichiers propres à l'application ; « html_handling: none » et
+    // « not_found_handling: none » : aucune autre adresse ne renvoie la page, donc jamais l'application sur un domaine non vérifié.
+    "run_worker_first": ["/", "/index.html", "/sw.js", "/manifest.webmanifest"],
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "vars": {
+    "FII_HOSTS": "fiila.app",
+    "CANONICAL_HOST": "fiila.app",
+    "LEGACY_PREFIX": "https://aramislab0.github.io/fii-la/",
+    "SUPABASE_URL": "https://lkvulwocirttozfnyxck.supabase.co",
+    "SUPABASE_ANON_KEY": "REMPLACÉ_PAR_LA_CI"
+  }
+  // Routes (à la bascule) : fiila.app/* , www.fiila.app/* et */* (domaines des boutiques, Cloudflare for SaaS).
+}
