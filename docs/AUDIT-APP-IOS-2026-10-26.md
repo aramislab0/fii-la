@@ -49,14 +49,16 @@ L'audit a trouvé **8 défauts**, tous corrigés et couverts par des tests, dont
 - **Performance** sur un iPhone ancien (iPhone 8 ou SE).
 - **Liens universels** `https://fii.app` : ils demandent le domaine et le Team ID Apple.
 
-## 5. Optimisations proposées (non faites, par ordre de valeur)
+## 5. Optimisations — validées par le fondateur (26/10, 18:07), état
 
-1. **Notifications de commande** (nouvelle commande, adresse reçue). C'est ce qui fera rouvrir l'app. Coût : Firebase pour Android et une clé APNs Apple, plus une fonction serveur. Recommandé juste après les paiements.
-2. **Liens universels** dès `fii.app` acheté : la facture, la vitrine et le retour de paiement Wave s'ouvrent directement dans l'app.
-3. **Premier écran plus rapide.** `app.js` fait 501 Ko compressé dans l'app (757 Ko en source). Découper le back-office, qui n'est jamais utilisé dans l'app commerçant, gagnerait environ 30 %, à mesurer.
-4. **Publication plus rapide.** L'image passe aujourd'hui en base64 par le pont natif, soit 1 à 2 s avant la feuille de partage. On peut écrire le fichier directement.
-5. **Mode hors ligne des commandes** : garder la dernière liste lisible sans réseau.
-6. **Verrou Face ID**, en option, sur les clés de gestion d'une boutique à plusieurs.
+| # | Optimisation | État |
+|---|---|---|
+| 1 | **Notifications de commande** (nouvelle commande, adresse reçue) | **Après les paiements**, comme prévu. Il faudra un projet Firebase (Android) et une clé APNs (compte Apple Developer), à créer par le fondateur |
+| 2 | **Liens universels** `https://fii.app/…` ouverts dans l'app | **Préparé.** L'app déclare déjà `fii.app` (Android et iPhone). La CI écrit les fichiers de vérification dès que les variables `APPLE_TEAM_ID` et `ANDROID_CERT_SHA256` sont remplies. Le Worker sert le fichier iPhone en JSON (test). Actif quand `fii.app` sera en ligne |
+| 3 | Premier écran plus rapide (sortir le back-office) | **Mesuré, puis écarté pour l'instant.** Le back-office ne représente que 18 % du code (138 Ko sur 758), pas 30 % comme estimé. Dans l'app, le code est lu sur le téléphone, sans téléchargement : gain faible pour une refonte risquée. À revoir si un iPhone ancien montre un démarrage lent pendant la recette |
+| 4 | Publication plus rapide | **Écarté après analyse.** L'écriture de l'image et l'ouverture du partage partent dans la même fraction de seconde (journal natif) ; l'attente vient surtout d'iOS, qui prépare la feuille de partage. Rien d'utile à gagner côté Fii |
+| 5 | **Lecture hors ligne** | **Fait.** Sans réseau, la boutique, les commandes, une commande, les articles et les clients s'affichent dans leur dernière version, avec « Hors ligne : affichage du … à … ». Lecture seule, aucune écriture ; jamais copié dans la sauvegarde du téléphone ni transféré d'une adresse à l'autre ; effacé à la suppression de la boutique et à la déconnexion d'une boutique liée au compte. Aussi sur le web. Test `native` |
+| 6 | Verrou Face ID | **Plus tard, sur demande.** Utile seulement pour une boutique à plusieurs membres sur un même téléphone |
 
 ## 6. Méthode (reproductible)
 

@@ -76,6 +76,12 @@ export async function handle(req, env, deps = {}) {
   if (zone && canonical && (host === zone || host === 'www.' + zone)) return Response.redirect(`https://${canonical}/`, 301);
   const isMain = hosts.includes(host) || host.endsWith('.workers.dev');
   if (isMain) {
+    // Liens universels iPhone : fichier sans extension, servi en JSON (exigence d'Apple).
+    if (path === '/.well-known/apple-app-site-association') {
+      const r = await env.ASSETS.fetch(new Request(new URL(path, req.url), { method: 'GET' }));
+      if (!r.ok) return new Response('Not found', { status: 404 });
+      return new Response(await r.text(), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=3600', ...SECURITY } });
+    }
     if (path === '/' || path === '/index.html') {
       return new Response(mainIndex(await indexHtml(env, req), env), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ...SECURITY } });
     }

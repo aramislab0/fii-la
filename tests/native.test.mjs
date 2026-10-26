@@ -176,6 +176,25 @@ await t('liens externes : WhatsApp ouvert par le téléphone, l’app reste ; li
   await p.context().close();
 });
 
+await t('hors ligne : boutique, commandes et articles relus depuis le téléphone (lecture seule), avec la date', async () => {
+  await ok('fiila_vitrine_order', { p_slug: SLUG, p: { items: [{ product_id: A.id, qty: 1 }], customer: { name: 'Cliente hors ligne (test)', phone: '770000088' } } });
+  const p = await newApp({ local: { 'fiila.shop': SHOP } });
+  await p.goto(URL0 + '#/boutique'); await p.locator('#shop-title').waitFor();
+  await p.getByText('Cliente hors ligne (test)').first().waitFor();
+  await p.evaluate(() => { location.hash = '#/boutique/articles'; }); await p.getByText('Robe mobile (test)').first().waitFor();
+  assert.ok(await p.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith('fiila.off.fiila_shop_get.'))));
+  assert.equal(await p.evaluate(() => Object.keys(window.__prefs).some((k) => k.startsWith('fiila.off.'))), false, 'le cache n’est pas recopié dans les préférences');
+  await p.context().setOffline(true);
+  await p.evaluate(() => { location.hash = '#/boutique'; });
+  await p.locator('#shop-title').waitFor();
+  await p.getByText('Cliente hors ligne (test)').first().waitFor();
+  await p.getByText(/Hors ligne : affichage du/).waitFor();
+  await p.evaluate(() => { location.hash = '#/boutique/marketing'; });
+  await p.getByText(/Impossible|Connexion impossible|Pas de connexion/).first().waitFor();
+  await p.context().setOffline(false);
+  await p.context().close();
+});
+
 await t('iPhone : aucune incitation à acheter un abonnement (modèles Premium visibles, sans « Je veux ce modèle »)', async () => {
   const p = await newApp({ platform: 'ios', local: { 'fiila.shop': SHOP } });
   await p.goto(URL0 + '#/boutique/vitrine');

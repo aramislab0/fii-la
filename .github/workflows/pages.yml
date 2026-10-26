@@ -120,12 +120,23 @@ jobs:
           LEGACY_ORIGINS: ${{ vars.LEGACY_ORIGINS }}
           SHOP_ZONE: ${{ vars.SHOP_ZONE }}
           DOMAINS_LIVE: ${{ vars.DOMAINS_LIVE }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
           FACEBOOK_APP_ID: ${{ vars.FACEBOOK_APP_ID }}
         run: |
           test -n "$SUPABASE_URL" || { echo "Variable SUPABASE_URL manquante"; exit 1; }
           test -n "$SUPABASE_KEY" || { echo "Variable SUPABASE_PUBLISHABLE_KEY manquante"; exit 1; }
           node -e 'const L=(v)=>String(v||"").split(",").map((x)=>x.trim()).filter(Boolean);const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:process.env.PUBLIC_URL||"",facebookAppId:process.env.FACEBOOK_APP_ID||"",appHosts:L(process.env.APP_HOSTS),movedTo:process.env.MOVED_TO||"",legacyOrigins:L(process.env.LEGACY_ORIGINS),shopZone:process.env.SHOP_ZONE||"",domainsLive:process.env.DOMAINS_LIVE==="1"};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
           echo "<!-- build ${GITHUB_SHA} -->" >> web/index.html
+          # Liens universels (app mobile) : écrits seulement quand l'identifiant d'équipe Apple et l'empreinte de la clé
+          # Play sont fournis (variables du dépôt). Servis par le Worker sur fii.app (docs/PLAN-APP-MOBILE.md).
+          if [ -n "$APPLE_TEAM_ID" ] || [ -n "$ANDROID_CERT_SHA256" ]; then mkdir -p web/.well-known; fi
+          if [ -n "$APPLE_TEAM_ID" ]; then
+            node -e 'require("fs").writeFileSync("web/.well-known/apple-app-site-association", JSON.stringify({applinks:{details:[{appIDs:[process.env.APPLE_TEAM_ID+".app.fii"],components:[{"/":"/*"}]}]}}))'
+          fi
+          if [ -n "$ANDROID_CERT_SHA256" ]; then
+            node -e 'require("fs").writeFileSync("web/.well-known/assetlinks.json", JSON.stringify([{relation:["delegate_permission/common.handle_all_urls"],target:{namespace:"android_app",package_name:"app.fii",sha256_cert_fingerprints:process.env.ANDROID_CERT_SHA256.split(",").map((x)=>x.trim())}}]))'
+          fi
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --ignore-scripts

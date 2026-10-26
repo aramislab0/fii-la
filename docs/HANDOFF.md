@@ -280,6 +280,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 26/10 18:40 | Optimisations validées (« je valide go », 18:07) : lecture hors ligne (boutique, commandes, articles, clients) ; liens universels préparés (fichiers écrits par la CI dès `APPLE_TEAM_ID` / `ANDROID_CERT_SHA256`, servis par le Worker) ; découpage du back-office et accélération du partage mesurés puis écartés (gain faible) ; notifications après les paiements | `docs/AUDIT-APP-IOS-2026-10-26.md` §5 |
 | 26/10 18:05 | Audit iPhone, 8ᵉ défaut : flash blanc au démarrage → écran de démarrage masqué au premier écran affiché, fond de la WebView aux couleurs de Fii | voir commit |
 | 26/10 17:55 | Audit iPhone de bout en bout (simulateur, base de test locale) : 25 écrans sans erreur JavaScript ; 7 défauts corrigés (démarrage, double demande de position « localhost », listes déroulantes écrasées — aussi sur Safari web —, contenu sous l'heure, texte écarté dans les titres repliables — aussi sur le web —, nom du fichier partagé, cibles tactiles) ; geste retour iOS, pas d'aperçu de lien ; test `native` 8/8, suites SQL et navigateur vertes ; APK Android reconstruit | `docs/AUDIT-APP-IOS-2026-10-26.md` |
 | 26/10 17:15 | App iPhone ouverte dans le simulateur du Mac du fondateur (iPhone 16 Pro, iOS 18.6) : l'accueil s'affiche avec les données réelles. Défaut trouvé et corrigé : l'app restait sur l'écran de démarrage (noyau Capacitor non chargé) — même défaut dans le 1er APK, remplacé | `dbd9d3d` |

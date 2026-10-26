@@ -151,7 +151,7 @@
     // dans la WebView est restauré (les sessions de connexion comprises, pour ne pas devoir se reconnecter).
     if (!Prefs) return Promise.resolve();
     var proto = Object.getPrototypeOf(window.localStorage), set0 = proto.setItem, del0 = proto.removeItem;
-    proto.setItem = function (k, v) { set0.call(this, k, v); if (this === window.localStorage && /^fiila\./.test(k)) Prefs.set({ key: k, value: String(v) }).catch(function () {}); };
+    proto.setItem = function (k, v) { set0.call(this, k, v); if (this === window.localStorage && /^fiila\./.test(k) && !/^fiila\.off\./.test(k)) Prefs.set({ key: k, value: String(v) }).catch(function () {}); };
     proto.removeItem = function (k) { del0.call(this, k); if (this === window.localStorage && /^fiila\./.test(k)) Prefs.remove({ key: k }).catch(function () {}); };
     return Prefs.keys().then(function (r) {
       return Promise.all((r.keys || []).filter(function (k) { return /^fiila\./.test(k) && window.localStorage.getItem(k) == null; }).map(function (k) {
@@ -159,7 +159,7 @@
       }));
     }).then(function () {
       // Recopie initiale (installation d'une version de l'app sans ce mécanisme, ou première ouverture).
-      for (var i = 0; i < window.localStorage.length; i++) { var k = window.localStorage.key(i); if (/^fiila\./.test(k)) Prefs.set({ key: k, value: window.localStorage.getItem(k) }).catch(function () {}); }
+      for (var i = 0; i < window.localStorage.length; i++) { var k = window.localStorage.key(i); if (/^fiila\./.test(k) && !/^fiila\.off\./.test(k)) Prefs.set({ key: k, value: window.localStorage.getItem(k) }).catch(function () {}); }
     }, function () { /* préférences illisibles : on continue avec la WebView */ });
   }
 
@@ -670,7 +670,7 @@
         LS.set('fiila.owned', owned.all().filter(function (r) { return r.owner; }));
         // Boutique rattachée au compte : elle reste accessible par le compte, plus par ce téléphone.
         var sk = LS.get('fiila.shop', null);
-        if (sk && sk.linked) LS.del('fiila.shop');
+        if (sk && sk.linked) { LS.del('fiila.shop'); offlineClear(); }
       };
       return authCall('/logout', 'POST', null, true).then(done, done);
     },
@@ -735,11 +735,36 @@
   })(); });
 
   function api(fn, args, retried) {
-    return freshToken().then(function () { return rawApi(fn, args); }).catch(function (e) {
+    return freshToken().then(function () { return rawApi(fn, args); }).then(function (body) {
+      if (OFFLINE_READS[fn]) offlineSave(fn, args, body);
+      return body;
+    }).catch(function (e) {
       if (e.code === 'jwt_expired' && !retried && SESSION) return refreshSession().then(function () { return api(fn, args, true); });
+      // Sans réseau : la dernière version lue de la boutique, des commandes, des articles et des clients (lecture seule).
+      if (e.code === 'network' && OFFLINE_READS[fn]) { var c = offlineGet(fn, args); if (c) { offlineNotice(c.at); return c.body; } }
       throw e;
     });
   }
+  /* Lecture hors ligne (26/10, audit de l'app mobile) : seules ces lectures sont gardées sur le téléphone, jamais une écriture.
+     Clé : nom de la fonction + empreinte des paramètres (la clé de boutique n'apparaît pas en clair dans le nom). */
+  var OFFLINE_READS = { fiila_shop_get: 1, fiila_orders: 1, fiila_order_get: 1, fiila_products: 1, fiila_customers: 1 };
+  function offlineKey(fn, args) {
+    var str = JSON.stringify(args || {}), h1 = 5381, h2 = 52711;
+    for (var i = 0; i < str.length; i++) { var c = str.charCodeAt(i); h1 = (h1 * 33) ^ c; h2 = (h2 * 31) ^ c; }
+    return 'fiila.off.' + fn + '.' + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+  }
+  function offlineSave(fn, args, body) {
+    try { var v = JSON.stringify({ at: Date.now(), body: body }); if (v.length < 400000) localStorage.setItem(offlineKey(fn, args), v); } catch (e) { /* stockage plein : sans cache */ }
+  }
+  function offlineGet(fn, args) { try { return JSON.parse(localStorage.getItem(offlineKey(fn, args)) || 'null'); } catch (e) { return null; } }
+  var offlineShown = 0;
+  function offlineNotice(at) {
+    if (Date.now() - offlineShown < 4000) return;
+    offlineShown = Date.now();
+    var d = new Date(at);
+    setTimeout(function () { toast('Hors ligne : affichage du ' + d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '.'); }, 50);
+  }
+  function offlineClear() { try { for (var i = localStorage.length - 1; i >= 0; i--) { var k = localStorage.key(i); if (k && k.indexOf('fiila.off.') === 0) localStorage.removeItem(k); } } catch (e) { /* rien */ } }
   function rawApi(fn, args) {
     if (!API_URL) return Promise.reject(new ApiError('not_configured'));
     if (navigator.onLine === false) return Promise.reject(new ApiError('network'));
@@ -6230,7 +6255,7 @@
             h('div', { class: 'row' },
               h('button', { class: 'btn danger-fill', type: 'button', id: 'shop-delete-confirm', onclick: function (ev) {
                 ev.currentTarget.disabled = true;
-                sapi('fiila_shop_delete', {}).then(function () {
+                sapi('fiila_shop_delete', {}).then(function () { offlineClear();
                   LS.del(SHOP_LS); LS.del(ORDER_DRAFT); LS.del(PRODUCT_DRAFT); ME = null; track('shop_deleted', 'shop'); toast('Boutique supprimée.'); go('#/');
                 }, function (e) { errBox(zone, e); });
               } }, 'Supprimer'),
@@ -9627,7 +9652,7 @@
      pas celles de l'ancienne. L'ancienne adresse (CFG.movedTo) transmet les données locales de Fii à la nouvelle par un
      message direct entre deux fenêtres, origines vérifiées des deux côtés ; jamais dans une adresse, un journal ou une mesure.
      Les sessions de connexion ne sont pas transmises. Rien n'est effacé sur l'ancienne adresse (retour arrière possible). */
-  var MIGRATE_SKIP = /^fiila\.(session|pkce|flags|visits|moved|ret\.s|install\.)/;
+  var MIGRATE_SKIP = /^fiila\.(session|pkce|flags|visits|moved|ret\.s|install\.|off\.)/;
   function originOf(u) { try { return new URL(u).origin; } catch (e) { return null; } }
   function localFiiData() {
     var out = {};

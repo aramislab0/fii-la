@@ -171,6 +171,13 @@ await t('Worker : cache par nom d’hôte (aucun mélange entre boutiques) ; bas
   assert.deepEqual(await resolveHost('www.maison-awa.sn', WENV, { fetch: async () => json({ state: 'ok', slug: 'x', name: 'X', host: 'autre.sn' }), cache: null }), { state: 'unknown' }, 'hôte différent dans la réponse → refusé');
 });
 
+await t('Worker : liens universels iPhone servis en JSON sur le domaine principal, jamais sur un domaine de boutique', async () => {
+  const env = { ...WENV, ASSETS: { fetch: async (r) => new URL(r.url).pathname === '/.well-known/apple-app-site-association' ? new Response('{"applinks":{}}') : WENV.ASSETS.fetch(r) } };
+  const r = await handle(new Request('https://fii.app/.well-known/apple-app-site-association'), env, wsim().deps);
+  assert.equal(r.status, 200); assert.equal(r.headers.get('content-type'), 'application/json'); assert.equal(await r.text(), '{"applinks":{}}');
+  assert.equal((await handle(new Request('https://inconnu.sn/.well-known/apple-app-site-association'), env, wsim().deps)).status, 404);
+});
+
 await t('Worker : remplacement de l’ancienne adresse et page de site pures (fonctions exportées)', async () => {
   assert.equal(mainIndex('<a href="https://aramislab0.github.io/fii-la/x">', WENV), '<a href="https://fii.app/x">');
   const s = siteIndex('<head><title>Fii</title></head>', { slug: 'a', name: 'A"B', host: 'a.sn' });
