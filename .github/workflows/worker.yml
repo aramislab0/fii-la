@@ -7,6 +7,10 @@ name: Worker Cloudflare (getfii.app)
 # Retour arrière : relancer avec la version précédente, ou « Rollback » dans Cloudflare (Workers → fii → Deployments).
 
 on:
+  # Appelé aussi par « Mettre Fii La en production » (pages.yml) à chaque envoi sur main, cible production (bascule faite le 26/10).
+  workflow_call:
+    inputs:
+      target: { type: string, required: true }
   workflow_dispatch:
     inputs:
       target:
@@ -18,10 +22,6 @@ on:
 
 permissions:
   contents: read
-
-concurrency:
-  group: worker
-  cancel-in-progress: false
 
 jobs:
   deploy:

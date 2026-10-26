@@ -7,7 +7,7 @@ name: Mettre Fii La en production
 on:
   push:
     branches: [main]
-    paths: ['web/**', 'supabase/migrations/**', 'scripts/**', 'tests/**', 'package*.json', '.github/workflows/pages.yml']
+    paths: ['web/**', 'worker/**', 'supabase/migrations/**', 'scripts/**', 'tests/**', 'package*.json', '.github/workflows/pages.yml', '.github/workflows/worker.yml']
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,8 @@ defaults:
 env:
   # Adresse du serveur de la base, sans mot de passe (non secrète).
   SUPABASE_POOLER_URL: postgresql://postgres.lkvulwocirttozfnyxck@aws-1-eu-west-3.pooler.supabase.com:5432/postgres
-  SITE_URL: https://aramislab0.github.io/fii-la/
+  # Adresse publique (26/10 : getfii.app, servie par le Worker Cloudflare). L'ancienne adresse GitHub Pages migre puis renvoie.
+  SITE_URL: https://getfii.app/
 
 jobs:
   test:
@@ -149,9 +150,16 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
 
+  worker:
+    name: 2b. Mise en ligne getfii.app (Worker)
+    needs: migrate
+    uses: ./.github/workflows/worker.yml
+    with: { target: production }
+    secrets: inherit
+
   verify:
     name: 3. Tests en production (Chrome + Safari)
-    needs: deploy
+    needs: [deploy, worker]
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
