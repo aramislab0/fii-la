@@ -1,0 +1,28 @@
+{
+  "name": "fii-mobile",
+  "private": true,
+  "type": "module",
+  "description": "Fii — application Android et iPhone (Capacitor) construite à partir de web/. docs/PLAN-APP-MOBILE.md",
+  "scripts": {
+    "www": "node scripts/build-www.mjs",
+    "icons": "node scripts/icons.mjs",
+    "sync": "npm run www && npx cap sync",
+    "android:debug": "npm run sync && cd android && ./gradlew assembleDebug",
+    "android:release": "npm run sync && cd android && ./gradlew bundleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/app-launcher": "8.0.1",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/preferences": "8.0.1",
+    "@capacitor/share": "8.0.3",
+    "@capacitor/splash-screen": "8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

@@ -1,0 +1,97 @@
+name: App mobile (Android + iPhone)
+
+# Construit l'app Android (APK de test, et bundle signé pour Google Play dès que la clé d'envoi est fournie) et l'app iPhone
+# (simulateur ; archive signée pour l'App Store dès que le compte Apple Developer est relié). docs/PLAN-APP-MOBILE.md.
+# Ne publie rien sur les stores : l'envoi en test interne ou en revue se fait avec l'accord du fondateur.
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'mobile/**', 'scripts/minify.mjs', '.github/workflows/mobile.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+  PUBLIC_URL: ${{ vars.APP_PUBLIC_URL || vars.PUBLIC_URL }}
+  APP_LINK_HOSTS: ${{ vars.APP_LINK_HOSTS }}
+  SHOP_ZONE: ${{ vars.SHOP_ZONE }}
+  DOMAINS_LIVE: ${{ vars.DOMAINS_LIVE }}
+  FII_VERSION_CODE: ${{ github.run_number }}
+  FII_VERSION_NAME: 1.0.${{ github.run_number }}
+
+jobs:
+  android:
+    name: Android
+    runs-on: ubuntu-24.04
+    env:
+      HAS_KEY: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: 'package-lock.json' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm ci --ignore-scripts
+      - run: npm ci
+        working-directory: mobile
+      - name: Préparer l'app (web → www, synchronisation Android)
+        working-directory: mobile
+        run: npm run www && npx cap sync android
+      - name: APK de test
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Bundle signé pour Google Play (si la clé d'envoi est fournie)
+        if: ${{ env.HAS_KEY == 'true' }}
+        env:
+          KS_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+          FII_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          FII_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          FII_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        working-directory: mobile/android
+        run: |
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          FII_KEYSTORE="$RUNNER_TEMP/upload.jks" ./gradlew bundleRelease --no-daemon
+          rm -f "$RUNNER_TEMP/upload.jks"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fii-android-${{ github.run_number }}
+          path: |
+            mobile/android/app/build/outputs/apk/debug/*.apk
+            mobile/android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: iPhone
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: 'package-lock.json' }
+      - run: npm ci --ignore-scripts
+      - run: npm ci
+        working-directory: mobile
+      - name: Préparer l'app (web → www, synchronisation iPhone)
+        working-directory: mobile
+        run: npm run www && npx cap sync ios
+      - name: Compiler pour le simulateur (sans signature)
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -40
+          test -d build/Build/Products/Debug-iphonesimulator/App.app
+      - name: Archiver l'app du simulateur
+        working-directory: mobile/ios/App/build/Build/Products/Debug-iphonesimulator
+        run: ditto -c -k --keepParent App.app "$GITHUB_WORKSPACE/fii-ios-simulateur.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fii-ios-simulateur-${{ github.run_number }}
+          path: fii-ios-simulateur.zip
+          retention-days: 14

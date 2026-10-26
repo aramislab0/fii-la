@@ -185,7 +185,7 @@ jobs:
         run: FIILA_URL=$SITE_URL ENGINE=webkit SHOTS=/tmp/prod-w node tests/e2e.test.mjs
       - name: Écrans clés — Safari (WebKit, base de test locale)
         if: always()
-        run: ENGINE=webkit scripts/run-suites.sh list referrals shop vitrine products videdressing navigation feed ambassadors engage backoffice team photos nudges onboarding shopsetup aftertask partners wacards media domains
+        run: ENGINE=webkit scripts/run-suites.sh list referrals shop vitrine products videdressing navigation feed ambassadors engage backoffice team photos nudges onboarding shopsetup aftertask partners wacards media domains native
       - name: Captures et rapports en cas d'échec
         if: failure()
         uses: actions/upload-artifact@v4

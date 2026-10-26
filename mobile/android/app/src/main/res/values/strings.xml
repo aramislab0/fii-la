@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Fii</string>
+    <string name="title_activity_main">Fii</string>
+    <string name="package_name">app.fii</string>
+    <string name="custom_url_scheme">app.fii</string>
+</resources>

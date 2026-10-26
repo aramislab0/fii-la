@@ -83,6 +83,22 @@ Colonnes :
 | Lisibilité au soleil (fiche destinataire) | | | | |
 | Thème sombre du téléphone : panneau de partage lisible | | | | |
 
+## F. App Android (APK de test, 26/10)
+
+Installer `fii-android-test.apk` (autoriser « sources inconnues » une fois). Données de test uniquement.
+
+| # | Geste | Attendu | OK ? |
+|---|---|---|---|
+| F1 | Ouvrir l'app | Écran vert Fii puis l'accueil, sans barre d'adresse ; le haut et le bas ne passent pas sous l'encoche ni la barre de navigation | |
+| F2 | Créer une boutique test, un article avec photo | Appareil photo demandé au moment de la photo ; photo enregistrée | |
+| F3 | Marketing → logo Instagram sur un article | Feuille de partage Android avec l'image ; Instagram s'ouvre avec la photo | |
+| F4 | Logo WhatsApp | WhatsApp avec l'image et le texte (lien `https://…/#/b/…`) | |
+| F5 | Bouton retour du téléphone : sur une feuille, sur un écran, à l'accueil | Ferme la feuille ; écran précédent ; l'app passe en arrière-plan | |
+| F6 | Fermer l'app (balayer), la rouvrir | La boutique est toujours là | |
+| F7 | Mon adresse → « Utiliser ma position » ; repère vocal | Position demandée puis placée ; micro demandé puis enregistrement | |
+| F8 | Itinéraire, Waze, lien d'un réseau | S'ouvre dans l'app concernée ; retour à Fii au même écran | |
+| F9 | Modèle Premium verrouillé | Aperçu possible ; aucun bouton d'achat | |
+
 ## Bilan
 
 | Point bloquant trouvé | Canal / téléphone | Gravité | Décision |

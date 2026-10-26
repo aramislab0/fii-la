@@ -21,6 +21,115 @@
   var APP_HOSTS = Array.isArray(CFG.appHosts) && CFG.appHosts.length ? CFG.appHosts : null;
   function mainUrl() { return (CFG.publicUrl || (location.origin + location.pathname)).replace(/\/?$/, '/'); }
 
+  /* ================================================================ application mobile (Android, iPhone)
+     docs/PLAN-APP-MOBILE.md. La même application, embarquée dans une coquille native (Capacitor). Sur le web, rien ne change :
+     NATIVE est faux et chaque branche ci-dessous est inactive. Dans l'app :
+     - partage natif (images comprises) à la place de navigator.share, absent de la WebView Android ;
+     - stockage local recopié dans les préférences du téléphone (le système peut vider celui de la WebView) ;
+     - bouton retour Android (ferme une feuille, revient en arrière, quitte à l'accueil) ;
+     - liens externes (WhatsApp, cartes, réseaux) ouverts dans l'application concernée ;
+     - liens https://<adresse publique>/#/… ouverts dans l'app (retour de paiement, liens partagés) ;
+     - aucun achat d'abonnement ni de pack dans l'app (règles Apple et Google) : l'app débloque ce qui a été payé sur le web. */
+  var CAP = window.Capacitor;
+  var NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
+  var PLATFORM = NATIVE ? CAP.getPlatform() : 'web';
+  // Abonnements et packs (contenus numériques) : vendus seulement sur le web ; l'app mobile débloque ce qui a été payé.
+  var SELL_DIGITAL = !NATIVE;
+  function plugin(name) { return NATIVE && CAP.Plugins ? CAP.Plugins[name] : null; }
+  var NATIVE_READY = NATIVE ? nativeInit() : Promise.resolve();
+  function blobToB64(blob) {
+    return new Promise(function (ok, ko) { var fr = new FileReader(); fr.onload = function () { ok(String(fr.result).split(',')[1] || ''); }; fr.onerror = ko; fr.readAsDataURL(blob); });
+  }
+  function nativeInit() {
+    var root = document.documentElement;
+    root.classList.add('native', 'native-' + PLATFORM);
+    var Prefs = plugin('Preferences'), App = plugin('App'), Share = plugin('Share'), FS = plugin('Filesystem'), Launcher = plugin('AppLauncher');
+    // Partage natif : textes, liens et fichiers (écrits dans le cache de l'app, puis confiés au partage du téléphone).
+    if (Share) {
+      var nativeShare = function (data) {
+        data = data || {};
+        var files = Array.prototype.slice.call(data.files || []);
+        var write = files.length && FS ? Promise.all(files.map(function (f, i) {
+          return blobToB64(f).then(function (b64) {
+            return FS.writeFile({ path: 'share/' + Date.now() + '-' + i + '-' + String(f.name || 'fii.jpg').replace(/[^\w.-]/g, '_'), data: b64, directory: 'CACHE', recursive: true });
+          }).then(function (r) { return r.uri; });
+        })) : Promise.resolve([]);
+        return write.then(function (uris) {
+          var o = {};
+          if (data.title) o.title = data.title;
+          if (data.text) o.text = data.text;
+          if (data.url) o.url = data.url;
+          if (uris.length) o.files = uris;
+          return Share.share(o);
+        }).then(function () { return undefined; }, function (e) {
+          var msg = String((e && e.message) || e || '');
+          var err = new Error(msg); err.name = /cancel/i.test(msg) ? 'AbortError' : 'NotAllowedError'; throw err;
+        });
+      };
+      try {
+        Object.defineProperty(navigator, 'share', { configurable: true, value: nativeShare });
+        Object.defineProperty(navigator, 'canShare', { configurable: true, value: function (d) { return !d || !d.files || !!FS; } });
+      } catch (e) { /* navigateur ancien : partage du web */ }
+    }
+    // Liens externes : l'application du téléphone (WhatsApp, Maps, Waze, réseaux) ou le navigateur.
+    function openExternal(url) { if (Launcher) Launcher.openUrl({ url: url }).catch(function () { location.href = url; }); else location.href = url; }
+    function isExternal(href) {
+      if (!href || href.charAt(0) === '#') return false;
+      if (/^(tel|sms|mailto|whatsapp|comgooglemaps|waze|geo|intent|wave|orange):/i.test(href)) return true;
+      try { var u = new URL(href, location.href); return u.origin !== location.origin; } catch (e) { return false; }
+    }
+    document.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+      if (!a || e.defaultPrevented) return;
+      var href = a.getAttribute('href');
+      if (!isExternal(href)) return;
+      var inApp = appRoute(a.href);
+      e.preventDefault();
+      if (inApp) location.hash = inApp; else openExternal(a.href);
+    }, false);
+    // Retour haptique léger sur les actions principales (onglets, grands boutons, logos des réseaux).
+    var Hap = plugin('Haptics');
+    if (Hap) document.addEventListener('click', function (e) {
+      if (e.target && e.target.closest && e.target.closest('.tab, .btn.big, .pub-net, .round-btn')) Hap.impact({ style: 'LIGHT' }).catch(function () {});
+    }, true);
+    window.open = function (url) { if (url) { var r = appRoute(url); if (r) location.hash = r; else openExternal(String(url)); } return null; };
+    // Adresse publique de Fii → écran de l'app (même chemin après #).
+    function appRoute(url) {
+      try {
+        var u = new URL(url), pub = new URL(CFG.publicUrl || 'https://invalid.invalid/'), hosts = [pub.host].concat(CFG.appLinkHosts || []);
+        if (u.protocol === 'fii:') return '#/' + (u.host + u.pathname).replace(/^\/+/, '') + (u.search || '') || '#/';
+        if (u.protocol !== 'https:' || hosts.indexOf(u.host) < 0) return null;
+        if (u.host === pub.host && u.pathname.indexOf(pub.pathname) !== 0) return null;
+        return u.hash && u.hash.indexOf('#/') === 0 ? u.hash : '#/';
+      } catch (e) { return null; }
+    }
+    if (App) {
+      App.addListener('appUrlOpen', function (ev) { var r = appRoute(ev && ev.url); if (r) { if (location.hash === r) render(); else location.hash = r; } });
+      // Bouton retour Android : feuille ouverte → fermée ; sinon écran précédent ; à l'accueil → l'app se met en arrière-plan.
+      App.addListener('backButton', function () {
+        if (document.querySelector('.sheet-back, .sheet')) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return; }
+        var h = location.hash || '';
+        if (h === '' || h === '#/' || h === '#') { if (App.minimizeApp) App.minimizeApp(); else App.exitApp(); return; }
+        if (history.length > 1) history.back(); else location.hash = '#/';
+      });
+      App.addListener('resume', function () { try { netState(); } catch (e) { /* rien */ } });
+    }
+    // Stockage : chaque écriture fiila.* est recopiée dans les préférences du téléphone ; au démarrage, ce qui manque
+    // dans la WebView est restauré (les sessions de connexion comprises, pour ne pas devoir se reconnecter).
+    if (!Prefs) return Promise.resolve();
+    var proto = Object.getPrototypeOf(window.localStorage), set0 = proto.setItem, del0 = proto.removeItem;
+    proto.setItem = function (k, v) { set0.call(this, k, v); if (this === window.localStorage && /^fiila\./.test(k)) Prefs.set({ key: k, value: String(v) }).catch(function () {}); };
+    proto.removeItem = function (k) { del0.call(this, k); if (this === window.localStorage && /^fiila\./.test(k)) Prefs.remove({ key: k }).catch(function () {}); };
+    return Prefs.keys().then(function (r) {
+      return Promise.all((r.keys || []).filter(function (k) { return /^fiila\./.test(k) && window.localStorage.getItem(k) == null; }).map(function (k) {
+        return Prefs.get({ key: k }).then(function (x) { if (x && x.value != null) set0.call(window.localStorage, k, x.value); });
+      }));
+    }).then(function () {
+      // Recopie initiale (installation d'une version de l'app sans ce mécanisme, ou première ouverture).
+      for (var i = 0; i < window.localStorage.length; i++) { var k = window.localStorage.key(i); if (/^fiila\./.test(k)) Prefs.set({ key: k, value: window.localStorage.getItem(k) }).catch(function () {}); }
+    }, function () { /* préférences illisibles : on continue avec la WebView */ });
+  }
+
   /* ================================================================ outils DOM */
   function h(tag, props) {
     var el = document.createElement(tag);
@@ -653,6 +762,7 @@
      Jamais d'adresse, de coordonnées, de photo, de clé ni de jeton de lien.
      Envoi silencieux : un échec n'a aucun effet sur l'affichage ou la création. */
   var TRACKABLE = {
+    app: ['android', 'ios'],
     account_created: ['account', 'shop', 'nudge'],
     account_nudge: ['shown', 'dismissed'],
     shop_created: ['shop', 'no_account', 'account'],
@@ -1227,6 +1337,7 @@
     window.dispatchEvent(new Event('fiila:installable'));
   });
   function isStandalone() {
+    if (NATIVE) return true;
     try { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
     catch (e) { return false; }
   }
@@ -2777,7 +2888,7 @@
         if (r.plan !== 'premium') {
           setKids(box, h('section', { class: 'card stack tight', id: 'domain-premium' }, h('span', { class: 'chip neutral' }, icon('lock', 12), 'Premium'),
             h('p', null, 'Votre site sur votre propre adresse, sans la marque Fii.'),
-            h('a', { class: 'btn ghost', href: '#/boutique/vitrine' }, 'Voir le Premium')));
+            SELL_DIGITAL ? h('a', { class: 'btn ghost', href: '#/boutique/vitrine' }, 'Voir le Premium') : null));
           return;
         }
         if (!r.enabled) { setKids(box, stateCard('⦸', 'Indisponible pour le moment', 'Réessayez plus tard.')); return; }
@@ -3002,7 +3113,8 @@
         h('div', { class: 'vt-mini big vt-mini-' + t[0], 'aria-hidden': 'true' }, h('i'), h('i'), h('i'), h('i')),
         slug ? iconBtn('a', { class: 'btn big full', id: 'premium-preview', href: '#/b/' + slug + '?modele=' + t[0], onclick: function () { track('premium', t[0] + ':preview'); close(); } }, 'eye', 'Voir sur mon site')
           : h('p', { class: 'small muted' }, 'Mettez votre site en ligne pour voir l’aperçu.'),
-        h('button', { class: 'btn ghost full', type: 'button', id: 'premium-interest', onclick: function () {
+        // App mobile : aucune incitation à l'achat d'un abonnement (règles Apple et Google), voir SELL_DIGITAL.
+        !SELL_DIGITAL ? null : h('button', { class: 'btn ghost full', type: 'button', id: 'premium-interest', onclick: function () {
           track('premium', t[0] + ':interest'); close(); toast('C’est noté. L’abonnement Premium arrive bientôt.');
         } }, 'Je veux ce modèle'),
         h('p', { class: 'small muted' }, 'Aperçu seulement : votre site ne change pas.')));
@@ -8894,6 +9006,8 @@
             var pm = d.premium || {}; function q(a) { return boNum(Number(pm[t[0] + ':' + a] || 0)); }
             return t[1] + ' — touché verrouillé ' + q('locked') + ', aperçu ' + q('preview') + ', « Je veux ce modèle » ' + q('interest') + ', appliqué ' + q('applied');
           }).join(' · ') + '. Boutiques Premium : ' + boNum(d.premium_shops || 0) + '.'),
+          h('p', { class: 'small', id: 'bo-app-line' }, 'App mobile (ouvertures, 30 jours) : Android ' + boNum(Number((d.app_opens || {}).android || 0)) +
+            ' · iPhone ' + boNum(Number((d.app_opens || {}).ios || 0)) + '.'),
           h('p', { class: 'small muted' }, 'Un partage touché ne prouve pas qu’un message est parti.'));
       })(),
       (function () {
@@ -9550,5 +9664,8 @@
   }
   TRACKABLE.migrate = ['merged', 'empty'];
 
-  if (!legacyMove()) authBoot.then(render, render);
+  NATIVE_READY.then(function () {
+    if (NATIVE) { track('app', PLATFORM === 'ios' ? 'ios' : 'android'); var SB = plugin('SplashScreen'); if (SB) setTimeout(function () { SB.hide().catch(function () {}); }, 150); }
+    if (!legacyMove()) authBoot.then(render, render);
+  });
 })();
