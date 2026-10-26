@@ -25,6 +25,7 @@
 |---|---|
 | Super admin | Tout, dont l'équipe, les réglages et le journal |
 | Opérations | Boutiques (lecture et actions), commandes, comptes, fil, modération, vide-dressing, ambassadeurs, finances |
+| Studio (26/10) | Fii Studio : ouvert ou fermé (`studio_ready`), dépense du mois face au budget (`studio_budget_usd`), séries, versions gardées, échecs, boutiques ; crédits des boutiques ; « Accorder des crédits » (recherche de la boutique, nombre positif ou négatif, motif obligatoire, journal `studio_grant`) ; dernières séries (style, statut, coût, erreur). Réglage `studio_daily`. Tests : `studio.sql`, `backoffice` |
 | Domaines (24/10) | Domaines propres des boutiques Premium : nom, boutique (gratuite signalée), statut (en attente, vérification, actif, erreur, expiré, déconnecté), certificat, dernière erreur de Cloudflare, date. « Revérifier » (relit Cloudflare) ; « Déconnecter » avec motif obligatoire (droit `shops_write`, journal `domain_disconnect`, nom retiré chez Cloudflare). Interrupteurs `custom_domains` et `shop_subdomains` (adresses `<lien>.fii.shop`) dans Réglages. Test : `backoffice` (16 sections), `domains.sql` |
 | Modération | Commentaires, vérification du vide-dressing (sans téléphones), suspension et réactivation des boutiques |
 | Support | Lecture des boutiques, commandes et comptes |

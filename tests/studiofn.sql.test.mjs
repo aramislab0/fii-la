@@ -1,0 +1,83 @@
+// Fonction fiila-studio : droits vérifiés avec l'identité de l'appelant, fal simulé (aucun appel réel, aucune clé réelle).
+import assert from 'node:assert/strict';
+import { makeHandler, SCENES, MODEL } from '../supabase/functions/fiila-studio/handler.mjs';
+
+let passed = 0, failed = 0;
+async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
+const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test', SUPABASE_SERVICE_ROLE_KEY: 'service-test', FAL_KEY: 'fal-test' };
+const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
+function sim({ reserve = { job: 'j1', style: 'luxe', image: 'data:image/jpeg;base64,AAA' }, fal = null, result = 'https://v3.fal.media/files/x/1.png' } = {}) {
+  const calls = [];
+  const fetch = async (url, init = {}) => {
+    calls.push({ url, init, body: init.body ? JSON.parse(init.body) : null });
+    if (url.startsWith('https://fal.run/')) return fal ? fal() : json({ images: [1, 2, 3].map((i) => ({ url: `https://v3.fal.media/files/x/${i}.png` })) });
+    if (url.startsWith('https://v3.fal.media/')) return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } });
+    const fn = url.split('/rpc/')[1];
+    if (fn === 'fiila_studio_reserve') return reserve ? json(reserve) : json({ message: 'fiila:studio_no_credits' }, 400);
+    if (fn === 'fiila_studio_complete') { const p = calls.at(-1).body.p; return json({ id: 'j1', status: p.results ? 'done' : 'failed', results: p.results || [], error: p.error || null }); }
+    if (fn === 'fiila_studio_result') return result ? json({ url: result }) : json({ message: 'fiila:not_found' }, 400);
+    return json({});
+  };
+  return { fetch, calls };
+}
+const req = (body, auth = 'Bearer anon-test') => new Request('https://x/functions/v1/fiila-studio', { method: 'POST', body: JSON.stringify(body), headers: auth ? { authorization: auth } : {} });
+
+await t('sans session (clé de boutique seule) : droits demandés à la base sans en-tête Authorization ; action inconnue refusée ; sans FAL_KEY → configured:false', async () => {
+  const s0 = sim();
+  const r0 = await makeHandler({ env: (k) => ENV[k], fetch: s0.fetch })(req({ action: 'render', key: 'cle', product: 'p', style: 'blanc' }, null));
+  assert.equal(r0.status, 200);
+  const rv = s0.calls.find((c) => c.url.endsWith('fiila_studio_reserve'));
+  assert.equal(rv.init.headers.Authorization, undefined); assert.equal(rv.init.headers.apikey, 'anon-test');
+  const s = sim();
+  assert.equal((await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'zap' }))).status, 400);
+  const r = await makeHandler({ env: (k) => ({ ...ENV, FAL_KEY: '' })[k], fetch: s.fetch })(req({ action: 'render', key: 'k', product: 'p', style: 'luxe' }));
+  assert.equal((await r.json()).configured, false);
+  assert.equal(s.calls.length, 0);
+});
+
+await t('série : droits avec l’identité de la personne ; fal appelé avec la photo, le décor du style, 3 versions au format 4:5 ; résultat écrit avec la clé de service', async () => {
+  const s = sim();
+  const r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'luxe' }, 'Bearer jwt-user'));
+  const b = await r.json();
+  assert.equal(b.status, 'done'); assert.equal(b.results.length, 3);
+  const res = s.calls.find((c) => c.url.endsWith('fiila_studio_reserve'));
+  assert.equal(res.init.headers.Authorization, 'Bearer jwt-user'); assert.deepEqual(res.body, { p_key: 'cle', p_product: 'p1', p_style: 'luxe' });
+  const f = s.calls.find((c) => c.url.startsWith('https://fal.run/'));
+  assert.equal(f.url, 'https://fal.run/' + MODEL); assert.equal(f.init.headers.Authorization, 'Key fal-test');
+  assert.equal(f.body.image_url, 'data:image/jpeg;base64,AAA'); assert.equal(f.body.scene_description, SCENES.luxe);
+  assert.equal(f.body.num_results, 3); assert.deepEqual(f.body.shot_size, [880, 1100]);
+  const c = s.calls.find((x) => x.url.endsWith('fiila_studio_complete'));
+  assert.equal(c.init.headers.Authorization, 'Bearer service-test'); assert.equal(c.body.p.cost_usd, 0.12);
+});
+
+await t('refus de la base (crédits) → 409 lisible, fal jamais appelé ; échec de fal → série en échec, message court', async () => {
+  let s = sim({ reserve: null });
+  let r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'k', product: 'p', style: 'blanc' }));
+  assert.equal(r.status, 409); assert.equal((await r.json()).error, 'studio_no_credits');
+  assert.ok(!s.calls.some((c) => c.url.startsWith('https://fal.run/')));
+  s = sim({ fal: () => json({ detail: 'Image too small' }, 422) });
+  r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'k', product: 'p', style: 'blanc' }));
+  const b = await r.json();
+  assert.equal(b.status, 'failed'); assert.equal(s.calls.find((c) => c.url.endsWith('fiila_studio_complete')).body.p.error, 'Image too small');
+});
+
+await t('images hors de fal ignorées (aucune adresse étrangère enregistrée)', async () => {
+  const s = sim({ fal: () => json({ images: [{ url: 'https://evil.example/x.png' }, { url: 'https://v3.fal.media/files/ok.png' }] }) });
+  await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'k', product: 'p', style: 'blanc' }));
+  assert.deepEqual(s.calls.find((c) => c.url.endsWith('fiila_studio_complete')).body.p.results, ['https://v3.fal.media/files/ok.png']);
+});
+
+await t('reprise de la version : droit vérifié par la base, image renvoyée en base64 ; autre boutique → 403', async () => {
+  let s = sim();
+  let r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'take', key: 'k', job: 'j1', index: 1 }));
+  assert.match((await r.json()).image, /^data:image\/png;base64,iVBORw==$/);
+  s = sim({ result: null });
+  r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'take', key: 'autre', job: 'j1', index: 1 }));
+  assert.equal(r.status, 403);
+  s = sim({ result: 'https://evil.example/x.png' });
+  r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'take', key: 'k', job: 'j1', index: 0 }));
+  assert.equal(r.status, 404);
+});
+
+console.log(`\n${passed}/${passed + failed} tests fonction Studio réussis`);
+process.exit(failed ? 1 : 0);

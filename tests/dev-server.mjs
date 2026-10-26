@@ -220,7 +220,9 @@ export async function startServer(port = 0) {
       const ip = req.headers['x-test-ip'] || '127.0.0.1';
       const who = auth.uidFor(req.headers.authorization);
       if (who.expired) { res.writeHead(401, { 'Content-Type': 'application/json' }); return res.end('{"code":"PGRST301","message":"JWT expired"}'); }
-      const r = await rpc(db, m[1], args, { ip, uid: who.uid, loginAt: who.loginAt, aal: who.aal || 'aal1' });
+      // Clé de service de test (fonctions serveur simulées) : rôle service_role, comme la vraie clé de service.
+      const svc = req.headers.authorization === 'Bearer local-service-key';
+      const r = await rpc(db, m[1], args, svc ? { ip, role: 'service_role' } : { ip, uid: who.uid, loginAt: who.loginAt, aal: who.aal || 'aal1' });
       res.writeHead(r.status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(r.body));
     }
@@ -250,6 +252,30 @@ export async function startServer(port = 0) {
       const { makeHandler } = await import('../supabase/functions/fiila-domains/handler.mjs');
       const origin = `http://127.0.0.1:${server.address().port}`;
       const h = makeHandler({ env: (k) => ({ SUPABASE_URL: origin, SUPABASE_ANON_KEY: 'local-test-key' })[k], fetch: globalThis.fetch });
+      const r = await h(new Request(origin + url.pathname, { method: req.method, headers: { authorization: req.headers.authorization || '' }, body: req.method === 'POST' ? body : undefined }));
+      res.writeHead(r.status, { 'Content-Type': 'application/json' });
+      return res.end(await r.text());
+    }
+    // Fonction fiila-studio : le vrai code ; fal est simulé (FIILA_STUDIO_FAIL=1 : le fournisseur échoue). Images de test servies ici.
+    if (url.pathname === '/functions/v1/fiila-studio') {
+      let body = '';
+      for await (const c of req) body += c;
+      if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+      const { makeHandler } = await import('../supabase/functions/fiila-studio/handler.mjs');
+      const origin = `http://127.0.0.1:${server.address().port}`;
+      const fakeFetch = async (u, init) => {
+        if (String(u).startsWith('https://fal.run/')) {
+          if (process.env.FIILA_STUDIO_FAIL === '1') return new Response(JSON.stringify({ detail: 'test failure' }), { status: 500 });
+          return new Response(JSON.stringify({ images: [0, 1, 2].map((i) => ({ url: `https://v3.fal.media/files/test/studio-${i}.png`, content_type: 'image/png' })) }), { status: 200 });
+        }
+        if (String(u).startsWith('https://v3.fal.media/files/test/')) {
+          const { default: sharp } = await import('sharp');
+          const png = await sharp({ create: { width: 880, height: 1100, channels: 3, background: '#d8c3a5' } }).png().toBuffer();
+          return new Response(png, { status: 200, headers: { 'content-type': 'image/png' } });
+        }
+        return globalThis.fetch(u, init);
+      };
+      const h = makeHandler({ env: (k) => ({ SUPABASE_URL: origin, SUPABASE_ANON_KEY: 'local-test-key', SUPABASE_SERVICE_ROLE_KEY: 'local-service-key', FAL_KEY: 'fal-test' })[k], fetch: fakeFetch });
       const r = await h(new Request(origin + url.pathname, { method: req.method, headers: { authorization: req.headers.authorization || '' }, body: req.method === 'POST' ? body : undefined }));
       res.writeHead(r.status, { 'Content-Type': 'application/json' });
       return res.end(await r.text());

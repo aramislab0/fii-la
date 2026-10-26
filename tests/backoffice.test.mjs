@@ -96,11 +96,11 @@ await t('portail : connexion de l’équipe ; un compte hors équipe est refusé
   assert.equal(await heading(D).textContent(), 'Tableau de bord');
 });
 
-const SECTIONS = [['', 'Tableau de bord'], ['boutiques', 'Boutiques'], ['commandes', 'Commandes'], ['domaines', 'Domaines'], ['comptes', 'Comptes'], ['moderation', 'Modération'],
+const SECTIONS = [['', 'Tableau de bord'], ['boutiques', 'Boutiques'], ['commandes', 'Commandes'], ['domaines', 'Domaines'], ['studio', 'Studio'], ['comptes', 'Comptes'], ['moderation', 'Modération'],
   ['vide-dressing', 'Vide-dressing'], ['ambassadeurs', 'Ambassadeurs'], ['agents', 'Agents'], ['carriere', 'Manager Carrière'], ['fil', 'Fil (25 places gratuites)'], ['finances', 'Finances'], ['croissance', 'Croissance'],
   ['equipe', 'Équipe'], ['journal', 'Journal'], ['reglages', 'Réglages de la plateforme']];
-await t('ordinateur : barre latérale avec les 16 sections du super admin, chacune s’ouvre sans erreur', async () => {
-  assert.equal(await D.locator('.bo-nav .bo-link').count(), 16);
+await t('ordinateur : barre latérale avec les 17 sections du super admin, chacune s’ouvre sans erreur', async () => {
+  assert.equal(await D.locator('.bo-nav .bo-link').count(), 17);
   assert.ok(await D.locator('#bo-side').isVisible());
   assert.equal(await D.locator('#bo-menu').isVisible(), false, 'pas de bouton menu sur ordinateur');
   await shot(D, '02-tableau-de-bord');
@@ -298,7 +298,7 @@ await t('équipe : inviter un membre (lien à usage unique), il s’inscrit avec
   await M.click('#bo-menu');
   await M.waitForTimeout(300);
   const labels = (await M.locator('.bo-nav .bo-link').allTextContents()).map((s) => s.replace(/\d+$/, '').trim());
-  assert.deepEqual(labels, ['Tableau de bord', 'Croissance', 'Boutiques', 'Domaines', 'Vide-dressing', 'Modération']);
+  assert.deepEqual(labels, ['Tableau de bord', 'Croissance', 'Boutiques', 'Domaines', 'Studio', 'Vide-dressing', 'Modération']);
   await shot(M, '09-mobile-menu-moderation');
   await M.click('#bo-nav-moderation');
   await M.waitForFunction(() => document.querySelector('#bo-main h1').textContent === 'Modération');

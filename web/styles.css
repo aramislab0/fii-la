@@ -2004,3 +2004,25 @@ p,li,.hint,.small{text-wrap:pretty}
 html.native body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:2000;pointer-events:none}
 html.native a,html.native button,html.native .tab,html.native .pub-net,html.native img{-webkit-touch-callout:none}
 html.native button,html.native .btn,html.native .tab,html.native .chip,html.native .tabbar{-webkit-user-select:none;user-select:none}
+
+/* ================================================================ Fii Studio (26/10) — signe : étincelle, couleur Marketing */
+.studio-row{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:10px 14px;border:1px solid var(--line);border-radius:16px;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--c-marketing) 9%,var(--surface)),var(--surface));color:var(--ink);text-align:left;cursor:pointer;font:inherit}
+.studio-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;color:#fff;background:linear-gradient(135deg,var(--c-marketing),#7C3AED)}
+.studio-t{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.studio-t small{color:var(--muted);font-size:13px}
+.studio-sheet h2{display:flex;align-items:center;gap:8px;margin:0}
+.studio-sheet h2 .ico{color:var(--c-marketing)}
+.studio-styles{display:flex;gap:8px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+.studio-styles::-webkit-scrollbar{display:none}
+.studio-style{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:64px;padding:8px 6px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.studio-style .sw{width:34px;height:34px;border-radius:50%;border:1px solid var(--line-strong)}
+.studio-style.on{border-color:var(--c-marketing);box-shadow:0 0 0 2px color-mix(in srgb,var(--c-marketing) 25%,transparent)}
+.studio-orig{position:relative;align-self:center;width:96px}
+.studio-orig.solo{width:min(60%,220px)}
+.studio-orig img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
+.studio-orig small{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.55);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.studio-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.studio-tile{display:block;padding:0;border:2px solid transparent;border-radius:14px;overflow:hidden;background:var(--surface-2);aspect-ratio:4/5;cursor:pointer}
+.studio-tile img{display:block;width:100%;height:100%;object-fit:cover}
+.studio-tile.on{border-color:var(--c-marketing);box-shadow:0 0 0 2px color-mix(in srgb,var(--c-marketing) 30%,transparent)}

@@ -38,10 +38,14 @@ export function makeHandler({ env, fetch }) {
   const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
   const base = () => String(env('SUPABASE_URL') || '').replace(/\/$/, '');
   // auth : en-tête Authorization de la personne (session ou clé publique) ; null = clé de service.
-  async function rpc(fn, args, auth) {
-    const key = auth ? env('SUPABASE_ANON_KEY') : env('SUPABASE_SERVICE_ROLE_KEY');
-    const r = await fetch(`${base()}/rest/v1/rpc/${fn}`, { method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: key, Authorization: auth || 'Bearer ' + key }, body: JSON.stringify(args || {}) });
+  // caller : { auth } = identité de la personne (session, ou aucune : clé publique seule, droits par la clé de boutique) ;
+  // null = clé de service.
+  async function rpc(fn, args, caller) {
+    const key = caller ? env('SUPABASE_ANON_KEY') : env('SUPABASE_SERVICE_ROLE_KEY');
+    const headers = { 'Content-Type': 'application/json', apikey: key };
+    if (!caller) headers.Authorization = 'Bearer ' + key;
+    else if (caller.auth) headers.Authorization = caller.auth;
+    const r = await fetch(`${base()}/rest/v1/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args || {}) });
     const body = await r.json().catch(() => null);
     if (!r.ok) { const e = new Error((body && body.message) || 'rpc ' + r.status); e.status = r.status; e.code = /fiila:([a-z_]+)/.exec((body && body.message) || '')?.[1]; throw e; }
     return body;
@@ -78,8 +82,9 @@ export function makeHandler({ env, fetch }) {
   return async (req) => {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (req.method !== 'POST') return json(405, { error: 'method' });
-    const auth = req.headers.get('authorization');
-    if (!auth) return json(401, { error: 'auth_required' });
+    // Sans session (boutique sans compte, clé publique au nouveau format) : pas d'en-tête Authorization ; la base vérifie
+    // alors les droits par la clé de la boutique.
+    const auth = { auth: req.headers.get('authorization') || '' };
     let body;
     try { body = await req.json(); } catch { return json(400, { error: 'invalid' }); }
     if (!body || !body.id || !['sync', 'cleanup'].includes(body.action)) return json(400, { error: 'invalid' });

@@ -445,6 +445,14 @@
     domain_taken: 'Ce domaine est déjà relié à une boutique.',
     domain_limit: 'Deux domaines au plus par boutique.',
     domains_off: 'Les domaines propres sont indisponibles pour le moment.',
+    studio_off: 'Le Studio est indisponible pour le moment.',
+    studio_no_photo: 'Ajoutez d’abord une photo de l’article.',
+    studio_no_credits: 'Plus de crédit Studio pour le moment.',
+    studio_budget: 'Le Studio est en pause pour ce mois. Réessayez plus tard.',
+    studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
+    studio_busy: 'Une création est déjà en cours. Patientez quelques secondes.',
+    studio_failed: 'La création n’a pas abouti. Aucun crédit n’a été utilisé.',
+    studio_expired: 'Cette version n’est plus disponible : créez-en de nouvelles.',
     vd_photo_rule: 'Confirmez qu’aucune personne n’est reconnaissable sur la photo.',
     vd_photo_required: 'Ajoutez une photo de l’article.',
     vd_category_required: 'Choisissez la catégorie de l’article.',
@@ -533,6 +541,14 @@
     domain_taken: 'Ce domaine est déjà relié à une boutique.',
     domain_limit: 'Deux domaines au plus par boutique.',
     domains_off: 'Les domaines propres sont indisponibles pour le moment.',
+    studio_off: 'Le Studio est indisponible pour le moment.',
+    studio_no_photo: 'Ajoutez d’abord une photo de l’article.',
+    studio_no_credits: 'Plus de crédit Studio pour le moment.',
+    studio_budget: 'Le Studio est en pause pour ce mois. Réessayez plus tard.',
+    studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
+    studio_busy: 'Une création est déjà en cours. Patientez quelques secondes.',
+    studio_failed: 'La création n’a pas abouti. Aucun crédit n’a été utilisé.',
+    studio_expired: 'Cette version n’est plus disponible : créez-en de nouvelles.',
     shop_suspended: 'Votre boutique est suspendue par l’équipe Fii. Contactez-nous pour la réactiver.',
     invite_invalid: 'Invitation expirée, annulée ou déjà utilisée.',
     invite_email_mismatch: 'Cette invitation a été créée pour une autre adresse e-mail.',
@@ -825,6 +841,7 @@
      Envoi silencieux : un échec n'a aucun effet sur l'affichage ou la création. */
   var TRACKABLE = {
     app: ['android', 'ios'],
+    studio: ['open', 'run', 'kept', 'cancel'].reduce(function (a, k) { return a.concat(['blanc', 'minimal', 'luxe', 'soleil', 'fete'].map(function (st) { return k + ':' + st; })); }, []),
     account_created: ['account', 'shop', 'nudge'],
     account_nudge: ['shown', 'dismissed'],
     shop_created: ['shop', 'no_account', 'account'],
@@ -2507,6 +2524,9 @@
     draw();
     return {
       el: box, count: function () { return st.list.length; },
+      // Studio : la version gardée devient la photo principale ; l'originale reste juste après (5 photos au plus).
+      addFront: function (src) { st.list.unshift({ src: src, orig: src }); if (st.list.length > 5) st.list.pop(); st.changed = true; draw(); },
+      isReady: function () { return st.ready; },
       // Photos à envoyer (null si rien n'a changé) ; les photos hors format sont recadrées au centre avant l'envoi.
       payload: function () {
         var off = st.list.filter(function (x) { return x.off; });
@@ -4166,6 +4186,7 @@
      sinon une simple copie du lien, nommée comme telle ; aucun message prérempli, aucun SDK.
      Instagram / TikTok : pas de partage de lien par URL ; image verticale + lien à copier + consigne honnête. */
   var ICONS = {
+    spark: 'M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4L12 3ZM19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z',
     globe: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3.5 9h17M3.5 15h17M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9s1.2-6.4 3.7-9Z',
     copy: 'M9 9h10v12H9zM5 15V3h10',
     tag: 'M3.5 12.5V4.5a1 1 0 0 1 1-1h8l8 8a1.5 1.5 0 0 1 0 2.1l-6.9 6.9a1.5 1.5 0 0 1-2.1 0l-8-8ZM8 8h.01',
@@ -6942,6 +6963,105 @@
     }, function () {});
     return line;
   }
+  /* ----- Fii Studio, niveau 1 (docs/PLAN-FII-STUDIO.md) : 3 versions « pro » de la photo principale (décor, lumière, ombre),
+     le produit garde ses pixels. 1 crédit si la boutique garde une version ; sinon rien n'est débité. Visible seulement quand
+     le Studio est ouvert (réglage studio_ready, après la clé du fournisseur). */
+  var STUDIO_STYLES = [['blanc', 'Blanc', '#FFFFFF'], ['minimal', 'Minimal', '#E9DFD0'], ['luxe', 'Luxe', '#2B2A28'], ['soleil', 'Soleil', '#F2B544'], ['fete', 'Fête', '#B5452F']];
+  function studioCall(body) {
+    return freshToken().then(function () {
+      return fetch(API_URL + '/functions/v1/fiila-studio', { method: 'POST', headers: apiHeaders(), body: JSON.stringify(Object.assign({ key: shopKey() }, body)) });
+    }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (b) { if (!r.ok && !b.error) b.error = 'server'; return b; }); },
+      function () { return { error: 'network' }; });
+  }
+  function studioRow(pr, photos, saveStay) {
+    var row = h('div', { id: 'studio-row' });
+    sapi('fiila_studio_state', { p_product: pr.id }).then(function (st) {
+      if (!st || !st.ready) return;
+      var n = (st.credits && st.credits.total) || 0;
+      setKids(row, h('button', { type: 'button', class: 'studio-row', id: 'studio-open', onclick: function () { studioSheet(pr, photos, saveStay, st); } },
+        h('span', { class: 'studio-ic', 'aria-hidden': 'true' }, icon('spark', 22)),
+        h('span', { class: 'studio-t' }, h('b', null, 'Studio'), h('small', null, 'Rendre la photo pro')),
+        h('span', { class: 'chip ' + (n ? 'ok' : 'neutral'), id: 'studio-credits' }, n + (n > 1 ? ' crédits' : ' crédit'))));
+    }, function () { /* Studio indisponible : rien n'est montré */ });
+    return row;
+  }
+  function studioSheet(pr, photos, saveStay, st) {
+    var style = 'blanc', job = null, pick = null, busy = false, closeSheet;
+    var credits = (st.credits && st.credits.total) || 0;
+    var body = h('div', { class: 'stack', id: 'studio-body' });
+    var err = h('div', { role: 'alert' });
+    var back = h('div', { class: 'sheet-back', id: 'studio-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'studio-h', onclick: function (e) { if (e.target === back && !busy) closeSheet(); } },
+      h('div', { class: 'sheet studio-sheet' },
+        h('div', { class: 'brand-row' }, h('h2', { id: 'studio-h' }, icon('spark', 22), ' Studio'),
+          h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Fermer', id: 'studio-close', onclick: function () { if (!busy) closeSheet(); } }, icon('close', 20))),
+        body, err));
+    function styles() {
+      return h('div', { class: 'studio-styles', role: 'radiogroup', 'aria-label': 'Style du décor' }, STUDIO_STYLES.map(function (x) {
+        return h('button', { type: 'button', role: 'radio', 'aria-checked': String(style === x[0]), class: 'studio-style' + (style === x[0] ? ' on' : ''), 'data-style': x[0],
+          onclick: function () { style = x[0]; draw(); } }, h('span', { class: 'sw', style: 'background:' + x[2] }), h('span', null, x[1]));
+      }));
+    }
+    function draw() {
+      setKids(err);
+      if (busy) {
+        setKids(body, h('p', { class: 'small muted', role: 'status' }, 'Création des 3 versions… environ 10 secondes.'),
+          h('div', { class: 'studio-grid' }, [0, 1, 2].map(function () { return h('div', { class: 'studio-tile loading-skel', 'aria-hidden': 'true' }); })));
+        return;
+      }
+      if (job && job.results && job.results.length) {
+        var tiles = job.results.map(function (u, i) {
+          return h('button', { type: 'button', class: 'studio-tile' + (pick === i ? ' on' : ''), id: 'studio-res-' + i, 'aria-pressed': String(pick === i),
+            'aria-label': 'Version ' + (i + 1), onclick: function () { pick = i; draw(); } }, h('img', { src: u, alt: '' }));
+        });
+        setKids(body,
+          h('div', { class: 'studio-orig' }, h('img', { src: pr.photo, alt: 'Photo d’origine' }), h('small', null, 'Original')),
+          h('div', { class: 'studio-grid' }, tiles),
+          h('button', { class: 'btn big full', type: 'button', id: 'studio-keep', disabled: pick == null || null, onclick: keep }, 'Garder cette version'),
+          h('button', { class: 'btn link', type: 'button', id: 'studio-again', onclick: function () { job = null; pick = null; draw(); } }, 'Essayer un autre style'));
+        return;
+      }
+      setKids(body,
+        h('div', { class: 'studio-orig solo' }, h('img', { src: pr.photo, alt: 'Photo d’origine' })),
+        styles(),
+        credits ? h('button', { class: 'btn big full', type: 'button', id: 'studio-run', onclick: run }, 'Créer 3 versions') :
+          h('p', { class: 'notice', id: 'studio-empty' }, 'Plus de crédit Studio pour le moment.'),
+        h('p', { class: 'small muted' }, 'Le produit reste tel quel : seul le décor change. 1 crédit si vous gardez une version.'));
+    }
+    function run() {
+      busy = true; draw(); track('studio', 'run:' + style);
+      studioCall({ action: 'render', product: pr.id, style: style }).then(function (r) {
+        busy = false;
+        if (r.configured === false) { draw(); errBox(err, new ApiError('studio_off')); return; }
+        if (r.error || r.status !== 'done') { draw(); errBox(err, new ApiError(STUDIO_ERR[r.error] ? r.error : 'studio_failed')); return; }
+        job = { id: r.job, results: r.results }; pick = null; draw();
+      });
+    }
+    function keep() {
+      if (pick == null || !job) return;
+      if (!photos.isReady()) { toast('Photos de l’article en cours de chargement : réessayez dans un instant.'); return; }
+      var b = document.getElementById('studio-keep'); if (b) b.disabled = true;
+      sapi('fiila_studio_keep', { p_job: job.id, p_index: pick }).then(function (k) {
+        credits = (k.credits && k.credits.total) || 0;
+        track('studio', 'kept:' + style);
+        return studioCall({ action: 'take', job: job.id, index: pick });
+      }).then(function (t) {
+        if (!t || !t.image) throw new ApiError(t && t.error === 'expired' ? 'studio_expired' : 'studio_failed');
+        // Sans fetch (la politique de sécurité de la page n'autorise pas les adresses data:) : décodage direct.
+        var m = /^data:([^;,]+);base64,(.*)$/.exec(t.image);
+        if (!m) throw new ApiError('studio_failed');
+        var bin = atob(m[2]), u8 = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        return importProductPhoto(new File([u8], 'studio.' + (m[1] === 'image/jpeg' ? 'jpg' : 'png'), { type: m[1] }));
+      }).then(function (d) {
+        photos.addFront(d.photo);
+        return saveStay();
+      }).then(function () { closeSheet(); render(); }, function (e) { if (b) b.disabled = false; errBox(err, e); });
+    }
+    track('studio', 'open:' + style);
+    draw();
+    closeSheet = openSheet(back);
+  }
+  var STUDIO_ERR = { studio_off: 1, studio_no_photo: 1, studio_no_credits: 1, studio_budget: 1, studio_daily_limit: 1, studio_busy: 1, studio_failed: 1, studio_expired: 1 };
   function productForm(pr, shop, fresh) {
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
     f.category = pr && pr.category || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');
@@ -6954,7 +7074,9 @@
     var zone = h('div', { class: 'stack' });
     var photos = productPhotos(pr);
     var photoBox = photos.el;
-    var btn = h('button', { class: 'btn', type: 'button', id: 'product-save', onclick: function () {
+    var btn = h('button', { class: 'btn', type: 'button', id: 'product-save', onclick: function () { save(false); } }, pr ? 'Enregistrer' : 'Ajouter l’article');
+    // stay : enregistrement sur place (Studio), sans quitter l'écran.
+    function save(stay) {
       setKids(err);
       var price = parseInt(String(f.price).replace(/\D/g, ''), 10);
       if (!f.name.trim()) return errBox(err, new ApiError('item_label_required'));
@@ -6964,21 +7086,23 @@
       var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active,
         category: f.category || null, sizes: splitTags(f.sizes), colors: splitTags(f.colors), stock: stock };
       btn.disabled = true;
-      photos.payload().then(function (pp) {
+      return photos.payload().then(function (pp) {
         if (pp) { p.photo = pp.photo; p.photos = pp.photos; }
         return sapi('fiila_product_save', { p: p });
       }).then(function (res) {
         if (!pr) { track('product_created', photos.count() ? 'photo' : 'no_photo'); LS.del(PRODUCT_DRAFT); resumeDone('product'); }
         var nid = res && (res.id || (res.product && res.product.id));
+        if (stay) { btn.disabled = false; toast('Photo Studio enregistrée.'); return res; }
         if (!pr && nid && p.active !== false) { go('#/boutique/article/' + nid + '?publier=1'); return; }
         toast(pr ? 'Article mis à jour.' : 'Article ajouté.'); go('#/boutique/articles');
-      }, function (e) { btn.disabled = false; errBox(err, e); });
-    } }, pr ? 'Enregistrer' : 'Ajouter l’article');
+      }, function (e) { btn.disabled = false; errBox(err, e); if (stay) throw e; });
+    }
     return page(backBtn('Mes articles', '#/boutique/articles'),
       pr && pr.active ? publishBox(pr, shop, fresh) : null,
       secHead('products', 'tag', pr ? 'Modifier l’article' : 'Nouvel article'),
       pr ? productStats(pr.id) : null,
       photoBox,
+      pr && pr.photo ? studioRow(pr, photos, function () { return save(true); }) : null,
       textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; keepP(); } }),
       textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; keepP(); } }),
       textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, onInput: function (v) { f.description = v; keepP(); } }),
@@ -8021,6 +8145,7 @@
     ['boutiques', 'shop', 'Boutiques', 'shops', 'suspended', 'Opérations'],
     ['commandes', 'box', 'Commandes', 'orders', null, 'Opérations'],
     ['domaines', 'globe', 'Domaines', 'shops', null, 'Opérations'],
+    ['studio', 'spark', 'Studio', 'shops', null, 'Opérations'],
     ['comptes', 'user', 'Comptes', 'accounts', null, 'Opérations'],
     ['fil', 'heart', 'Fil (25 places)', 'feed', null, 'Opérations'],
     ['ambassadeurs', 'star', 'Ambassadeurs', 'partners', null, 'Programmes'],
@@ -8285,6 +8410,7 @@
           case 'boutiques': return id ? boShop(id) : boShops(q);
           case 'commandes': return id ? boOrder(id) : boOrders(q);
           case 'domaines': return boDomains();
+          case 'studio': return boStudio();
           case 'comptes': return id ? boAccount(id) : boAccounts(q);
           case 'moderation': return boEmbed(viewAdminComments).then(function (b) { return boShell(sec, 'Modération', b); });
           case 'vide-dressing': return boEmbed(viewAdminVd).then(function (b) { return boShell(sec, 'Vide-dressing', b); });
@@ -8493,6 +8619,62 @@
   }
   // ----- Domaines des boutiques (Site Pro) : nom d'hôte, boutique, statut de vérification et de certificat, erreur ;
   // revérifier (fonction fiila-domains) et déconnecter avec motif (journal). docs/PLAN-DOMAINES-FII.md §4.
+  // ----- Fii Studio : ouvert ou non, dépense du mois face au budget, séries (gardées, en échec), crédits des boutiques ;
+  // accorder ou retirer des crédits (motif obligatoire, au journal). docs/PLAN-FII-STUDIO.md.
+  var STUDIO_ST = { running: ['warn', 'En cours'], done: ['info', 'Proposée'], kept: ['ok', 'Gardée'], failed: ['danger', 'Échec'] };
+  function boStudio() {
+    return api('fiila_bo_studio', {}).then(function (d) {
+      var m = d.month || {}, spent = Number(d.spent_usd || 0), budget = Number(d.budget_usd || 0);
+      var pct = budget ? Math.min(100, Math.round(spent / budget * 100)) : 100;
+      var q = h('input', { type: 'search', id: 'bo-studio-shop', placeholder: 'Nom de la boutique', autocomplete: 'off' });
+      var found = h('div', { id: 'bo-studio-found' }), chosen = null;
+      var delta = h('input', { type: 'text', inputmode: 'numeric', id: 'bo-studio-delta', placeholder: 'Ex. : 10 ou -5' });
+      var reason = h('input', { type: 'text', id: 'bo-studio-reason', maxlength: 200, placeholder: 'Motif (journal)' });
+      q.addEventListener('input', function () {
+        var v = q.value.trim(); chosen = null;
+        if (v.length < 2) { setKids(found); return; }
+        api('fiila_bo_shops', { p_q: v, p_filter: null, p_page: 0 }).then(function (r) {
+          setKids(found, h('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px' }, (r.shops || []).slice(0, 6).map(function (x) {
+            return h('button', { type: 'button', class: 'chip neutral', 'data-shop': x.id, onclick: function () { chosen = x; q.value = x.name; setKids(found, h('small', { class: 'muted' }, 'Boutique choisie : ' + x.name)); } }, x.name);
+          })));
+        }, function () {});
+      });
+      var grant = boCan('shops_write') ? h('section', { class: 'card stack tight', id: 'bo-studio-grant' }, h('h3', null, 'Accorder des crédits'),
+        h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Boutique'), q), found,
+        h('div', { class: 'row', style: 'gap:8px' }, h('label', { class: 'field', style: 'flex:1' }, h('span', { class: 'lbl' }, 'Crédits'), delta),
+          h('label', { class: 'field', style: 'flex:2' }, h('span', { class: 'lbl' }, 'Motif'), reason)),
+        h('button', { class: 'btn', type: 'button', id: 'bo-studio-go', onclick: function () {
+          var n = parseInt(String(delta.value).replace(/[^\d-]/g, ''), 10);
+          if (!chosen) { toast('Choisissez une boutique.'); return; }
+          if (!n) { toast('Indiquez un nombre de crédits.'); return; }
+          if (!reason.value.trim()) { toast('Indiquez un motif.'); reason.focus(); return; }
+          boAct(function () { return api('fiila_bo_studio_grant', { p_shop: chosen.id, p_delta: n, p_reason: reason.value }); }, 'Crédits mis à jour.', null, null, this);
+        } }, 'Enregistrer')) : null;
+      return boShell('studio', 'Studio', [
+        h('p', { class: 'small', id: 'bo-studio-state' }, d.ready ? boBadge('ok', 'Ouvert') : boBadge('muted', 'Fermé'),
+          ' Ouvert ou fermé, budget du mois et séries par boutique : Réglages (studio_ready, studio_budget_usd, studio_daily).'),
+        h('div', { class: 'bo-kpis small' },
+          h('div', { class: 'bo-kpi' }, h('strong', { id: 'bo-studio-spent' }, '$' + spent.toFixed(2)), h('span', null, 'dépensés ce mois sur $' + budget + ' (' + pct + ' %)')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.series || 0)), h('span', null, 'séries')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.kept || 0)), h('span', null, 'versions gardées')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.failed || 0)), h('span', null, 'échecs')),
+          h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.shops || 0)), h('span', null, 'boutiques'))),
+        grant,
+        h('h3', null, 'Crédits des boutiques'),
+        boTable([
+          { label: 'Boutique', get: function (x) { return h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop); } },
+          { label: 'Crédits', get: function (x) { return boNum(x.credits); } },
+          { label: 'Mis à jour', get: function (x) { return boDate(x.updated_at); }, cls: 'hide-s' }], d.wallets || [], { id: 'bo-studio-wallets', empty: 'Aucun crédit accordé.' }),
+        h('h3', null, 'Dernières séries'),
+        boTable([
+          { label: 'Boutique', get: function (x) { return h('span', { class: 'stack tight', style: 'gap:0' }, h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop), h('small', { class: 'muted' }, x.product)); } },
+          { label: 'Style', get: function (x) { var t = STUDIO_STYLES.filter(function (y) { return y[0] === x.style; })[0]; return t ? t[1] : x.style; } },
+          { label: 'Statut', get: function (x) { var t = STUDIO_ST[x.status] || ['muted', x.status]; return h('span', null, boBadge(t[0], t[1]), x.error ? h('small', { class: 'muted' }, ' ' + x.error) : null); } },
+          { label: 'Coût', get: function (x) { return '$' + Number(x.cost_usd || 0).toFixed(2); }, cls: 'hide-s' },
+          { label: 'Date', get: function (x) { return boDate(x.created_at); }, cls: 'hide-s' }], d.jobs || [], { id: 'bo-studio-jobs', empty: 'Aucune série pour le moment.' })
+      ]);
+    }, function (e) { return boShell('studio', 'Studio', stateCard('!', 'Chargement impossible', errText(e))); });
+  }
   function boDomains() {
     return api('fiila_bo_domains', {}).then(function (d) {
       var ST = { pending: ['warn', 'En attente du DNS'], verifying: ['warn', 'Vérification'], active: ['ok', 'Actif'], failed: ['danger', 'Erreur'],
@@ -9423,7 +9605,7 @@
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’agent versé',
     reward_cancelled: 'a annulé un gain d’agent', reward_validated: 'a validé un gain d’agent', ambassador_active: 'a activé un agent',
-    domain_disconnect: 'a déconnecté le domaine', ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
+    domain_disconnect: 'a déconnecté le domaine', studio_grant: 'a modifié les crédits Studio de', ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
     view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique',
     career_reply: 'a répondu à l’agent', career_objective: 'a fixé le cap du mois :', career_mission: 'a modifié la mission', career_note_accepted: 'a accepté la proposition du Manager', career_note_rejected: 'a écarté la proposition du Manager' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain agent, niveau 1', 'FCFA'], amb_reward_2: ['Gain agent, niveau 2', 'FCFA'],
@@ -9436,7 +9618,10 @@
     wa_card_media: ['Carte image avec la demande d’adresse sur WhatsApp', '0 = texte seul, 1 = image + texte'],
     media_cdn: ['Photos servies par le stockage (adresse fixe, mise en cache)', '0 = servies par la base, 1 = stockage'],
     custom_domains: ['Domaines propres des boutiques Premium (Site Pro)', '0 = coupés, 1 = ouverts'],
-    shop_subdomains: ['Adresses <lien>.fii.shop des boutiques', '0 = coupées, 1 = ouvertes'] };
+    shop_subdomains: ['Adresses <lien>.fii.shop des boutiques', '0 = coupées, 1 = ouvertes'],
+    studio_ready: ['Fii Studio ouvert aux boutiques', '0 = fermé, 1 = ouvert (après la clé du fournisseur)'],
+    studio_budget_usd: ['Budget mensuel du Studio', 'USD (au-delà, le Studio se met en pause)'],
+    studio_daily: ['Séries Studio par boutique et par jour', 'séries'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

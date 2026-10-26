@@ -31,10 +31,10 @@ function sim({ target = DOM, cf = {} } = {}) {
 }
 const req = (body, auth = 'Bearer anon-test') => new Request('https://x/functions/v1/fiila-domains', { method: 'POST', body: JSON.stringify(body), headers: auth ? { authorization: auth } : {} });
 
-await t('fonction : sans session refusée ; action inconnue refusée ; domaine d’une autre boutique → 403', async () => {
+await t('fonction : sans session, la base décide ; action inconnue refusée ; domaine d’une autre boutique → 403', async () => {
   const s = sim({ target: null });
   const h = makeHandler({ env: (k) => CF_ENV[k], fetch: s.fetch });
-  assert.equal((await h(req({ action: 'sync', id: 'd1' }, null))).status, 401);
+  assert.equal((await h(req({ action: 'sync', id: 'd1' }, null))).status, 403, 'sans session : la base décide (ici, refus)');
   assert.equal((await h(req({ action: 'delete', id: 'd1' }))).status, 400);
   assert.equal((await h(req({ action: 'sync', id: 'd1', key: 'k' }))).status, 403);
   assert.ok(!s.calls.some((c) => c.url.includes('cloudflare')), 'rien n’est envoyé à Cloudflare');
