@@ -69,7 +69,8 @@ async function indexHtml(env, req) {
 }
 
 export async function handle(req, env, deps = {}) {
-  deps = { fetch: deps.fetch || fetch, cache: 'cache' in deps ? deps.cache : (typeof caches !== 'undefined' ? caches.default : null) };
+  deps = { fetch: deps.fetch || ((u, i) => fetch(u, i)),   // fetch lié : appelé comme méthode, Cloudflare refuse (« Illegal invocation »)
+     cache: 'cache' in deps ? deps.cache : (typeof caches !== 'undefined' ? caches.default : null) };
   const url = new URL(req.url), host = url.hostname.toLowerCase(), path = url.pathname;
   const hosts = hostsOf(env), canonical = String(env.CANONICAL_HOST || '').toLowerCase();
   if (canonical && host === 'www.' + canonical) return Response.redirect(`https://${canonical}${path}${url.search}`, 301);
