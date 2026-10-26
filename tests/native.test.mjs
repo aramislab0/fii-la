@@ -202,6 +202,9 @@ await t('web (sans coquille native) : rien ne change — « Je veux ce modèle �
   assert.ok((await p.locator('#shop-type').boundingBox()).height >= 48, 'liste déroulante pleine hauteur');
   const foot = await p.locator('footer.foot .foot-links a').first().evaluate((a) => { const r = getComputedStyle(a); return parseFloat(r.paddingTop) + parseFloat(r.paddingBottom) + a.getBoundingClientRect().height; });
   assert.ok(foot >= 40, 'zone de toucher du pied de page : ' + foot);
+  // Titre repliable (flex) avec groupe insécable : un seul bloc de texte, pas « vous      aide ? » (audit iPhone, 26/10).
+  const sum = await p.evaluate(() => { const x = [...document.querySelectorAll('summary')].find((e) => /Un agent Fii vous/.test(e.textContent)); return x ? [...x.childNodes].filter((n) => n.nodeType === 1 || n.textContent.trim()).map((n) => n.textContent.trim()) : null; });
+  assert.ok(sum && sum.some((tx) => /^Un agent Fii vous aide\s?\?$/.test(tx)), JSON.stringify(sum));
   await ctx.close();
 });
 

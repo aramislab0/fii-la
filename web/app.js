@@ -197,13 +197,16 @@
   }
   function typo(t) {
     if (t.length < 3 || !/[«»:;!?]|\d /.test(t)) return document.createTextNode(t);
-    var parts = t.split(/( +)/), frag = document.createDocumentFragment(), buf = '';
+    // Un seul élément en ligne autour du texte : dans un conteneur flex (titre de section repliable, bouton), le texte et ses
+    // groupes insécables restent un seul bloc au lieu d'être écartés comme des éléments séparés (constaté sur iPhone, 26/10).
+    var parts = t.split(/( +)/), frag = document.createElement('span'), buf = '', glued = false;
     for (var i = 0; i < parts.length; i += 2) {
       var w = parts[i], sp = parts[i + 1] || '', g = w, j = i;
       while (j + 2 < parts.length && parts[j + 2] !== '' && typoGlue(parts[j], parts[j + 2])) { g += parts[j + 1] + parts[j + 2]; j += 2; }
-      if (j > i) { if (buf) { frag.append(buf); buf = ''; } var el = document.createElement('span'); el.className = 'nb'; el.textContent = g; frag.append(el); buf = parts[j + 1] || ''; i = j; }
+      if (j > i) { glued = true; if (buf) { frag.append(buf); buf = ''; } var el = document.createElement('span'); el.className = 'nb'; el.textContent = g; frag.append(el); buf = parts[j + 1] || ''; i = j; }
       else buf += w + sp;
     }
+    if (!glued) return document.createTextNode(t);
     if (buf) frag.append(buf);
     return frag;
   }
