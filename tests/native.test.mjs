@@ -47,7 +47,7 @@ function fakeNative({ platform, prefs }) {
 async function newApp({ platform = 'android', prefs = {}, local: ls = {} } = {}) {
   const ctx = await browser.newContext({ viewport: phone.viewport, deviceScaleFactor: 2, isMobile: ENGINE === 'chromium', hasTouch: true, userAgent: phone.userAgent, locale: 'fr-FR' });
   await ctx.route('**/config.js', (r) => r.fulfill({ contentType: 'text/javascript',
-    body: `window.FIILA_CONFIG={supabaseUrl:location.origin,supabaseKey:'local-test-key',publicUrl:'https://fii.app/',serviceWorker:false,native:true};` }));
+    body: `window.FIILA_CONFIG={supabaseUrl:location.origin,supabaseKey:'local-test-key',publicUrl:'https://getfii.app/',serviceWorker:false,native:true};` }));
   await ctx.addInitScript(fakeNative, { platform, prefs });
   if (Object.keys(ls).length) await ctx.addInitScript((x) => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); for (const k in x) localStorage.setItem(k, x[k]); } }, ls);
   const page = await ctx.newPage();
@@ -143,7 +143,7 @@ await t('partage natif : image écrite dans le cache puis confiée au partage du
   const sh = await p.evaluate(() => window.__shared), files = await p.evaluate(() => window.__files);
   assert.equal(files.length, 2); assert.equal(files[0].dir, 'CACHE'); assert.match(files[0].path, /^share\/\d+-0\/robe-mobile-test\.jpg$/, 'nom de fichier propre (affiché par la feuille de partage)'); assert.ok(files[0].size > 1000);
   assert.deepEqual(sh[0].files, ['file:///cache/' + files[0].path]); assert.equal(sh[0].text, undefined);
-  assert.match(sh[1].files[0], /robe-mobile-test-story\.jpg$/); assert.match(sh[1].text, /Robe mobile \(test\)[\s\S]*Pour commander : https:\/\/fii\.app\/#\/b\//, 'lien public, pas l’adresse interne de l’app');
+  assert.match(sh[1].files[0], /robe-mobile-test-story\.jpg$/); assert.match(sh[1].text, /Robe mobile \(test\)[\s\S]*Pour commander : https:\/\/getfii\.app\/#\/b\//, 'lien public, pas l’adresse interne de l’app');
   await p.context().close();
 });
 
@@ -161,11 +161,11 @@ await t('liens externes : WhatsApp ouvert par le téléphone, l’app reste ; li
   await p.waitForFunction(() => window.__opened.length === 1);
   assert.equal(await p.evaluate(() => window.__opened[0]), 'https://wa.me/221770000000');
   assert.equal(await p.evaluate(() => location.hash), '#/boutique/reglages');
-  await p.evaluate(() => { const a = document.createElement('a'); a.id = 'x-fii'; a.href = 'https://fii.app/#/confidentialite'; a.textContent = 'y'; document.getElementById('app').append(a); });
+  await p.evaluate(() => { const a = document.createElement('a'); a.id = 'x-fii'; a.href = 'https://getfii.app/#/confidentialite'; a.textContent = 'y'; document.getElementById('app').append(a); });
   await p.click('#x-fii');
   await p.waitForFunction(() => location.hash === '#/confidentialite');
   assert.equal(await p.evaluate(() => window.__opened.length), 1, 'lien de Fii : dans l’app');
-  await p.evaluate((slug) => window.__listeners.appUrlOpen({ url: 'https://fii.app/#/b/' + slug }), SLUG);
+  await p.evaluate((slug) => window.__listeners.appUrlOpen({ url: 'https://getfii.app/#/b/' + slug }), SLUG);
   await p.waitForFunction((slug) => location.hash === '#/b/' + slug, SLUG);
   await p.getByText('Robe mobile (test)').first().waitFor();
   await p.evaluate(() => window.__listeners.appUrlOpen({ url: 'fii://boutique' }));

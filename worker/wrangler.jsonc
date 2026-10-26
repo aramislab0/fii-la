@@ -14,13 +14,34 @@
     "not_found_handling": "none"
   },
   "vars": {
-    "FII_HOSTS": "fii.app",
-    "CANONICAL_HOST": "fii.app",
-    "SHOP_ZONE": "fii.shop",
+    "FII_HOSTS": "getfii.app",
+    "CANONICAL_HOST": "getfii.app",
+    "SHOP_ZONE": "getfii.app",
     "LEGACY_PREFIX": "https://aramislab0.github.io/fii-la/",
     "SUPABASE_URL": "https://lkvulwocirttozfnyxck.supabase.co",
     "SUPABASE_ANON_KEY": "REMPLACÉ_PAR_LA_CI"
+  },
+  // Production (bascule, accord du fondateur) : getfii.app et www en domaines personnalisés du Worker ; *.getfii.app/* (sites des
+  // boutiques) demande un enregistrement DNS « * » proxifié dans la zone. Les variables sont reprises à l'identique.
+  "env": {
+    "production": {
+      "name": "fii",
+      "routes": [
+        { "pattern": "getfii.app", "custom_domain": true },
+        { "pattern": "www.getfii.app", "custom_domain": true },
+        { "pattern": "*.getfii.app/*", "zone_name": "getfii.app" }
+      ],
+      "vars": {
+        "FII_HOSTS": "getfii.app",
+        "CANONICAL_HOST": "getfii.app",
+        "SHOP_ZONE": "getfii.app",
+        "LEGACY_PREFIX": "https://aramislab0.github.io/fii-la/",
+        "SUPABASE_URL": "https://lkvulwocirttozfnyxck.supabase.co",
+        "SUPABASE_ANON_KEY": "REMPLACÉ_PAR_LA_CI"
+      }
+    }
   }
-  // Routes (à la bascule) : fii.app/*, www.fii.app/* ; fii.shop/*, *.fii.shop/* (sites des boutiques) ; */* (domaines propres,
-  // Cloudflare for SaaS sur la zone fii.shop, cible sites.fii.shop). Domaine principal : fii.app, ou fii.com si acquis (à confirmer).
+  // Domaine acheté le 26/10/2026 (Porkbun) : getfii.app, pour l'application et les sites des boutiques (<lien>.getfii.app).
+  // Routes (à la bascule, accord du fondateur) : getfii.app/*, *.getfii.app/* ; */* pour les domaines propres (Cloudflare for SaaS
+  // sur la zone getfii.app, cible sites.getfii.app).
 }

@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Liens https://fii.app/… ouverts dans l'app (retour de paiement, liens partagés) ; fichier
-	     https://fii.app/.well-known/apple-app-site-association avec l'identifiant d'équipe Apple. -->
+	<!-- Liens https://getfii.app/… ouverts dans l'app (retour de paiement, liens partagés) ; fichier
+	     https://getfii.app/.well-known/apple-app-site-association avec l'identifiant d'équipe Apple. -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:fii.app</string>
-		<string>applinks:www.fii.app</string>
+		<string>applinks:getfii.app</string>
+		<string>applinks:www.getfii.app</string>
 	</array>
 </dict>
 </plist>

@@ -1,5 +1,9 @@
 # Plan — Domaine principal de Fii et domaines des boutiques
 
+> **v3, 26/10/2026 21:50 — domaine acheté par le fondateur : `getfii.app` (Porkbun, 8,75 USD la 1ʳᵉ année, 14,93 USD/an ensuite).** Un seul domaine pour l'application (`getfii.app`) et les sites des boutiques (`<lien>.getfii.app`) ; cible des domaines propres : `sites.getfii.app`. `fii.app` (3 895 USD) et `fii.shop` (2 184 USD la 1ʳᵉ année) étaient des noms premium : non achetés. Partout ci-dessous, lire `getfii.app` pour `fii.app` et pour `fii.shop`. Le domaine est chez Porkbun ; seule la zone DNS passe chez Cloudflare (gratuit), le registraire ne change pas.
+> **Isolation :** les sites des boutiques sont des sous-domaines du domaine de l'application, donc des origines distinctes (stockage séparé) mais le même « site » au sens des cookies. Fii n'utilise pas de cookies de session (stockage local par origine), donc pas d'effet. Sous-domaines réservés à Fii (jamais une boutique) : www, sites, api, admin, mail, aide, docs, blog, status, staging, preview, dev, test, demo, pay, paiement…
+> **Mise en ligne du Worker :** workflow manuel `.github/workflows/worker.yml` — `preprod` (adresse `*.workers.dev`, sans effet) puis `production` (bascule, accord du fondateur).
+
 > v2, 24/10/2026 17:00 — **domaines changés par le fondateur (24/10 16:51) : `fii.app` (ou `fii.com`) pour l'application, `fii.shop` pour les sites des boutiques.** v1 (`fiila.app`) remplacée.
 > v1, 24/10/2026, Builder (Claude Code). Mandat du fondateur du 24/10 (domaine principal + domaine propre d'une boutique).
 > **Rien n'est acheté, aucun DNS n'est modifié, aucun service payant n'est activé sans accord du fondateur.**

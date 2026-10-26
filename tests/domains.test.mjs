@@ -47,7 +47,7 @@ async function origin({ host = null, config = null } = {}) {
     }
     const relay = () => fetch(URL0 + u.pathname.slice(1) + u.search, { method: req.method, headers: { 'content-type': req.headers['content-type'] || 'application/json', authorization: req.headers.authorization || '' }, body });
     if (!host || /^\/(rest|auth|functions)\/v1\//.test(u.pathname)) return send(await relay());
-    const env = { FII_HOSTS: 'fii.app', CANONICAL_HOST: 'fii.app', SHOP_ZONE: 'fii.shop', SUPABASE_URL: URL0, SUPABASE_ANON_KEY: 'local-test-key',
+    const env = { FII_HOSTS: 'getfii.app', CANONICAL_HOST: 'getfii.app', SHOP_ZONE: 'getfii.app', SUPABASE_URL: URL0, SUPABASE_ANON_KEY: 'local-test-key',
       ASSETS: { fetch: (r) => fetch(URL0 + new URL(r.url).pathname.slice(1)) } };
     return send(await handle(new Request('https://' + host + u.pathname + u.search), env, { cache: null }));
   });
@@ -111,7 +111,7 @@ await t('domaine inconnu (Worker) : « Site introuvable » sans l’application 
   assert.equal(r.status(), 404);
   await p.getByRole('heading', { name: 'Site introuvable' }).waitFor();
   assert.equal(await p.locator('script[src*="app.js"]').count(), 0);
-  const guarded = await origin({ config: { appHosts: ['fii.app'] } });
+  const guarded = await origin({ config: { appHosts: ['getfii.app'] } });
   await p.goto(guarded + '/#/boutique');
   await p.locator('#app').getByText('Site introuvable').waitFor();
   assert.equal(await p.locator('#shop-name').count(), 0);
@@ -172,7 +172,7 @@ await t('transfert : écran d’arrivée ouvert seul (sans l’ancienne fenêtre
 await t('Mon domaine : enregistrements affichés tels que renvoyés, copier, vérifier, déconnecter', async () => {
   const D2 = await ok('fiila_domain_add', { p_key: KEY, p_host: 'maison-awa.sn' });
   await ok('fiila_domain_cf_update', { p_id: D2.id, p: { cf_id: 'cf-2', cf_status: 'pending', ssl_status: 'pending_validation', records: [
-    { type: 'CNAME', name: 'maison-awa.sn', value: 'sites.fii.shop', purpose: 'route' },
+    { type: 'CNAME', name: 'maison-awa.sn', value: 'sites.getfii.app', purpose: 'route' },
     { type: 'TXT', name: '_cf-custom-hostname.maison-awa.sn', value: 'verif-123', purpose: 'ownership' }] } }, { role: 'service_role' });
   const p = await newPhone({ fn: (k) => { if (!localStorage.getItem('fiila.shop')) localStorage.setItem('fiila.shop', JSON.stringify({ key: k })); }, arg: KEY });
   await p.goto(URL0 + '#/boutique/reglages');
@@ -206,12 +206,12 @@ await t('boutique gratuite : « Mon domaine » montre le Premium, sans formulair
   await p.context().close();
 });
 
-await t('zone des sites en service : lien partagé <lien>.fii.shop ; sans domaines en service, pas de ligne « Mon domaine »', async () => {
-  const live = await origin({ config: { shopZone: 'fii.shop' } });
+await t('zone des sites en service : lien partagé <lien>.getfii.app ; sans domaines en service, pas de ligne « Mon domaine »', async () => {
+  const live = await origin({ config: { shopZone: 'getfii.app' } });
   const p = await newPhone({ fn: (k) => { if (!localStorage.getItem('fiila.shop')) localStorage.setItem('fiila.shop', JSON.stringify({ key: k })); }, arg: KEY });
   await p.goto(live + '/#/boutique/reglages');
   await p.locator('#vitrine-url').waitFor();
-  assert.equal((await p.locator('#vitrine-url').textContent()).trim(), 'https://' + SLUG + '.fii.shop/#/b/' + SLUG);
+  assert.equal((await p.locator('#vitrine-url').textContent()).trim(), 'https://' + SLUG + '.getfii.app/#/b/' + SLUG);
   assert.equal(await p.locator('#vitrine-domain').count(), 0);
   await p.context().close();
 });

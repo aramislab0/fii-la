@@ -37,7 +37,7 @@ await t('boutique gratuite : liste visible, ajout refusé (Premium requis)', asy
 
 await t('noms refusés : IP, domaines de Fii, hébergeurs, localhost, sans extension, caractères invalides', async () => {
   await premium(A); await premium(B);
-  for (const h of ['1.2.3.4', 'fii.app', 'www.fii.com', 'maison.fii.shop', 'fiila.app', 'shop.fiila.app', 'x.github.io', 'abc.supabase.co', 'a.workers.dev', 'localhost', 'boutique', 'ma boutique.sn', 'a..sn', '-a.sn', 'x.test'])
+  for (const h of ['1.2.3.4', 'getfii.app', 'www.fii.com', 'maison.getfii.app', 'fiila.app', 'shop.fiila.app', 'x.github.io', 'abc.supabase.co', 'a.workers.dev', 'localhost', 'boutique', 'ma boutique.sn', 'a..sn', '-a.sn', 'x.test'])
     await ko('fiila_domain_add', { p_key: A.key, p_host: h }, 'domain_invalid');
 });
 
@@ -71,7 +71,7 @@ await t('écriture du résultat Cloudflare : refusée aux rôles publics, permis
   await ko('fiila_domain_cf_update', { p_id: dA.id, p: { cf_status: 'active', ssl_status: 'active' } }, 'permission denied');
   await ko('fiila_domain_cf_update', { p_id: dA.id, p: { cf_status: 'active', ssl_status: 'active' } }, 'permission denied', F);
   const r = await ok('fiila_domain_cf_update', { p_id: dA.id, p: { cf_id: 'cf-1', cf_status: 'pending', ssl_status: 'pending_validation',
-    records: [{ type: 'CNAME', name: 'www.maison-awa.sn', value: 'sites.fii.shop', purpose: 'route' }] } }, SR);
+    records: [{ type: 'CNAME', name: 'www.maison-awa.sn', value: 'sites.getfii.app', purpose: 'route' }] } }, SR);
   assert.equal(r.status, 'verifying'); assert.equal(r.records.length, 1);
 });
 
@@ -97,7 +97,7 @@ await t('actif : propriété ET certificat ; la résolution ne renvoie que slug,
   const s = await ok('fiila_domain_resolve', { p_host: 'WWW.maison-awa.sn.' });
   assert.deepEqual(Object.keys(s).sort(), ['host', 'name', 'slug', 'state']);
   assert.deepEqual(s, { state: 'ok', slug: A.slug, name: 'Maison Awa [TEST]', host: 'www.maison-awa.sn' });
-  for (const h of ['maison-awa.sn', 'shop.maison-awa.sn', 'inconnu.sn', '', 'fii.app'])
+  for (const h of ['maison-awa.sn', 'shop.maison-awa.sn', 'inconnu.sn', '', 'getfii.app'])
     assert.equal((await ok('fiila_domain_resolve', { p_host: h })).state, 'unknown', h);
 });
 
@@ -113,16 +113,16 @@ await t('résolution coupée si la boutique n’est plus Premium, plus en ligne,
   await ok('fiila_bo_setting_set', { p_key: 'custom_domains', p_value: 1 }, F); assert.equal(await st(), 'ok');
 });
 
-await t('adresse <lien>.fii.shop : toute boutique en ligne (même gratuite) ; hors ligne, suspendue, inconnue ou interrupteur coupé → rien', async () => {
+await t('adresse <lien>.getfii.app : toute boutique en ligne (même gratuite) ; hors ligne, suspendue, inconnue ou interrupteur coupé → rien', async () => {
   const st = (h) => ok('fiila_domain_resolve', { p_host: h });
-  assert.deepEqual(await st(B.slug + '.FII.shop'), { state: 'ok', slug: B.slug, name: 'Atelier Binta [TEST]', host: B.slug + '.fii.shop' });
+  assert.deepEqual(await st(B.slug + '.GETFII.app'), { state: 'ok', slug: B.slug, name: 'Atelier Binta [TEST]', host: B.slug + '.getfii.app' });
   await premium(B, 'free');
-  assert.equal((await st(B.slug + '.fii.shop')).state, 'ok', 'gratuite comprise');
-  for (const h of ['inconnue-xyz.fii.shop', 'a.b.fii.shop', 'fii.shop', 'www.fii.shop', B.slug + '.fii.shop.evil.sn', B.slug + '.fii-shop.sn'])
+  assert.equal((await st(B.slug + '.getfii.app')).state, 'ok', 'gratuite comprise');
+  for (const h of ['inconnue-xyz.getfii.app', 'a.b.getfii.app', 'getfii.app', 'www.getfii.app', 'sites.getfii.app', 'api.getfii.app', B.slug + '.fii.shop', B.slug + '.getfii.app.evil.sn', B.slug + '.fii-shop.sn'])
     assert.equal((await st(h)).state, 'unknown', h);
-  await ok('fiila_shop_vitrine', { p_key: B.key, p: { public: false } }); assert.equal((await st(B.slug + '.fii.shop')).state, 'unknown');
+  await ok('fiila_shop_vitrine', { p_key: B.key, p: { public: false } }); assert.equal((await st(B.slug + '.getfii.app')).state, 'unknown');
   await ok('fiila_shop_vitrine', { p_key: B.key, p: { public: true } });
-  await ok('fiila_bo_setting_set', { p_key: 'shop_subdomains', p_value: 0 }, F); assert.equal((await st(B.slug + '.fii.shop')).state, 'unknown');
+  await ok('fiila_bo_setting_set', { p_key: 'shop_subdomains', p_value: 0 }, F); assert.equal((await st(B.slug + '.getfii.app')).state, 'unknown');
   await ok('fiila_bo_setting_set', { p_key: 'shop_subdomains', p_value: 1 }, F);
   await premium(B);
 });

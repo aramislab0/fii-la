@@ -2170,7 +2170,7 @@
     bordeaux: ['Bordeaux', '#7A1F3D'], terre: ['Terre', '#8A4B1F'] };
   function vitrineUrl(slug, productId) {
     if (SITE && slug === SITE.slug) return 'https://' + SITE.host + '/#/b/' + slug + (productId ? '?a=' + productId : '');
-    // Adresse courte de la boutique (<lien>.fii.shop) dès que la zone des sites est en ligne (CFG.shopZone).
+    // Adresse courte de la boutique (<lien>.getfii.app) dès que la zone des sites est en ligne (CFG.shopZone).
     if (CFG.shopZone && /^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])$/.test(slug)) return 'https://' + slug + '.' + CFG.shopZone + '/#/b/' + slug + (productId ? '?a=' + productId : '');
     return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : '');
   }
@@ -9618,7 +9618,7 @@
     wa_card_media: ['Carte image avec la demande d’adresse sur WhatsApp', '0 = texte seul, 1 = image + texte'],
     media_cdn: ['Photos servies par le stockage (adresse fixe, mise en cache)', '0 = servies par la base, 1 = stockage'],
     custom_domains: ['Domaines propres des boutiques Premium (Site Pro)', '0 = coupés, 1 = ouverts'],
-    shop_subdomains: ['Adresses <lien>.fii.shop des boutiques', '0 = coupées, 1 = ouvertes'],
+    shop_subdomains: ['Adresses <lien>.getfii.app des boutiques', '0 = coupées, 1 = ouvertes'],
     studio_ready: ['Fii Studio ouvert aux boutiques', '0 = fermé, 1 = ouvert (après la clé du fournisseur)'],
     studio_budget_usd: ['Budget mensuel du Studio', 'USD (au-delà, le Studio se met en pause)'],
     studio_daily: ['Séries Studio par boutique et par jour', 'séries'] };

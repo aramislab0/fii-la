@@ -1,0 +1,69 @@
+name: Worker Cloudflare (getfii.app)
+
+# Lancement manuel seulement (docs/PLAN-DOMAINES-FII.md §7).
+#   preprod    : le Worker sur son adresse de test *.workers.dev, sans toucher getfii.app (aucun effet pour les utilisateurs) ;
+#   production : le Worker branché sur getfii.app et *.getfii.app — BASCULE, seulement avec l'accord écrit du fondateur.
+# Secret : CLOUDFLARE_API_TOKEN (saisi par le fondateur, jamais dans le dépôt). Variable : CLOUDFLARE_ACCOUNT_ID (non secrète).
+# Retour arrière : relancer avec la version précédente, ou « Rollback » dans Cloudflare (Workers → fii → Deployments).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'preprod (workers.dev) ou production (getfii.app — accord du fondateur requis)'
+        required: true
+        default: preprod
+        type: choice
+        options: [preprod, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Mise en ligne du Worker (${{ inputs.target }})
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier les accès
+        env: { CF: '${{ secrets.CLOUDFLARE_API_TOKEN }}', ACC: '${{ vars.CLOUDFLARE_ACCOUNT_ID }}' }
+        run: |
+          test -n "$CF" || { echo "Secret CLOUDFLARE_API_TOKEN manquant"; exit 1; }
+          test -n "$ACC" || { echo "Variable CLOUDFLARE_ACCOUNT_ID manquante"; exit 1; }
+      - name: Écrire la configuration publique
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
+          FACEBOOK_APP_ID: ${{ vars.FACEBOOK_APP_ID }}
+        run: |
+          node -e 'const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:"https://getfii.app/",facebookAppId:process.env.FACEBOOK_APP_ID||"",appHosts:["getfii.app"],movedTo:"",legacyOrigins:["https://aramislab0.github.io"],shopZone:"getfii.app",domainsLive:false};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
+          echo "<!-- build ${GITHUB_SHA} -->" >> web/index.html
+          if [ -n "$APPLE_TEAM_ID" ] || [ -n "$ANDROID_CERT_SHA256" ]; then mkdir -p web/.well-known; fi
+          if [ -n "$APPLE_TEAM_ID" ]; then
+            node -e 'require("fs").writeFileSync("web/.well-known/apple-app-site-association", JSON.stringify({applinks:{details:[{appIDs:[process.env.APPLE_TEAM_ID+".app.fii"],components:[{"/":"/*"}]}]}}))'
+          fi
+          if [ -n "$ANDROID_CERT_SHA256" ]; then
+            node -e 'require("fs").writeFileSync("web/.well-known/assetlinks.json", JSON.stringify([{relation:["delegate_permission/common.handle_all_urls"],target:{namespace:"android_app",package_name:"app.fii",sha256_cert_fingerprints:process.env.ANDROID_CERT_SHA256.split(",").map((x)=>x.trim())}}]))'
+          fi
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: node scripts/minify.mjs web
+      - name: Déployer
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          ENVARG=""; [ "${{ inputs.target }}" = production ] && ENVARG="--env production"
+          npx --yes wrangler@4 deploy $ENVARG --var "SUPABASE_ANON_KEY:$KEY"
+      - name: Vérifier en ligne
+        run: |
+          echo "Contrôler l'adresse affichée ci-dessus (workers.dev en préproduction, https://getfii.app en production)."

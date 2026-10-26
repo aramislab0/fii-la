@@ -23,14 +23,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Liens https://fii.app/#/… ouverts dans l'app (retour de paiement Wave, liens partagés). La vérification
-                 Android lit https://fii.app/.well-known/assetlinks.json (empreinte de la clé de signature Play). -->
+            <!-- Liens https://getfii.app/#/… ouverts dans l'app (retour de paiement Wave, liens partagés). La vérification
+                 Android lit https://getfii.app/.well-known/assetlinks.json (empreinte de la clé de signature Play). -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="fii.app" />
-                <data android:scheme="https" android:host="www.fii.app" />
+                <data android:scheme="https" android:host="getfii.app" />
+                <data android:scheme="https" android:host="www.getfii.app" />
             </intent-filter>
             <!-- Repli : fii://… (retour de paiement si le lien https n'est pas encore vérifié). -->
             <intent-filter>
