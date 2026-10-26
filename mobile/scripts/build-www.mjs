@@ -22,7 +22,10 @@ if (!cfg.supabaseUrl || !cfg.supabaseKey) console.warn('Attention : SUPABASE_URL
 writeFileSync(join(www, 'config.js'), 'window.FIILA_CONFIG=' + JSON.stringify(cfg) + ';\n');
 // Page : pas de manifeste d'installation (c'est déjà une app).
 const idx = join(www, 'index.html');
-writeFileSync(idx, readFileSync(idx, 'utf8').replace(/<link rel="manifest"[^>]*>\n?/, ''));
+// Noyau Capacitor (enregistrement des modules natifs : partage, préférences, retour…), chargé avant l'application.
+cpSync(join(here, 'node_modules', '@capacitor', 'core', 'dist', 'capacitor.js'), join(www, 'capacitor.js'));
+writeFileSync(idx, readFileSync(idx, 'utf8').replace(/<link rel="manifest"[^>]*>\n?/, '')
+  .replace('<script src="config.js"></script>', '<script src="capacitor.js"></script>\n<script src="config.js"></script>'));
 const minify = join(here, '..', 'scripts', 'minify.mjs');
 if (existsSync(minify)) execFileSync(process.execPath, [minify, www], { stdio: 'inherit' });
 console.log('www prêt :', www);

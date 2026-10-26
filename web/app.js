@@ -35,7 +35,17 @@
   var PLATFORM = NATIVE ? CAP.getPlatform() : 'web';
   // Abonnements et packs (contenus numériques) : vendus seulement sur le web ; l'app mobile débloque ce qui a été payé.
   var SELL_DIGITAL = !NATIVE;
-  function plugin(name) { return NATIVE && CAP.Plugins ? CAP.Plugins[name] : null; }
+  // Module natif : déjà enregistré, sinon enregistré à la demande s'il existe dans la coquille (en-têtes natifs).
+  var PLUGINS = {};
+  function plugin(name) {
+    if (!NATIVE) return null;
+    if (CAP.Plugins && CAP.Plugins[name]) return CAP.Plugins[name];
+    if (!(name in PLUGINS)) {
+      var has = !CAP.PluginHeaders || CAP.PluginHeaders.some(function (h) { return h.name === name; });
+      try { PLUGINS[name] = has && CAP.registerPlugin ? CAP.registerPlugin(name) : null; } catch (e) { PLUGINS[name] = null; }
+    }
+    return PLUGINS[name];
+  }
   var NATIVE_READY = NATIVE ? nativeInit() : Promise.resolve();
   function blobToB64(blob) {
     return new Promise(function (ok, ko) { var fr = new FileReader(); fr.onload = function () { ok(String(fr.result).split(',')[1] || ''); }; fr.onerror = ko; fr.readAsDataURL(blob); });
