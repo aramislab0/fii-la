@@ -280,6 +280,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 26/10 17:05 | App mobile **en production côté web (sans effet sur le site : pont inactif hors de l'app)** ; CI mobile verte (Android + compilation iPhone sur macOS, run 40356378209) ; tests en production verts après relance (installation de Safari en échec sur GitHub, sans lien avec le code) ; APK de test remis au fondateur | run 40356378147 ; `cbe6df0` |
 | 26/10 16:10 | App mobile Android + iPhone : projet `mobile/` (Capacitor 8), pont natif dans `web/app.js`, icônes et démarrage, APK de test construit, CI `mobile.yml`, mesure et ligne back-office ; test `native` 7/7 ; suites SQL et navigateur relancées | voir commit |
 | 24/10 18:05 | Domaines **en production sans effet visible** (variables vides) : migration appliquée, tests en production Chrome + Safari verts, dont `domains` sous Safari. 1ʳᵉ passe : un échec Safari sur `feed` (mode démo : 14 boutiques fictives visibles hors mode démo), sans lien avec les domaines, vert à la relance ; à surveiller s'il revient | run 40113965641 ; `95ffdf4` |
 | 24/10 17:10 | Domaines passés à `fii.app` + `fii.shop` : adresses `<lien>.fii.shop` (base, Worker, interrupteur `shop_subdomains`), liens partagés courts dès `SHOP_ZONE`, « Mon domaine » caché tant que `DOMAINS_LIVE` est vide ; tests 14/14, 12/12, 8/8 ; plan et guide v2 ; fusion dans `main` | voir commit |
