@@ -4,8 +4,8 @@
 // sont suivies. Rien n'est enregistré. Aucune clé privilégiée.
 import { extractFromUrl, extractFromHtml, isShortMapsUrl, isGoogleHost } from './extract.mjs';
 
-// Origines autorisées : le site public et le développement local (audit S8 : pas de relais ouvert à tous).
-const ORIGINS = ['https://aramislab0.github.io', 'http://localhost', 'http://127.0.0.1'];
+// Origines autorisées : getfii.app (26/10), la préproduction workers.dev, l'ancienne adresse et le développement local (audit S8 : pas de relais ouvert à tous).
+const ORIGINS = ['https://getfii.app', 'https://www.getfii.app', 'https://fii.aramislab.workers.dev', 'https://aramislab0.github.io', 'http://localhost', 'http://127.0.0.1'];
 const originOk = (o: string | null) => !!o && ORIGINS.some((a) => o === a || o.startsWith(a + ':') || o.startsWith(a + '/'));
 // Limite simple par adresse IP et par instance : 30 lectures par minute.
 const hits = new Map<string, number[]>();
