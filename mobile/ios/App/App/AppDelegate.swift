@@ -1,6 +1,14 @@
 import UIKit
 import Capacitor
 
+/// Fii : contrôleur de l'app. Geste de retour d'iPhone (glisser depuis le bord gauche) pour revenir à l'écran précédent,
+/// comme dans toute app iOS (l'historique de l'app suit ses écrans).
+class FiiBridgeViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        webView?.allowsBackForwardNavigationGestures = true
+    }
+}
+
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 

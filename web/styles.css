@@ -139,6 +139,9 @@ label,.label{font-weight:600;font-size:14px}
 .field{display:flex;flex-direction:column;gap:6px}
 input[type=text],input[type=date],input[type=time],input[type=email],input[type=tel],input[type=password],input[type=search],textarea,select{font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);width:100%;min-height:52px}
 input:focus,textarea:focus,select:focus{border:2px solid var(--focus);outline:none}
+/* Listes déroulantes : même hauteur et même style que les champs sur iPhone (Safari et app ignorent sinon la hauteur). */
+select{-webkit-appearance:none;appearance:none;padding-right:44px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236B7570' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;background-size:20px}
+select::-ms-expand{display:none}
 textarea{min-height:96px;resize:vertical}
 .counter{font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
 .choice{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -159,7 +162,7 @@ textarea{min-height:96px;resize:vertical}
   filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
 .map-dot{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--qr-ink);z-index:500;pointer-events:none;box-shadow:0 0 0 2px var(--qr-bg)}
 .leaflet-container{font-family:var(--font)}
-.leaflet-bar a,.leaflet-bar a:hover{background:var(--surface);color:var(--ink);border-color:var(--line);width:44px;height:44px;line-height:44px}
+.leaflet-bar a,.leaflet-bar a:hover,.leaflet-touch .leaflet-bar a{background:var(--surface);color:var(--ink);border-color:var(--line);width:44px;height:44px;line-height:44px}
 .leaflet-control-attribution{background:var(--surface)!important;color:var(--ink)}
 .leaflet-control-attribution a{color:var(--link)}
 .pt{border:1.5px dashed var(--line-strong);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;background:var(--surface)}
@@ -233,6 +236,8 @@ details summary{font-weight:600;cursor:pointer;min-height:44px;display:flex;alig
 footer.foot{display:flex;flex-direction:column;gap:16px;font-size:13px;color:var(--muted);padding-top:8px;border-top:1px solid var(--line)}
 .foot-links{display:flex;gap:16px;flex-wrap:wrap}
 footer.foot a,footer.foot button{color:var(--muted);font-size:13px}
+/* Liens du pied de page : zone de toucher de 44 px sans changer l'aspect. */
+.foot-links a,.foot-links button{display:inline-block;padding:12px 0;margin:-12px 0}
 
 /* Découverte, après la fiche */
 .discover{background:var(--soft);border:0;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0;box-shadow:none}
@@ -961,7 +966,7 @@ a.brand-home{text-decoration:none;color:var(--ink)}
 .bo-login{width:100%;max-width:420px}
 .bo-login h1{margin:4px 0 0}
 .bo-login input{min-height:48px}
-.bo-table select,.bo-dl select{width:auto;min-height:36px;padding:0 10px;font-size:14px}
+.bo-table select,.bo-dl select{width:auto;min-height:36px;padding:0 32px 0 10px;font-size:14px;background-position:right 8px center;background-size:16px}
 input[type=number]{font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);width:100%;min-height:52px}
 .bo-bar{border:0;background:none;padding:0;font:inherit;cursor:pointer;color:inherit}
 .bo-bar:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
@@ -1992,3 +1997,10 @@ p,li,.hint,.small{text-wrap:pretty}
 .mk-net.on .mk-net-ic[data-net="facebook"]{background:var(--b-fb);color:#FFFFFF}
 .mk-net.on .mk-net-ic[data-net="tiktok"]{background:var(--b-tt);color:#FFFFFF}
 .mk-net.on .mk-net-ic[data-net="snapchat"]{background:var(--b-sc);color:#111111}
+
+/* ================================================================ app mobile (Android, iPhone) — docs/PLAN-APP-MOBILE.md
+   Bande opaque sous l'heure et l'encoche : le contenu ne défile pas sous la barre d'état. Pas d'aperçu de lien ni de menu
+   « copier » au toucher long sur les commandes de l'app (comportement d'application, pas de page web). */
+html.native body::before{content:'';position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:2000;pointer-events:none}
+html.native a,html.native button,html.native .tab,html.native .pub-net,html.native img{-webkit-touch-callout:none}
+html.native button,html.native .btn,html.native .tab,html.native .chip,html.native .tabbar{-webkit-user-select:none;user-select:none}

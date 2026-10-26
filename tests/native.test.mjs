@@ -37,7 +37,10 @@ function fakeNative({ platform, prefs }) {
       Share: { share: (o) => { window.__shared.push(o); return P({}); } },
       Filesystem: { writeFile: (o) => { window.__files.push({ path: o.path, dir: o.directory, size: o.data.length }); return P({ uri: 'file:///cache/' + o.path }); } },
       AppLauncher: { openUrl: (o) => { window.__opened.push(o.url); return P({ completed: true }); } },
-      SplashScreen: { hide: () => { window.__app.push('splash-hidden'); return P(); } }
+      SplashScreen: { hide: () => { window.__app.push('splash-hidden'); return P(); } },
+      Geolocation: { getCurrentPosition: (o) => { window.__geo = (window.__geo || 0) + 1; return P({ coords: { latitude: 14.75814, longitude: -17.47032, accuracy: 8 }, timestamp: 1 }); },
+        watchPosition: (o, cb) => { setTimeout(() => cb({ coords: { latitude: 14.7582, longitude: -17.4704, accuracy: 6 }, timestamp: 2 }), 50); return P('w1'); },
+        clearWatch: () => { window.__geoCleared = true; return P(); } }
     }
   };
 }
@@ -72,6 +75,18 @@ await t('démarrage Android : classe native, écran de démarrage masqué, ouver
   assert.ok(n >= 1, 'ouverture comptée');
   await shot(p, '01-accueil');
   assert.deepEqual(p.__errors, []);
+  await p.context().close();
+});
+
+await t('position : module natif du téléphone (pas de seconde demande « localhost » sur iPhone), même interface que le web', async () => {
+  const p = await newApp({ platform: 'ios' });
+  await p.goto(URL0 + '#/');
+  await p.locator('#app h1, #app h2').first().waitFor();
+  const r = await p.evaluate(() => new Promise((ok) => navigator.geolocation.getCurrentPosition((pos) => ok([pos.coords.latitude, pos.coords.accuracy]), (e) => ok('err ' + e.code), { enableHighAccuracy: true, timeout: 5000 })));
+  assert.deepEqual(r, [14.75814, 8]);
+  const w = await p.evaluate(() => new Promise((ok) => { const id = navigator.geolocation.watchPosition((pos) => { navigator.geolocation.clearWatch(id); ok(pos.coords.longitude); }); }));
+  assert.equal(w, -17.4704);
+  await p.waitForFunction(() => window.__geoCleared === true);
   await p.context().close();
 });
 
@@ -126,7 +141,7 @@ await t('partage natif : image écrite dans le cache puis confiée au partage du
   await p.click('#pub-whatsapp-' + A.id);
   await p.waitForFunction(() => window.__shared.length >= 2);
   const sh = await p.evaluate(() => window.__shared), files = await p.evaluate(() => window.__files);
-  assert.equal(files.length, 2); assert.equal(files[0].dir, 'CACHE'); assert.match(files[0].path, /^share\/\d+-0-robe-mobile-test\.jpg$/); assert.ok(files[0].size > 1000);
+  assert.equal(files.length, 2); assert.equal(files[0].dir, 'CACHE'); assert.match(files[0].path, /^share\/\d+-0\/robe-mobile-test\.jpg$/, 'nom de fichier propre (affiché par la feuille de partage)'); assert.ok(files[0].size > 1000);
   assert.deepEqual(sh[0].files, ['file:///cache/' + files[0].path]); assert.equal(sh[0].text, undefined);
   assert.match(sh[1].files[0], /robe-mobile-test-story\.jpg$/); assert.match(sh[1].text, /Robe mobile \(test\)[\s\S]*Pour commander : https:\/\/fii\.app\/#\/b\//, 'lien public, pas l’adresse interne de l’app');
   await p.context().close();
@@ -182,6 +197,11 @@ await t('web (sans coquille native) : rien ne change — « Je veux ce modèle �
   await p.locator('#vitrine-theme-premium [data-theme="atelier"]').click();
   await p.locator('#premium-interest').waitFor();
   assert.equal(await p.evaluate(() => document.documentElement.classList.contains('native')), false);
+  // Audit iPhone (26/10) : listes déroulantes à la hauteur des champs ; liens du pied de page touchables (44 px).
+  await p.goto(URL0 + '#/boutique/reglages'); await p.locator('#shop-type').waitFor();
+  assert.ok((await p.locator('#shop-type').boundingBox()).height >= 48, 'liste déroulante pleine hauteur');
+  const foot = await p.locator('footer.foot .foot-links a').first().evaluate((a) => { const r = getComputedStyle(a); return parseFloat(r.paddingTop) + parseFloat(r.paddingBottom) + a.getBoundingClientRect().height; });
+  assert.ok(foot >= 40, 'zone de toucher du pied de page : ' + foot);
   await ctx.close();
 });
 
