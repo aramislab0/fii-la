@@ -42,11 +42,15 @@ export function makeHandler({ env, fetch }) {
     const r = await fetch(`https://fal.run/${MODEL}`, { method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Key ' + env('FAL_KEY') },
       body: JSON.stringify({ image_url: image, scene_description: SCENES[style], optimize_description: true, num_results: 3, fast: true,
-        placement_type: 'automatic', shot_size: [880, 1100], sync_mode: false }) });
+        // « manual_placement » + une position = num_results images (« automatic » en produit 10 par résultat : 0,84 USD la série
+        // constatés le 26/10 au lieu de 0,12).
+        placement_type: 'manual_placement', manual_placement_selection: 'bottom_center', shot_size: [880, 1100], sync_mode: false }) });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) return { error: String((body && (body.detail && (body.detail[0]?.msg || body.detail))) || body.error || ('fal ' + r.status)).slice(0, 200) };
     const urls = (body.images || []).map((x) => x && x.url).filter((u) => typeof u === 'string' && FAL_HOST.test(u)).slice(0, 3);
-    return urls.length ? { results: urls, cost_usd: urls.length * PRICE_USD } : { error: 'Aucune image renvoyée' };
+    // Coût : toutes les images produites par fal (facturées), pas seulement les 3 gardées.
+    const billed = Math.max((body.images || []).length, urls.length);
+    return urls.length ? { results: urls, cost_usd: billed * PRICE_USD } : { error: 'Aucune image renvoyée', cost_usd: billed * PRICE_USD };
   }
   const configured = () => !!env('FAL_KEY');
 

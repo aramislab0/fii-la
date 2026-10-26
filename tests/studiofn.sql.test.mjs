@@ -46,6 +46,7 @@ await t('série : droits avec l’identité de la personne ; fal appelé avec la
   assert.equal(f.url, 'https://fal.run/' + MODEL); assert.equal(f.init.headers.Authorization, 'Key fal-test');
   assert.equal(f.body.image_url, 'data:image/jpeg;base64,AAA'); assert.equal(f.body.scene_description, SCENES.luxe);
   assert.equal(f.body.num_results, 3); assert.deepEqual(f.body.shot_size, [880, 1100]);
+  assert.equal(f.body.placement_type, 'manual_placement', '3 images facturées, pas 30'); assert.equal(f.body.manual_placement_selection, 'bottom_center');
   const c = s.calls.find((x) => x.url.endsWith('fiila_studio_complete'));
   assert.equal(c.init.headers.Authorization, 'Bearer service-test'); assert.equal(c.body.p.cost_usd, 0.12);
 });
