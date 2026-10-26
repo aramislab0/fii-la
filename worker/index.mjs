@@ -57,8 +57,8 @@ export async function resolveHost(host, env, deps) {
       headers: { 'Content-Type': 'application/json', apikey: env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + env.SUPABASE_ANON_KEY },
       body: JSON.stringify({ p_host: host }) });
     if (r.ok) { const b = await r.json(); if (b && b.state === 'ok' && b.slug && b.host === host) out = { state: 'ok', slug: b.slug, name: b.name, host }; }
-    else return { state: 'error' };   // base indisponible : on ne met rien en cache
-  } catch { return { state: 'error' }; }
+    else return { state: 'error', why: 'http ' + r.status };   // base indisponible : on ne met rien en cache
+  } catch (e) { return { state: 'error', why: String((e && e.message) || e).slice(0, 80) }; }
   if (cache) await cache.put(key, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=' + RESOLVE_TTL } }));
   return out;
 }
@@ -90,7 +90,7 @@ export async function handle(req, env, deps = {}) {
   }
   // Domaine de boutique : rien n'est servi avant la vérification.
   const site = await resolveHost(host, env, deps);
-  if (site.state === 'error') return new Response('Service momentanément indisponible.', { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '30', ...SECURITY } });
+  if (site.state === 'error') return new Response('Service momentanément indisponible.', { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '30', 'X-Fii-Upstream': site.why || '', ...SECURITY } });
   if (site.state !== 'ok') return notFound();
   if (path === '/sw.js' || path === '/manifest.webmanifest' || path === '/config.js.map') return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
   if (path === '/' || path === '/index.html') {
