@@ -5,17 +5,19 @@
   "loggingBehavior": "none",
   "android": {
     "allowMixedContent": false,
-    "webContentsDebuggingEnabled": false
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#F5F2EA"
   },
   "ios": {
     "contentInset": "never",
     "limitsNavigationsToAppBoundDomains": false,
-    "allowsLinkPreview": false
+    "allowsLinkPreview": false,
+    "backgroundColor": "#F5F2EA"
   },
   "plugins": {
     "SplashScreen": {
       "launchAutoHide": true,
-      "launchShowDuration": 1500,
+      "launchShowDuration": 4500,
       "backgroundColor": "#1E4A34",
       "showSpinner": false,
       "androidScaleType": "CENTER_CROP"

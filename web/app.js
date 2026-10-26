@@ -9702,7 +9702,16 @@
   TRACKABLE.migrate = ['merged', 'empty'];
 
   NATIVE_READY.then(function () {
-    if (NATIVE) { track('app', PLATFORM === 'ios' ? 'ios' : 'android'); var SB = plugin('SplashScreen'); if (SB) setTimeout(function () { SB.hide().catch(function () {}); }, 150); }
+    if (NATIVE) {
+      track('app', PLATFORM === 'ios' ? 'ios' : 'android');
+      // Écran de démarrage masqué quand le premier écran est affiché (pas de flash blanc entre les deux), 4 s au plus.
+      var SB = plugin('SplashScreen'), hidden = false;
+      var hide = function () { if (hidden || !SB) return; hidden = true; mo.disconnect(); requestAnimationFrame(function () { SB.hide({ fadeOutDuration: 200 }).catch(function () {}); }); };
+      var ready = function () { return app.children.length && !app.querySelector('.loading'); };
+      var mo = new MutationObserver(function () { if (ready()) hide(); });
+      mo.observe(app, { childList: true, subtree: true });
+      setTimeout(hide, 4000);
+    }
     if (!legacyMove()) authBoot.then(render, render);
   });
 })();

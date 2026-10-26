@@ -7,7 +7,7 @@
 
 L'app iPhone fonctionne de bout en bout : accueil, adresse, position, boutique, article avec photo, partage natif vers les réseaux, vitrine, commande, facture, réglages, mode sombre, retour depuis une app externe. **Aucune erreur JavaScript** sur les 25 écrans parcourus, **aucun débordement horizontal**.
 
-L'audit a trouvé **7 défauts**, tous corrigés et couverts par des tests, dont **3 visibles par tout utilisateur d'iPhone** : une double demande de position au nom de « localhost », des listes déroulantes écrasées, et le contenu qui passait sous l'heure.
+L'audit a trouvé **8 défauts**, tous corrigés et couverts par des tests, dont **3 visibles par tout utilisateur d'iPhone** : une double demande de position au nom de « localhost », des listes déroulantes écrasées, et le contenu qui passait sous l'heure.
 
 ## 2. Défauts trouvés et corrigés
 
@@ -19,6 +19,7 @@ L'audit a trouvé **7 défauts**, tous corrigés et couverts par des tests, dont
 | 4 | **Majeur** | En faisant défiler, le contenu passait sous l'heure et l'encoche | Bande opaque aux couleurs du fond sous la barre d'état (clair et sombre) | Capture iPhone |
 | 5 | Moyen | Titre repliable « Un agent Fii vous      aide ? » écarté au milieu (groupe insécable traité comme un élément séparé dans un conteneur flex). **Aussi sur le web** | Le texte et ses groupes insécables forment un seul bloc | Test `native` (anti-régression) |
 | 6 | Mineur | Feuille de partage : le nom du fichier affiché était « 1793035553069-0-robe-photo-test » | Nom propre (« robe-photo-test.jpg ») dans un dossier unique par partage | Test `native` |
+| 8 | Moyen | Flash blanc entre l'écran de démarrage et l'accueil (vu sur la version de production réinstallée) | Écran de démarrage masqué quand le premier écran est affiché (4 s au plus) ; fond de la WebView aux couleurs de Fii | Capture iPhone |
 | 7 | Mineur | Liens du pied de page hauts de 19 px (cible tactile minimale d'Apple : 44 px) ; boutons + / − de la carte à 30 px | Zone de toucher de 44 px sans changer l'aspect ; boutons de carte à 44 px | Test `native` |
 
 **Comportements d'app ajoutés :**
