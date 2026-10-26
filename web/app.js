@@ -61,7 +61,8 @@
         var files = Array.prototype.slice.call(data.files || []);
         var write = files.length && FS ? Promise.all(files.map(function (f, i) {
           return blobToB64(f).then(function (b64) {
-            return FS.writeFile({ path: 'share/' + Date.now() + '-' + i + '-' + String(f.name || 'fii.jpg').replace(/[^\w.-]/g, '_'), data: b64, directory: 'CACHE', recursive: true });
+            // Dossier unique par partage, nom de fichier propre (c'est lui que la feuille de partage affiche).
+            return FS.writeFile({ path: 'share/' + Date.now() + '-' + i + '/' + String(f.name || 'fii.jpg').replace(/[^\w.-]/g, '_'), data: b64, directory: 'CACHE', recursive: true });
           }).then(function (r) { return r.uri; });
         })) : Promise.resolve([]);
         return write.then(function (uris) {
@@ -80,6 +81,28 @@
         Object.defineProperty(navigator, 'share', { configurable: true, value: nativeShare });
         Object.defineProperty(navigator, 'canShare', { configurable: true, value: function (d) { return !d || !d.files || !!FS; } });
       } catch (e) { /* navigateur ancien : partage du web */ }
+    }
+    // Position : module natif plutôt que la WebView (sur iPhone, la WebView affiche sinon une seconde demande au nom de
+    // « localhost » après celle du téléphone). Même interface que navigator.geolocation.
+    var Geo = plugin('Geolocation');
+    if (Geo) {
+      var gpos = function (p) { var c = p.coords || {}; return { coords: { latitude: c.latitude, longitude: c.longitude, accuracy: c.accuracy, altitude: c.altitude == null ? null : c.altitude,
+        altitudeAccuracy: c.altitudeAccuracy == null ? null : c.altitudeAccuracy, heading: c.heading == null ? null : c.heading, speed: c.speed == null ? null : c.speed }, timestamp: p.timestamp || Date.now() }; };
+      var gerr = function (e) { var m = String((e && e.message) || e || ''); var code = /denied|permission|disabled|not authorized/i.test(m) ? 1 : /time/i.test(m) ? 3 : 2;
+        return { code: code, message: m, PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }; };
+      var gopt = function (o) { o = o || {}; var r = { enableHighAccuracy: !!o.enableHighAccuracy }; if (o.timeout != null && isFinite(o.timeout)) r.timeout = o.timeout; if (o.maximumAge != null) r.maximumAge = o.maximumAge; return r; };
+      var watches = {}, wn = 0;
+      var geo = {
+        getCurrentPosition: function (ok, ko, o) { Geo.getCurrentPosition(gopt(o)).then(function (p) { ok(gpos(p)); }, function (e) { if (ko) ko(gerr(e)); }); },
+        watchPosition: function (ok, ko, o) {
+          var id = ++wn; watches[id] = { cid: null, off: false };
+          Geo.watchPosition(gopt(o), function (p, e) { if (watches[id] && !watches[id].off) { if (e) { if (ko) ko(gerr(e)); } else if (p) ok(gpos(p)); } })
+            .then(function (cid) { if (!watches[id] || watches[id].off) Geo.clearWatch({ id: cid }); else watches[id].cid = cid; });
+          return id;
+        },
+        clearWatch: function (id) { var w = watches[id]; if (!w) return; w.off = true; if (w.cid) Geo.clearWatch({ id: w.cid }); delete watches[id]; }
+      };
+      try { Object.defineProperty(navigator, 'geolocation', { configurable: true, value: geo }); } catch (e) { /* position de la WebView */ }
     }
     // Liens externes : l'application du téléphone (WhatsApp, Maps, Waze, réseaux) ou le navigateur.
     function openExternal(url) { if (Launcher) Launcher.openUrl({ url: url }).catch(function () { location.href = url; }); else location.href = url; }
@@ -174,13 +197,16 @@
   }
   function typo(t) {
     if (t.length < 3 || !/[«»:;!?]|\d /.test(t)) return document.createTextNode(t);
-    var parts = t.split(/( +)/), frag = document.createDocumentFragment(), buf = '';
+    // Un seul élément en ligne autour du texte : dans un conteneur flex (titre de section repliable, bouton), le texte et ses
+    // groupes insécables restent un seul bloc au lieu d'être écartés comme des éléments séparés (constaté sur iPhone, 26/10).
+    var parts = t.split(/( +)/), frag = document.createElement('span'), buf = '', glued = false;
     for (var i = 0; i < parts.length; i += 2) {
       var w = parts[i], sp = parts[i + 1] || '', g = w, j = i;
       while (j + 2 < parts.length && parts[j + 2] !== '' && typoGlue(parts[j], parts[j + 2])) { g += parts[j + 1] + parts[j + 2]; j += 2; }
-      if (j > i) { if (buf) { frag.append(buf); buf = ''; } var el = document.createElement('span'); el.className = 'nb'; el.textContent = g; frag.append(el); buf = parts[j + 1] || ''; i = j; }
+      if (j > i) { glued = true; if (buf) { frag.append(buf); buf = ''; } var el = document.createElement('span'); el.className = 'nb'; el.textContent = g; frag.append(el); buf = parts[j + 1] || ''; i = j; }
       else buf += w + sp;
     }
+    if (!glued) return document.createTextNode(t);
     if (buf) frag.append(buf);
     return frag;
   }
@@ -688,7 +714,8 @@
   };
   // Retour d'un lien e-mail : seul « ?code=… » (PKCE) est accepté, avec le secret gardé sur ce téléphone.
   // Tout jeton passé dans l'URL (#access_token=…) est ignoré et effacé.
-  var authBoot = (function () {
+  // App mobile : la session est lue après la restauration du stockage du téléphone (NATIVE_READY).
+  var authBoot = NATIVE_READY.then(function () { return (function () {
     var hs = (location.hash || '').replace(/^#/, '');
     if (/(^|&)(access_token|refresh_token|error)=/.test(hs)) {
       try { history.replaceState(null, '', location.pathname + '#/compte?lien=invalide'); } catch (e) { location.hash = '#/compte?lien=invalide'; }
@@ -705,7 +732,7 @@
       saveSession(r);
       clean(pk.kind === 'recovery' ? '#/compte?mdp=1' : pk.after && /^#\/[a-z0-9\/-]{1,40}$/.test(pk.after) ? pk.after : '#/compte?bienvenue=1');
     }, function () { clean('#/compte?lien=invalide'); });
-  })();
+  })(); });
 
   function api(fn, args, retried) {
     return freshToken().then(function () { return rawApi(fn, args); }).catch(function (e) {

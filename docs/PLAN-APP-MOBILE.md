@@ -59,7 +59,11 @@ Décision antérieure conservée (#60, 21/10) : l'argent d'une commande va **dir
 3. **Builder :** liens vérifiés (`.well-known`), bundle signé, test interne Google Play ; TestFlight pour iPhone (avec accord).
 4. **Builder :** Fii Studio (fournisseur), puis paiements Orange Money (compte marchand Aramis Lab) et Wave (sortie vers Wave, retour automatique par `https://fii.app/#/paiement/…`, confirmation par le serveur de Wave, jamais par le retour seul).
 
-## 6. Risques
+## 6. Audit iPhone (26/10)
+
+Voir `docs/AUDIT-APP-IOS-2026-10-26.md` : 7 défauts corrigés, optimisations proposées (notifications de commande, liens universels, premier écran plus rapide, publication plus rapide, hors ligne, Face ID).
+
+## 7. Risques
 
 - **Revue Apple (4.2, « fonctionnalité minimale ») :** une app qui affiche un site est refusée. Ici l'app est embarquée (fonctionne au démarrage hors ligne), avec partage natif, appareil photo, position, micro et liens universels. Risque faible, à surveiller à la première revue.
 - **Abonnements :** si une incitation à acheter réapparaît dans l'app iPhone ou Android, refus. Garde-fou : `SELL_DIGITAL` est faux dans l'app ; tout futur écran d'achat d'abonnement ou de pack doit en dépendre (test `native`).
