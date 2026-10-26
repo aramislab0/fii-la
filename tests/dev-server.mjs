@@ -187,6 +187,14 @@ export async function startServer(port = 0) {
   const db = await createDb();
   const auth = makeAuth(db);
   const server = http.createServer(async (req, res) => {
+    // App mobile en test local (FIILA_CORS=1) : l'app tourne sur capacitor://localhost, autre origine que ce serveur,
+    // comme avec Supabase en production (qui autorise toutes les origines).
+    if (process.env.FIILA_CORS === '1') {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Headers', 'authorization, apikey, content-type, x-client-info, prefer, accept-profile, content-profile');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+    }
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/__test/expire-tokens') { auth.expireAll(); res.writeHead(204); return res.end(); }
     if (url.pathname === '/__test/last-recovery') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(auth.lastRecovery())); }
