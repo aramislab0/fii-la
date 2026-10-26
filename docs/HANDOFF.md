@@ -283,6 +283,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 26/10 20:45 | Fonction serveur `fiila-studio` déployée (sans clé fal : répond `configured:false`, rien n'est ouvert) ; contrôle de la base corrigé : `fiila_studio_complete` est réservée à la clé de service, donc absente des fonctions du rôle public | déploiement Supabase v1 ; voir commit |
 | 26/10 20:30 | Fii Studio niveau 1 construit (base, fonction serveur, écran, back-office, tests) ; domaines vérifiés : `fii.app` pris (en vente 3 895 USD chez Dynadot), `fii.shop` et `fiila.app` libres ; fonctions serveur acceptent désormais les boutiques sans compte (clé publique seule) | `docs/PLAN-FII-STUDIO.md` |
 | 26/10 18:40 | Optimisations validées (« je valide go », 18:07) : lecture hors ligne (boutique, commandes, articles, clients) ; liens universels préparés (fichiers écrits par la CI dès `APPLE_TEAM_ID` / `ANDROID_CERT_SHA256`, servis par le Worker) ; découpage du back-office et accélération du partage mesurés puis écartés (gain faible) ; notifications après les paiements | `docs/AUDIT-APP-IOS-2026-10-26.md` §5 |
 | 26/10 18:05 | Audit iPhone, 8ᵉ défaut : flash blanc au démarrage → écran de démarrage masqué au premier écran affiché, fond de la WebView aux couleurs de Fii | voir commit |
