@@ -40,8 +40,11 @@ jobs:
           APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
           ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
           FACEBOOK_APP_ID: ${{ vars.FACEBOOK_APP_ID }}
+          TARGET: ${{ inputs.target }}
         run: |
-          node -e 'const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:"https://getfii.app/",facebookAppId:process.env.FACEBOOK_APP_ID||"",appHosts:["getfii.app"],movedTo:"",legacyOrigins:["https://aramislab0.github.io"],shopZone:"getfii.app",domainsLive:false};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
+          # Préproduction : l'application tourne sur fii.aramislab.workers.dev (adresse publique et hôte autorisé) ; production : getfii.app.
+          if [ "$TARGET" = production ]; then export HOST=getfii.app ZONE=getfii.app; else export HOST=fii.aramislab.workers.dev ZONE=; fi
+          node -e 'const H=process.env.HOST;const c={supabaseUrl:process.env.SUPABASE_URL,supabaseKey:process.env.SUPABASE_KEY,publicUrl:"https://"+H+"/",facebookAppId:process.env.FACEBOOK_APP_ID||"",appHosts:[H],movedTo:"",legacyOrigins:["https://aramislab0.github.io"],shopZone:process.env.ZONE||"",domainsLive:false};require("fs").writeFileSync("web/config.js","window.FIILA_CONFIG="+JSON.stringify(c)+";\n")'
           echo "<!-- build ${GITHUB_SHA} -->" >> web/index.html
           if [ -n "$APPLE_TEAM_ID" ] || [ -n "$ANDROID_CERT_SHA256" ]; then mkdir -p web/.well-known; fi
           if [ -n "$APPLE_TEAM_ID" ]; then
