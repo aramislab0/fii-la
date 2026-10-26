@@ -3,7 +3,7 @@ name: Worker Cloudflare (getfii.app)
 # Lancement manuel seulement (docs/PLAN-DOMAINES-FII.md §7).
 #   preprod    : le Worker sur son adresse de test *.workers.dev, sans toucher getfii.app (aucun effet pour les utilisateurs) ;
 #   production : le Worker branché sur getfii.app et *.getfii.app — BASCULE, seulement avec l'accord écrit du fondateur.
-# Secret : CLOUDFLARE_API_TOKEN (saisi par le fondateur, jamais dans le dépôt). Variable : CLOUDFLARE_ACCOUNT_ID (non secrète).
+# Secret : CLOUDFLARE_API_TOKEN (saisi par le fondateur, jamais dans le dépôt). Compte : account_id dans worker/wrangler.jsonc.
 # Retour arrière : relancer avec la version précédente, ou « Rollback » dans Cloudflare (Workers → fii → Deployments).
 
 on:
@@ -30,10 +30,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Vérifier les accès
-        env: { CF: '${{ secrets.CLOUDFLARE_API_TOKEN }}', ACC: '${{ vars.CLOUDFLARE_ACCOUNT_ID }}' }
+        env: { CF: '${{ secrets.CLOUDFLARE_API_TOKEN }}' }
         run: |
           test -n "$CF" || { echo "Secret CLOUDFLARE_API_TOKEN manquant"; exit 1; }
-          test -n "$ACC" || { echo "Variable CLOUDFLARE_ACCOUNT_ID manquante"; exit 1; }
       - name: Écrire la configuration publique
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
@@ -59,7 +58,6 @@ jobs:
         working-directory: worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
         run: |
           ENVARG=""; [ "${{ inputs.target }}" = production ] && ENVARG="--env production"

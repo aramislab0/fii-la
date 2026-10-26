@@ -2,6 +2,8 @@
 // d'Aramis Lab et l'accord du fondateur. Aucun secret ici (la clé Supabase est la clé publique, déjà servie par config.js).
 {
   "name": "fii",
+  // Compte Cloudflare d'Aramis Lab (identifiant non secret).
+  "account_id": "bfc376befcfa08ae9834aac025d2009a",
   "main": "index.mjs",
   "compatibility_date": "2026-10-01",
   "assets": {
