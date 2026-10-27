@@ -30,6 +30,8 @@ export async function createDb(opts = {}) {
     grant execute on function auth.uid() to anon, authenticated;
   `);
   await applyMigrations(db, null, opts.before || null);
+  // Pièce d'identité après la première vente (20261027200000) : coupée dans les tests, sauf ceux qui la testent (opts.kyc).
+  if (!opts.before && !opts.kyc) await db.exec(`update fiila.settings set value = '0' where key = 'kyc_required'`);
   return db;
 }
 export async function applyMigrations(db, from, before) {

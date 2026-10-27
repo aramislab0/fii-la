@@ -96,11 +96,11 @@ await t('portail : connexion de l’équipe ; un compte hors équipe est refusé
   assert.equal(await heading(D).textContent(), 'Tableau de bord');
 });
 
-const SECTIONS = [['', 'Tableau de bord'], ['boutiques', 'Boutiques'], ['commandes', 'Commandes'], ['domaines', 'Domaines'], ['studio', 'Studio'], ['comptes', 'Comptes'], ['moderation', 'Modération'],
+const SECTIONS = [['', 'Tableau de bord'], ['boutiques', 'Boutiques'], ['commandes', 'Commandes'], ['domaines', 'Domaines'], ['studio', 'Studio'], ['identites', 'Identités'], ['comptes', 'Comptes'], ['moderation', 'Modération'],
   ['vide-dressing', 'Vide-dressing'], ['ambassadeurs', 'Ambassadeurs'], ['agents', 'Agents'], ['carriere', 'Manager Carrière'], ['fil', 'Fil (25 places gratuites)'], ['finances', 'Finances'], ['croissance', 'Croissance'],
   ['equipe', 'Équipe'], ['journal', 'Journal'], ['reglages', 'Réglages de la plateforme']];
-await t('ordinateur : barre latérale avec les 17 sections du super admin, chacune s’ouvre sans erreur', async () => {
-  assert.equal(await D.locator('.bo-nav .bo-link').count(), 17);
+await t('ordinateur : barre latérale avec les 18 sections du super admin, chacune s’ouvre sans erreur', async () => {
+  assert.equal(await D.locator('.bo-nav .bo-link').count(), 18);
   assert.ok(await D.locator('#bo-side').isVisible());
   assert.equal(await D.locator('#bo-menu').isVisible(), false, 'pas de bouton menu sur ordinateur');
   await shot(D, '02-tableau-de-bord');
@@ -374,6 +374,31 @@ await t('téléphone et mode sombre : tableau de bord, liste en cartes, fiche li
   await passMfa(DD, 'fondateur.bo@example.invalid');
   await DD.locator('#bo-kpis').waitFor();
   await shot(DD, '14-ordinateur-sombre');
+});
+
+await t('identité du propriétaire (27/10) : fiche boutique, file « Identités », pièce ouverte (journalisée) puis validée', async () => {
+  await local.db.query(`update fiila.settings set value = '1' where key = 'kyc_required'`);
+  await ok('fiila_shop_owner_save', { p_key: KEY, p_name: 'Awa Couture', p_phone: '77 600 00 01' });
+  const o = await ok('fiila_order_create', { p_key: KEY, p: { customer: { name: 'Cliente (test)' }, items: [{ label: 'Robe', qty: 1, price: 12000 }] } });
+  await ok('fiila_order_set_status', { p_key: KEY, p_id: o.id, p_status: 'delivered' });
+  const SID = (await local.db.query(`select id from fiila.shops where name = 'Couture Awa (test)'`)).rows[0].id;
+  await D.goto(URL0 + '#/bo/boutiques/' + SID);
+  await D.locator('#bo-shop-identity').getByText('Exigée, non envoyée').waitFor();
+  await D.locator('#bo-kyc-blocked').waitFor();
+  const IMG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(4000, 7)]).toString('base64');
+  await ok('fiila_shop_kyc_submit', { p_key: KEY, p_doc_type: 'passport', p_front: IMG });
+  await D.goto(URL0 + '#/bo/identites');
+  await D.locator('#bo-kyc-pending').getByText('Couture Awa (test)').waitFor();
+  await D.locator('#bo-kyc-pending').getByText('Couture Awa (test)').click();
+  await D.locator('#bo-shop-identity').getByText('À vérifier').waitFor();
+  await D.click('#bo-kyc-open');
+  await D.locator('#bo-kyc-doc img').first().waitFor({ state: 'attached' });
+  await shot(D, '20-identite');
+  await D.click('#bo-kyc-ok');
+  await D.locator('#bo-shop-identity').getByText('Validée').waitFor();
+  const log = (await local.db.query(`select action from fiila.admin_log where target_id = $1 and action like 'kyc_%' order by at`, [SID])).rows.map((r) => r.action);
+  assert.deepEqual(log, ['kyc_view', 'kyc_verified']);
+  await local.db.query(`update fiila.settings set value = '0' where key = 'kyc_required'`);
 });
 
 await t('déconnexion depuis le back-office : retour au portail', async () => {

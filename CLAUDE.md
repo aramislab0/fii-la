@@ -12,6 +12,8 @@
 6. Ne jamais contacter la CDP, publier sur un compte réel ni activer un service payant sans accord explicite du fondateur.
 7. **Règle d'interface « simple et intuitif »** (fondateur, 19/10/2026, pour toute l'application et tous les builds à venir) :
    - une seule action principale et une seule rangée de filtres visibles par écran ; les filtres et réglages secondaires vont dans « Filtres » (feuille) ou une section repliée ;
+   - précision du 27/10 : les informations **utiles** d'une saisie (ex. catégorie, tailles, couleurs, stock d'un article) restent visibles, jamais repliées par défaut ; seul le vraiment secondaire se replie. Choix en pastilles touchables plutôt qu'en texte libre, interrupteur unique pour visible / masqué ;
+   - un bouton d'enregistrement est toujours visible sous ses champs (jamais caché par la barre d'onglets ou le clavier) ;
    - jamais de choix inutile : une option unique (une seule taille, une seule couleur) s'affiche en texte, pas en bouton ;
    - une ligne d'informations discrète plutôt que plusieurs ;
    - avant de livrer un écran, vérifier sa capture : si l'écran paraît chargé, replier ou retirer avant d'ajouter.

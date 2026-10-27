@@ -60,6 +60,9 @@ await t('boutique : ouvre sa vitrine depuis les réglages, lien prêt à envoyer
   await S.locator('#vitrine-open-link').click();
   assert.equal(await S.locator('#vitrine-switch').getAttribute('aria-checked'), 'false');
   await S.click('#vitrine-switch'); // un seul toucher
+  // Site sans logo : la personnalisation est proposée juste après la mise en ligne (recette du 27/10).
+  await S.locator('#look-online').waitFor();
+  await S.goto(URL0 + '#/boutique/reglages');
   await S.locator('#vitrine-url').waitFor();
   assert.equal(await S.locator('#vitrine-switch').getAttribute('aria-checked'), 'true');
   URLV = await S.locator('#vitrine-url').textContent();

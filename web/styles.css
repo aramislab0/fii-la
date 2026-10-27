@@ -492,8 +492,9 @@ footer.foot a:hover{text-decoration:underline}
 .pro-row .chev{color:var(--muted);display:flex}
 .pro-row:hover{background:var(--surface-2)}
 @media (prefers-reduced-motion: no-preference){
+  /* Entrée de page en fondu seulement : une transformation sur .wrap ferait bouger la barre d'onglets fixe (recette 27/10). */
   #app>.wrap{animation:fiila-in .18s ease-out}
-  @keyframes fiila-in{from{transform:translateY(6px)}to{transform:none}}
+  @keyframes fiila-in{from{opacity:.4}to{opacity:1}}
 }
 
 /* Actions sensibles : en bas, en texte, séparées (audit design D4). */
@@ -573,7 +574,7 @@ button.rnd:not(:disabled):active{transform:none}
 .invite-row .ico{color:var(--green)}
 .invite-row .chev{margin-left:auto;color:var(--muted);display:flex}
 /* Barre d'onglets de la boutique */
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:900;display:flex;justify-content:center;padding:0 12px calc(10px + env(safe-area-inset-bottom,0px));pointer-events:none}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:900;transform:translateZ(0);display:flex;justify-content:center;padding:0 12px calc(10px + env(safe-area-inset-bottom,0px));pointer-events:none}
 .tabbar nav{pointer-events:auto;width:100%;max-width:528px;background:var(--surface);border-radius:22px;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding:6px 4px;box-shadow:var(--shadow-float)}
 .tab{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;font-weight:600;color:var(--muted);text-decoration:none;min-height:52px;justify-content:center}
 .tab .p{padding:4px 14px;border-radius:99px;display:flex}
@@ -1628,9 +1629,9 @@ kbd{font:600 11.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 6p
 .setup-ok .btn{align-self:stretch}
 @keyframes setup-pop{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion: reduce){.setup-ok-ic{animation:none}}
-.setup-badges{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.setup-badges{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .sb{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--muted)}
-.sb-ic{width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:var(--surface-2);border:1.5px solid var(--line);color:var(--muted);transition:transform .3s}
+.sb-ic{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:var(--surface-2);border:1.5px solid var(--line);color:var(--muted);transition:transform .3s}
 .sb-now .sb-ic{background:var(--surface);border-color:var(--green);color:var(--green);box-shadow:0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent)}
 .sb-now{color:var(--ink)}
 .sb-done .sb-ic{background:var(--green);border-color:var(--green);color:var(--lime);animation:setup-pop .45s cubic-bezier(.22,.61,.36,1)}
@@ -2033,3 +2034,77 @@ html.native button,html.native .btn,html.native .tab,html.native .chip,html.nati
 .studio-one{width:min(70%,260px);aspect-ratio:4/5;border-radius:12px;align-self:center}
 .studio-mode{justify-content:flex-start;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
 .studio-mode input{width:22px;height:22px;flex:0 0 auto;accent-color:var(--c-marketing)}
+
+/* Clavier ouvert (saisie sur téléphone) : la barre d'onglets et la barre d'enregistrement fixes se retirent pour ne pas
+   couvrir le champ ni le bouton (recette 27/10, « je ne vois pas le bouton enregistrer »). */
+html.kbd .tabbar{display:none}
+
+/* ===== Recette du 27/10 (fondateur) : fiche article lisible, feuille Équipe, personnalisation guidée, propriétaire et pièce. */
+.opt{font-weight:500;color:var(--muted);font-size:.85em}
+.lbl{font-size:15px;font-weight:700;color:var(--ink)}
+/* Fiche article : blocs nets, champs utiles toujours visibles. */
+.pf-sec{display:flex;flex-direction:column;gap:16px;padding:18px 16px;border-radius:var(--radius-card);background:var(--surface);box-shadow:var(--shadow-card);border:1px solid var(--line)}
+.pf-h{margin:0;font-size:18px;letter-spacing:-.01em}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 15px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+.pill.sm{min-height:36px;padding:0 12px;font-size:13.5px}
+.pill:active{transform:scale(.96)}
+.pill.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.pill .dot{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.18);flex:none}
+.pill.on .dot{border-color:rgba(255,255,255,.6)}
+.pill-add input{width:84px;min-height:36px;padding:0 12px;border-radius:999px;border:1.5px dashed var(--line-strong);background:transparent;color:var(--ink);font:inherit;font-size:13.5px}
+.stock-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.stepper{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+.stepper .step{width:46px;height:46px;border:0;background:var(--surface-2);color:var(--ink);font:inherit;font-size:22px;font-weight:700;cursor:pointer}
+.stepper .step:disabled{opacity:.35;cursor:default}
+.stepper input{width:64px;height:46px;border:0;text-align:center;font:inherit;font-size:17px;font-weight:700;background:transparent;color:var(--ink)}
+/* Studio proposé partout. */
+.studio-row.teaser{cursor:default}
+.studio-promo{display:flex;align-items:center;gap:12px;text-align:left;width:100%;box-sizing:border-box;padding:14px 16px;border-radius:18px;text-decoration:none;color:#fff;
+  background:radial-gradient(120% 140% at 0% 0%,#7C3AED 0%,#3B1D7A 45%,#17201B 100%);box-shadow:0 10px 30px -14px rgba(76,29,149,.6)}
+.studio-promo .studio-ic{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22)}
+.studio-promo .studio-t small{color:rgba(255,255,255,.78)}
+.studio-promo .chip{color:#fff;border-color:rgba(255,255,255,.5)}
+.studio-promo.compact{padding:12px 14px}
+/* Feuilles (Équipe) : en-tête avec fermeture, confirmation. */
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sheet-head h2{margin:0}
+.sheet-x{width:40px;height:40px;border-radius:50%;border:0;background:var(--surface-2);color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.sheet-ok{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--soft)}
+.sheet-ok > div{display:flex;flex-direction:column;gap:2px}
+.sheet-ok-ic{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:var(--on-green);flex:none}
+.sheet .btn.full,.btn.full{width:100%}
+/* Personnalisation guidée : deux grandes cases (logo, couverture) et les conseils d'images. */
+.look-slots{display:grid;grid-template-columns:1fr 1.6fr;gap:12px}
+.look-slot,.kyc-slot{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:150px;padding:14px 10px;border-radius:20px;
+  border:2px dashed var(--line-strong);background:var(--surface);color:var(--ink);font:inherit;text-align:center;cursor:pointer;overflow:hidden}
+.look-slot b,.kyc-slot b{font-size:15px;position:relative}
+.look-slot small,.kyc-slot small{color:var(--muted);font-size:12.5px;position:relative}
+.look-slot.has,.kyc-slot.has{border-style:solid;border-color:var(--green)}
+.look-slot.has img,.kyc-slot.has img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9}
+.look-slot.has b,.look-slot.has small,.kyc-slot.has b,.kyc-slot.has small{background:rgba(255,255,255,.88);color:#17201B;padding:2px 8px;border-radius:99px}
+.look-slot.has small,.kyc-slot.has small{display:none}
+.look-slot.ls-logo{aspect-ratio:1}
+.ls-ic{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:var(--soft);color:var(--green);margin-bottom:4px}
+.look-tips{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.look-tips li{display:flex;gap:8px;align-items:flex-start;font-size:14px;color:var(--muted)}
+.look-tips li .ico{color:var(--green);margin-top:3px;flex:none}
+.look-advice{border-radius:16px;background:var(--surface-2);padding:12px 14px}
+.look-advice summary{font-weight:700;cursor:pointer}
+/* Propriétaire et pièce d'identité. */
+.id-card{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;text-decoration:none;color:var(--ink);border:1.5px solid var(--line);background:var(--surface)}
+.id-card > span:nth-child(2){display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.id-card small{color:var(--muted);font-size:13px}
+.id-card.danger{border-color:var(--danger);background:color-mix(in srgb,var(--danger) 7%,var(--surface))}
+.id-card.danger .id-ic{background:var(--danger);color:#fff}
+.id-ic{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--soft);color:var(--green)}
+.id-head{display:flex;gap:12px;align-items:center}
+.id-head h2{margin:0;font-size:18px}
+.id-head p{margin:2px 0 0}
+.id-note{display:flex;align-items:center;gap:6px}
+.kyc-slots{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kyc-slots.one{grid-template-columns:1fr}
+.kyc-slot{min-height:140px}
+.kyc-doc{display:grid;gap:10px}
+.kyc-doc img{width:100%;max-width:520px;border-radius:12px;border:1px solid var(--line)}
+@media (max-width:360px){.look-slots{grid-template-columns:1fr}}

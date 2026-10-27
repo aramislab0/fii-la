@@ -81,7 +81,27 @@ await t('étape 2 → 3 : premier article ; aperçu ; la vitrine ne s’ouvre qu
   assert.match(await P.locator('#cel').textContent(), /Place n° \d+ \/ 25/);
   await shot(P, '03b-bravo');
   await P.click('#cel-close');
+  // Étape 4 (27/10) : la personnalisation est proposée juste après la mise en ligne — logo, couverture, conseils d'images.
+  await P.locator('#shop-setup[data-step="4"]').waitFor();
+  assert.match(await P.locator('#setup-win').textContent(), /Étape 3 réussie/);
+  assert.equal(await P.locator('#look-tips-logo li').count(), 3); assert.equal(await P.locator('#look-tips-cover li').count(), 3);
+  await shot(P, '03c-image');
+  await P.setInputFiles('#setup-logo-in', 'tests/fixtures/article-4x5.jpg');
+  await P.locator('#setup-logo.has').waitFor();
+  assert.equal(await P.textContent('#setup-look-save'), 'Enregistrer et continuer');
+  await P.click('#setup-look-save');
+  // Étape 5 : le propriétaire, obligatoire (pas de « Plus tard »).
+  await P.locator('#shop-setup[data-step="5"]').waitFor();
+  assert.equal(await P.locator('#shop-setup .setup-later').count(), 0, 'aucune sortie : étape obligatoire');
+  await P.click('#setup-owner-save');
+  await P.getByText('Indiquez le nom et le prénom du propriétaire.').waitFor();
+  await P.fill('#setup-owner-name', 'Coumba Ndiaye'); await P.fill('#setup-owner-phone', '77 555 44 33');
+  await shot(P, '03d-proprietaire');
+  await P.click('#setup-owner-save');
   await P.locator('#setup-done').waitFor();
+  const own = (await local.db.query(`select owner_name, owner_phone, logo is not null has_logo from fiila.shops where name = 'Boutique Coumba (test)'`)).rows[0];
+  assert.deepEqual(own, { owner_name: 'Coumba Ndiaye', owner_phone: '+221775554433', has_logo: true });
+  assert.equal(await metric('look:done'), 1); assert.equal(await metric('owner:done'), 1);
   assert.equal((await shopOf('Boutique Coumba (test)')).public, true);
   assert.match(await P.locator('#setup-url').textContent(), /#\/b\//);
   assert.match(await P.locator('#setup-share').getAttribute('href'), /^https:\/\/wa\.me\//);

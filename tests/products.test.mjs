@@ -48,11 +48,15 @@ await t('boutique : article avec catégorie, tailles (raccourci), couleurs et st
   await S.goto(URL0 + '#/boutique/article/nouveau');
   await S.fill('#product-name', 'Robe wax (test)');
   await S.fill('#product-price', '15000');
-  await S.locator('#product-details summary').click();
-  await S.selectOption('#product-cat', 'mode');
-  await S.getByRole('button', { name: 'Tailles S à XL' }).click();
-  await S.fill('#product-colors', 'Rouge, Bleu nuit');
-  await S.fill('#product-stock', '2');
+  // Détails toujours visibles (recette du 27/10) : catégorie, tailles et couleurs en pastilles, stock avec – / +.
+  assert.equal(await S.locator('#product-details').isVisible(), true, 'détails visibles sans rien déplier');
+  await S.locator('#product-cat [data-v="mode"]').click();
+  for (const x of ['S', 'M', 'L', 'XL']) await S.locator('#product-sizes .pill', { hasText: new RegExp('^' + x + '$') }).click();
+  await S.locator('#product-colors .pill', { hasText: 'Rouge' }).click();
+  await S.fill('#product-color-add', 'Bleu nuit'); await S.press('#product-color-add', 'Enter');
+  await S.locator('#product-stock-hint').getByText('Non suivi').waitFor();
+  await S.locator('.stepper .step').last().click(); await S.locator('.stepper .step').last().click();
+  assert.equal(await S.inputValue('#product-stock'), '2');
   await shot(S, '01-formulaire');
   await S.click('#product-save');
   await S.waitForFunction(() => !/nouveau/.test(location.hash));

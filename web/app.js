@@ -453,6 +453,11 @@
     studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
     studio_busy: 'Une création est déjà en cours. Patientez quelques secondes.',
     studio_failed: 'La création n’a pas abouti. Aucun crédit n’a été utilisé.',
+    shop_kyc_required: 'Cette boutique ne prend pas de nouvelle commande pour le moment.',
+    owner_name_required: 'Indiquez le nom et le prénom du propriétaire.',
+    kyc_image_invalid: 'Photo illisible ou trop lourde. Reprenez la photo, bien à plat et nette.',
+    kyc_back_required: 'Ajoutez aussi le verso de la carte.',
+    kyc_already_verified: 'Votre pièce est déjà validée.',
     studio_expired: 'Cette version n’est plus disponible : créez-en de nouvelles.',
     vd_photo_rule: 'Confirmez qu’aucune personne n’est reconnaissable sur la photo.',
     vd_photo_required: 'Ajoutez une photo de l’article.',
@@ -550,6 +555,11 @@
     studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
     studio_busy: 'Une création est déjà en cours. Patientez quelques secondes.',
     studio_failed: 'La création n’a pas abouti. Aucun crédit n’a été utilisé.',
+    shop_kyc_required: 'Cette boutique ne prend pas de nouvelle commande pour le moment.',
+    owner_name_required: 'Indiquez le nom et le prénom du propriétaire.',
+    kyc_image_invalid: 'Photo illisible ou trop lourde. Reprenez la photo, bien à plat et nette.',
+    kyc_back_required: 'Ajoutez aussi le verso de la carte.',
+    kyc_already_verified: 'Votre pièce est déjà validée.',
     studio_expired: 'Cette version n’est plus disponible : créez-en de nouvelles.',
     shop_suspended: 'Votre boutique est suspendue par l’équipe Fii. Contactez-nous pour la réactiver.',
     invite_invalid: 'Invitation expirée, annulée ou déjà utilisée.',
@@ -2924,6 +2934,8 @@
       sapi('fiila_shop_vitrine', { p: { public: want } }).then(function (r) {
         busy = false; state.public = !!r.public; state.slug = r.slug; FEED_CACHE = null; loadFeedState();
         toast(want ? 'Site en ligne : vos clientes peuvent commander.' : 'Site hors ligne.'); draw();
+        // Personnalisation proposée juste après la mise en ligne (fondateur, 27/10) quand le site n'a pas encore de logo.
+        if (want && !state.logo && SHOP_ROLE !== 'editor') go('#/boutique/vitrine?enligne=1');
       }, function (e) { busy = false; state.public = !want; draw(); errBox(err, e); });
     }
     function draw() {
@@ -3064,7 +3076,8 @@
   function isPremiumTheme(t) { return t === 'atelier' || t === 'comptoir' || t === 'maison'; }
   TRACKABLE.premium = [];
   VT_PREMIUM.forEach(function (t) { ['locked', 'preview', 'interest', 'applied'].forEach(function (a) { TRACKABLE.premium.push(t[0] + ':' + a); }); });
-  function viewVitrineLook() {
+  function viewVitrineLook(q) {
+    q = q || {};
     return Promise.all([sapi('fiila_shop_get', {}), sapi('fiila_shop_vitrine', { p: null })]).then(function (rr) {
       var shop = rr[0].shop, v = rr[1];
       if (!shop) { redirect('#/boutique'); return loading(); }
@@ -3174,11 +3187,13 @@
       drawAll();
       var pg = page(back,
         h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow wrapword' }, shop.name), h('h1', null, 'Personnaliser mon site')),
+        q.enligne ? h('div', { class: 'setup-win', id: 'look-online', role: 'status' }, h('span', { class: 'setup-win-ic', 'aria-hidden': 'true' }, icon('check', 24)),
+          h('div', null, h('p', { class: 'setup-win-k' }, 'Site en ligne'), h('b', null, 'Donnez-lui votre image'), h('span', null, 'Ajoutez votre logo et une photo de couverture.'))) : null,
         prevBox,
-        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Logo'), logoBox),
+        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Logo ', h('span', { class: 'opt' }, '· photo de profil')), logoBox, lookTips('logo')),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Modèle'), themesBox),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couleur'), colorsBox),
-        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couverture et présentation'), coverBox, aboutBox),
+        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couverture et présentation'), coverBox, lookTips('cover'), aboutBox),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Réseaux sociaux'),
           h('p', { class: 'small muted' }, 'Le nom du compte ou son lien.'), socialFields),
         err, h('div', { style: 'height:96px' }), footer());
@@ -3624,10 +3639,11 @@
       else if (p[0] === 'vide-dressing' && p[1] === 'vendre') view = viewVdSell(r.q);
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
       else if (p[0] === 'boutique' && p[1] === 'marketing') view = viewShopMarketing(r.q || {});
-      else if (p[0] === 'boutique' && p[1] === 'vitrine') view = viewVitrineLook();
+      else if (p[0] === 'boutique' && p[1] === 'vitrine') view = viewVitrineLook(r.q);
       else if (p[0] === 'boutique' && p[1] === 'domaine') view = viewShopDomain();
       else if (p[0] === 'boutique' && p[1] === 'demarrer') view = viewShopSetup();
-      else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts();
+      else if (p[0] === 'boutique' && p[1] === 'identite') view = viewShopIdentity();
+      else if (p[0] === 'boutique' && p[1] === 'articles') view = viewProducts(r.q);
       else if (p[0] === 'livreur' && !p[1]) view = viewCourierHome();
       else if (p[0] === 'livreur' && p[1] === 'invitation' && p[2]) view = viewCourierInvite(p[2]);
       else if (p[0] === 'equipe' && p[1]) view = viewTeamInvite(p[1]);
@@ -3665,6 +3681,13 @@
      en reçoit un : retour à l'écran précédent de l'application s'il existe, sinon à l'écran « parent » logique. */
   var NAV = [];
   var lastHash = location.hash || '#/';
+  // Clavier ouvert sur téléphone : html.kbd retire la barre d'onglets fixe le temps de la saisie (recette 27/10).
+  (function () {
+    var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches, t = null;
+    function typing(el) { return el && (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el.tagName === 'INPUT' && !/^(checkbox|radio|file|button|submit|range|color)$/.test(el.type))); }
+    document.addEventListener('focusin', function (e) { if (coarse && typing(e.target)) { clearTimeout(t); document.documentElement.classList.add('kbd'); } });
+    document.addEventListener('focusout', function () { clearTimeout(t); t = setTimeout(function () { if (!typing(document.activeElement)) document.documentElement.classList.remove('kbd'); }, 120); });
+  })();
   window.addEventListener('hashchange', function () {
     var cur = location.hash || '#/';
     if (NAV.length && NAV[NAV.length - 1] === cur) NAV.pop(); // retour arrière
@@ -5805,13 +5828,14 @@
      explicite de la vitrine, puis partage. Une boutique sans article n'est pas proposée au partage. Chaque étape est
      enregistrée sur le serveur ; l'étape suivante se déduit de l'état réel (reprise après interruption). */
   var SETUP_LS = 'fiila.shop.setup';
-  ['name:done', 'product:done', 'product:skip', 'vitrine:open', 'share:click', 'resume:open'].forEach(function (v) { (TRACKABLE.shop_setup = TRACKABLE.shop_setup || []).push(v); });
+  ['name:done', 'product:done', 'product:skip', 'vitrine:open', 'look:done', 'owner:done', 'share:click', 'resume:open'].forEach(function (v) { (TRACKABLE.shop_setup = TRACKABLE.shop_setup || []).push(v); });
   function setupState() { return LS.get(SETUP_LS, null) || {}; }
   function setupPending() { var st = setupState(); return !!(st.started && !st.done && (shopKey() || (ME && ME.shop))); }
   // Trois badges qui se débloquent (fondateur, 21/10 00:47 : « des cartes dynamiques gratifiantes… rendre ça amusant »).
-  var SETUP_BADGES = [['shop', 'Boutique'], ['cam', 'Article'], ['eye', 'Site']];
+  // 27/10 (recette du fondateur) : 5 étapes — personnalisation juste après la mise en ligne, puis propriétaire (obligatoire).
+  var SETUP_BADGES = [['shop', 'Boutique'], ['cam', 'Article'], ['eye', 'Site'], ['spark', 'Style'], ['user', 'Vous']];
   function setupBadges(n) {
-    return h('ol', { class: 'setup-badges', role: 'progressbar', 'aria-valuemin': '1', 'aria-valuemax': '3', 'aria-valuenow': String(n), 'aria-label': 'Étape ' + n + ' sur 3' },
+    return h('ol', { class: 'setup-badges', role: 'progressbar', 'aria-valuemin': '1', 'aria-valuemax': String(SETUP_BADGES.length), 'aria-valuenow': String(n), 'aria-label': 'Étape ' + n + ' sur ' + SETUP_BADGES.length },
       SETUP_BADGES.map(function (b, i) {
         var st = i + 1 < n ? 'done' : i + 1 === n ? 'now' : 'next';
         return h('li', { class: 'sb sb-' + st }, h('span', { class: 'sb-ic', 'aria-hidden': 'true' }, icon(st === 'done' ? 'check' : b[0], 20)), h('span', { class: 'sb-l' }, b[1]));
@@ -5823,7 +5847,9 @@
     if (!st.just || st.just.step !== n - 1) return null;
     var j = st.just; delete st.just; LS.set(SETUP_LS, st);
     var t = n === 2 ? ['Étape 1 réussie', '« ' + j.name + ' » est créée', 'Prochaine étape : votre premier article. Une photo et un prix suffisent.']
-      : ['Étape 2 réussie', 'Votre premier article est prêt', 'Dernière étape : mettre votre site en ligne. Vos clientes pourront commander.'];
+      : n === 3 ? ['Étape 2 réussie', 'Votre premier article est prêt', 'Étape suivante : mettre votre site en ligne. Vos clientes pourront commander.']
+      : n === 4 ? ['Étape 3 réussie', 'Votre site est en ligne', 'Donnons-lui votre image : un logo et une photo de couverture.']
+      : ['Étape 4 réussie', 'Votre site a son style', 'Dernière étape : qui tient la boutique ?'];
     return h('section', { class: 'setup-win', id: 'setup-win', role: 'status' },
       h('span', { class: 'setup-win-ic', 'aria-hidden': 'true' }, icon('check', 24),
         h('span', { class: 'setup-win-spark' }, h('i'), h('i'), h('i'), h('i'), h('i'))),
@@ -5834,7 +5860,7 @@
       h('section', { class: 'setup', id: 'shop-setup', 'data-step': String(n) },
         setupBadges(n),
         setupWin(n),
-        h('p', { class: 'setup-step' }, 'Étape ' + n + ' sur 3'),
+        h('p', { class: 'setup-step' }, 'Étape ' + n + ' sur ' + SETUP_BADGES.length),
         h('h1', null, title), text ? h('p', { class: 'muted' }, text) : null,
         body),
       footer(true));
@@ -5871,13 +5897,17 @@
       err, btn));
   }
   function viewShopSetup() {
-    return Promise.all([sapi('fiila_shop_get', {}), sapi('fiila_products', { p_all: true })]).then(function (rr) {
-      var shop = rr[0].shop, prods = rr[1] || [];
+    return Promise.all([sapi('fiila_shop_get', {}), sapi('fiila_products', { p_all: true }), sapi('fiila_shop_identity', {}).then(null, function () { return {}; })]).then(function (rr) {
+      var shop = rr[0].shop, prods = rr[1] || [], idt = rr[2] || {};
       if (!shop) return onboardingOn() ? setupStepName() : shopForm(null);
       SHOP_ROLE = shop.role || 'owner';
       if (SHOP_ROLE === 'editor') { redirect('#/boutique'); return page(); }
       if (!prods.length) return setupStepProduct(shop);
-      return setupStepVitrine(shop, prods);
+      if (!(shop.public && shop.slug)) return setupStepVitrine(shop, prods);
+      var st = setupState();
+      if (!st.look && !st.done) return setupStepLook(shop);
+      if (idt.need_owner && SHOP_ROLE === 'owner') return setupStepOwner(shop);
+      return setupDone(shop);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
   function setupStepProduct(shop) {
@@ -5921,7 +5951,7 @@
           celebrate({ icon: 'star', kicker: 'Boutique ouverte', title: 'Bravo, ' + shop.name + ' est en ligne !',
             gain: fd && fd.rank ? 'Place n° ' + fd.rank + ' / 25' : null,
             sub: (fd && fd.rank ? 'Votre place offerte dans le fil Fii. ' : '') + 'Vos clientes peuvent commander dès maintenant, sans compte, et vous donner leur adresse exacte.',
-            cta: 'Partager mon site', onClose: function () { render(); } });
+            cta: 'Continuer', onClose: function () { var st = setupState(); st.just = { step: 3 }; LS.set(SETUP_LS, st); render(); } });
         });
       }, function (e) { btn.disabled = false; errBox(err, e); });
     } }, 'Mettre mon site en ligne');
@@ -5936,6 +5966,156 @@
       err, btn,
       h('a', { class: 'setup-later', id: 'setup-later', href: '#/boutique' }, 'Plus tard')));
   }
+  // Recommandations d'images (fondateur, 27/10 : « faire les recommandations des images qu'il faut »).
+  var LOOK_TIPS = {
+    logo: ['Votre logo, ou à défaut une belle photo carrée de votre boutique', 'Fond uni, sans texte trop petit', 'Carré, au moins 400 × 400 px'],
+    cover: ['Une photo large : votre boutique, vos articles en situation, une ambiance', 'Lumineuse, nette, sans texte écrit dessus', 'Horizontale, au moins 1600 × 900 px']
+  };
+  function lookTips(k) {
+    return h('ul', { class: 'look-tips', id: 'look-tips-' + k }, LOOK_TIPS[k].map(function (t) { return h('li', null, icon('check', 14), h('span', null, t)); }));
+  }
+  // Étape 4 : personnaliser juste après la mise en ligne — logo (photo de profil) et couverture, en deux grandes cases.
+  function setupStepLook(shop) {
+    var d = { logo: null, cover: null }, err = h('div', { role: 'alert' });
+    var slots = h('div', { class: 'look-slots' });
+    var logoIn = h('input', { type: 'file', accept: 'image/*', id: 'setup-logo-in', hidden: true, onchange: function () {
+      var f = logoIn.files && logoIn.files[0]; logoIn.value = ''; if (!f) return;
+      logoFromFile(f).then(function (u) { d.logo = u; draw(); }, function (e) { toast(e.message); });
+    } });
+    var coverIn = h('input', { type: 'file', accept: 'image/*', id: 'setup-cover-in', hidden: true, onchange: function () {
+      var f = coverIn.files && coverIn.files[0]; coverIn.value = ''; if (!f) return;
+      compressPhoto(f, 1600).then(function (u) { d.cover = u; draw(); }, function (e) { toast(e.message); });
+    } });
+    var btn = h('button', { class: 'btn big', type: 'button', id: 'setup-look-save', onclick: function () {
+      setKids(err);
+      if (!d.logo && !d.cover) { finish('skip'); return; }
+      var p = {}; if (d.logo) p.logo = d.logo.replace(/^data:[^,]+,/, ''); if (d.cover) p.cover = d.cover.replace(/^data:[^,]+,/, '');
+      btn.disabled = true;
+      sapi('fiila_shop_vitrine', { p: p }).then(function () { track('shop_setup', 'look:done'); finish('done'); }, function (e) { btn.disabled = false; errBox(err, e); });
+    } }, 'Continuer');
+    function finish(how) { var st = setupState(); st.look = how; st.just = { step: 4 }; LS.set(SETUP_LS, st); render(); }
+    function draw() {
+      setKids(slots,
+        h('button', { type: 'button', class: 'look-slot ls-logo' + (d.logo ? ' has' : ''), id: 'setup-logo', onclick: function () { logoIn.click(); } },
+          d.logo ? h('img', { src: d.logo, alt: 'Logo choisi' }) : h('span', { class: 'ls-ic', 'aria-hidden': 'true' }, icon('cam', 26)),
+          h('b', null, d.logo ? 'Changer le logo' : 'Logo'), h('small', null, 'Photo de profil')),
+        h('button', { type: 'button', class: 'look-slot ls-cover' + (d.cover ? ' has' : ''), id: 'setup-cover', onclick: function () { coverIn.click(); } },
+          d.cover ? h('img', { src: d.cover, alt: 'Couverture choisie' }) : h('span', { class: 'ls-ic', 'aria-hidden': 'true' }, icon('cam', 26)),
+          h('b', null, d.cover ? 'Changer la couverture' : 'Couverture'), h('small', null, 'Grande photo en haut du site')));
+      btn.textContent = d.logo || d.cover ? 'Enregistrer et continuer' : 'Continuer sans image';
+    }
+    draw();
+    return setupFrame(4, 'Votre image', 'Un logo et une couverture rendent votre site reconnaissable. Vous pourrez tout changer plus tard.', h('div', { class: 'stack' },
+      slots, logoIn, coverIn,
+      h('details', { class: 'look-advice', id: 'setup-look-advice', open: true }, h('summary', null, 'Quelles images choisir ?'),
+        h('div', { class: 'stack tight', style: 'margin-top:10px' }, h('b', { class: 'small' }, 'Logo'), lookTips('logo'), h('b', { class: 'small' }, 'Couverture'), lookTips('cover'))),
+      err, btn,
+      h('a', { class: 'setup-later', id: 'setup-look-more', href: '#/boutique/vitrine', onclick: function () { var st = setupState(); st.look = 'more'; LS.set(SETUP_LS, st); } }, 'Plus de choix : modèle, couleur, réseaux')));
+  }
+  // Étape 5 : le propriétaire (obligatoire, fondateur 27/10). Jamais affiché sur le site.
+  function setupStepOwner(shop) {
+    return setupFrame(5, 'Qui tient la boutique ?', 'Le nom et le numéro du propriétaire. Ils ne sont pas affichés sur votre site : ils servent à vous joindre et à sécuriser vos ventes.',
+      ownerForm({ id: 'setup-owner', cta: 'Terminer', onDone: function () { track('shop_setup', 'owner:done'); var st = setupState(); st.just = { step: 5 }; LS.set(SETUP_LS, st); render(); } }));
+  }
+  function ownerForm(o) {
+    var f = { name: '', phone: '' }, err = h('div', { role: 'alert' });
+    var btn = h('button', { class: 'btn big', type: 'button', id: o.id + '-save', onclick: function () {
+      setKids(err);
+      if (f.name.trim().length < 2) return errBox(err, new ApiError('owner_name_required'));
+      btn.disabled = true;
+      sapi('fiila_shop_owner_save', { p_name: f.name.trim(), p_phone: f.phone.trim() }).then(function (r) { toast('Informations enregistrées.'); o.onDone(r); },
+        function (e) { btn.disabled = false; errBox(err, e); });
+    } }, o.cta || 'Enregistrer');
+    return h('div', { class: 'stack', id: o.id },
+      textField({ id: o.id + '-name', label: 'Prénom et nom du propriétaire', max: 80, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
+      textField({ id: o.id + '-phone', label: 'Téléphone du propriétaire', type: 'tel', inputmode: 'tel', autocomplete: 'tel', placeholder: 'Ex. : 77 123 45 67', onInput: function (v) { f.phone = v; } }),
+      h('p', { class: 'hint' }, icon('lock', 14), ' Visible seulement par vous et l’équipe Fii.'),
+      err, btn);
+  }
+  // Fii Studio proposé partout (fondateur, 27/10 : « toujours proposer Fii Studio ») : carte vers les articles.
+  function studioPromo(id, compact) {
+    var box = h('div', { id: id });
+    sapi('fiila_studio_state_shop', {}).then(function (st) {
+      if (!st || !st.ready) return;
+      var n = (st.credits && st.credits.total) || 0;
+      setKids(box, h(compact ? 'div' : 'a', { class: 'studio-promo' + (compact ? ' compact' : ''), href: compact ? null : '#/boutique/articles' },
+        h('span', { class: 'studio-ic', 'aria-hidden': 'true' }, icon('spark', 24)),
+        h('span', { class: 'studio-t' }, h('b', null, 'Fii Studio'),
+          h('small', null, compact ? 'Touchez un article, puis « Studio » : sa photo en version pro.' : 'Vos photos d’articles en version studio : décor, lumière, ombres.')),
+        h('span', { class: 'chip ' + (n ? 'ok' : 'neutral') }, n + (n > 1 ? ' crédits' : ' crédit'))));
+    }, function () {});
+    return box;
+  }
+  // Propriétaire et pièce d'identité (fondateur, 27/10) : cartes en tête de « Ma boutique » et des réglages.
+  function identitySlot(id) {
+    var box = h('div', { id: id || 'identity-slot', class: 'stack' });
+    function draw(r) {
+      if (!r) { setKids(box); return; }
+      var k = r.kyc || {};
+      // Commandes bloquées : « Nouvelle commande » cède la place à l'envoi de la pièce (une seule action principale).
+      var no = document.getElementById('new-order');
+      if (no && r.blocked) { no.classList.remove('big'); no.classList.add('ghost'); no.setAttribute('aria-disabled', 'true'); }
+      setKids(box,
+        r.blocked ? h('a', { class: 'id-card danger', id: 'kyc-blocked', href: '#/boutique/identite' },
+          h('span', { class: 'id-ic', 'aria-hidden': 'true' }, icon('lock', 22)),
+          h('span', null, h('b', null, k.status === 'rejected' ? 'Pièce refusée : commandes bloquées' : 'Commandes bloquées'),
+            h('small', null, k.status === 'rejected' ? (k.reason ? 'Motif : ' + k.reason + '. ' : '') + 'Envoyez une nouvelle photo.'
+              : r.role === 'editor' ? 'Le propriétaire doit envoyer sa pièce d’identité.' : 'Bravo pour votre première vente ! Envoyez votre pièce d’identité pour continuer à vendre.')),
+          r.role === 'editor' ? null : h('span', { class: 'chev', 'aria-hidden': 'true' }, icon('chev', 18))) : null,
+        !r.blocked && k.status === 'submitted' ? h('p', { class: 'small muted id-note', id: 'kyc-pending' }, icon('clock', 14), ' Pièce d’identité envoyée : vérification par l’équipe Fii.') : null,
+        r.need_owner && r.role === 'owner' ? h('section', { class: 'card stack id-owner', id: 'owner-card' },
+          h('div', { class: 'id-head' }, h('span', { class: 'id-ic', 'aria-hidden': 'true' }, icon('user', 22)),
+            h('div', null, h('h2', null, 'Qui tient la boutique ?'), h('p', { class: 'small muted' }, 'Obligatoire : le nom et le numéro du propriétaire.'))),
+          ownerForm({ id: 'owner', cta: 'Enregistrer', onDone: draw })) : null);
+    }
+    sapi('fiila_shop_identity', {}).then(draw, function () {});
+    return box;
+  }
+  // Pièce d'identité du propriétaire (#/boutique/identite) : carte d'identité (recto, verso) ou passeport (page photo).
+  function viewShopIdentity() {
+    return sapi('fiila_shop_identity', {}).then(function (r) {
+      var back = backBtn('Ma boutique', '#/boutique');
+      if (r.role !== 'owner') return page(back, stateCard('?', 'Réservé au propriétaire', 'Seul le propriétaire de la boutique envoie sa pièce d’identité.'), footer());
+      var k = r.kyc || {};
+      if (k.status === 'verified') return page(back, stateCard('✓', 'Pièce validée', 'Votre identité est vérifiée. Merci !', h('a', { class: 'btn', href: '#/boutique' }, 'Ma boutique')), footer());
+      var d = { type: 'cni', front: null, back: null }, err = h('div', { role: 'alert' }), body = h('div', { class: 'stack' });
+      function slot(key, label, sub) {
+        var inp = h('input', { type: 'file', accept: 'image/*', id: 'kyc-' + key + '-in', hidden: true, onchange: function () {
+          var f = inp.files && inp.files[0]; inp.value = ''; if (!f) return;
+          compressPhoto(f, 1600).then(function (u) { d[key] = u; draw(); }, function (e) { toast(e.message); });
+        } });
+        return h('button', { type: 'button', class: 'kyc-slot' + (d[key] ? ' has' : ''), id: 'kyc-' + key, onclick: function () { inp.click(); } },
+          d[key] ? h('img', { src: d[key], alt: label }) : h('span', { class: 'ls-ic', 'aria-hidden': 'true' }, icon('cam', 26)),
+          h('b', null, d[key] ? 'Reprendre' : label), h('small', null, sub), inp);
+      }
+      var btn = h('button', { class: 'btn big full', type: 'button', id: 'kyc-send', onclick: function () {
+        setKids(err);
+        if (!d.front) return errBox(err, new Error(d.type === 'cni' ? 'Ajoutez la photo du recto.' : 'Ajoutez la photo de la page avec votre photo.'));
+        if (d.type === 'cni' && !d.back) return errBox(err, new ApiError('kyc_back_required'));
+        btn.disabled = true; btn.textContent = 'Envoi…';
+        sapi('fiila_shop_kyc_submit', { p_doc_type: d.type, p_front: d.front.replace(/^data:[^,]+,/, ''), p_back: d.type === 'cni' ? d.back.replace(/^data:[^,]+,/, '') : null }).then(function () {
+          toast('Pièce envoyée. Vous pouvez de nouveau prendre des commandes.'); go('#/boutique');
+        }, function (e) { btn.disabled = false; btn.textContent = 'Envoyer'; errBox(err, e); });
+      } }, 'Envoyer');
+      function draw() {
+        setKids(body,
+          segField({ name: 'kyc-type', id: 'kyc-type', value: d.type, options: [['cni', 'Carte d’identité'], ['passport', 'Passeport']],
+            onChange: function (v) { d.type = v; d.front = null; d.back = null; draw(); } }),
+          h('div', { class: 'kyc-slots' + (d.type === 'cni' ? '' : ' one') },
+            d.type === 'cni' ? [slot('front', 'Recto', 'Face avec votre photo'), slot('back', 'Verso', 'Face arrière')] : slot('front', 'Page photo', 'La page avec votre photo')),
+          h('ul', { class: 'look-tips' }, ['Pièce entière, bien à plat, sans reflet', 'Texte lisible, photo nette', 'La pièce du propriétaire : ' + (r.owner_name || 'vous')].map(function (t) { return h('li', null, icon('check', 14), h('span', null, t)); })),
+          err, btn);
+      }
+      draw();
+      return page(back,
+        h('div', { class: 'stack tight' }, h('p', { class: 'eyebrow' }, 'Sécurité des ventes'), h('h1', null, 'Pièce d’identité'),
+          h('p', { class: 'muted' }, k.status === 'rejected' ? 'Votre pièce a été refusée' + (k.reason ? ' : ' + k.reason : '') + '. Envoyez une nouvelle photo.'
+            : 'Après votre première vente, Fii vérifie l’identité du propriétaire. Vos nouvelles commandes reprennent dès l’envoi.')),
+        body,
+        h('p', { class: 'hint' }, icon('lock', 14), ' Vue seulement par l’équipe Fii, jamais affichée sur votre site.'),
+        footer());
+    }, failPage('Impossible de charger la page', 'boutique/identite'));
+  }
   function setupDone(shop) {
     var url = vitrineUrl(shop.slug);
     function finish() { var st = setupState(); st.done = Date.now(); LS.set(SETUP_LS, st); }
@@ -5948,6 +6128,7 @@
         h('p', { class: 'sharelink', id: 'setup-url' }, url),
         iconBtn('a', { class: 'btn big', id: 'setup-share', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
           onclick: function () { track('shop_setup', 'share:click'); } }, 'chat', 'Partager sur WhatsApp'),
+        studioPromo('setup-studio'),
         h('a', { class: 'setup-later', id: 'setup-to-shop', href: '#/boutique' }, 'Aller à ma boutique')),
       footer(true));
   }
@@ -6183,33 +6364,48 @@
           h('span', { class: 'team-name' }, (i.name || i.phone)), h('span', { class: 'small muted' }, 'Invité · ' + ROLE_LABEL[i.role]),
           h('button', { class: 'btn link small', type: 'button', onclick: function () { act('fiila_shop_invite_cancel', { p_id: i.id }, 'Invitation annulée.'); } }, 'Annuler')));
       });
-      var f = { name: '', phone: '', role: 'editor' };
-      var hint = h('p', { class: 'hint', id: 'team-role-hint' }, ROLE_HINT.editor);
-      var sendBox = h('div', { class: 'stack' });
-      var inviteBtn = iconBtn('button', { class: 'btn', type: 'button', id: 'team-invite', onclick: function (ev) {
-        setKids(err);
-        if (!f.phone.trim()) return errBox(err, new ApiError('phone_invalid'));
-        var b = ev.currentTarget; b.disabled = true;
-        sapi('fiila_shop_invite', { p_name: f.name.trim() || null, p_phone: f.phone.trim(), p_role: f.role }).then(function (r) {
-          var link = baseUrl() + '#/equipe/' + r.token;
-          var who = f.name.trim() ? f.name.trim().split(' ')[0] : '';
-          var msg = 'Bonjour' + (who ? ' ' + who : '') + ', ' + shop.name + ' vous invite à rejoindre son équipe sur Fii (' + ROLE_LABEL[f.role].toLowerCase() + '). Ouvrez ce lien pour accepter : ' + link;
-          track('team_invited', f.role);
-          b.hidden = true;
-          setKids(sendBox, iconBtn('a', { class: 'btn', id: 'team-invite-send', href: waTo(f.phone, msg), target: '_blank', rel: 'noopener noreferrer',
-              onclick: function () { setTimeout(function () { draw(r.team); }, 400); } }, 'chat', 'Envoyer sur WhatsApp'),
-            iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'team-invite-copy', style: 'align-self:flex-start', onclick: function () { copy(link, 'Lien'); } }, 'link', 'Copier le lien'),
-            h('p', { class: 'small muted' }, 'Lien personnel, valable 7 jours, utilisable une seule fois.'));
-        }, function (e) { b.disabled = false; errBox(err, e); });
-      } }, 'chat', 'Inviter sur WhatsApp');
+      // Ajout d'une personne : feuille dédiée, champs puis un seul bouton « Enregistrer et inviter » juste dessous, jamais
+      // caché par la barre d'onglets (recette du fondateur, 27/10 : « je ne vois pas le bouton enregistrer »).
+      function addSheet() {
+        var f = { name: '', phone: '', role: 'editor' }, closeSheet;
+        var serr = h('div', { role: 'alert' });
+        var hint = h('p', { class: 'hint', id: 'team-role-hint' }, ROLE_HINT.editor);
+        var sendBox = h('div', { class: 'stack' });
+        var inviteBtn = iconBtn('button', { class: 'btn big full', type: 'button', id: 'team-invite', onclick: function (ev) {
+          setKids(serr);
+          if (!f.phone.trim()) return errBox(serr, new ApiError('phone_invalid'));
+          var b = ev.currentTarget; b.disabled = true;
+          sapi('fiila_shop_invite', { p_name: f.name.trim() || null, p_phone: f.phone.trim(), p_role: f.role }).then(function (r) {
+            var link = baseUrl() + '#/equipe/' + r.token;
+            var who = f.name.trim() ? f.name.trim().split(' ')[0] : '';
+            var msg = 'Bonjour' + (who ? ' ' + who : '') + ', ' + shop.name + ' vous invite à rejoindre son équipe sur Fii (' + ROLE_LABEL[f.role].toLowerCase() + '). Ouvrez ce lien pour accepter : ' + link;
+            track('team_invited', f.role);
+            draw(r.team);
+            setKids(form, h('div', { class: 'sheet-ok', id: 'team-saved' }, h('span', { class: 'sheet-ok-ic', 'aria-hidden': 'true' }, icon('check', 22)),
+                h('div', null, h('b', null, (f.name.trim() || f.phone.trim()) + ' est ajouté(e)'), h('span', { class: 'small muted' }, 'Il reste à lui envoyer son lien d’accès.'))),
+              iconBtn('a', { class: 'btn big full', id: 'team-invite-send', href: waTo(f.phone, msg), target: '_blank', rel: 'noopener noreferrer',
+                onclick: function () { setTimeout(function () { if (closeSheet) closeSheet(); }, 400); } }, 'chat', 'Envoyer sur WhatsApp'),
+              iconBtn('button', { class: 'btn ghost full', type: 'button', id: 'team-invite-copy', onclick: function () { copy(link, 'Lien'); } }, 'link', 'Copier le lien'),
+              h('p', { class: 'small muted' }, 'Lien personnel, valable 7 jours, utilisable une seule fois.'));
+          }, function (e) { b.disabled = false; errBox(serr, e); });
+        } }, 'check', 'Enregistrer et inviter');
+        var form = h('div', { class: 'stack' },
+          textField({ id: 'team-name', label: 'Nom', max: 60, autocomplete: 'off', onInput: function (v) { f.name = v; } }),
+          textField({ id: 'team-phone', label: 'Numéro WhatsApp', type: 'tel', inputmode: 'tel', onInput: function (v) { f.phone = v; } }),
+          segField({ legend: 'Rôle', name: 'team-role', id: 'team-role', value: f.role, options: [['editor', ROLE_LABEL.editor], ['admin', ROLE_LABEL.admin]],
+            onChange: function (v) { f.role = v; hint.textContent = ROLE_HINT[v]; } }),
+          hint, serr, inviteBtn, sendBox);
+        var back = h('div', { class: 'sheet-back', id: 'team-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'team-sheet-h', onclick: function (e) { if (e.target === back) closeSheet(); } },
+          h('div', { class: 'sheet' },
+            h('div', { class: 'sheet-head' }, h('h2', { id: 'team-sheet-h' }, 'Ajouter une personne'),
+              h('button', { class: 'sheet-x', type: 'button', 'aria-label': 'Fermer', onclick: function () { closeSheet(); } }, icon('close', 20))),
+            form));
+        closeSheet = openSheet(back);
+      }
       setKids(body,
         h('ul', { class: 'team-list', id: 'team-list' }, rows),
-        h('h3', { class: 'small' }, 'Ajouter une personne'),
-        textField({ id: 'team-name', label: 'Nom', max: 60, onInput: function (v) { f.name = v; } }),
-        textField({ id: 'team-phone', label: 'WhatsApp', type: 'tel', inputmode: 'tel', onInput: function (v) { f.phone = v; } }),
-        segField({ legend: 'Rôle', name: 'team-role', id: 'team-role', value: f.role, options: [['editor', ROLE_LABEL.editor], ['admin', ROLE_LABEL.admin]],
-          onChange: function (v) { f.role = v; hint.textContent = ROLE_HINT[v]; } }),
-        hint, err, inviteBtn, sendBox);
+        err,
+        iconBtn('button', { class: 'btn ghost full', type: 'button', id: 'team-add', onclick: addSheet }, 'plus', 'Ajouter une personne'));
     }
     return box;
   }
@@ -6352,6 +6548,7 @@
     if (st.orders) load();
     return shopTabs(page(backBtn(),
       secHead('boutique', 'shop', shop.name, { id: 'shop-title' }),
+      identitySlot(),
       partnerSlot(),
       due,
       resume,
@@ -6910,10 +7107,11 @@
         footer()), 'marketing');
     }, failPage('Impossible de charger le marketing', 'boutique/marketing'));
   }
-  function viewProducts() {
+  function viewProducts(q) {
     return sapi('fiila_products', { p_all: true }).then(function (rows) {
       return shopTabs(page(backBtn('Ma boutique', '#/boutique'),
         h('div', { class: 'brand-row' }, secHead('products', 'tag', 'Mes articles'), iconBtn('a', { class: 'btn small', id: 'product-new', href: '#/boutique/article/nouveau' }, 'plus', 'Ajouter', 18)),
+        rows.some(function (x) { return x.photo; }) ? studioPromo('products-studio', true) : null,
         rows.length ? h('div', { class: 'list', id: 'products' }, rows.map(function (pr) {
           return h('a', { class: 'item product-item', href: '#/boutique/article/' + pr.id },
             pr.photo ? h('img', { class: 'thumb', src: pr.photo, alt: '' }) : h('span', { class: 'thumb empty', 'aria-hidden': 'true' }),
@@ -6937,23 +7135,71 @@
   function splitTags(t) {
     var seen = {}; return String(t || '').split(/[,;\n]+/).map(function (x) { return x.trim(); }).filter(function (x) { if (!x || seen[x]) return false; seen[x] = 1; return true; });
   }
-  // Détails de l'article (facultatifs) : catégorie, tailles ou pointures, couleurs, stock. Ouverts s'ils sont déjà remplis.
+  // Détails de l'article : catégorie, tailles ou pointures, couleurs, stock — toujours visibles (fondateur, 27/10 : « des
+  // onglets importants masqués par défaut… afficher les cases des informations utiles »). Tailles et couleurs en pastilles
+  // touchables (préréglages selon la catégorie), stock avec – / +, vide = « je ne compte pas ».
+  var SIZE_SETS = { mode: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], enfants: ['0-3 m', '3-6 m', '6-12 m', '2 ans', '4 ans', '6 ans', '8 ans', '10 ans', '12 ans'],
+    chaussures: ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45'] };
+  var COLOR_SET = [['Noir', '#1B1A17'], ['Blanc', '#FFFFFF'], ['Rouge', '#C0392B'], ['Bleu', '#2E5AAC'], ['Vert', '#2F7A4D'], ['Jaune', '#E8B931'],
+    ['Rose', '#E58FB1'], ['Beige', '#D9C7A7'], ['Marron', '#7A4E2D'], ['Gris', '#9A9A96'], ['Orange', '#E67E22'], ['Multicolore', 'conic-gradient(#C0392B,#E8B931,#2F7A4D,#2E5AAC,#C0392B)']];
   function productDetails(f) {
-    var sizesBox = textField({ id: 'product-sizes', label: 'Tailles ou pointures', optional: true, max: 120, value: f.sizes, placeholder: 'Ex. : S, M, L ou 40, 41, 42', onInput: function (v) { f.sizes = v; } });
-    function preset(label, val) {
-      return h('button', { class: 'btn ghost small', type: 'button', onclick: function () { f.sizes = val; var i = document.getElementById('product-sizes'); if (i) i.value = val; } }, label);
+    var box = h('section', { class: 'pf-sec', id: 'product-details' });
+    function tags(v) { return splitTags(v); }
+    function toggleTag(key, val) {
+      var l = tags(f[key]), i = l.indexOf(val);
+      if (i >= 0) l.splice(i, 1); else l.push(val);
+      f[key] = l.join(', '); draw();
     }
-    var sel = h('select', { id: 'product-cat', onchange: function (e) { f.category = e.target.value; } },
-      h('option', { value: '' }, 'Choisir…'), CATEGORIES.map(function (c) { return h('option', { value: c[0], selected: f.category === c[0] || null }, c[1]); }));
-    return h('details', { class: 'more-details', id: 'product-details', open: f.category || f.sizes || f.colors || f.stock ? true : null },
-      h('summary', null, 'Catégorie, tailles, couleurs, stock'),
-      h('div', { class: 'stack', style: 'margin-top:12px' },
-        h('div', { class: 'field' }, h('label', { for: 'product-cat' }, 'Catégorie'), sel),
-        sizesBox,
-        h('div', { class: 'row' }, preset('Tailles S à XL', 'S, M, L, XL'), preset('Pointures 38 à 45', '38, 39, 40, 41, 42, 43, 44, 45')),
-        textField({ id: 'product-colors', label: 'Couleurs', optional: true, max: 160, value: f.colors, placeholder: 'Ex. : Rouge, Bleu nuit', onInput: function (v) { f.colors = v; } }),
-        textField({ id: 'product-stock', label: 'Stock', optional: true, inputmode: 'numeric', value: f.stock, placeholder: 'Laisser vide si vous ne comptez pas', onInput: function (v) { f.stock = v; } }),
-        h('p', { class: 'hint' }, 'À zéro en stock, l’article passe « Épuisé ».')));
+    function sizeChoices() {
+      var cat = f.category === 'chaussures' ? 'chaussures' : f.category === 'enfants' ? 'enfants' : f.category === 'mode' ? 'mode' : null;
+      var base = cat ? SIZE_SETS[cat] : SIZE_SETS.mode.concat(SIZE_SETS.chaussures.slice(2, 8));
+      var cur = tags(f.sizes);
+      return base.concat(cur.filter(function (x) { return base.indexOf(x) < 0; }));
+    }
+    var extraSize = '', extraColor = '';
+    function draw() {
+      var curS = tags(f.sizes), curC = tags(f.colors);
+      var stockN = f.stock.trim() === '' ? null : parseInt(f.stock.replace(/\D/g, ''), 10);
+      function setStock(n) { f.stock = n == null ? '' : String(Math.max(0, n)); draw(); }
+      setKids(box,
+        h('h2', { class: 'pf-h' }, 'Détails'),
+        h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-cat-l' }, 'Catégorie'),
+          h('div', { class: 'pills', role: 'radiogroup', 'aria-labelledby': 'product-cat-l', id: 'product-cat' }, CATEGORIES.map(function (c) {
+            var on = f.category === c[0];
+            return h('button', { type: 'button', class: 'pill' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-v': c[0],
+              onclick: function () { f.category = on ? '' : c[0]; draw(); } }, c[1]);
+          }))),
+        h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-sizes-l' }, f.category === 'chaussures' ? 'Pointures' : 'Tailles', h('span', { class: 'opt' }, ' (touchez pour choisir)')),
+          h('div', { class: 'pills', role: 'group', 'aria-labelledby': 'product-sizes-l', id: 'product-sizes' }, sizeChoices().map(function (x) {
+            var on = curS.indexOf(x) >= 0;
+            return h('button', { type: 'button', class: 'pill sm' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', onclick: function () { toggleTag('sizes', x); } }, x);
+          }), h('span', { class: 'pill-add' }, h('input', { type: 'text', id: 'product-size-add', maxlength: 20, placeholder: 'Autre', 'aria-label': 'Autre taille', value: extraSize,
+            oninput: function (e) { extraSize = e.target.value; },
+            onkeydown: function (e) { if (e.key === 'Enter' && extraSize.trim()) { e.preventDefault(); var v = extraSize.trim(); extraSize = ''; if (tags(f.sizes).indexOf(v) < 0) toggleTag('sizes', v); } },
+            onblur: function () { if (extraSize.trim()) { var v = extraSize.trim(); extraSize = ''; if (tags(f.sizes).indexOf(v) < 0) toggleTag('sizes', v); } } })))),
+        h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-colors-l' }, 'Couleurs'),
+          h('div', { class: 'pills', role: 'group', 'aria-labelledby': 'product-colors-l', id: 'product-colors' }, COLOR_SET.map(function (c) {
+            var on = curC.indexOf(c[0]) >= 0;
+            return h('button', { type: 'button', class: 'pill sm col' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', onclick: function () { toggleTag('colors', c[0]); } },
+              h('i', { class: 'dot', style: 'background:' + c[1], 'aria-hidden': 'true' }), c[0]);
+          }), curC.filter(function (x) { return !COLOR_SET.some(function (c) { return c[0] === x; }); }).map(function (x) {
+            return h('button', { type: 'button', class: 'pill sm on', 'aria-pressed': 'true', onclick: function () { toggleTag('colors', x); } }, x);
+          }), h('span', { class: 'pill-add' }, h('input', { type: 'text', id: 'product-color-add', maxlength: 30, placeholder: 'Autre', 'aria-label': 'Autre couleur', value: extraColor,
+            oninput: function (e) { extraColor = e.target.value; },
+            onkeydown: function (e) { if (e.key === 'Enter' && extraColor.trim()) { e.preventDefault(); var v = extraColor.trim(); extraColor = ''; if (tags(f.colors).indexOf(v) < 0) toggleTag('colors', v); } },
+            onblur: function () { if (extraColor.trim()) { var v = extraColor.trim(); extraColor = ''; if (tags(f.colors).indexOf(v) < 0) toggleTag('colors', v); } } })))),
+        h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-stock-l' }, 'Stock'),
+          h('div', { class: 'stock-row' },
+            h('div', { class: 'stepper', role: 'group', 'aria-labelledby': 'product-stock-l' },
+              h('button', { type: 'button', class: 'step', 'aria-label': 'Un de moins', disabled: !stockN ? true : null, onclick: function () { setStock((stockN || 0) - 1); } }, '–'),
+              h('input', { type: 'text', inputmode: 'numeric', id: 'product-stock', value: f.stock, placeholder: '—', 'aria-label': 'Quantité en stock',
+                oninput: function (e) { f.stock = e.target.value.replace(/\D/g, '').slice(0, 6); } , onchange: function () { draw(); } }),
+              h('button', { type: 'button', class: 'step', 'aria-label': 'Un de plus', onclick: function () { setStock((stockN || 0) + 1); } }, '+')),
+            h('span', { class: 'small muted', id: 'product-stock-hint' }, stockN == null ? 'Non suivi' : stockN === 0 ? 'Épuisé' : 'En stock'),
+            stockN != null ? h('button', { type: 'button', class: 'btn link small', id: 'product-stock-off', onclick: function () { setStock(null); } }, 'Ne pas suivre') : null)));
+    }
+    draw();
+    return box;
   }
   // Une ligne discrète : ce que le fil dit de l'article (j'aime, commentaires, enregistrements, ventes livrées sur 30 jours).
   function productStats(id) {
@@ -7091,7 +7337,27 @@
     var zone = h('div', { class: 'stack' });
     var photos = productPhotos(pr);
     var photoBox = photos.el;
-    var btn = h('button', { class: 'btn', type: 'button', id: 'product-save', onclick: function () { save(false); } }, pr ? 'Enregistrer' : 'Ajouter l’article');
+    var btn = h('button', { class: 'btn big full', type: 'button', id: 'product-save', onclick: function () { save(false); } }, pr ? 'Enregistrer' : 'Ajouter l’article');
+    // Visibilité : un seul interrupteur (fondateur, 27/10 : « simplifier le bouton visibilité ou masqué »).
+    function visSwitch() {
+      var b = h('button', { class: 'switch-row' + (f.active ? ' on' : ''), type: 'button', role: 'switch', id: 'product-active', 'aria-checked': f.active ? 'true' : 'false',
+        onclick: function () { f.active = !f.active; b.replaceWith(visSwitch()); } },
+        h('span', { class: 'sw-t' }, h('b', null, f.active ? 'Visible sur mon site' : 'Masqué'),
+          h('small', null, f.active ? 'Vos clientes le voient et peuvent le commander.' : 'Personne ne le voit. Ses notes sont gardées.')),
+        h('span', { class: 'sw', 'aria-hidden': 'true' }, h('i')));
+      return b;
+    }
+    function studioTeaser() {
+      var row = h('div', { id: 'studio-row' });
+      if (pr) return row;
+      sapi('fiila_studio_state_shop', {}).then(function (st) {
+        if (!st || !st.ready) return;
+        setKids(row, h('div', { class: 'studio-row teaser', id: 'studio-teaser' },
+          h('span', { class: 'studio-ic', 'aria-hidden': 'true' }, icon('spark', 22)),
+          h('span', { class: 'studio-t' }, h('b', null, 'Fii Studio'), h('small', null, 'Après l’ajout : une photo pro de votre article, décor et lumière de studio.'))));
+      }, function () {});
+      return row;
+    }
     // stay : enregistrement sur place (Studio), sans quitter l'écran.
     function save(stay) {
       setKids(err);
@@ -7119,12 +7385,16 @@
       secHead('products', 'tag', pr ? 'Modifier l’article' : 'Nouvel article'),
       pr ? productStats(pr.id) : null,
       photoBox,
-      pr && pr.photo ? studioRow(pr, photos, function () { return save(true); }) : null,
-      textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax taille M', onInput: function (v) { f.name = v; keepP(); } }),
-      textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; keepP(); } }),
-      textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, onInput: function (v) { f.description = v; keepP(); } }),
+      // Fii Studio toujours proposé (fondateur, 27/10) : sur l'article enregistré, la ligne Studio ; sur un nouvel article,
+      // l'annonce (le Studio s'ouvre juste après l'ajout, la photo doit d'abord être enregistrée).
+      pr && pr.photo ? studioRow(pr, photos, function () { return save(true); }) : studioTeaser(),
+      h('section', { class: 'pf-sec' },
+        textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax fille', onInput: function (v) { f.name = v; keepP(); } }),
+        textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; keepP(); } })),
       productDetails(f),
-      pr ? segField({ name: 'product-active', id: 'product-active', value: f.active ? 'on' : 'off', options: [['on', 'Visible'], ['off', 'Masqué']], onChange: function (v) { f.active = v === 'on'; } }) : null,
+      h('section', { class: 'pf-sec' },
+        textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, placeholder: 'Matière, coupe, conseils de taille…', onInput: function (v) { f.description = v; keepP(); } }),
+        visSwitch()),
       err, btn,
       pr && SHOP_ROLE !== 'editor' ? h('button', { class: 'btn danger', type: 'button', id: 'product-delete', onclick: function () {
         setKids(zone, h('div', { class: 'confirm' },
@@ -8163,6 +8433,7 @@
     ['commandes', 'box', 'Commandes', 'orders', null, 'Opérations'],
     ['domaines', 'globe', 'Domaines', 'shops', null, 'Opérations'],
     ['studio', 'spark', 'Studio', 'shops', null, 'Opérations'],
+    ['identites', 'lock', 'Identités', 'shops_write', 'kyc', 'Opérations'],
     ['comptes', 'user', 'Comptes', 'accounts', null, 'Opérations'],
     ['fil', 'heart', 'Fil (25 places)', 'feed', null, 'Opérations'],
     ['ambassadeurs', 'star', 'Ambassadeurs', 'partners', null, 'Programmes'],
@@ -8428,6 +8699,7 @@
           case 'commandes': return id ? boOrder(id) : boOrders(q);
           case 'domaines': return boDomains();
           case 'studio': return boStudio();
+          case 'identites': return boKyc();
           case 'comptes': return id ? boAccount(id) : boAccounts(q);
           case 'moderation': return boEmbed(viewAdminComments).then(function (b) { return boShell(sec, 'Modération', b); });
           case 'vide-dressing': return boEmbed(viewAdminVd).then(function (b) { return boShell(sec, 'Vide-dressing', b); });
@@ -8564,7 +8836,7 @@
   function boDashboard() {
     var o = BO.overview || { kpis: {}, queues: {}, days: [] }, k = o.kpis;
     var QUEUE = [['comments', 'flag', 'Commentaires signalés', '#/bo/moderation'], ['vide_dressing', 'users', 'Articles de vide-dressing à vérifier', '#/bo/vide-dressing'],
-      ['ambassadors', 'gift', 'Agents à valider', '#/bo/agents'], ['career', 'chat', 'Messages d’agents à lire', '#/bo/carriere'], ['proposals', 'star', 'Propositions du Manager à décider', '#/bo/carriere'], ['rewards', 'cash', 'Gains d’agents à verser', '#/bo/agents'], ['suspended', 'ban', 'Boutiques suspendues', '#/bo/boutiques?f=suspended']];
+      ['ambassadors', 'gift', 'Agents à valider', '#/bo/agents'], ['career', 'chat', 'Messages d’agents à lire', '#/bo/carriere'], ['proposals', 'star', 'Propositions du Manager à décider', '#/bo/carriere'], ['rewards', 'cash', 'Gains d’agents à verser', '#/bo/agents'], ['kyc', 'lock', 'Pièces d’identité à vérifier', '#/bo/identites'], ['suspended', 'ban', 'Boutiques suspendues', '#/bo/boutiques?f=suspended']];
     var queues = QUEUE.filter(function (x) { return o.queues[x[0]] != null; });
     var todo = queues.reduce(function (n, x) { return n + (x[0] === 'suspended' ? 0 : (o.queues[x[0]] || 0)); }, 0);
     var max = Math.max.apply(null, [1].concat(o.days.map(function (d) { return d.orders; })));
@@ -8639,6 +8911,58 @@
   // ----- Fii Studio : ouvert ou non, dépense du mois face au budget, séries (gardées, en échec), crédits des boutiques ;
   // accorder ou retirer des crédits (motif obligatoire, au journal). docs/PLAN-FII-STUDIO.md.
   var STUDIO_ST = { running: ['warn', 'En cours'], done: ['info', 'Proposée'], kept: ['ok', 'Gardée'], failed: ['danger', 'Échec'] };
+  // Propriétaire et pièce d'identité d'une boutique (fondateur, 27/10) : voir, ouvrir la pièce (journalisé), valider ou refuser.
+  function boShopIdentity(id) {
+    var box = h('section', { class: 'card stack tight', id: 'bo-shop-identity' }, h('h2', null, 'Propriétaire et identité'), loading());
+    function row(label, value) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword' }, value)); }
+    var KST = { submitted: ['warn', 'À vérifier'], verified: ['ok', 'Validée'], rejected: ['danger', 'Refusée'] };
+    function draw(r) {
+      var k = r.kyc, docBox = h('div', { class: 'kyc-doc', id: 'bo-kyc-doc' });
+      var reason = h('input', { type: 'text', id: 'bo-kyc-reason', maxlength: 200, placeholder: 'Motif du refus (visible par la boutique)' });
+      setKids(box, h('h2', null, 'Propriétaire et identité'),
+        row('Propriétaire', r.owner_name || h('span', { class: 'bo-warn' }, 'Non renseigné')),
+        row('Téléphone', r.owner_phone ? h('a', { href: 'tel:' + r.owner_phone }, r.owner_phone) : '—'),
+        row('Pièce', k ? h('span', null, boBadge(KST[k.status][0], KST[k.status][1]), ' ', k.doc_type === 'cni' ? 'Carte d’identité' : 'Passeport', ' · ', boDate(k.submitted_at, true),
+            k.reason ? ' · motif : ' + k.reason : '') : r.needed ? boBadge('danger', 'Exigée, non envoyée') : h('span', { class: 'muted' }, r.sold ? 'Non exigée (réglage coupé)' : 'Pas encore exigée (aucune vente)')),
+        r.blocked ? h('p', { class: 'small bo-warn', id: 'bo-kyc-blocked' }, 'Nouvelles commandes bloquées tant que la pièce n’est pas envoyée.') : null,
+        k && k.has_images ? h('div', { class: 'row' }, h('button', { class: 'btn ghost small', type: 'button', id: 'bo-kyc-open', onclick: function (ev) {
+          var b = ev.currentTarget; b.disabled = true;
+          api('fiila_bo_kyc_doc', { p_shop: id }).then(function (d) {
+            setKids(docBox, h('img', { src: d.front, alt: 'Pièce, recto' }), d.back ? h('img', { src: d.back, alt: 'Pièce, verso' }) : null);
+            b.hidden = true;
+          }, function (e) { b.disabled = false; toast(errText(e)); });
+        } }, icon('eye', 16), h('span', null, 'Voir la pièce (consultation journalisée)'))) : null,
+        docBox,
+        k && k.status === 'submitted' ? h('div', { class: 'stack tight' },
+          h('button', { class: 'btn', type: 'button', id: 'bo-kyc-ok', onclick: function () {
+            boAct(function () { return api('fiila_bo_kyc_decide', { p_shop: id, p_ok: true }); }, 'Pièce validée.', draw, null, this);
+          } }, 'Valider la pièce'),
+          h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Refuser'), reason),
+          h('button', { class: 'btn danger', type: 'button', id: 'bo-kyc-no', onclick: function () {
+            if (!reason.value.trim()) { toast('Indiquez un motif.'); reason.focus(); return; }
+            boAct(function () { return api('fiila_bo_kyc_decide', { p_shop: id, p_ok: false, p_reason: reason.value }); }, 'Pièce refusée : la boutique est prévenue et ses commandes sont bloquées.', draw, null, this);
+          } }, 'Refuser la pièce')) : null);
+    }
+    api('fiila_bo_shop_identity', { p_shop: id }).then(draw, function (e) { setKids(box, h('h2', null, 'Propriétaire et identité'), h('p', { class: 'small muted' }, errText(e))); });
+    return box;
+  }
+  // Identités : pièces à vérifier et boutiques bloquées faute de pièce ; réglage kyc_required dans Réglages.
+  function boKyc() {
+    return api('fiila_bo_kyc_list', {}).then(function (r) {
+      return boShell('identites', 'Identités', [
+        h('p', { class: 'small muted' }, 'Pièce d’identité du propriétaire exigée après la première vente (réglage « kyc_required »). Sans pièce, les nouvelles commandes sont bloquées. ' + boNum(r.verified) + ' pièce(s) validée(s).'),
+        h('section', { class: 'stack tight', id: 'bo-kyc-pending' }, h('h2', null, 'À vérifier'),
+          boTable([{ label: 'Boutique', get: function (x) { return h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop); } },
+            { label: 'Propriétaire', get: function (x) { return x.owner_name || '—'; } }, { label: 'Téléphone', get: function (x) { return x.owner_phone || '—'; } },
+            { label: 'Pièce', get: function (x) { return x.doc_type === 'cni' ? 'Carte d’identité' : 'Passeport'; } }, { label: 'Envoyée', get: function (x) { return boDate(x.at, true); } }],
+            r.pending, { href: function (x) { return '#/bo/boutiques/' + x.shop_id; }, empty: 'Aucune pièce à vérifier.' })),
+        h('section', { class: 'stack tight', id: 'bo-kyc-blocked-list' }, h('h2', null, 'Bloquées faute de pièce'),
+          boTable([{ label: 'Boutique', get: function (x) { return h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop); } },
+            { label: 'Propriétaire', get: function (x) { return x.owner_name || '—'; } }, { label: 'Téléphone', get: function (x) { return x.owner_phone || '—'; } },
+            { label: 'État', get: function (x) { return x.rejected ? boBadge('danger', 'Refusée') : boBadge('warn', 'Non envoyée'); } }],
+            r.blocked, { href: function (x) { return '#/bo/boutiques/' + x.shop_id; }, empty: 'Aucune boutique bloquée.' }))]);
+    }, function (e) { return boShell('identites', 'Identités', stateCard('!', 'Impossible de charger', errText(e))); });
+  }
   function boStudio() {
     return Promise.all([api('fiila_bo_studio', {}), api('fiila_bo_studio_scenes', {}).catch(function () { return []; })]).then(function (both) {
       var d = both[0], scenes = both[1] || [];
@@ -8818,6 +9142,7 @@
             return [i ? ' · ' : null, h('a', { href: socialUrl(o[0], s.marketing.socials[o[0]]), target: '_blank', rel: 'noopener noreferrer' }, o[1] + ' @' + s.marketing.socials[o[0]])];
           })) : '—')) : null,
         boShopTeam(s, id),
+        boCan('shops_write') && !s.platform ? boShopIdentity(id) : null,
         s.recent_orders ? h('section', { class: 'stack tight' }, h('h2', null, 'Dernières commandes'),
           boTable([{ label: 'N°', get: function (o) { return String(o.number).padStart(4, '0'); } }, { label: 'Total', get: function (o) { return fcfa(o.total); }, cls: 'num' },
             { label: 'Statut', get: boOrderState }, { label: 'Date', get: function (o) { return boDate(o.created_at, true); } }], s.recent_orders || [],
@@ -9641,7 +9966,7 @@
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’agent versé',
     reward_cancelled: 'a annulé un gain d’agent', reward_validated: 'a validé un gain d’agent', ambassador_active: 'a activé un agent',
-    domain_disconnect: 'a déconnecté le domaine', studio_scene: 'a modifié le décor Studio', studio_grant: 'a modifié les crédits Studio de', ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
+    domain_disconnect: 'a déconnecté le domaine', studio_scene: 'a modifié le décor Studio', studio_grant: 'a modifié les crédits Studio de', kyc_view: 'a consulté la pièce d’identité de la boutique', kyc_verified: 'a validé la pièce d’identité de la boutique', kyc_rejected: 'a refusé la pièce d’identité de la boutique', ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
     view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique',
     career_reply: 'a répondu à l’agent', career_objective: 'a fixé le cap du mois :', career_mission: 'a modifié la mission', career_note_accepted: 'a accepté la proposition du Manager', career_note_rejected: 'a écarté la proposition du Manager' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain agent, niveau 1', 'FCFA'], amb_reward_2: ['Gain agent, niveau 2', 'FCFA'],
@@ -9658,7 +9983,8 @@
     studio_ready: ['Fii Studio ouvert aux boutiques', '0 = fermé, 1 = ouvert (après la clé du fournisseur)'],
     studio_budget_usd: ['Budget mensuel du Studio', 'USD (au-delà, le Studio se met en pause)'],
     studio_daily: ['Séries Studio par boutique et par jour', 'séries'],
-    studio_premium: ['Mode Studio premium (rendu de studio hyperréaliste)', '0 = coupé, 1 = proposé'], studio_premium_credits: ['Crédits pour garder une version Studio premium', 'crédits'] };
+    studio_premium: ['Mode Studio premium (rendu de studio hyperréaliste)', '0 = coupé, 1 = proposé'], studio_premium_credits: ['Crédits pour garder une version Studio premium', 'crédits'],
+    kyc_required: ['Pièce d’identité exigée après la première vente', '0 = non exigée, 1 = exigée (nouvelles commandes bloquées sans pièce)'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

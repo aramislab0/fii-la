@@ -64,6 +64,8 @@ await t('propriétaire : Réglages → Équipe (section repliée), invitation av
   await sec.locator('summary').click();
   await O.locator('#team-list').getByText('Awa Ndiaye').waitFor();
   assert.match(await O.locator('#team-list').textContent(), /Propriétaire/);
+  await O.click('#team-add');
+  await O.locator('#team-sheet').waitFor();
   await O.fill('#team-name', 'Fatou Sow');
   await O.fill('#team-phone', '77 222 22 22');
   assert.match(await O.locator('#team-role-hint').textContent(), /Commandes, articles et clients/);
@@ -150,6 +152,7 @@ await t('lien déjà utilisé ; aucun débordement à 320 px', async () => {
   await O.setViewportSize({ width: 320, height: 800 });
   await O.goto(URL0 + '#/'); await O.goto(URL0 + '#/boutique/reglages');
   await O.locator('#team-section summary').click();
+  await O.click('#team-add');
   await O.locator('#team-phone').waitFor();
   assert.ok(await noOverflow(O), 'réglages et équipe sans débordement à 320 px');
 });
@@ -179,6 +182,7 @@ await t('code SMS exigé (réglage) : l’invitée confirme le numéro invité, 
   await O.setViewportSize(phone.viewport);
   await O.goto(URL0 + '#/'); await O.goto(URL0 + '#/boutique/reglages');
   await O.locator('#team-section summary').click();
+  await O.click('#team-add');
   await O.fill('#team-name', 'Mame Diarra');
   await O.fill('#team-phone', '77 333 44 55');
   await O.click('#team-invite');
