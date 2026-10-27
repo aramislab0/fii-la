@@ -33,7 +33,7 @@ await t('migration : un ancien « J’aime » seul et un ancien « Enregistrer �
   await fresh.query(`insert into fiila.likes (product_id, who) values ($1, 'd:aa')`, [p.id]);
   await fresh.query(`insert into fiila.saves (product_id, who) values ($1, 'd:bb')`, [p.id]);
   const { applyMigrations } = await import('./db.mjs');
-  await applyMigrations(fresh, '20261027300000');
+  await applyMigrations(fresh, '20261027300000', '20261027300001'); // cette migration seule (la suivante efface les empreintes non salées)
   const l = (await fresh.query(`select who from fiila.likes where product_id = $1 order by who`, [p.id])).rows.map((r) => r.who);
   const v = (await fresh.query(`select who from fiila.saves where product_id = $1 order by who`, [p.id])).rows.map((r) => r.who);
   assert.deepEqual(l, ['d:aa', 'd:bb']); assert.deepEqual(v, ['d:aa', 'd:bb']);

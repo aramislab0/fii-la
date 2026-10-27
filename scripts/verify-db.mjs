@@ -1,7 +1,7 @@
 // Vérifie la base déployée : migrations appliquées et droits d'accès du rôle public (anon).
 // Usage : DATABASE_URL=... node scripts/verify-db.mjs   (l'URL n'est jamais affichée)
 import { createRequire } from 'node:module';
-import { writeFileSync, readdirSync } from 'node:fs';
+import { writeFileSync, readdirSync, readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 
@@ -36,9 +36,14 @@ const EXPECTED_FUNCTIONS = [
   // Ma boutique → Marketing (20261022300000)
   'fiila_shop_stats',
   // domaine propre d'une boutique (20261024100000) — fiila_domain_cf_update : clé de service seulement
+  // audit du 27/10 (20261028300000) : effacer ses favoris faits sans compte
+  'fiila_forget_device',
   'fiila_domains', 'fiila_domain_add', 'fiila_domain_remove', 'fiila_domain_target', 'fiila_domain_resolve', 'fiila_bo_domains', 'fiila_bo_domain_action', 'fiila_studio_state', 'fiila_studio_reserve', 'fiila_studio_keep', 'fiila_studio_result', 'fiila_bo_studio', 'fiila_bo_studio_grant', 'fiila_bo_studio_scenes', 'fiila_bo_studio_scene_set', 'fiila_studio_state_shop', 'fiila_shop_identity', 'fiila_shop_owner_save', 'fiila_shop_kyc_submit', 'fiila_bo_shop_identity', 'fiila_bo_kyc_doc', 'fiila_bo_kyc_decide', 'fiila_bo_kyc_list', 'fiila_fav', 'fiila_favs_in', 'fiila_follow', 'fiila_follow_state', 'fiila_follows', 'fiila_bo_shop_audience',
-].sort();
-const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+// Audit du 27/10 (20261028300000) : le back-office est fermé à anon, sauf l'ouverture d'une invitation et le portail.
+].filter((f) => !/^fiila_(bo|admin)_/.test(f) || f === 'fiila_bo_invite_get' || f === 'fiila_bo_me').sort();
+// Certificat public de Supabase (Supabase Root 2021 CA, jusqu'en 2031) : la connexion qui porte le mot de passe de la base
+// vérifie le serveur (avant : rejectUnauthorized false ; audit du 27/10, vérifié contre le pooler de production).
+const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { ca: readFileSync(new URL('./supabase-ca-2021.crt', import.meta.url), 'utf8') } });
 await c.connect();
 const q = async (sql) => (await c.query(sql)).rows;
 const checks = [];
@@ -61,6 +66,10 @@ check('schéma fiila fermé à anon et authenticated', !usage[0].anon && !usage[
 const tablePriv = await q(`select table_name, privilege_type, grantee from information_schema.role_table_grants
   where table_schema = 'fiila' and grantee in ('anon', 'authenticated', 'PUBLIC')`);
 check('aucun droit sur les tables fiila pour anon / authenticated / PUBLIC', tablePriv.length === 0, tablePriv);
+
+const noRls = await q(`select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'fiila' and c.relkind in ('r', 'p') and not c.relrowsecurity order by 1`);
+check('RLS activé sur toutes les tables fiila (audit du 27/10)', noRls.length === 0, noRls.map((r) => r.relname));
 
 const fns = await q(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname like 'fiila_%' and has_function_privilege('anon', p.oid, 'execute') order by 1`);

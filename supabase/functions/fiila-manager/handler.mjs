@@ -10,6 +10,8 @@
 // SUPABASE_URL, SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase à toute fonction.
 // Module sans dépendance (testé sous Node, déployé sous Deno).
 
+import { corsFor, readText, MB } from '../_shared/http.mjs';
+
 export const DEFAULT_MODEL = 'claude-haiku-5-5';
 const TAGS = ['question', 'objection', 'probleme', 'gains', 'idee', 'positif', 'retour', 'formation', 'motivation'];
 
@@ -69,8 +71,6 @@ export async function draftReply(deps, ctx) {
 }
 
 export function makeHandler({ env, fetch, timeoutMs = 25000 }) {
-  const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
   const base = () => String(env('SUPABASE_URL') || '').replace(/\/$/, '');
   async function rest(fn, args, token) {
     const key = token ? env('SUPABASE_ANON_KEY') : env('SUPABASE_SERVICE_ROLE_KEY');
@@ -87,12 +87,16 @@ export function makeHandler({ env, fetch, timeoutMs = 25000 }) {
     return u && u.id ? u.id : null;
   }
   return async (req) => {
+    const cors = corsFor(req);
+    const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (req.method !== 'POST') return json(405, { error: 'method' });
     const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
     if (!token) return json(401, { error: 'auth_required' });
     let body;
-    try { body = await req.json(); } catch { return json(400, { error: 'invalid' }); }
+    const raw = await readText(req, MB);
+    if (raw === null) return json(413, { error: 'too_large' });
+    try { body = JSON.parse(raw); } catch { return json(400, { error: 'invalid' }); }
     const uid = await userOf(token);
     if (!uid) return json(401, { error: 'auth_required' });
     try {

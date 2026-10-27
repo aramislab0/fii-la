@@ -43,7 +43,7 @@ let PID, SLUG;
 await t('mise en place : boutique avec un article à 2 photos, puis photos « copiées » dans le stockage', async () => {
   await S.goto(URL0 + '#/boutique');
   await S.fill('#shop-name', 'Boutique Stockage (test)');
-  await S.selectOption('#shop-type', 'mode');
+  await S.click('#shop-type [data-v="mode"]');
   await S.click('#shop-save');
   await S.locator('#shop-setup[data-step="2"]').waitFor();
   await S.goto(URL0 + '#/boutique/article/nouveau');

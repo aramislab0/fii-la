@@ -76,7 +76,7 @@ let CODE, LINK;
 await t('boutique : « Parrainer une boutique », code, lien et message WhatsApp prêts', async () => {
   await A.goto(URL0 + '#/boutique');
   await A.fill('#shop-name', 'Boutique Awa (test)');
-  await A.selectOption('#shop-type', 'mode');
+  await A.click('#shop-type [data-v="mode"]');
   if (!(await A.locator('#shop-more').evaluate((d) => d.open))) await A.locator('#shop-more > summary').click();
   await A.fill('#shop-phone', '77 100 00 01');
   await A.click('#shop-save');
@@ -90,7 +90,7 @@ await t('boutique : « Parrainer une boutique », code, lien et message WhatsApp
   LINK = await A.locator('#ref-link').textContent();
   assert.ok(LINK.endsWith('#/r/' + CODE));
   const msg = await waText(A, '#ref-whatsapp');
-  assert.ok(msg.includes(LINK) && /Crée ta boutique/.test(msg), msg);
+  assert.ok(msg.includes(LINK) && /Créez votre boutique/.test(msg), msg);
   assert.ok(!msg.includes('77 100'), 'le numéro de la boutique n’est pas dans le message');
   await A.getByText('À l’inscription, on peut aussi taper votre numéro.').waitFor();
   await A.getByText('Personne pour l’instant.').waitFor();
@@ -106,7 +106,7 @@ await t('lien de parrainage : bandeau « Boutique Awa vous invite », boutique c
   await B.click('#invite-shop');
   assert.equal(await B.locator('#shop-ref').count(), 0, 'pas de question « qui vous a parlé » : le lien suffit');
   await B.fill('#shop-name', 'Boutique Binta (test)');
-  await B.selectOption('#shop-type', 'mode');
+  await B.click('#shop-type [data-v="mode"]');
   await B.click('#shop-save');
   await B.locator('#setup-later').click();
   await B.locator('#shop-title').waitFor();

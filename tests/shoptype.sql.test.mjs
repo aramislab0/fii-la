@@ -30,7 +30,7 @@ await t('fil : le type de la boutique est fourni (pour le filtre)', async () => 
   assert.equal((await ok('fiila_feed', {})).shops[0].type, 'esthetique');
 });
 await t('statistiques par type : réservées au fondateur', async () => {
-  await ko('fiila_admin_shop_types', {}, 'auth_required|not_allowed');
+  await ko('fiila_admin_shop_types', {}, 'auth_required|not_allowed|permission denied'); // audit du 27/10 : fermé à anon
   const uid = (await db.query(`insert into auth.users (id, email) values (gen_random_uuid(), 'admin@example.test') returning id`)).rows[0].id;
   await db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Admin')`, [uid]);
   await db.query(`insert into fiila.staff (user_id, role) values ($1, 'super_admin')`, [uid]);

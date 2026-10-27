@@ -447,7 +447,17 @@ window.FiiBO = function (F) {
     var me = BO.me || {}, first = (me.name || me.email || '').split(' ')[0];
     var today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
     function mini(id, ic, value, label) { return h('div', { class: 'bo-mini', id: 'kpi-' + id }, h('span', { class: 'bo-mini-ic', 'aria-hidden': 'true' }, icon(ic, 16)), h('b', null, value), h('span', null, label)); }
+    // Santé (audit du 27/10) : erreurs du navigateur par écran, copies de photos et séries Studio en échec, 7 jours.
+    var health = h('p', { class: 'small', id: 'bo-health', hidden: true });
+    api('fiila_bo_health', {}).then(function (x) {
+      var js = Object.keys(x.js_errors || {}).map(function (k) { return k + ' ' + x.js_errors[k]; });
+      var bad = js.length || x.media_failed || x.studio_failed;
+      setKids(health, bad ? boBadge('warn', 'À regarder') : boBadge('ok', 'Rien à signaler'), ' Santé, 7 jours : erreurs de l’application ' + (js.length ? js.join(', ') : '0') +
+        ' · copies de photos en échec ' + boNum(x.media_failed || 0) + ' · séries Studio en échec ' + boNum(x.studio_failed || 0) + '.');
+      health.hidden = false;
+    }, function () { /* droit « dashboard » absent : la ligne reste cachée */ });
     return boShell('', 'Tableau de bord', [
+      health,
       h('section', { class: 'bo-kpis', id: 'bo-kpis' },
         boKpi('shops', 'shop', boNum(k.shops_open) + ' / ' + boNum(k.shops), 'boutiques ouvertes', '+' + (k.shops_7d || 0) + ' en 7 jours', 'green'),
         boKpi('orders', 'box', boNum(k.orders_30d), 'commandes (30 j)', boNum(k.delivered_30d) + ' livrées', 'blue'),
@@ -806,9 +816,23 @@ window.FiiBO = function (F) {
             (o.items || []).map(function (it) { return row((it.qty || 1) + ' × ' + (it.label || ''), fcfa((it.price || 0) * (it.qty || 1))); }),
             row(h('b', null, 'Total'), h('b', null, fcfa(o.total))),
             row('Encaissé', fcfa(o.paid)),
-            (o.payments || []).map(function (p) { return h('p', { class: 'small muted' }, boDate(p.at, true) + ' · ' + fcfa(p.amount) + ' · ' + (({ cash: 'Espèces', wave: 'Wave', orange_money: 'Orange Money', card: 'Carte', other: 'Autre' })[p.method] || p.method)); })))
+            (o.payments || []).map(function (p) { return h('p', { class: 'small muted' }, boDate(p.at, true) + ' · ' + fcfa(p.amount) + ' · ' + (({ cash: 'Espèces', wave: 'Wave', orange_money: 'Orange Money', card: 'Carte', other: 'Autre' })[p.method] || p.method)); }))),
+        boOrderEvents(o.id)
       ], { back: ['#/bo/commandes', 'Commandes'] });
     }, function (e) { return boShell('commandes', 'Commande', stateCard('!', 'Commande introuvable', errText(e)), { back: ['#/bo/commandes', 'Commandes'] }); });
+  }
+  // Historique d'une commande (audit du 27/10) : changements d'état, paiements ajoutés ou supprimés, par la boutique ou un compte.
+  var BO_ORDER_STATE = { open: 'En cours', delivered: 'Livrée', cancelled: 'Annulée' };
+  function boOrderEvents(id) {
+    var box = h('section', { class: 'card stack tight', id: 'bo-order-events' }, h('h2', null, 'Historique'), loading());
+    api('fiila_bo_order_events', { p_order: id }).then(function (l) {
+      setKids(box, h('h2', null, 'Historique'), l.length ? h('ul', { class: 'small', style: 'margin:0;padding-left:18px' }, l.map(function (e) {
+        var what = e.kind === 'status' ? (BO_ORDER_STATE[e.from] || e.from) + ' → ' + (BO_ORDER_STATE[e.to] || e.to)
+          : (e.kind === 'payment_add' ? 'Paiement ajouté : ' : 'Paiement supprimé : ') + fcfa(e.amount || 0) + (e.method ? ' (' + e.method + ')' : '');
+        return h('li', null, boDate(e.at, true) + ' · ' + what + ' · par ' + (e.actor === 'compte' ? 'un compte' : 'la boutique'));
+      })) : h('p', { class: 'small muted' }, 'Aucun changement depuis la création (journal tenu depuis le 28/10).'));
+    }, function (e) { setKids(box, h('h2', null, 'Historique'), h('p', { class: 'small muted' }, errText(e))); });
+    return box;
   }
 
   // ----- Comptes

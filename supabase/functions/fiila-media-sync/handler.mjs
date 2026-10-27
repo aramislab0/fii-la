@@ -1,10 +1,13 @@
 // Fii — copie des photos publiques (articles, couvertures de vitrine) de la base vers le seau Supabase Storage « media ».
-// Appelée toutes les minutes par la base (pg_cron) et depuis le back-office (« Copier maintenant »). Sans vérification JWT :
-// elle ne fait que vider une file d'attente idempotente (rien n'est lu ni renvoyé hors des compteurs).
+// Appelée toutes les minutes par la base (pg_cron) et depuis le back-office (« Copier maintenant »). Déployée sans
+// vérification JWT par la passerelle, elle exige elle-même (audit du 27/10) : soit l'en-tête x-sync-token envoyé par pg_cron
+// (jeton aléatoire de fiila.settings, vérifié par la base avec fiila_media_sync_auth), soit la session d'un membre de
+// l'équipe (fiila_bo_me) ; sinon 401.
 // Chaque photo est déposée à une adresse qui contient l'empreinte de son contenu (mise en cache d'un an sans risque),
 // puis l'adresse est enregistrée par fiila_media_done, seulement si la photo n'a pas changé entre-temps.
 // Les photos du seau qui ne servent plus (article supprimé, photo remplacée) sont retirées.
-// SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase. Module sans dépendance (testé sous Node).
+// SUPABASE_URL, SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase. Module sans dépendance (testé sous Node).
+import { corsFor } from '../_shared/http.mjs';
 
 export const BUCKET = 'media';
 export const BATCH = 8;
@@ -24,21 +27,33 @@ export function decode(b64) {
 }
 
 export function makeHandler({ env, fetch }) {
-  const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
   const base = () => String(env('SUPABASE_URL') || '').replace(/\/$/, '');
   const key = () => env('SUPABASE_SERVICE_ROLE_KEY');
   const auth = () => ({ apikey: key(), Authorization: 'Bearer ' + key() });
-  async function rpc(fn, args) {
-    const r = await fetch(`${base()}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify(args || {}) });
+  // token : session d'une personne (clé publique + son JWT) ; absent = clé de service.
+  async function rpc(fn, args, token) {
+    const headers = token ? { apikey: env('SUPABASE_ANON_KEY'), Authorization: 'Bearer ' + token } : auth();
+    const r = await fetch(`${base()}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(args || {}) });
     const body = await r.json().catch(() => null);
     if (!r.ok) throw new Error((body && body.message) || 'rpc ' + r.status);
     return body;
   }
+  // pg_cron (x-sync-token) ou membre connecté de l'équipe ; toute erreur de vérification vaut refus.
+  async function allowed(req) {
+    const sync = String(req.headers.get('x-sync-token') || '');
+    if (sync) return (await rpc('fiila_media_sync_auth', { p_token: sync }).catch(() => false)) === true;
+    const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+    if (!token) return false;
+    const me = await rpc('fiila_bo_me', {}, token).catch(() => null);
+    return !!(me && me.staff);
+  }
   return async (req) => {
+    const cors = corsFor(req);
+    const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (req.method !== 'POST') return json(405, { error: 'method' });
     if (!key() || !base()) return json(500, { error: 'not_configured' });
+    if (!(await allowed(req))) return json(401, { error: 'unauthorized' });
     let copied = 0, failed = 0, removed = 0;
     try {
       const items = await rpc('fiila_media_pending', { p_limit: BATCH });

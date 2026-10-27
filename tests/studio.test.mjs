@@ -120,7 +120,9 @@ await t('Studio premium : comparaison avec la question de fidélité ; garder co
 });
 
 await t('sans crédit : pas de bouton de création, message clair', async () => {
-  await ok('fiila_bo_studio_grant', { p_shop: S.shop.id, p_delta: -5, p_reason: 'Test' }, { uid: F });
+  // Retrait du solde exact (audit du 27/10 : un retrait plus grand que le solde est refusé).
+  const left = (await local.db.query(`select credits from fiila.studio_wallets where shop_id = $1`, [S.shop.id])).rows[0].credits;
+  await ok('fiila_bo_studio_grant', { p_shop: S.shop.id, p_delta: -left, p_reason: 'Test' }, { uid: F });
   const p = await newPhone(SHOP);
   await p.goto(URL0 + '#/boutique/article/' + A.id);
   await p.click('#studio-open');

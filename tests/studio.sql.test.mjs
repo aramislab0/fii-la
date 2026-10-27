@@ -51,7 +51,9 @@ await t('crédits : accordés par l’équipe (droit d’écriture, motif obliga
   await ko('fiila_bo_studio_grant', { p_shop: A.id, p_delta: 5, p_reason: ' ' }, 'reason_required', F);
   await ko('fiila_bo_studio_grant', { p_shop: A.id, p_delta: 0, p_reason: 'x' }, 'invalid_value', F);
   assert.equal((await ok('fiila_bo_studio_grant', { p_shop: A.id, p_delta: 3, p_reason: 'Boutique fondatrice' }, F)).credits, 3);
-  assert.equal((await ok('fiila_bo_studio_grant', { p_shop: A.id, p_delta: -10, p_reason: 'Correction' }, F)).credits, 0);
+  // Audit du 27/10 : un retrait plus grand que le solde est refusé (avant : ramené à 0 sans le dire).
+  await ko('fiila_bo_studio_grant', { p_shop: A.id, p_delta: -10, p_reason: 'Correction' }, 'not_enough_credits', F);
+  assert.equal((await ok('fiila_bo_studio_grant', { p_shop: A.id, p_delta: -3, p_reason: 'Correction' }, F)).credits, 0);
   assert.equal((await ok('fiila_bo_studio_grant', { p_shop: A.id, p_delta: 2, p_reason: 'Boutique fondatrice' }, F)).credits, 2);
   assert.equal((await one(`select count(*)::int n from fiila.admin_log where action = 'studio_grant' and target_id = $1`, [A.id])).n, 3);
 });

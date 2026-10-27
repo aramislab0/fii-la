@@ -54,7 +54,7 @@ await t('propriétaire : Réglages → Équipe (section repliée), invitation av
   await signup(O, 'Awa Ndiaye', 'awa.equipe@example.invalid');
   await O.goto(URL0 + '#/boutique');
   await O.fill('#shop-name', 'Boutique Awa (test)');
-  await O.selectOption('#shop-type', 'mode');
+  await O.click('#shop-type [data-v="mode"]');
   await O.click('#shop-save');
   await O.locator('#shop-setup[data-step="2"]').waitFor();
   await O.goto(URL0 + '#/boutique/reglages');

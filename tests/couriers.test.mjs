@@ -61,7 +61,7 @@ let invite, invoice;
 await t('commerçante : boutique sans compte, invitation du livreur sur son WhatsApp', async () => {
   await S.goto(URL0 + '#/boutique');
   await S.fill('#shop-name', 'Boutique Fatim (test)');
-  await S.selectOption('#shop-type', 'mode');
+  await S.click('#shop-type [data-v="mode"]');
   await S.click('#shop-save');
   await S.locator('#setup-later').click();
   await S.locator('#shop-title').waitFor();

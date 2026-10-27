@@ -146,7 +146,7 @@ await t('publication : journalisée pour l’article de la boutique seulement, c
 });
 
 await t('statistiques : refusées sans compte administrateur, agrégées pour le fondateur', async () => {
-  await ko('fiila_admin_stats', {}, 'auth_required|not_authenticated|login');
+  await ko('fiila_admin_stats', {}, 'auth_required|not_authenticated|login|permission denied'); // audit du 27/10 : fermé à anon
   const uid = (await one(`insert into auth.users (id, email) values (gen_random_uuid(), 'fondateur@example.test') returning id`)).id;
   await db.query(`insert into fiila.profiles (user_id, display_name) values ($1, 'Fondateur')`, [uid]);
   await ko('fiila_admin_stats', {}, 'not_allowed', { uid });

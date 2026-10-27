@@ -39,7 +39,7 @@ await t('portail : un compte sans rôle n’est pas de l’équipe ; le fondateu
   const me = await ok('fiila_bo_me', {}, FOUNDER);
   assert.equal(me.role, 'super_admin'); assert.ok(me.perms.includes('team') && me.perms.includes('settings'));
   await ko('fiila_bo_overview', {}, 'not_allowed', NOBODY);
-  await ko('fiila_bo_overview', {}, 'auth_required');
+  await ko('fiila_bo_overview', {}, 'auth_required|permission denied'); // audit du 27/10 : fermé à anon
 });
 
 let MOD;

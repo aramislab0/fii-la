@@ -67,7 +67,7 @@ await t('série « premium » : Nano Banana Pro 2K, 4:5, une image, prompt de la
   assert.equal(s.calls.find((x) => x.url.endsWith('fiila_studio_complete')).body.p.cost_usd, 0.15);
 });
 
-await t('refus de la base (crédits) → 409 lisible, fal jamais appelé ; échec de fal → série en échec, message court', async () => {
+await t('refus de la base (crédits) → 409 lisible, fal jamais appelé ; échec de fal → série en échec, code interne (jamais le message de fal)', async () => {
   let s = sim({ reserve: null });
   let r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'k', product: 'p', style: 'blanc' }));
   assert.equal(r.status, 409); assert.equal((await r.json()).error, 'studio_no_credits');
@@ -75,7 +75,12 @@ await t('refus de la base (crédits) → 409 lisible, fal jamais appelé ; éche
   s = sim({ fal: () => json({ detail: 'Image too small' }, 422) });
   r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'k', product: 'p', style: 'blanc' }));
   const b = await r.json();
-  assert.equal(b.status, 'failed'); assert.equal(s.calls.find((c) => c.url.endsWith('fiila_studio_complete')).body.p.error, 'Image too small');
+  assert.equal(b.status, 'failed'); assert.equal(b.error, 'provider_error', 'code interne seulement pour l’application');
+  assert.equal(s.calls.find((c) => c.url.endsWith('fiila_studio_complete')).body.p.error, 'provider_error', 'le message brut de fal n’est pas enregistré');
+  assert.ok(!JSON.stringify(s.calls.find((c) => c.url.endsWith('fiila_studio_complete')).body).includes('Image too small'));
+  s = sim({ fal: () => { throw new TypeError('network'); } });
+  r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'k', product: 'p', style: 'blanc' }));
+  assert.equal((await r.json()).error, 'provider_unavailable');
 });
 
 await t('images hors de fal ignorées (aucune adresse étrangère enregistrée)', async () => {

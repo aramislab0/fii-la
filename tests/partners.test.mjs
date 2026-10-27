@@ -59,7 +59,7 @@ await t('lien d’invitation : la marque, la durée et le contenu exact du pack 
 await t('accepter sans boutique : création guidée, invitation acceptée ; l’essai attend « Activer mon essai »', async () => {
   await P.click('#invite-accept');
   await P.locator('#shop-setup[data-step="1"]').waitFor();
-  await P.fill('#shop-name', 'Maison Diallo (test)'); await P.selectOption('#shop-type', 'mode');
+  await P.fill('#shop-name', 'Maison Diallo (test)'); await P.click('#shop-type [data-v="mode"]');
   await P.click('#shop-save');
   await P.locator('#shop-setup[data-step="2"]').waitFor();
   await P.waitForFunction(() => !localStorage.getItem('fiila.partner.invite'));
@@ -88,7 +88,7 @@ await t('pack bloqué (Studio non prêt) : rien ne s’active, message clair', a
   const Q = await newPhone('dark');
   await Q.goto(URL0 + '#/invitation/' + inv.token);
   await Q.click('#invite-accept');
-  await Q.fill('#shop-name', 'Studio Beauté (test)'); await Q.selectOption('#shop-type', 'beaute');
+  await Q.fill('#shop-name', 'Studio Beauté (test)'); await Q.click('#shop-type [data-v="beaute"]');
   await Q.click('#shop-save');
   await Q.locator('#shop-setup[data-step="2"]').waitFor();
   await Q.click('#setup-later');

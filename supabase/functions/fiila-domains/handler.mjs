@@ -13,6 +13,8 @@
 // Sans ces secrets : { configured: false } et la demande reste « en attente » (rien n'est envoyé nulle part).
 // SUPABASE_URL, SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase.
 
+import { corsFor, readText, MB } from '../_shared/http.mjs';
+
 const CF = 'https://api.cloudflare.com/client/v4';
 const LIVE = ['pending', 'verifying', 'active', 'failed'];
 
@@ -34,8 +36,6 @@ export function errorOf(cf) {
 }
 
 export function makeHandler({ env, fetch }) {
-  const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
   const base = () => String(env('SUPABASE_URL') || '').replace(/\/$/, '');
   // auth : en-tête Authorization de la personne (session ou clé publique) ; null = clé de service.
   // caller : { auth } = identité de la personne (session, ou aucune : clé publique seule, droits par la clé de boutique) ;
@@ -80,13 +80,17 @@ export function makeHandler({ env, fetch }) {
   }
 
   return async (req) => {
+    const cors = corsFor(req);
+    const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (req.method !== 'POST') return json(405, { error: 'method' });
     // Sans session (boutique sans compte, clé publique au nouveau format) : pas d'en-tête Authorization ; la base vérifie
     // alors les droits par la clé de la boutique.
     const auth = { auth: req.headers.get('authorization') || '' };
     let body;
-    try { body = await req.json(); } catch { return json(400, { error: 'invalid' }); }
+    const raw = await readText(req, MB);
+    if (raw === null) return json(413, { error: 'too_large' });
+    try { body = JSON.parse(raw); } catch { return json(400, { error: 'invalid' }); }
     if (!body || !body.id || !['sync', 'cleanup'].includes(body.action)) return json(400, { error: 'invalid' });
     let d;
     try { d = await rpc('fiila_domain_target', { p_key: body.key || null, p_id: body.id }, auth); }

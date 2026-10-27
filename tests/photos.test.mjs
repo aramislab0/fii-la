@@ -49,7 +49,7 @@ let SLUG;
 await t('boutique : 3 photos ajoutées en une fois, la 3e devient principale, enregistrement', async () => {
   await S.goto(URL0 + '#/boutique');
   await S.fill('#shop-name', 'Boutique Photos (test)');
-  await S.selectOption('#shop-type', 'mode');
+  await S.click('#shop-type [data-v="mode"]');
   await S.click('#shop-save');
   await S.locator('#shop-setup[data-step="2"]').waitFor();
   await S.goto(URL0 + '#/boutique/article/nouveau');

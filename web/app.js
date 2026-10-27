@@ -231,6 +231,8 @@
   }
   // Pied de page : complet sur les écrans de gestion ; réduit sur les pages reçues par lien.
   function footer(minimal) {
+    // Espace boutique (audit du 27/10) : pas de « Restaurer une clé » ni « Espace livreur » sous chaque formulaire.
+    if (!minimal && /^#\/(boutique|clients?|commande)(\/|\?|$)/.test(location.hash)) minimal = true;
     if (SITE) return h('footer', { class: 'foot foot-min' }, h('div', { class: 'foot-links' },
       h('a', { href: mainUrl() + '#/confidentialite', target: '_blank', rel: 'noopener' }, 'Confidentialité')));
     if (minimal) return h('footer', { class: 'foot foot-min' },
@@ -283,11 +285,15 @@
     function close() {
       if (!back.isConnected) return;
       back.remove(); document.removeEventListener('keydown', key, true);
+      // Dernière feuille fermée : la page redevient défilable et lisible par les lecteurs d'écran.
+      if (!document.querySelector('.sheet-back')) { document.documentElement.classList.remove('sheet-open'); app.inert = false; }
       if (prev && prev.focus && prev.isConnected) { try { prev.focus({ preventScroll: true }); } catch (e) { /* rien */ } }
       if (opts.onClose) opts.onClose();
     }
     document.addEventListener('keydown', key, true);
     document.body.append(back);
+    // Fond figé et inerte pendant la feuille (audit du 27/10 : la page défilait derrière, VoiceOver pouvait en sortir).
+    document.documentElement.classList.add('sheet-open'); app.inert = true;
     onMedia(close);
     setTimeout(function () { var t = back.querySelector('[data-autofocus]') || focusables()[0]; if (t) { try { t.focus({ preventScroll: true }); } catch (e) { /* rien */ } } }, 0);
     return close;
@@ -448,6 +454,7 @@
     studio_off: 'Le Studio est indisponible pour le moment.',
     studio_no_photo: 'Ajoutez d’abord une photo de l’article.',
     studio_no_credits: 'Plus de crédit Studio pour le moment.',
+    not_enough_credits: 'Retrait impossible : la boutique n’a pas autant de crédits.',
     studio_premium_off: 'Le mode Studio premium n’est pas disponible pour cette boutique.',
     studio_budget: 'Le Studio est en pause pour ce mois. Réessayez plus tard.',
     studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
@@ -833,7 +840,10 @@
     }
     setKids(t, box); t.hidden = false;
     t.dataset.seq = String(renderSeq);
-    toastTimer = setTimeout(function () { t.hidden = true; }, 2600);
+    // Lisible même lentement (audit du 27/10) : 4 s, plus pour un long message ; le toucher le garde affiché.
+    var ms = Math.max(4000, Math.min(8000, String(text).length * 60));
+    toastTimer = setTimeout(function () { t.hidden = true; }, ms);
+    box.addEventListener('pointerdown', function () { clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, ms); });
   }
   // Un message ne survit qu'à la page qui suit l'action (jamais deux changements de page).
   function staleToast() {
@@ -1386,6 +1396,22 @@
     });
     return card;
   }
+  // Erreurs du navigateur comptées par écran, sans leur contenu (audit du 27/10) : une fois par écran et par session,
+  // jamais pour une erreur d'API (déjà affichée à la personne) ni une ressource externe bloquée.
+  var JS_ERR_SEEN = {};
+  function jsError(e) {
+    try {
+      if (e && (e instanceof ApiError || e.name === 'ApiError')) return;
+      var seg = (location.hash.replace(/^#\/?/, '').split(/[/?]/)[0] || 'accueil').toLowerCase().replace(/[^a-z_]/g, '').slice(0, 30);
+      var scr = seg === 'b' ? 'site' : seg === 'f' ? 'facture' : seg === 'a' ? 'adresse' : seg.length >= 2 ? seg : 'autre';
+      if (JS_ERR_SEEN[scr]) return;
+      JS_ERR_SEEN[scr] = 1;
+      (TRACKABLE.js_error = TRACKABLE.js_error || []).push(scr);
+      track('js_error', scr);
+    } catch (x) { /* compter ne doit jamais casser l'application */ }
+  }
+  window.addEventListener('error', function (ev) { if (ev && ev.error) jsError(ev.error); });
+  window.addEventListener('unhandledrejection', function (ev) { if (ev && ev.reason instanceof Error) jsError(ev.reason); });
   function privacyOptOut() {
     try { return navigator.globalPrivacyControl === true || navigator.doNotTrack === '1' || window.doNotTrack === '1'; }
     catch (e) { return false; }
@@ -2506,7 +2532,7 @@
       if (sizes.length >= 2) more.push(['size', 'Taille ou pointure', sizes.map(function (z) { return [z, z]; })]);
       var active = more.filter(function (m) { return filter[m[0]]; }).length;
       var btn = more.length ? h('button', { class: 'opt filt-btn' + (active ? ' on' : ''), type: 'button', id: 'filter-more', 'aria-haspopup': 'dialog', onclick: function () { sheet(more); } },
-        icon('settings', 16), active ? 'Filtres · ' + active : 'Filtres') : null;
+        icon('filter', 16), active ? 'Filtres · ' + active : 'Filtres') : null;
       setKids(filters, primary || btn ? h('div', { class: 'filt-bar' }, primary, btn) : null);
     }
     function sheet(more) {
@@ -2556,8 +2582,8 @@
       var err = h('div', { role: 'alert' });
       var send = iconBtn('button', { class: 'btn big', type: 'button', id: 'order-send', onclick: function () {
         setKids(err);
-        if (!f.name.trim()) return errBox(err, new ApiError('your_name_required'));
-        if (f.phone.replace(/\D/g, '').length < 9) return errBox(err, new ApiError('phone_required'));
+        if (!f.name.trim()) return errBox(err, new ApiError('your_name_required'), 'v-name');
+        if (f.phone.replace(/\D/g, '').length < 9) return errBox(err, new ApiError('phone_required'), 'v-phone');
         send.disabled = true;
         api('fiila_vitrine_order', { p_slug: slug, p: { items: Object.keys(cart).map(function (k) { var l = cart[k]; return { product_id: l.id, qty: l.qty, size: l.size || undefined, color: l.color || undefined }; }),
           customer: { name: f.name.trim(), phone: f.phone.trim() }, note: f.note.trim() || null } }).then(function (r) {
@@ -2575,8 +2601,8 @@
           }),
           h('div', { class: 'total-row big' }, h('span', null, 'Total'), h('strong', { id: 'order-total' }, fcfa(total())))),
         textField({ id: 'v-name', label: 'Votre nom', max: 60, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
-        textField({ id: 'v-phone', label: 'Votre numéro WhatsApp', type: 'tel', inputmode: 'tel', autocomplete: 'tel', onInput: function (v) { f.phone = v; } }),
-        textField({ id: 'v-note', label: 'Précision pour la boutique', optional: true, max: 200, placeholder: 'Ex. : taille M, couleur bleue', onInput: function (v) { f.note = v; } }),
+        textField({ id: 'v-phone', label: 'Votre numéro WhatsApp', type: 'tel', inputmode: 'tel', autocomplete: 'tel', placeholder: 'Ex. : 77 123 45 67', onInput: function (v) { f.phone = v; } }),
+        textField({ id: 'v-note', label: 'Précision pour la boutique', optional: true, max: 200, placeholder: 'Ex. : livrer après 18 h, appeler avant', onInput: function (v) { f.note = v; } }),
         h('p', { class: 'safe-line' }, icon('lock', 18), 'Votre nom et votre numéro vont uniquement à ' + shop.name + '.'),
         err, send);
       window.scrollTo(0, 0);
@@ -3166,7 +3192,7 @@
             'aria-label': 'Site en ligne', onclick: toggle }, h('i', { 'aria-hidden': 'true' }))),
         h('p', { class: 'st-state' + (state.public ? ' on' : ''), id: 'vitrine-state' }, state.public ? 'En ligne : vos clientes peuvent commander.' : 'Hors ligne : personne ne voit le site.'),
         state.public && url ? h('div', { class: 'duo' },
-            iconBtn('a', { class: 'btn mid', id: 'vitrine-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
+            iconBtn('a', { class: 'btn ghost mid', id: 'vitrine-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
               onclick: waCardClick('vitrine', 'Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url) }, 'chat', 'Partager'),
             iconBtn('a', { class: 'btn ghost mid', id: 'vitrine-view', href: '#/b/' + state.slug }, 'eye', 'Voir')) : null,
         h('a', { class: 'st-row', id: 'vitrine-customize', href: '#/boutique/vitrine' },
@@ -3512,7 +3538,7 @@
   function referralUrl(code) { return baseUrl() + '#/r/' + code; }
   function referralMessage(kind, code) {
     var url = referralUrl(code);
-    if (kind === 'shop') return 'Je reçois l’adresse de mes clientes en une photo avec Fii : la bonne porte, un repère, le livreur arrive du premier coup. Crée ta boutique, c’est gratuit : ' + url;
+    if (kind === 'shop') return 'Je reçois l’adresse de mes clientes en une photo avec Fii : la bonne porte, un repère, le livreur arrive du premier coup. Créez votre boutique, c’est gratuit : ' + url;
     if (kind === 'courier') return 'Avec Fii, les boutiques m’envoient l’adresse exacte avec la photo de l’entrée. Plus besoin d’appeler pour trouver. Essaie : ' + url;
     return 'J’envoie mon adresse en une photo avec Fii : la bonne porte, un repère, où se garer. C’est gratuit : ' + url;
   }
@@ -4427,6 +4453,8 @@
      sinon une simple copie du lien, nommée comme telle ; aucun message prérempli, aucun SDK.
      Instagram / TikTok : pas de partage de lien par URL ; image verticale + lien à copier + consigne honnête. */
   var ICONS = {
+    filter: 'M4 5h16l-6 7.5V19l-4-2v-4.5L4 5Z',
+    image: 'M4 5h16v14H4zM4 15l4.5-4.5L13 15l2.5-2.5L20 17M15.5 9.5h.01',
     spark: 'M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4L12 3ZM19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2Z',
     globe: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3.5 9h17M3.5 15h17M12 3c2.5 2.6 3.7 5.6 3.7 9s-1.2 6.4-3.7 9c-2.5-2.6-3.7-5.6-3.7-9s1.2-6.4 3.7-9Z',
     copy: 'M9 9h10v12H9zM5 15V3h10',
@@ -5661,7 +5689,19 @@
       return page(backBtn(), stateCard('!', title, errText(e), retryBtn()), footer());
     };
   }
-  function errBox(box, e) { setKids(box, h('p', { class: 'alert' }, errText(e))); }
+  // field : identifiant du champ en cause (audit du 27/10) — marqué invalide, relié au message, amené à l'écran avec le focus.
+  var ERR_SEQ = 0;
+  function errBox(box, e, field) {
+    var id = 'err-' + (++ERR_SEQ);
+    setKids(box, h('p', { class: 'alert', id: id }, errText(e)));
+    Array.prototype.forEach.call(document.querySelectorAll('[aria-invalid="true"]'), function (x) { x.removeAttribute('aria-invalid'); });
+    var el = field && document.getElementById(field);
+    if (el) {
+      el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', id);
+      el.addEventListener('input', function clear() { el.removeAttribute('aria-invalid'); el.removeEventListener('input', clear); });
+      try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.focus({ preventScroll: true }); } catch (x) { /* ancien navigateur : rien */ }
+    } else if (box && box.scrollIntoView) { try { box.scrollIntoView({ block: 'nearest' }); } catch (x) { /* rien */ } }
+  }
 
   // Classement d'une adresse dans le carnet (maison, bureau, boutique, autre).
   function tagPicker(pl, owner) {
@@ -5976,6 +6016,19 @@
       return r.shop && SHOP_ROLE === 'editor' ? memberSettings(r.shop) : shopForm(r.shop);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
+  // Type de commerce en pastilles (règle 7 ; audit du 27/10 : la liste déroulante cachait les choix sur iPhone).
+  function typePills(f) {
+    var box = h('div', { class: 'pills', role: 'radiogroup', 'aria-labelledby': 'shop-type-l', id: 'shop-type' });
+    function draw() {
+      setKids(box, BUSINESS_TYPES.map(function (t) {
+        var on = f.type === t[0];
+        return h('button', { type: 'button', class: 'pill sm' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-v': t[0],
+          onclick: function () { f.type = t[0]; draw(); } }, t[1]);
+      }));
+    }
+    draw();
+    return h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'shop-type-l' }, 'Type de commerce'), box);
+  }
   /* ----- Réglages v2 (fondateur, 27/10 soir, maquette T3zFpNLrgCYn5gjaNkwoJi validée) : 1) carte « presque prête »
      (anneau x/n et UN bouton vers ce qui manque), 2) carte « Mon site », 3) tuiles en deux colonnes qui ouvrent chacune une
      feuille (un seul bouton d'enregistrement, toujours visible), 4) parrainage, 5) quitter ou supprimer, tout en bas. */
@@ -6000,12 +6053,15 @@
     var ready = h('section', { class: 'st-ready', id: 'st-ready', 'aria-live': 'polite' });
     var tiles = h('div', { class: 'st-tiles', id: 'st-tiles' });
     var site = vitrineSection(shop, function () { load(); });
+    // Un échec de chargement n'est jamais montré comme « Non indiqués » ou « Aucun » (audit du 27/10).
+    function fail() { d.err = true; return null; }
     function load() {
+      d.err = false;
       return Promise.all([
-        sapi('fiila_shop_vitrine', { p: null }).then(null, function () { return null; }),
-        sapi('fiila_shop_identity', {}).then(null, function () { return null; }),
-        sapi('fiila_shop_team', {}).then(null, function () { return null; }),
-        sapi('fiila_shop_ambassador', {}).then(null, function () { return null; })
+        sapi('fiila_shop_vitrine', { p: null }).then(null, fail),
+        sapi('fiila_shop_identity', {}).then(null, fail),
+        sapi('fiila_shop_team', {}).then(null, fail),
+        sapi('fiila_shop_ambassador', {}).then(null, fail)
       ]).then(function (rr) { d.site = rr[0]; d.ident = rr[1]; d.team = rr[2]; d.amb = rr[3]; draw(); });
     }
     function policiesOk() { var po = (d.site && d.site.policies) || {}; return !!(po.delivery && po.pay && po.pay.length); }
@@ -6020,6 +6076,12 @@
         owner ? ['owner', 'propriétaire', !(d.ident && d.ident.need_owner), openOwner] : null].filter(Boolean);
     }
     function drawReady() {
+      if (!d.site && d.err) {
+        setKids(ready, h('div', { class: 'st-ready-top' }, h('div', { class: 'st-ready-t' }, h('h2', null, 'État de la boutique indisponible'),
+            h('p', null, 'Vérifiez la connexion, puis réessayez.'))),
+          h('button', { class: 'st-cta', type: 'button', id: 'st-ready-retry', onclick: function () { setKids(ready, h('div', { class: 'loading-skel st-ready-skel' })); load(); } }, 'Réessayer'));
+        return;
+      }
       if (!d.site) { setKids(ready, h('div', { class: 'loading-skel st-ready-skel' })); return; }
       var st = steps(), done = st.filter(function (x) { return x[2]; }).length, left = st.filter(function (x) { return !x[2]; });
       var C = 2 * Math.PI * 24, off = C * (1 - done / st.length);
@@ -6045,13 +6107,13 @@
     function drawTiles() {
       var po = (d.site && d.site.policies) || {}, k = (d.ident && d.ident.kyc) || {}, t = d.team;
       var typ = BUSINESS_TYPES.filter(function (x) { return x[0] === shop.business_type; })[0];
-      var kyc = d.ident && d.ident.blocked ? ['À envoyer : commandes bloquées', true] : k.status === 'submitted' ? ['En vérification', false] : k.status === 'verified' ? ['Validée', false]
+      var kyc = !d.ident ? [d.err ? '—' : '…', false] : d.ident.blocked ? ['À envoyer : commandes bloquées', true] : k.status === 'submitted' ? ['En vérification', false] : k.status === 'verified' ? ['Validée', false]
         : k.status === 'rejected' ? ['Refusée : à renvoyer', true] : ['Après la 1re vente', false];
       var people = t ? 1 + (t.members || []).length : null;
       setKids(tiles,
         tile('info', 'shop', 'Informations', shop.name + (typ ? ' · ' + typ[1] : ''), false, openInfo),
-        tile('policies', 'cash', 'Livraison et paiement', policiesOk() ? [lbl(POLICY_DELIVERY, po.delivery), (po.pay || []).map(function (x) { return lbl(POLICY_PAY, x); }).join(', ')].join(' · ') : 'Non indiqués', d.site && !policiesOk(), openPolicies),
-        tile('team', 'users', 'Équipe', people == null ? '…' : people === 1 ? 'Vous seul(e)' : people + ' personnes' + (t.invites && t.invites.length ? ' · ' + t.invites.length + ' invitée(s)' : ''), false, openTeam),
+        tile('policies', 'cash', 'Livraison et paiement', !d.site ? '—' : policiesOk() ? [lbl(POLICY_DELIVERY, po.delivery), (po.pay || []).map(function (x) { return lbl(POLICY_PAY, x); }).join(', ')].join(' · ') : 'Non indiqués', d.site && !policiesOk(), openPolicies),
+        tile('team', 'users', 'Équipe', people == null ? (d.err ? '—' : '…') : people === 1 ? 'Vous seul(e)' : people + ' personnes' + (t.invites && t.invites.length ? ' · ' + t.invites.length + ' invitée(s)' : ''), false, openTeam),
         tile('courier', 'moto', 'Livreur attitré', shop.courier ? shop.courier.name + (shop.courier_confirmed ? '' : ' · à confirmer') : shop.courier_invite ? 'Invitation envoyée' : 'Aucun pour le moment',
           !!(shop.courier && !shop.courier_confirmed), openCourier),
         owner ? tile('identity', 'lock', 'Pièce d’identité', kyc[0], kyc[1], function () { go('#/boutique/identite'); }) : null,
@@ -6160,10 +6222,7 @@
         shop ? null : h('p', { class: 'muted' }, 'Ces informations apparaissent sur vos factures.')),
       textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, value: f.name, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
       textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', value: f.phone, onInput: function (v) { f.phone = v; } }),
-      h('div', { class: 'field' }, h('label', { for: 'shop-type' }, 'Type de commerce'),
-        h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
-          h('option', { value: '' }, 'Choisir…'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0], selected: f.type === t[0] || null }, t[1]); })),
-        null),
+      typePills(f),
       shop ? null : textField({ id: 'shop-amb', label: 'Code agent', optional: true, max: 10, placeholder: 'Si un agent Fii vous aide', onInput: function (v) { ambCode = v; } }),
       ask ? ask.el : null,
       err, btn,
@@ -6215,7 +6274,7 @@
       h('section', { class: 'setup', id: 'shop-setup', 'data-step': String(n) },
         setupBadges(n),
         setupWin(n),
-        h('p', { class: 'setup-step' }, 'Étape ' + n + ' sur ' + SETUP_BADGES.length),
+        h('p', { class: 'setup-step sr-only' }, 'Étape ' + n + ' sur ' + SETUP_BADGES.length), // déjà dit par les badges
         h('h1', null, title), text ? h('p', { class: 'muted' }, text) : null,
         body),
       footer(true));
@@ -6241,9 +6300,7 @@
     } }, 'Continuer');
     return setupFrame(1, 'Votre boutique', 'Son nom apparaît sur votre site et vos factures.', h('div', { class: 'stack' },
       textField({ id: 'shop-name', label: 'Nom de la boutique', max: 60, placeholder: 'Ex. : Boutique Ndèye', onInput: function (v) { f.name = v; } }),
-      h('div', { class: 'field' }, h('label', { for: 'shop-type' }, 'Type de commerce'),
-        h('select', { id: 'shop-type', onchange: function (e) { f.type = e.target.value; } },
-          h('option', { value: '' }, 'Choisir…'), BUSINESS_TYPES.map(function (t) { return h('option', { value: t[0] }, t[1]); }))),
+      typePills(f),
       h('details', { class: 'more-details', id: 'shop-more' }, h('summary', null, 'Téléphone, code agent (facultatif)'),
         h('div', { class: 'stack', style: 'margin-top:12px' },
           textField({ id: 'shop-phone', label: 'Téléphone', optional: true, type: 'tel', inputmode: 'tel', onInput: function (v) { f.phone = v; } }),
@@ -6362,10 +6419,11 @@
     draw();
     return setupFrame(4, 'Votre image', 'Un logo et une couverture rendent votre site reconnaissable. Vous pourrez tout changer plus tard.', h('div', { class: 'stack' },
       slots, logoIn, coverIn,
-      h('details', { class: 'look-advice', id: 'setup-look-advice', open: true }, h('summary', null, 'Quelles images choisir ?'),
+      h('details', { class: 'look-advice', id: 'setup-look-advice' }, h('summary', null, 'Quelles images choisir ?'),
         h('div', { class: 'stack tight', style: 'margin-top:10px' }, h('b', { class: 'small' }, 'Logo'), lookTips('logo'), h('b', { class: 'small' }, 'Couverture'), lookTips('cover'))),
       err, btn,
-      h('a', { class: 'setup-later', id: 'setup-look-more', href: '#/boutique/vitrine', onclick: function () { var st = setupState(); st.look = 'more'; LS.set(SETUP_LS, st); } }, 'Plus de choix : modèle, couleur, réseaux')));
+      // « Plus de choix » retiré (audit du 27/10) : il sortait de l'assistant ; modèle, couleur, réseaux sont dans Réglages.
+      null));
   }
   // Étape 5 : le propriétaire (obligatoire, fondateur 27/10). Jamais affiché sur le site.
   function setupStepOwner(shop) {
@@ -6914,7 +6972,9 @@
       !st.orders && !st.products ? h('section', { class: 'card', id: 'first-product' },
         h('h2', null, 'Ajoutez votre premier article'),
         iconBtn('a', { class: 'btn', href: '#/boutique/article/nouveau' }, 'cam', 'Ajouter un article')) : null,
-      iconBtn('a', { class: !st.orders && !st.products ? 'btn ghost full' : 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'plus', 'Nouvelle commande'),
+      // Boutique neuve : « Ajouter un article » reste la seule action pleine ; la commande sans article est un lien discret.
+      !st.orders && !st.products ? h('a', { class: 'btn link', id: 'new-order', href: '#/commande/nouvelle' }, 'Ou créer une commande sans article')
+        : iconBtn('a', { class: 'btn big full', id: 'new-order', href: '#/commande/nouvelle' }, 'plus', 'Nouvelle commande'),
       // Compte proposé quand la boutique tourne (3 commandes), pas dès sa création.
       (shop.account || authed() || (st.orders || 0) < 3 ? null : shopAccountCard()) || (resume || due ? null : sugg), // une seule carte en haut (23/10)
       // Les compteurs sont dans les onglets (plus de tuiles qui répètent la même chose).
@@ -7529,7 +7589,7 @@
             return h('button', { type: 'button', class: 'pill' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-v': c[0],
               onclick: function () { f.category = on ? '' : c[0]; draw(); } }, c[1]);
           }))),
-        h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-sizes-l' }, f.category === 'chaussures' ? 'Pointures' : 'Tailles', h('span', { class: 'opt' }, ' (touchez pour choisir)')),
+        h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-sizes-l' }, f.category === 'chaussures' ? 'Pointures' : 'Tailles'),
           h('div', { class: 'pills', role: 'group', 'aria-labelledby': 'product-sizes-l', id: 'product-sizes' }, sizeChoices().map(function (x) {
             var on = curS.indexOf(x) >= 0;
             return h('button', { type: 'button', class: 'pill sm' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', onclick: function () { toggleTag('sizes', x); } }, x);
@@ -7539,7 +7599,7 @@
             onblur: function () { if (extraSize.trim()) { var v = extraSize.trim(); extraSize = ''; if (tags(f.sizes).indexOf(v) < 0) toggleTag('sizes', v); } } })))),
         // Tailles épuisées (Fii Édition V1) : barrées sur le site et refusées à la commande ; un toucher pour basculer.
         curS.length >= 2 ? h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-sizes-out-l' }, f.category === 'chaussures' ? 'Pointures épuisées' : 'Tailles épuisées',
-            h('span', { class: 'opt' }, ' (barrées sur votre site)')),
+  ),
           h('div', { class: 'pills', role: 'group', 'aria-labelledby': 'product-sizes-out-l', id: 'product-sizes-out' }, curS.map(function (x) {
             var on = f.sizes_out.indexOf(x) >= 0;
             return h('button', { type: 'button', class: 'pill sm out' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', 'data-v': x, onclick: function () {
@@ -7609,7 +7669,7 @@
   function studioSheet(pr, photos, saveStay, st) {
     // Décors du pack de la catégorie de la boutique, ceux qu'elle garde le plus en premier (base Aramis Studio, règle R2).
     var scenes = (st.scenes && st.scenes.length ? st.scenes : STUDIO_STYLES.map(function (x) { return { id: x[0], label: x[1], swatch: x[2] }; }));
-    var style = scenes[0].id, job = null, pick = null, busy = false, step = 'decor', kept = false, closeSheet, timers = [];
+    var style = scenes[0].id, job = null, pick = null, busy = false, step = 'decor', kept = false, closeSheet, timers = [], runId = 0;
     var credits = (st.credits && st.credits.total) || 0;
     var prem = st.premium || null, mode = 'fidele';
     var body = h('div', { class: 'stack', id: 'studio-body' });
@@ -7663,7 +7723,13 @@
           h('div', { class: 'sd-busy-img loading-skel' }, h('span', { class: 'sd-pulse', 'aria-hidden': 'true' }, icon('spark', 28))),
           line, h('div', { class: 'sd-bar', 'aria-hidden': 'true' }, h('i', { style: 'animation-duration:' + (mode === 'premium' ? 30 : 15) + 's' })),
           h('p', { class: 'small muted' }, 'Environ ' + (mode === 'premium' ? 30 : 15) + ' secondes. Rien n’est débité si vous ne gardez pas.')));
-        setKids(foot);
+        // Sortie possible si la création traîne (audit du 27/10) : la série est abandonnée, rien n'est débité.
+        var cancel = h('button', { class: 'btn ghost full', type: 'button', id: 'studio-cancel', hidden: true, onclick: function () {
+          runId++; busy = false; timers.forEach(clearTimeout); timers = []; step = 'decor'; draw();
+          toast('Création abandonnée : rien n’a été débité.');
+        } }, 'Annuler');
+        timers.push(setTimeout(function () { cancel.hidden = false; }, (mode === 'premium' ? 45 : 30) * 1000));
+        setKids(foot, cancel);
         return;
       }
       if (step === 'choose') {
@@ -7718,8 +7784,10 @@
         : h('p', { class: 'notice', id: 'studio-empty' }, credits ? 'Pas assez de crédits Studio pour ce mode.' : 'Plus de crédit Studio pour le moment.'));
     }
     function run() {
+      var me = ++runId;
       busy = true; step = 'busy'; draw(); track('studio', 'run:' + style);
       studioCall({ action: 'render', product: pr.id, style: style, mode: mode }).then(function (r) {
+        if (me !== runId) return; // création annulée entre-temps
         busy = false; timers.forEach(clearTimeout); timers = [];
         if (r.configured === false) { step = 'decor'; draw(); errBox(err, new ApiError('studio_off')); return; }
         if (r.error || r.status !== 'done') { step = 'decor'; draw(); errBox(err, new ApiError(STUDIO_ERR[r.error] ? r.error : 'studio_failed')); return; }
@@ -7766,6 +7834,9 @@
     var photos = productPhotos(pr);
     var photoBox = photos.el;
     var btn = h('button', { class: 'btn big full', type: 'button', id: 'product-save', onclick: function () { save(false); } }, pr ? 'Enregistrer' : 'Ajouter l’article');
+    var promo = h('details', { class: 'more-details', id: 'product-promo', open: f.price_was ? true : null }, h('summary', null, 'Promo : prix barré'),
+      h('div', { style: 'margin-top:10px' }, textField({ id: 'product-price-was', label: 'Ancien prix (barré sur votre site)', optional: true, inputmode: 'numeric', value: f.price_was,
+        placeholder: 'Ex. : 15000', onInput: function (v) { f.price_was = v; } })));
     // Visibilité : un seul interrupteur (fondateur, 27/10 : « simplifier le bouton visibilité ou masqué »).
     function visSwitch() {
       var b = h('button', { class: 'switch-row' + (f.active ? ' on' : ''), type: 'button', role: 'switch', id: 'product-active', 'aria-checked': f.active ? 'true' : 'false',
@@ -7790,12 +7861,12 @@
     function save(stay) {
       setKids(err);
       var price = parseInt(String(f.price).replace(/\D/g, ''), 10);
-      if (!f.name.trim()) return errBox(err, new ApiError('item_label_required'));
-      if (!(price >= 0)) return errBox(err, new ApiError('invalid_price'));
+      if (!f.name.trim()) return errBox(err, new ApiError('item_label_required'), 'product-name');
+      if (!(price >= 0)) return errBox(err, new ApiError('invalid_price'), 'product-price');
       var stock = f.stock.trim() === '' ? null : parseInt(f.stock.replace(/\D/g, ''), 10);
-      if (stock !== null && !(stock >= 0)) return errBox(err, new ApiError('invalid_stock'));
+      if (stock !== null && !(stock >= 0)) return errBox(err, new ApiError('invalid_stock'), 'product-stock');
       var was = String(f.price_was).trim() === '' ? null : parseInt(String(f.price_was).replace(/\D/g, ''), 10);
-      if (was !== null && !(was > price)) return errBox(err, new ApiError('invalid_price_was'));
+      if (was !== null && !(was > price)) { if (promo) promo.open = true; return errBox(err, new ApiError('invalid_price_was'), 'product-price-was'); }
       var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active,
         category: f.category || null, sizes: splitTags(f.sizes), colors: splitTags(f.colors), stock: stock, price_was: was, sizes_out: f.sizes_out };
       btn.disabled = true;
@@ -7821,9 +7892,9 @@
       h('section', { class: 'pf-sec' },
         textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax fille', onInput: function (v) { f.name = v; keepP(); } }),
         textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; keepP(); } }),
-        // Promo (Fii Édition V1) : l'ancien prix, barré sur le site ; l'article entre dans la rubrique « Promos ».
-        textField({ id: 'product-price-was', label: 'Prix barré (promo)', optional: true, inputmode: 'numeric', value: f.price_was, placeholder: 'Ex. : 15000',
-          onInput: function (v) { f.price_was = v; } })),
+        // Promo (Fii Édition V1) : l'ancien prix, barré sur le site ; l'article entre dans la rubrique « Promos ». Repliée
+        // (audit du 27/10 : concerne peu d'articles), ouverte quand l'article est déjà en promo.
+        promo),
       productDetails(f),
       h('section', { class: 'pf-sec' },
         textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, placeholder: 'Matière, coupe, conseils de taille…', onInput: function (v) { f.description = v; keepP(); } }),
@@ -8869,59 +8940,84 @@
   }
 
   /* ================================================================ CONFIDENTIALITÉ */
+  // Page « Données et confidentialité » (réécrite le 28/10 après l'audit du 27/10, HANDOFF #78) : ce que Fii enregistre
+  // réellement, où, combien de temps, qui le voit, et comment l'effacer. À tenir à jour avec docs/CONFORMITE-CDP.md.
   function viewPrivacy() {
+    var forgetZone = h('div', { class: 'stack tight', id: 'privacy-forget' });
+    function forgetBtn() {
+      return h('button', { class: 'btn ghost', type: 'button', id: 'privacy-forget-btn', onclick: function (ev) {
+        var dev = deviceId(false);
+        if (!dev) { toast('Aucun favori enregistré depuis ce téléphone.'); return; }
+        ev.currentTarget.disabled = true;
+        api('fiila_forget_device', { p_device: dev }).then(function (r) {
+          LS.del(DEVICE_LS); FOLLOW = {};
+          setKids(forgetZone, h('p', { class: 'msg ok', role: 'status' }, 'Effacé : ' + countText(r.favs || 0, 'favori', 'favoris') + ', ' + countText(r.follows || 0, 'boutique suivie', 'boutiques suivies') + '.'));
+        }, function (e) { setKids(forgetZone, forgetBtn()); errBox(forgetZone, e); });
+      } }, 'Effacer mes favoris sur ce téléphone');
+    }
+    setKids(forgetZone, forgetBtn());
     return page(backBtn(),
       h('div', { class: 'prose' },
         h('h1', null, 'Données et confidentialité'),
-        h('p', null, 'Fii est en phase pilote. Cette page décrit ce que le service enregistre et comment le supprimer.'),
+        h('p', null, 'Fii est en phase pilote. Cette page décrit ce que le service enregistre, où, combien de temps, et comment le supprimer. Responsable du traitement : Aramis Lab, Dakar.'),
         h('h2', null, 'Ce qui est enregistré'),
         h('ul', null,
-          h('li', null, 'Ce que vous saisissez : nom du lieu, quartier, repère, point d’entrée, point d’arrêt voiture, photo, et pour un événement sa date.'),
+          h('li', null, 'Ce que vous saisissez pour une adresse : nom du lieu, quartier, repère, point d’entrée, point d’arrêt voiture, photo, et pour un événement sa date.'),
           h('li', null, 'Pour une demande d’adresse : le nom du demandeur, la raison et la référence éventuelle.'),
-          h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.'),
-          h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié : il n’est pas enregistré.'),
-          h('li', null, 'Si vous créez un compte (facultatif) : votre e-mail, votre mot de passe (géré par Supabase Auth, jamais visible en clair), et si vous les ajoutez votre nom, votre téléphone et votre photo de profil.'),
-          h('li', null, 'Si vous ouvrez une boutique : son nom et son téléphone s’il est indiqué ; vos clients (nom, téléphone), vos commandes, factures et les paiements que vous enregistrez. Pour ces données clients, le commerçant décide de ce qu’il saisit et en répond auprès de ses clients ; Fii les héberge pour lui.'),
-          h('li', null, 'Si vous êtes livreur : votre nom, et si vous les indiquez votre téléphone, votre moyen de livraison et votre zone. Vos boutiques voient votre nom, votre téléphone et votre note ; les clients voient votre prénom.'),
-          h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom. Le commerçant voit la moyenne de ses articles.'),
+          h('li', null, 'Si vous collez un lien court Google Maps, il est envoyé à notre serveur uniquement pour en lire le point, puis oublié.'),
+          h('li', null, 'Si vous créez un compte (facultatif) : votre e-mail, votre mot de passe (géré par Supabase Auth, jamais visible en clair), et si vous les ajoutez votre nom, votre téléphone et votre photo de profil. Si vous confirmez votre numéro, un code vous est envoyé par SMS par notre prestataire Africa’s Talking.'),
+          h('li', null, 'Si vous ouvrez une boutique : son nom, son type et son téléphone ; vos clientes (nom, téléphone), vos commandes, factures, les paiements que vous enregistrez et l’historique de leurs changements (date, état, montant). Pour ces données, la boutique décide de ce qu’elle saisit et en répond auprès de ses clientes ; Fii les héberge pour elle.'),
+          h('li', null, 'Propriétaire de la boutique : son nom et son numéro (obligatoires). Après la première vente, une photo de sa pièce d’identité (carte d’identité ou passeport), pour la sécurité des ventes. Seule l’équipe Fii habilitée peut l’ouvrir, chaque consultation est notée, et les images sont effacées dès que la pièce est vérifiée ou refusée ; seuls le type de pièce, les dates et la décision sont gardés.'),
+          h('li', null, 'Équipe d’une boutique : le nom et le numéro des personnes invitées, leur rôle, et si elles le confirment, leur numéro vérifié par SMS.'),
+          h('li', null, 'Fii Studio (si la boutique l’utilise) : la photo de l’article est envoyée à notre prestataire fal.ai (États-Unis) pour créer la version studio ; elle n’est pas utilisée à d’autres fins. Fii garde le décor choisi, la version gardée et le coût, 6 mois au plus.'),
+          h('li', null, 'Si vous êtes livreur : votre nom, et si vous les indiquez votre téléphone, votre moyen de livraison et votre zone. Vos boutiques voient votre nom, votre téléphone et votre note ; les clientes voient votre prénom.'),
+          h('li', null, 'Si vous notez un article reçu : la note (1 à 5), rattachée à la commande, sans votre nom.'),
+          h('li', null, 'Favoris et boutiques suivies sans compte : un identifiant tiré au hasard est gardé sur votre téléphone ; Fii n’en garde qu’une empreinte chiffrée avec une clé secrète, et, 30 jours au plus, une empreinte non réversible de votre adresse IP pour éviter les abus. Vous pouvez tout effacer plus bas. Avec un compte, ils sont rattachés au compte.'),
+          h('li', null, 'Commentaires et signalements du fil : le texte et le compte qui commente ; un signalement ne montre pas son auteur.'),
           h('li', null, 'Origine et parrainage : quand vous créez une adresse, un événement, une boutique ou un espace livreur, Fii note d’où vous venez (lien reçu, lien ou code de parrainage, ou numéro de la personne qui vous a recommandé, si vous le tapez). La personne qui vous a parrainé voit qu’une arrivée a eu lieu : le nom d’une boutique, le prénom d’un livreur, jamais le nom ni l’adresse d’un particulier.'),
-          h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro. Le numéro n’est jamais affiché ; il sert seulement à vous reconnaître quand quelqu’un le tape. Les personnes qui ouvrent votre lien voient votre prénom.'),
-          h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus que vous ajoutez à votre adresse. Le micro n’est utilisé que lorsque vous appuyez sur « Enregistrer ». Toute personne qui a le lien, et le livreur d’une course, peuvent l’écouter. Il est supprimé avec la fiche, ou dès que vous le retirez.'),
-          h('li', null, 'Site d’une boutique (s’il est en ligne) : ses articles visibles par toute personne qui a le lien. Une commande passée sur le site transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
-          h('li', null, 'Fil des boutiques : les 25 premières boutiques qui mettent leur site en ligne y apparaissent gratuitement (nom, présentation, articles, prix, note). La boutique peut en sortir à tout moment dans ses réglages. Aucune donnée de client n’y figure.'),
-          h('li', null, 'Programme Agents (facultatif, avec un compte) : votre nom, votre téléphone, votre quartier, votre numéro de versement, votre résultat au test, les boutiques que vous accompagnez et vos gains. Une boutique accompagnée voit le prénom de son agent ; l’agent voit le nom de la boutique et ses indicateurs (nombre d’articles, de commandes et de clientes), jamais le nom ni le numéro des clientes.'),
-          h('li', null, 'Vide-dressing : pour vendre, votre nom, votre téléphone, votre quartier et les informations de l’article (photo, catégorie, taille, état, prix ; genre et âge pour un article d’enfant). Ils ne sont visibles que de l’équipe Fii, pour vérifier l’article et organiser l’enlèvement ; l’acheteur ne voit que l’article. Les photos ne doivent montrer aucune personne reconnaissable.'),
-          h('li', null, 'Publication d’un article : Fii compte seulement qu’une publication a été faite, pas le réseau choisi.'),
-          h('li', null, 'Suivi en direct (livreur ou invité d’un événement), seulement si vous le démarrez : votre dernière position et une courte trace, visibles par l’expéditeur et le client (livraison) ou par le seul organisateur (rendez-vous). Effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après la fin de la livraison ou de l’événement. Pour un événement, votre prénom.')),
-        h('h2', null, 'Ce qui est obligatoire'),
-        h('p', null, 'Pour une adresse : un nom de lieu, le point d’entrée, et une photo ou un repère écrit. Pour un événement : un nom, le lieu et la date. Tout le reste est facultatif. Sans les éléments obligatoires, la fiche ne peut pas être créée.'),
+          h('li', null, 'Si vous créez un code de parrainage : votre nom et, si vous l’indiquez, votre numéro, jamais affiché.'),
+          h('li', null, 'Repère vocal (facultatif) : l’enregistrement de 30 secondes au plus ajouté à votre adresse, écoutable par qui a le lien et par le livreur d’une course ; supprimé avec la fiche ou dès que vous le retirez.'),
+          h('li', null, 'Site d’une boutique (s’il est en ligne) : ses articles, visibles par toute personne qui a le lien. Une commande passée sur le site transmet votre nom, votre numéro et votre commande à cette boutique seulement ; votre adresse n’est donnée qu’ensuite, par vous.'),
+          h('li', null, 'Fil des boutiques : les boutiques qui y apparaissent (nom, présentation, articles, prix, note) ; aucune donnée de cliente.'),
+          h('li', null, 'Programme Agents (facultatif, avec un compte) : votre nom, votre téléphone, votre quartier, votre numéro de versement, votre résultat au test, les boutiques que vous accompagnez et vos gains ; et vos échanges avec le Manager. Si l’assistance par IA est activée, vos messages au Manager sont traités par notre prestataire Anthropic ; s’il vous répond sur WhatsApp, par Meta.'),
+          h('li', null, 'Vide-dressing : pour vendre, votre nom, votre téléphone, votre quartier et les informations de l’article ; visibles de l’équipe Fii seulement. Les photos ne doivent montrer aucune personne reconnaissable.'),
+          h('li', null, 'Suivi en direct (livreur ou invité d’un événement), seulement si vous le démarrez : votre dernière position et une courte trace, effacées dès l’arrivée ou l’arrêt, et au plus tard un jour après.'),
+          h('li', null, 'Pour limiter les abus : une empreinte non réversible de l’adresse IP lors des créations, effacée après 24 heures.'),
+          h('li', null, 'Mesure d’usage : par jour et sans aucun identifiant, quelques actions (par exemple « une fiche a été créée », « une erreur s’est produite sur tel écran »). Si votre navigateur envoie le signal « ne pas suivre », rien n’est compté.')),
+        h('h2', null, 'Sur votre téléphone'),
+        h('p', null, 'Fii garde sur votre téléphone les clés de vos fiches et de votre boutique, votre session si vous êtes connectée, des brouillons, et pour une boutique une copie de ses dernières commandes et clientes afin de les afficher sans réseau. Tout est effacé à la déconnexion ou à la suppression de la boutique. L’application mobile garde les mêmes informations.'),
         h('h2', null, 'Où sont stockées les données'),
-        h('p', null, 'Les fiches sont enregistrées dans une base de données hébergée par Supabase sur des serveurs situés à Paris (France), donc hors du Sénégal. Supabase agit comme prestataire technique et ne les utilise pas pour son propre compte. Le site lui-même est servi par GitHub Pages, qui ne reçoit aucune donnée de fiche.'),
+        h('ul', null,
+          h('li', null, 'Base de données et photos publiques des articles et des sites : Supabase, serveurs à Paris (France), donc hors du Sénégal. Les photos d’articles et les couvertures de sites sont publiques par nature (elles sont faites pour être vues) ; les photos d’entrée, avatars, repères vocaux et pièces d’identité ne le sont pas.'),
+          h('li', null, 'Site getfii.app et sites des boutiques : servis par Cloudflare, qui voit l’adresse IP des visiteurs pour livrer les pages.'),
+          h('li', null, 'Prestataires selon l’usage : fal.ai (États-Unis, Fii Studio), Africa’s Talking (SMS), Meta et Anthropic (programme Agents, si activés), OpenStreetMap (tuiles de la carte), Google Maps (itinéraires, selon ses propres conditions). Aucun ne reçoit de données pour son propre compte.')),
         h('h2', null, 'Combien de temps'),
         h('ul', null,
           h('li', null, 'Adresse : jusqu’à ce que vous la supprimiez.'),
           h('li', null, 'Événement : le lieu cesse d’être affiché à la date choisie, puis la fiche est effacée 30 jours plus tard.'),
           h('li', null, 'Demande d’adresse : valable 7 jours, effacée 30 jours après son expiration.'),
-          h('li', null, 'Empreinte de l’adresse IP : 24 heures.'),
-          h('li', null, 'Commandes, factures et clients d’une boutique : 24 mois au plus, ou moins si le commerçant les supprime. Compte et boutique : jusqu’à leur suppression.'),
-          h('li', null, 'Origine d’une arrivée : autant que la fiche, la boutique ou l’espace livreur concerné. Code de parrainage : jusqu’à ce que vous le supprimiez (page « Inviter un proche »).'),
-          h('li', null, 'Adresse donnée à un commerçant pour une commande : il peut la réutiliser pour vos commandes suivantes tant que son lien reste actif. La désactiver ou la supprimer la lui retire.')),
+          h('li', null, 'Commandes, factures, historique et clientes d’une boutique : 24 mois au plus, ou moins si la boutique les supprime. Compte et boutique : jusqu’à leur suppression.'),
+          h('li', null, 'Images de la pièce d’identité : jusqu’à la vérification. Séries Fii Studio : 6 mois. Invitations d’équipe utilisées ou expirées : 90 jours.'),
+          h('li', null, 'Empreinte de l’adresse IP : 24 heures pour les créations, 30 jours pour les favoris et les boutiques suivies.'),
+          h('li', null, 'Adresse donnée à une boutique pour une commande : elle peut la réutiliser pour vos commandes suivantes tant que son lien reste actif. La désactiver ou la supprimer la lui retire.')),
         h('h2', null, 'Vos droits'),
-        h('p', null, 'Depuis le téléphone qui a créé la fiche (ou avec sa clé de gestion), vous pouvez à tout moment la consulter, la modifier, désactiver son lien ou la supprimer définitivement.'),
+        h('ul', null,
+          h('li', null, 'Fiches : depuis le téléphone qui les a créées (ou avec la clé de gestion), les consulter, les modifier, désactiver leur lien ou les supprimer à tout moment.'),
+          h('li', null, 'Compte : « Mon compte » → « Supprimer mon compte » efface votre profil, vos boutiques (articles, commandes, clientes, pièce d’identité), vos adresses, vos favoris et vos boutiques suivies. Restent, au nom des boutiques où vous avez commandé, les commandes que vous y avez passées.'),
+          h('li', null, 'Favoris et boutiques suivies sans compte : bouton ci-dessous.')),
+        forgetZone,
         h('h2', null, 'Ce qui n’est pas collecté'),
         h('ul', null,
-          h('li', null, 'Pas de compte obligatoire, pas d’accès à vos contacts, pas de pièce d’identité. Aucun paiement en ligne n’est traité par Fii pour le moment.'),
-          h('li', null, 'Pas de suivi de position : votre position n’est lue qu’au moment où vous appuyez sur « Utiliser ma position ».'),
+          h('li', null, 'Pas de compte obligatoire pour une adresse, une commande ou une boutique, pas d’accès à vos contacts. Aucun paiement en ligne n’est traité par Fii pour le moment.'),
+          h('li', null, 'Pas de suivi de position : votre position n’est lue qu’au moment où vous appuyez sur « Utiliser ma position », ou pendant un suivi que vous avez démarré.'),
           h('li', null, 'Les données de localisation contenues dans les photos sont retirées avant l’envoi, et le serveur refuse les photos qui en contiennent encore.'),
-          h('li', null, 'Pas de publicité ni d’outil de suivi. Fii compte seulement, par jour et sans aucun identifiant, quelques actions (par exemple « une fiche a été créée » ou « un lien a été copié »), pour savoir si le service est utile. Si votre navigateur envoie le signal « ne pas suivre », rien n’est compté.')),
+          h('li', null, 'Pas de publicité ni d’outil de suivi publicitaire.')),
         h('h2', null, 'Qui peut voir une fiche'),
         h('p', null, 'Toute personne qui a le lien peut voir la fiche et le transférer. Les fiches ne sont jamais listées publiquement. Une réponse à une demande n’est visible que par le demandeur.'),
         h('h2', null, 'Désactiver et supprimer'),
-        h('p', null, 'Depuis « Mes adresses », vous pouvez désactiver un lien (il n’affiche plus rien) ou supprimer la fiche et sa photo. Les événements cessent d’afficher le lieu à la date choisie, puis sont effacés 30 jours plus tard. Les copies d’écran ou messages déjà envoyés ne peuvent pas être rappelés. Les sauvegardes techniques de la base peuvent conserver une copie pendant quelques jours avant d’être écrasées.'),
+        h('p', null, 'Depuis « Mes adresses », vous pouvez désactiver un lien ou supprimer la fiche et sa photo. Les copies d’écran ou messages déjà envoyés ne peuvent pas être rappelés. Les sauvegardes techniques de la base peuvent conserver une copie pendant quelques jours avant d’être écrasées.'),
         h('h2', null, 'Clé de gestion'),
-        h('p', null, 'Vos fiches sont gérées depuis le téléphone qui les a créées. Si vous le perdez ou effacez ses données, seule la clé de gestion permet de les modifier ou de les supprimer. Sans elle, Fii ne peut pas vérifier que la fiche vous appartient.'),
-        h('h2', null, 'Services tiers'),
-        h('p', null, 'La carte utilise les tuiles OpenStreetMap, chargées uniquement pendant la création d’une fiche. Les itinéraires s’ouvrent dans Google Maps, selon ses propres conditions.')),
+        h('p', null, 'Vos fiches sont gérées depuis le téléphone qui les a créées. Si vous le perdez ou effacez ses données, seule la clé de gestion permet de les modifier ou de les supprimer.')),
       footer());
   }
 

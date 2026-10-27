@@ -13,6 +13,7 @@
 //   PUBLIC_URL        facultatif : adresse publique de l'application (lien d'inscription)
 // Module sans dépendance (testé sous Node, déployé sous Deno).
 import { draftReply } from './manager.mjs';
+import { corsFor, readText, MB } from '../_shared/http.mjs';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
 export const UNKNOWN_TEXT = (url) => `Bonjour ! Ici le Manager de Fii Carrière. Ce numéro n’est pas encore celui d’un agent Fii. Pour nous rejoindre : ${url}#/carriere`;
@@ -35,8 +36,6 @@ export function inboundMessages(payload) {
 }
 
 export function makeHandler({ env, fetch, timeoutMs = 20000 }) {
-  const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
-  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
   const base = () => String(env('SUPABASE_URL') || '').replace(/\/$/, '');
   async function rest(fn, args, token) {
     const key = token ? env('SUPABASE_ANON_KEY') : env('SUPABASE_SERVICE_ROLE_KEY');
@@ -65,18 +64,21 @@ export function makeHandler({ env, fetch, timeoutMs = 20000 }) {
     }
   }
   return async (req) => {
+    const cors = corsFor(req, 'GET, POST, OPTIONS');
+    const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     const url = new URL(req.url);
     if (req.method === 'GET') {
       const want = String(env('WA_VERIFY_TOKEN') || '').trim(), got = String(url.searchParams.get('hub.verify_token') || '').trim();
-      const ok = url.searchParams.get('hub.mode') === 'subscribe' && want !== '' && got === want;
+      const ok = url.searchParams.get('hub.mode') === 'subscribe' && want !== '' && same(got, want);
       // Diagnostic sans valeur secrète : présence et longueurs seulement.
       if (!ok) console.log(JSON.stringify({ webhook_verify: 'refused', mode: url.searchParams.get('hub.mode'), secret_set: want !== '', secret_len: want.length, received_len: got.length,
         others: { WA_TOKEN: !!env('WA_TOKEN'), WA_PHONE_ID: !!env('WA_PHONE_ID'), WA_APP_SECRET: !!env('WA_APP_SECRET') } }));
       return ok ? new Response(url.searchParams.get('hub.challenge') || '', { status: 200 }) : new Response('forbidden', { status: 403 });
     }
     if (req.method !== 'POST') return json(405, { error: 'method' });
-    const raw = await req.text();
+    const raw = await readText(req, MB);
+    if (raw === null) return json(413, { error: 'too_large' });
     let body;
     try { body = JSON.parse(raw || '{}'); } catch { return json(400, { error: 'invalid' }); }
     // Réponse de l'équipe à pousser sur WhatsApp.

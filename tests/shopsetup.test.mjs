@@ -47,7 +47,7 @@ await t('étape 1 : nom et type, un seul bouton ; les champs facultatifs replié
   await P.click('#shop-save');
   await P.getByText('Donnez un nom à votre boutique.').waitFor();
   await P.fill('#shop-name', 'Boutique Coumba (test)');
-  await P.selectOption('#shop-type', 'mode');
+  await P.click('#shop-type [data-v="mode"]');
   await P.click('#shop-save');
   await P.locator('#shop-setup[data-step="2"]').waitFor();
   assert.match(await P.locator('#setup-win').textContent(), /Étape 1 réussie.*Boutique Coumba \(test\)/);
@@ -115,7 +115,7 @@ await t('« Plus tard » à l’article : boutique enregistrée, vitrine fermée
   const Q = await newPhone('dark');
   await Q.goto(URL0 + '#/boutique');
   await Q.fill('#shop-name', 'Boutique Plus Tard (test)');
-  await Q.selectOption('#shop-type', 'beaute');
+  await Q.click('#shop-type [data-v="beaute"]');
   await Q.click('#shop-save');
   await Q.locator('#shop-setup[data-step="2"]').waitFor();
   await shot(Q, '05-article-sombre');

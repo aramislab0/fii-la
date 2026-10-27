@@ -1,13 +1,14 @@
 // Fonction fiila-media-sync : dépôt dans le seau (chemin à empreinte, cache d'un an), adresse enregistrée, échec journalisé
-// sans bloquer les autres, orphelines retirées, refus hors POST. Supabase est simulé (aucun appel réel, aucune clé réelle).
+// sans bloquer les autres, orphelines retirées, refus hors POST, appel réservé à pg_cron (x-sync-token) ou à l'équipe connectée,
+// CORS limité aux origines de Fii. Supabase est simulé (aucun appel réel, aucune clé réelle).
 import assert from 'node:assert/strict';
 import { makeHandler, pathFor, decode } from '../supabase/functions/fiila-media-sync/handler.mjs';
 
 let passed = 0, failed = 0;
 async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
-const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'service-test' };
+const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test', SUPABASE_SERVICE_ROLE_KEY: 'service-test' };
 const ID = '2f6bd807-a43e-412f-ac96-24b5c6b51518', H = 'd5c881e6e40fefe3cbe7878f30de64a5';
-function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatus = 200 }) {
+function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatus = 200, me = null }) {
   const calls = [];
   const fetch = async (url, init = {}) => {
     calls.push({ url, init });
@@ -16,6 +17,8 @@ function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatu
       return new Response('{}', { status: uploadStatus(url) });
     }
     const fn = url.split('/rpc/')[1];
+    if (fn === 'fiila_media_sync_auth') return new Response(JSON.stringify(JSON.parse(init.body).p_token === 'sync-test'), { status: 200 });
+    if (fn === 'fiila_bo_me') return new Response(JSON.stringify(me), { status: 200 });
     if (fn === 'fiila_media_pending') return new Response(JSON.stringify(pending), { status: 200 });
     if (fn === 'fiila_media_orphans') return new Response(JSON.stringify(orphans), { status: 200 });
     if (fn === 'fiila_media_forget') return new Response(JSON.stringify({ ok: true, removed: JSON.parse(init.body).p_paths.length }), { status: 200 });
@@ -23,7 +26,7 @@ function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatu
   };
   return { fetch, calls, rpcs: (name) => calls.filter((c) => c.url.endsWith('/rpc/' + name)).map((c) => JSON.parse(c.init.body)) };
 }
-const post = () => new Request('https://x/functions/v1/fiila-media-sync', { method: 'POST', body: '{}' });
+const post = (headers = { 'x-sync-token': 'sync-test' }) => new Request('https://x/functions/v1/fiila-media-sync', { method: 'POST', body: '{}', headers });
 const env = (k) => ENV[k];
 const B64 = Buffer.from('photo de test').toString('base64');
 
@@ -77,6 +80,40 @@ await t('rien à faire : aucun dépôt, « dernière copie » mise à jour sans 
   assert.deepEqual(s.rpcs('fiila_media_report'), [{ p_action: 'run', p_ref: null, p_detail: null }]);
   assert.equal((await makeHandler({ env, fetch: s.fetch })(new Request('https://x/', { method: 'GET' }))).status, 405);
   assert.equal((await makeHandler({ env: () => undefined, fetch: s.fetch })(post())).status, 500);
+});
+
+await t('accès : sans jeton ni session → 401, rien n’est copié ; mauvais jeton de pg_cron → 401 ; jeton vérifié par la base avec la clé de service', async () => {
+  for (const h of [{}, { 'x-sync-token': 'faux' }, { authorization: 'Bearer ' }]) {
+    const s = sim({ pending: [{ kind: 'product', ref: ID, hash: H, ctype: 'image/jpeg', b64: B64 }] });
+    const r = await makeHandler({ env, fetch: s.fetch })(post(h));
+    assert.equal(r.status, 401, JSON.stringify(h)); assert.deepEqual(await r.json(), { error: 'unauthorized' });
+    assert.equal(s.rpcs('fiila_media_pending').length, 0); assert.ok(!s.calls.some((c) => c.url.includes('/storage/')));
+  }
+  const s = sim({});
+  await makeHandler({ env, fetch: s.fetch })(post());
+  const a = s.calls.find((c) => c.url.endsWith('/rpc/fiila_media_sync_auth'));
+  assert.equal(a.init.headers.Authorization, 'Bearer service-test'); assert.deepEqual(JSON.parse(a.init.body), { p_token: 'sync-test' });
+});
+
+await t('accès back-office : membre de l’équipe (session vérifiée par fiila_bo_me) → copie ; personne connectée hors équipe → 401', async () => {
+  let s = sim({ me: { staff: true, perms: [] } });
+  let r = await makeHandler({ env, fetch: s.fetch })(post({ authorization: 'Bearer jwt-staff' }));
+  assert.equal(r.status, 200);
+  const me = s.calls.find((c) => c.url.endsWith('/rpc/fiila_bo_me'));
+  assert.equal(me.init.headers.Authorization, 'Bearer jwt-staff'); assert.equal(me.init.headers.apikey, 'anon-test');
+  s = sim({ me: { staff: false } });
+  r = await makeHandler({ env, fetch: s.fetch })(post({ authorization: 'Bearer jwt-client' }));
+  assert.equal(r.status, 401); assert.equal(s.rpcs('fiila_media_pending').length, 0);
+});
+
+await t('CORS : origine de Fii renvoyée telle quelle, origine inconnue sans Access-Control-Allow-Origin', async () => {
+  const h = makeHandler({ env, fetch: sim({}).fetch });
+  const ok = await h(new Request('https://x/', { method: 'OPTIONS', headers: { origin: 'https://admin.getfii.app' } }));
+  assert.equal(ok.status, 204); assert.equal(ok.headers.get('access-control-allow-origin'), 'https://admin.getfii.app');
+  const no = await h(new Request('https://x/', { method: 'OPTIONS', headers: { origin: 'https://evil.example' } }));
+  assert.equal(no.headers.get('access-control-allow-origin'), null);
+  const sneaky = await h(new Request('https://x/', { method: 'OPTIONS', headers: { origin: 'https://getfii.app.evil.example' } }));
+  assert.equal(sneaky.headers.get('access-control-allow-origin'), null);
 });
 
 console.log(`\n${passed}/${passed + failed} tests fonction de copie des photos réussis`);

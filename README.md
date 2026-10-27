@@ -17,8 +17,8 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 - **Gestion** : modifier (même lien), désactiver, nouveau lien, supprimer, clé de gestion pour un autre téléphone.
 - **Boutique (Rali intégré)** : articles, commandes, factures, clients, livreur attitré, vitrine publique `#/b/<lien>` avec commande sans compte.
 - **Fil** (`#/boutiques`) : une publication par article, j'aime, commentaires, enregistrements, onglets Pour vous / Best-sellers / Coups de cœur ; 25 premières boutiques mises en avant gratuitement.
-- **Croissance** : parrainage, programme Ambassadeurs, vide-dressing enfants tenu par Fii La.
-- **Back-office** (`#/bo`) : portail de l'équipe, 5 rôles, invitations nominatives, journal. Voir `docs/BACK-OFFICE.md`.
+- **Croissance** : parrainage, programme Agents et Ambassadeurs (marques), vide-dressing tenu par Fii (tout type d'article).
+- **Back-office** (`#/bo`, code chargé à part dans `web/bo.js`) : portail de l'équipe, 6 rôles, double authentification, invitations nominatives, journal. Voir `docs/BACK-OFFICE.md`.
 
 ## Architecture
 | Élément | Choix | Pourquoi |
@@ -27,7 +27,7 @@ Fii La complète les applications de navigation. Ce n’est ni une adresse posta
 | Hébergement | GitHub Pages (`.github/workflows/pages.yml` : tests → migrations → mise en ligne → tests en production) | Gratuit, HTTPS, rien ne part si un test échoue |
 | Données | Supabase Postgres, schéma privé `fiila` | Les tables ne sont jamais exposées par l’API |
 | API | Fonctions SQL `public.fiila_*` (`security definer`), appelées en POST | Vérification des jetons, validation, révocation et expiration appliquées côté serveur |
-| Photos | Dans la même ligne que la fiche (≤ 400 Ko) | Suppression et révocation immédiates, aucune URL publique permanente, aucun bucket à sécuriser |
+| Photos | Photos d'entrée, avatars, repères vocaux et pièces d'identité dans la base (privées) ; photos d'articles et couvertures de sites copiées dans le seau public Supabase Storage `media` (faites pour être vues) | Suppression et révocation immédiates pour les photos privées ; pièces d'identité effacées dès leur vérification |
 | Carte | Leaflet + tuiles OpenStreetMap, chargés seulement pendant la création | Licence ouverte, page destinataire sans carte |
 
 ## Sécurité, en bref

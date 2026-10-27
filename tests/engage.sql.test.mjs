@@ -171,7 +171,7 @@ await t('modération : file réservée à l’admin (masqués et signalés), ré
   await db.query(`insert into fiila.staff (user_id, role) values ($1, 'moderation')`, [id]);
   const ADM = { uid: id };
   await ko('fiila_admin_comments', {}, 'not_allowed', U2);
-  await ko('fiila_admin_comments', {}, 'auth_required');
+  await ko('fiila_admin_comments', {}, 'auth_required|permission denied'); // audit du 27/10 : fermé à anon
   const c = await ok('fiila_comment_add', { p_product: A2.id, p_body: 'Signalé une fois' }, U2);
   await ok('fiila_comment_report', { p_id: c.id }, R1);
   let q = await ok('fiila_admin_comments', {}, ADM);

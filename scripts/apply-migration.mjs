@@ -15,7 +15,9 @@ const [version, ...rest] = basename(file, '.sql').split('_');
 const name = rest.join('_');
 const url = new URL((process.env.SUPABASE_POOLER_URL || readFileSync('supabase/.temp/pooler-url', 'utf8')).trim());
 url.password = encodeURIComponent(process.env.SUPABASE_DB_PASSWORD); // un « % » ou un « @ » dans le mot de passe ne casse rien
-const c = new Client({ connectionString: url.toString(), ssl: { rejectUnauthorized: false } });
+// Certificat public de Supabase (Supabase Root 2021 CA, jusqu'en 2031) : la connexion qui porte le mot de passe de la base
+// vérifie le serveur (avant : rejectUnauthorized false ; audit du 27/10, vérifié contre le pooler de production).
+const c = new Client({ connectionString: url.toString(), ssl: { ca: readFileSync(new URL('./supabase-ca-2021.crt', import.meta.url), 'utf8') } });
 await c.connect();
 try {
   const done = await c.query('select 1 from supabase_migrations.schema_migrations where version = $1', [version]);

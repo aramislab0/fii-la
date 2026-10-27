@@ -159,7 +159,7 @@ let orderId, invoiceUrl;
 await t('boutique : création, tableau de bord vide', async () => {
   await M.goto(URL0 + '#/boutique');
   await M.fill('#shop-name', 'Boutique Awa (test)');
-  await M.selectOption('#shop-type', 'mode');
+  await M.click('#shop-type [data-v="mode"]');
   if (!(await M.locator('#shop-more').evaluate((d) => d.open))) await M.locator('#shop-more > summary').click();
   await M.fill('#shop-phone', '33 800 00 00');
   await M.click('#shop-save');
@@ -302,7 +302,7 @@ await t('boutique sans compte : créée en un geste, le compte est proposé, pas
   await S.page.click('#services-open');
   await S.page.click('#svc-boutique-go');
   await S.page.fill('#shop-name', 'Boutique Binta (test)');
-  await S.page.selectOption('#shop-type', 'mode');
+  await S.page.click('#shop-type [data-v="mode"]');
   await S.page.click('#shop-save');
   await S.page.locator('#setup-later').click();
   await S.page.locator('#shop-title').getByText('Boutique Binta (test)').waitFor();

@@ -97,6 +97,24 @@ await t('fonction : nettoyage seulement d’un domaine clos ; un domaine vivant 
   assert.equal(r.status, 409, 'pas de synchronisation d’un domaine clos');
 });
 
+await t('fonction : corps de plus d’1 Mo refusé (413) avant toute lecture en base ; CORS limité aux origines de Fii', async () => {
+  const s = sim();
+  const h = makeHandler({ env: (k) => CF_ENV[k], fetch: s.fetch });
+  const big = JSON.stringify({ action: 'sync', id: 'd1', pad: 'x'.repeat(1024 * 1024) });
+  const r = await h(new Request('https://x/functions/v1/fiila-domains', { method: 'POST', body: big }));
+  assert.equal(r.status, 413); assert.deepEqual(await r.json(), { error: 'too_large' });
+  // Corps en flux sans Content-Length : lecture arrêtée au dépassement.
+  const stream = new ReadableStream({ start(c) { for (let i = 0; i < 3; i++) c.enqueue(new Uint8Array(512 * 1024)); c.close(); } });
+  assert.equal((await h(new Request('https://x/', { method: 'POST', body: stream, duplex: 'half' }))).status, 413);
+  assert.equal(s.calls.length, 0, 'ni la base ni Cloudflare ne sont appelés');
+  const ok = await h(new Request('https://x/', { method: 'OPTIONS', headers: { origin: 'https://getfii.app' } }));
+  assert.equal(ok.headers.get('access-control-allow-origin'), 'https://getfii.app');
+  for (const o of ['capacitor://localhost', 'http://localhost:5173', 'http://127.0.0.1:8080', 'https://aramislab0.github.io', 'https://binta.getfii.app'])
+    assert.equal((await h(new Request('https://x/', { method: 'OPTIONS', headers: { origin: o } }))).headers.get('access-control-allow-origin'), o, o);
+  for (const o of ['https://evil.example', 'http://getfii.app', 'https://notgetfii.app', 'http://localhost.evil.example'])
+    assert.equal((await h(new Request('https://x/', { method: 'OPTIONS', headers: { origin: o } }))).headers.get('access-control-allow-origin'), null, o);
+});
+
 await t('enregistrements : seulement ceux renvoyés par Cloudflare ; erreurs regroupées', async () => {
   assert.deepEqual(recordsOf('a.sn', 't.app', null), [{ type: 'CNAME', name: 'a.sn', value: 't.app', purpose: 'route' }]);
   assert.equal(recordsOf('a.sn', 't.app', { ssl: { validation_records: [{ cname: 'x', cname_target: 'y' }, { emails: ['a@b'] }] } }).length, 2);
@@ -171,6 +189,18 @@ await t('Worker : cache par nom d’hôte (aucun mélange entre boutiques) ; bas
   assert.equal((await get('https://www.maison-awa.sn/', d.deps)).status, 503);
   assert.equal(d.store.size, 0);
   assert.deepEqual(await resolveHost('www.maison-awa.sn', WENV, { fetch: async () => json({ state: 'ok', slug: 'x', name: 'X', host: 'autre.sn' }), cache: null }), { state: 'unknown' }, 'hôte différent dans la réponse → refusé');
+});
+
+await t('Worker : en-têtes de sécurité aussi sur les fichiers statiques ; aucune cause interne dans la réponse 503', async () => {
+  for (const u of ['https://getfii.app/app.js', 'https://www.maison-awa.sn/styles.css', 'https://getfii.app/']) {
+    const r = await get(u, wsim().deps);
+    assert.equal(r.headers.get('strict-transport-security'), 'max-age=31536000; includeSubDomains', u);
+    assert.equal(r.headers.get('permissions-policy'), 'camera=(self), microphone=(self), geolocation=(self), payment=()', u);
+    assert.equal(r.headers.get('cross-origin-opener-policy'), null, u + ' : pas de COOP, le transfert #/migrer utilise window.opener entre deux domaines');
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff', u);
+  }
+  const d = await get('https://www.maison-awa.sn/', wsim({ down: true }).deps);
+  assert.equal(d.status, 503); assert.equal(d.headers.get('x-fii-upstream'), null);
 });
 
 await t('Worker : liens universels iPhone servis en JSON sur le domaine principal, jamais sur un domaine de boutique', async () => {

@@ -12,7 +12,16 @@
 // LEGACY_PREFIX (ancienne adresse à remplacer dans les aperçus, ex. https://aramislab0.github.io/fii-la/).
 
 const RESOLVE_TTL = 60;
-const SECURITY = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY' };
+// En-têtes de sécurité de toutes les réponses, fichiers statiques compris (audit du 27/10).
+const SECURITY = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin', 'X-Frame-Options': 'DENY',
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains', 'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=(self), payment=()' };
+// Pas de Cross-Origin-Opener-Policy : le transfert depuis l'ancienne adresse (#/migrer) passe par window.opener entre deux domaines.
+// Réponse de env.ASSETS (en-têtes non modifiables) recopiée avec les en-têtes de sécurité.
+function secured(r) {
+  const out = new Response(r.body, r);
+  for (const [k, v] of Object.entries(SECURITY)) out.headers.set(k, v);
+  return out;
+}
 
 export const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const hostsOf = (env) => String(env.FII_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
@@ -87,17 +96,21 @@ export async function handle(req, env, deps = {}) {
     if (path === '/' || path === '/index.html') {
       return new Response(mainIndex(await indexHtml(env, req), env), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', ...SECURITY } });
     }
-    return env.ASSETS.fetch(req);
+    return secured(await env.ASSETS.fetch(req));
   }
   // Domaine de boutique : rien n'est servi avant la vérification.
   const site = await resolveHost(host, env, deps);
-  if (site.state === 'error') return new Response('Service momentanément indisponible.', { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '30', 'X-Fii-Upstream': site.why || '', ...SECURITY } });
+  // Cause interne (statut HTTP, message d'erreur) dans le journal du Worker seulement, jamais dans la réponse.
+  if (site.state === 'error') {
+    console.log(JSON.stringify({ resolve: 'error', why: site.why || null }));
+    return new Response('Service momentanément indisponible.', { status: 503, headers: { 'Cache-Control': 'no-store', 'Retry-After': '30', ...SECURITY } });
+  }
   if (site.state !== 'ok') return notFound();
-  if (path === '/sw.js' || path === '/manifest.webmanifest' || path === '/config.js.map') return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  if (path === '/sw.js' || path === '/manifest.webmanifest' || path === '/config.js.map') return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store', ...SECURITY } });
   if (path === '/' || path === '/index.html') {
     return new Response(siteIndex(await indexHtml(env, req), site), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Vary': 'Host', ...SECURITY } });
   }
-  return env.ASSETS.fetch(req);   // fichiers identiques pour tous (app.js, styles, polices, images)
+  return secured(await env.ASSETS.fetch(req));   // fichiers identiques pour tous (app.js, styles, polices, images)
 }
 
 export default { fetch: (req, env, ctx) => handle(req, env) };

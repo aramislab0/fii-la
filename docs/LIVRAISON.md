@@ -1,5 +1,7 @@
 # Fii La — dossier de livraison du pilote
 
+> **Document historique (16/10/2026).** Il décrit le premier pilote (adresses seules). L'état actuel du produit est dans `docs/HANDOFF.md` §2 ; les traitements de données dans `docs/CONFORMITE-CDP.md` ; la page « Données et confidentialité » de l'application fait foi pour les utilisatrices.
+
 *Mis à jour le 16 octobre 2026. Données de démonstration et de test : uniquement synthétiques.*
 
 ## 1. Statut

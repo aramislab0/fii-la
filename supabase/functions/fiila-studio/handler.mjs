@@ -9,6 +9,10 @@
 // Secret (Supabase → Edge Functions → Secrets, saisi par le fondateur, jamais dans le dépôt) : FAL_KEY.
 // Sans FAL_KEY : { configured: false } et rien n'est ouvert. SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY : fournis.
 
+import { corsFor, readText, MB } from '../_shared/http.mjs';
+// Corps limité à 14 Mo (marge pour une photo en base64 ; aujourd'hui l'image est lue en base, le corps reste petit).
+const MAX_BODY = 14 * MB;
+
 export const MODEL = 'bria/replace-background';            // mode « fidele »
 export const PRICE_USD = 0.04;                              // par image (fal, consulté le 27/10/2026)
 export const MODEL_PREMIUM = 'fal-ai/nano-banana-pro/edit'; // mode « premium »
@@ -25,8 +29,6 @@ export const SCENES = {
 const FAL_HOST = /^https:\/\/[a-z0-9.-]+\.fal\.(media|ai|run)\//;
 
 export function makeHandler({ env, fetch }) {
-  const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
-  const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
   const base = () => String(env('SUPABASE_URL') || '').replace(/\/$/, '');
   // caller : { auth } = identité de la personne (session, ou aucune : clé publique seule, droits par la clé de boutique) ;
   // null = clé de service.
@@ -68,21 +70,31 @@ export function makeHandler({ env, fetch }) {
     const r = await fetch(`https://fal.run/${model}`, { method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Key ' + env('FAL_KEY') }, body: JSON.stringify(input) });
     const body = await r.json().catch(() => ({}));
-    if (!r.ok) return { error: String((body && (body.detail && (body.detail[0]?.msg || body.detail))) || body.error || ('fal ' + r.status)).slice(0, 200) };
+    if (!r.ok) {
+      // Le message de fal reste dans le journal (statut, modèle, détail court ; ni photo, ni prompt, ni donnée de boutique) ;
+      // la base et l'application ne reçoivent qu'un code interne.
+      const detail = (body && (body.detail && (body.detail[0]?.msg || body.detail))) || body.error || null;
+      console.log(JSON.stringify({ studio_fal: 'failed', model, status: r.status, detail: detail == null ? null : String(typeof detail === 'string' ? detail : JSON.stringify(detail)).slice(0, 200) }));
+      return { error: 'provider_error' };
+    }
     const imgs = body.images || (body.image ? [body.image] : []);
     const urls = imgs.map((x) => x && x.url).filter((u) => typeof u === 'string' && FAL_HOST.test(u)).slice(0, 1);
     const cost = Math.max(imgs.length, urls.length) * (premium ? PRICE_PREMIUM_USD : PRICE_USD);
-    return urls.length ? { results: urls, cost_usd: cost } : { error: 'Aucune image renvoyée', cost_usd: cost };
+    return urls.length ? { results: urls, cost_usd: cost } : { error: 'provider_no_image', cost_usd: cost };
   }
   const configured = () => !!env('FAL_KEY');
 
   return async (req) => {
+    const cors = corsFor(req);
+    const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors } });
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (req.method !== 'POST') return json(405, { error: 'method' });
     // Sans session (boutique sans compte, clé publique au nouveau format) : pas d'en-tête Authorization ; la base vérifie
     // alors les droits par la clé de la boutique.
     const auth = { auth: req.headers.get('authorization') || '' };
-    let b; try { b = await req.json(); } catch { return json(400, { error: 'invalid' }); }
+    const raw = await readText(req, MAX_BODY);
+    if (raw === null) return json(413, { error: 'too_large' });
+    let b; try { b = JSON.parse(raw); } catch { return json(400, { error: 'invalid' }); }
     if (!b || !['render', 'take'].includes(b.action)) return json(400, { error: 'invalid' });
     if (!configured()) return json(200, { configured: false });
     if (b.action === 'take') {
@@ -104,7 +116,11 @@ export function makeHandler({ env, fetch }) {
     let out;
     // Décor : prompt du pack de la catégorie (base, règle R2 d'Aramis Studio) ; repli sur les décors génériques.
     const scene = job.prompt || SCENES[job.style];
-    try { out = scene ? await fal(job.image, scene, job.mode) : { error: 'Décor inconnu' }; } catch { out = { error: 'Fournisseur indisponible' }; }
+    try { out = scene ? await fal(job.image, scene, job.mode) : { error: 'unknown_scene' }; }
+    catch (e) {
+      console.log(JSON.stringify({ studio_fal: 'unreachable', error: String((e && e.name) || 'error').slice(0, 60) }));
+      out = { error: 'provider_unavailable' };
+    }
     const done = await rpc('fiila_studio_complete', { p_job: job.job, p: out }, null);
     return json(200, { configured: true, job: job.job, status: done.status, results: done.results || [], error: done.error || null });
   };

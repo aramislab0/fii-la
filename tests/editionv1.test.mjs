@@ -143,6 +143,7 @@ await t('boutique : prix barré et tailles épuisées sur l’article ; livraiso
   await B.goto(URL0 + '#/');
   await B.evaluate((k) => localStorage.setItem('fiila.shop', JSON.stringify({ key: k })), KEY);
   await B.goto(URL0 + '#/boutique/article/' + ROBE.id);
+  await B.click('#product-promo summary'); // audit du 27/10 : prix barré replié sous « Promo »
   await B.locator('#product-price-was').waitFor();
   await B.locator('#product-sizes-out [data-v="8 ans"][aria-pressed="true"]').waitFor();
   await B.locator('#product-sizes-out [data-v="6 ans"]').click();
