@@ -448,6 +448,7 @@
     studio_off: 'Le Studio est indisponible pour le moment.',
     studio_no_photo: 'Ajoutez d’abord une photo de l’article.',
     studio_no_credits: 'Plus de crédit Studio pour le moment.',
+    studio_premium_off: 'Le mode Studio premium n’est pas disponible pour cette boutique.',
     studio_budget: 'Le Studio est en pause pour ce mois. Réessayez plus tard.',
     studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
     studio_busy: 'Une création est déjà en cours. Patientez quelques secondes.',
@@ -544,6 +545,7 @@
     studio_off: 'Le Studio est indisponible pour le moment.',
     studio_no_photo: 'Ajoutez d’abord une photo de l’article.',
     studio_no_credits: 'Plus de crédit Studio pour le moment.',
+    studio_premium_off: 'Le mode Studio premium n’est pas disponible pour cette boutique.',
     studio_budget: 'Le Studio est en pause pour ce mois. Réessayez plus tard.',
     studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
     studio_busy: 'Une création est déjà en cours. Patientez quelques secondes.',
@@ -7003,39 +7005,52 @@
           onclick: function () { style = x.id; draw(); } }, h('span', { class: 'sw', style: 'background:' + x.swatch }), h('span', null, x.label));
       }));
     }
+    // Deux modes (bench du 27/10/2026) : « Fidèle » (le produit garde ses pixels) et, selon la catégorie, « Studio premium »
+    // (rendu studio hyperréaliste ; la boutique compare avec l'original avant de garder). Une version par série.
+    var prem = st.premium || null, mode = 'fidele';
+    function need() { return mode === 'premium' && prem ? prem.credits : 1; }
+    function modeLine() {
+      if (!prem) return null;
+      return h('label', { class: 'row studio-mode', style: 'gap:10px;align-items:center' },
+        h('input', { type: 'checkbox', id: 'studio-premium', checked: mode === 'premium' || null, onchange: function () { mode = this.checked ? 'premium' : 'fidele'; draw(); } }),
+        h('span', { class: 'stack tight', style: 'gap:0' }, h('b', null, 'Studio premium'),
+          h('small', { class: 'muted' }, (prem.wear ? 'Porté par un mannequin, rendu hyperréaliste' : 'Lumière et décor de studio hyperréalistes') + ' · ' + prem.credits + ' crédits')));
+    }
     function draw() {
       setKids(err);
       if (busy) {
-        setKids(body, h('p', { class: 'small muted', role: 'status' }, 'Création des 3 versions… environ 20 secondes.'),
-          h('div', { class: 'studio-grid' }, [0, 1, 2].map(function () { return h('div', { class: 'studio-tile loading-skel', 'aria-hidden': 'true' }); })));
+        setKids(body, h('p', { class: 'small muted', role: 'status' }, mode === 'premium' ? 'Création en studio… environ 30 secondes.' : 'Création… environ 15 secondes.'),
+          h('div', { class: 'studio-one loading-skel', 'aria-hidden': 'true' }));
         return;
       }
       if (job && job.results && job.results.length) {
-        var tiles = job.results.map(function (u, i) {
-          return h('button', { type: 'button', class: 'studio-tile' + (pick === i ? ' on' : ''), id: 'studio-res-' + i, 'aria-pressed': String(pick === i),
-            'aria-label': 'Version ' + (i + 1), onclick: function () { pick = i; draw(); } }, h('img', { src: u, alt: '' }));
-        });
+        pick = 0;
         setKids(body,
-          h('div', { class: 'studio-orig' }, h('img', { src: pr.photo, alt: 'Photo d’origine' }), h('small', null, 'Original')),
-          h('div', { class: 'studio-grid' }, tiles),
-          h('button', { class: 'btn big full', type: 'button', id: 'studio-keep', disabled: pick == null || null, onclick: keep }, 'Garder cette version'),
-          h('button', { class: 'btn link', type: 'button', id: 'studio-again', onclick: function () { job = null; pick = null; draw(); } }, 'Essayer un autre style'));
+          h('div', { class: 'studio-compare' },
+            h('figure', null, h('img', { src: pr.photo, alt: 'Photo d’origine' }), h('figcaption', null, 'Original')),
+            h('figure', null, h('img', { src: job.results[0], alt: 'Version Studio', id: 'studio-res-0' }), h('figcaption', null, job.mode === 'premium' ? 'Studio premium' : 'Studio'))),
+          job.mode === 'premium' ? h('p', { class: 'small', id: 'studio-check' }, h('b', null, 'Le produit est-il identique à l’original ?'), ' Forme, couleurs, logo, texte de l’étiquette.') : null,
+          h('button', { class: 'btn big full', type: 'button', id: 'studio-keep', onclick: keep }, job.mode === 'premium' ? 'Oui, garder (' + job.need + ' crédits)' : 'Garder cette version'),
+          h('button', { class: 'btn link', type: 'button', id: 'studio-again', onclick: run }, job.mode === 'premium' ? 'Non, autre proposition' : 'Autre proposition'),
+          h('button', { class: 'btn link', type: 'button', id: 'studio-back', onclick: function () { job = null; draw(); } }, 'Changer de décor'));
         return;
       }
       setKids(body,
         h('div', { class: 'studio-orig solo' }, h('img', { src: pr.photo, alt: 'Photo d’origine' })),
         styles(),
-        credits ? h('button', { class: 'btn big full', type: 'button', id: 'studio-run', onclick: run }, 'Créer 3 versions') :
-          h('p', { class: 'notice', id: 'studio-empty' }, 'Plus de crédit Studio pour le moment.'),
-        h('p', { class: 'small muted' }, 'Le produit reste tel quel : seul le décor change. 1 crédit si vous gardez une version.'));
+        modeLine(),
+        credits >= need() ? h('button', { class: 'btn big full', type: 'button', id: 'studio-run', onclick: run }, 'Créer') :
+          h('p', { class: 'notice', id: 'studio-empty' }, credits ? 'Pas assez de crédits Studio pour ce mode.' : 'Plus de crédit Studio pour le moment.'),
+        h('p', { class: 'small muted' }, mode === 'premium' ? 'Rendu de studio : comparez avec l’original avant de garder. Rien n’est débité si vous ne gardez pas.' :
+          'Le produit reste tel quel : seul le décor change. 1 crédit si vous gardez la version.'));
     }
     function run() {
       busy = true; draw(); track('studio', 'run:' + style);
-      studioCall({ action: 'render', product: pr.id, style: style }).then(function (r) {
+      studioCall({ action: 'render', product: pr.id, style: style, mode: mode }).then(function (r) {
         busy = false;
         if (r.configured === false) { draw(); errBox(err, new ApiError('studio_off')); return; }
         if (r.error || r.status !== 'done') { draw(); errBox(err, new ApiError(STUDIO_ERR[r.error] ? r.error : 'studio_failed')); return; }
-        job = { id: r.job, results: r.results }; pick = null; draw();
+        job = { id: r.job, results: r.results, mode: mode, need: need() }; draw();
       });
     }
     function keep() {
@@ -7063,7 +7078,7 @@
     draw();
     closeSheet = openSheet(back);
   }
-  var STUDIO_ERR = { studio_off: 1, studio_no_photo: 1, studio_no_credits: 1, studio_budget: 1, studio_daily_limit: 1, studio_busy: 1, studio_failed: 1, studio_expired: 1 };
+  var STUDIO_ERR = { studio_premium_off: 1, studio_off: 1, studio_no_photo: 1, studio_no_credits: 1, studio_budget: 1, studio_daily_limit: 1, studio_busy: 1, studio_failed: 1, studio_expired: 1 };
   function productForm(pr, shop, fresh) {
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
     f.category = pr && pr.category || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');
@@ -8689,7 +8704,7 @@
         h('h3', null, 'Dernières séries'),
         boTable([
           { label: 'Boutique', get: function (x) { return h('span', { class: 'stack tight', style: 'gap:0' }, h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop), h('small', { class: 'muted' }, x.product)); } },
-          { label: 'Décor', get: function (x) { return sceneLabel[x.style] || x.style; } },
+          { label: 'Décor', get: function (x) { return (sceneLabel[x.style] || x.style) + (x.mode === 'premium' ? ' · premium' : ''); } },
           { label: 'Statut', get: function (x) { var t = STUDIO_ST[x.status] || ['muted', x.status]; return h('span', null, boBadge(t[0], t[1]), x.error ? h('small', { class: 'muted' }, ' ' + x.error) : null); } },
           { label: 'Coût', get: function (x) { return '$' + Number(x.cost_usd || 0).toFixed(2); }, cls: 'hide-s' },
           { label: 'Date', get: function (x) { return boDate(x.created_at); }, cls: 'hide-s' }], d.jobs || [], { id: 'bo-studio-jobs', empty: 'Aucune série pour le moment.' })
@@ -9642,7 +9657,8 @@
     shop_subdomains: ['Adresses <lien>.getfii.app des boutiques', '0 = coupées, 1 = ouvertes'],
     studio_ready: ['Fii Studio ouvert aux boutiques', '0 = fermé, 1 = ouvert (après la clé du fournisseur)'],
     studio_budget_usd: ['Budget mensuel du Studio', 'USD (au-delà, le Studio se met en pause)'],
-    studio_daily: ['Séries Studio par boutique et par jour', 'séries'] };
+    studio_daily: ['Séries Studio par boutique et par jour', 'séries'],
+    studio_premium: ['Mode Studio premium (rendu de studio hyperréaliste)', '0 = coupé, 1 = proposé'], studio_premium_credits: ['Crédits pour garder une version Studio premium', 'crédits'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

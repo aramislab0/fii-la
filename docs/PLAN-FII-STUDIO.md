@@ -47,6 +47,10 @@
 
 Fondateur (27/10) : « Je ne veux pas un modèle de génération standard pour toutes les boutiques ». Les décors proposés viennent du **pack de la catégorie** de la boutique (base privée Aramis Studio, dépôt XEL, `Production/FII_STUDIO/packs/`), chargés comme données dans la table `fiila.studio_scenes` — aucun prompt propriétaire dans ce dépôt public. Les décors qu'une boutique garde le plus passent en tête de sa liste. Coiffure, esthétique et services : pas de Studio (pas de faux résultat). Back-office → Studio → « Décors par catégorie » : taux de versions gardées par décor, couper/activer un décor (motif, journal). Repli : les 5 décors génériques.
 
+## 4 ter. Deux modes et recettes studio (27/10/2026, « go » 01:09)
+
+Bench « studio premium » (base privée XEL, `bench/STUDIO_PREMIUM.md`). **Fidèle** (Bria replace-background, 0,04 USD) : le produit garde ses pixels, 1 crédit. **Studio premium** (Nano Banana Pro 2K, 0,15 USD) : rendu de studio hyperréaliste ; pour mode et couture, porté par un mannequin ; la boutique voit l'original et la version côte à côte (« Le produit est-il identique ? ») ; garder coûte `studio_premium_credits` crédits (3 par défaut, **à confirmer par le fondateur**). Jamais de premium pour bijoux, plats, pâtisserie, fleurs. Une version par série, « Autre proposition » relance. Recettes v0.2 (77, schémas d'éclairage nommés) et gabarits de prompt chargés depuis XEL dans la base.
+
 ## 5. Suite (après le critère des 30 jours)
 
 - **Niveau 2 :** visuel pub (nom, prix, logo) avec le décor Studio comme fond des cartes de Publier. Petit travail : les modèles existent déjà.

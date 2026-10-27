@@ -48,7 +48,7 @@ await t('Studio fermé : aucune ligne Studio sur l’article', async () => {
   await p.context().close();
 });
 
-await t('Studio ouvert : ligne avec crédits ; 5 styles ; 3 versions ; la version gardée devient la photo principale, 1 crédit débité', async () => {
+await t('Studio ouvert : ligne avec crédits ; décors ; mode premium proposé (mode : mannequin) ; une version comparée à l’original ; gardée = photo principale, 1 crédit', async () => {
   await ok('fiila_bo_setting_set', { p_key: 'studio_ready', p_value: 1 }, { uid: F });
   await ok('fiila_bo_studio_grant', { p_shop: S.shop.id, p_delta: 2, p_reason: 'Boutique fondatrice (test)' }, { uid: F });
   const p = await newPhone(SHOP);
@@ -62,10 +62,15 @@ await t('Studio ouvert : ligne avec crédits ; 5 styles ; 3 versions ; la versio
   await p.click('.studio-style[data-style="luxe"]');
   assert.equal(await p.locator('.studio-style[data-style="luxe"]').getAttribute('aria-checked'), 'true');
   await p.screenshot({ path: `${SHOTS}/${ENGINE}-02-styles.png` });
+  assert.match(await p.locator('.studio-mode').textContent(), /Studio premium[\s\S]*mannequin[\s\S]*3 crédits/);
+  await p.check('#studio-premium');
+  assert.equal(await p.locator('#studio-run').count(), 0, '2 crédits < 3 : pas de premium');
+  await p.locator('#studio-empty').getByText('Pas assez de crédits').waitFor();
+  await p.uncheck('#studio-premium');
   await p.click('#studio-run');
-  await p.locator('#studio-res-2').waitFor();
-  assert.equal(await p.locator('#studio-keep').isDisabled(), true, 'il faut choisir une version');
-  await p.click('#studio-res-1');
+  await p.locator('#studio-res-0').waitFor();
+  assert.equal(await p.locator('.studio-compare figure').count(), 2, 'original et version côte à côte');
+  assert.equal(await p.locator('#studio-check').count(), 0, 'question de fidélité seulement en premium');
   await p.waitForTimeout(300);
   await p.screenshot({ path: `${SHOTS}/${ENGINE}-03-versions.png` });
   await p.click('#studio-keep');
@@ -74,10 +79,31 @@ await t('Studio ouvert : ligne avec crédits ; 5 styles ; 3 versions ; la versio
   const n = (await local.db.query(`select count(*)::int n from fiila.product_photos where product_id = $1`, [A.id])).rows[0].n;
   assert.equal(n, 1, 'l’originale reste comme photo supplémentaire');
   const job = (await local.db.query(`select status, kept, style, credit_from from fiila.studio_jobs where product_id = $1`, [A.id])).rows[0];
-  assert.deepEqual(job, { status: 'kept', kept: 1, style: 'luxe', credit_from: 'wallet' });
+  assert.deepEqual(job, { status: 'kept', kept: 0, style: 'luxe', credit_from: 'wallet' });
   await p.locator('#studio-credits').getByText('1 crédit').waitFor();
   const m = (await local.db.query(`select variant from fiila.metrics where event = 'studio' order by variant`)).rows.map((x) => x.variant);
   assert.ok(m.includes('run:luxe') && m.includes('kept:luxe'), JSON.stringify(m));
+  assert.deepEqual(p.__errors, []);
+  await p.context().close();
+});
+
+await t('Studio premium : comparaison avec la question de fidélité ; garder coûte 3 crédits', async () => {
+  await ok('fiila_bo_studio_grant', { p_shop: S.shop.id, p_delta: 4, p_reason: 'Test premium' }, { uid: F });
+  const p = await newPhone(SHOP);
+  await p.goto(URL0 + '#/boutique/article/' + A.id);
+  await p.click('#studio-open');
+  await p.check('#studio-premium');
+  await p.screenshot({ path: `${SHOTS}/${ENGINE}-04-premium.png` });
+  await p.click('#studio-run');
+  await p.locator('#studio-check').waitFor();
+  assert.match(await p.locator('#studio-keep').textContent(), /Oui, garder \(3 crédits\)/);
+  assert.match(await p.locator('#studio-again').textContent(), /Non, autre proposition/);
+  await p.screenshot({ path: `${SHOTS}/${ENGINE}-05-premium-compare.png` });
+  await p.click('#studio-keep');
+  await p.locator('#studio-sheet').waitFor({ state: 'detached' });
+  await p.locator('#studio-credits').getByText('2 crédits').waitFor();
+  const j = (await local.db.query(`select mode, status from fiila.studio_jobs where product_id = $1 order by created_at desc limit 1`, [A.id])).rows[0];
+  assert.deepEqual(j, { mode: 'premium', status: 'kept' });
   assert.deepEqual(p.__errors, []);
   await p.context().close();
 });

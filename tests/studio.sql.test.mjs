@@ -178,6 +178,35 @@ await t('export quotidien : réservé à la clé de service ; résumé par bouti
   const keys = JSON.stringify(e); assert.ok(!/phone|whatsapp|address|key/i.test(Object.keys(a).join(',')), 'aucun champ sensible');
 });
 
+await t('modes : premium proposé selon la catégorie (jamais bijoux), prompt = caméra + gabarit + décor, garder en premium coûte 3 crédits', async () => {
+  for (const [k, v] of [['studio_tpl_camera', 'CAM. '], ['studio_tpl_keep', 'KEEP. '], ['studio_tpl_wear', 'WEAR. ']]) await db.query(`update fiila.settings set value = $2 where key = $1`, [k, v]);
+  await db.query(`update fiila.studio_jobs set status = 'failed' where shop_id = $1 and status = 'running'`, [A.id]);
+  await db.query(`delete from fiila.studio_jobs where shop_id = $1 and created_at > now() - interval '1 day' and status = 'failed'`, [A.id]);
+  const st = await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid });
+  assert.deepEqual(st.premium, { credits: 3, wear: true }, 'mode : mannequin');
+  await db.query(`update fiila.studio_wallets set credits = 2 where shop_id = $1`, [A.id]);
+  await db.query(`update fiila.partner_trials set status = 'ended' where shop_id = $1`, [A.id]);
+  await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2', p_mode: 'premium' }, 'studio_no_credits');
+  await db.query(`update fiila.studio_wallets set credits = 5 where shop_id = $1`, [A.id]);
+  const r = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2', p_mode: 'premium' });
+  assert.equal(r.mode, 'premium'); assert.match(r.prompt, /^CAM\. WEAR\. light wooden clothing rail/);
+  await ok('fiila_studio_complete', { p_job: r.job, p: { results: ['https://v3.fal.media/files/x/p.jpg'], cost_usd: 0.15 } }, SR);
+  const k = await ok('fiila_studio_keep', { p_key: A.key, p_job: r.job, p_index: 0 });
+  assert.equal(k.credits.wallet, 2, '3 crédits débités');
+  const f = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2' });
+  assert.equal(f.mode, 'fidele'); assert.match(f.prompt, /^CAM\. light wooden/, 'fidèle : pas de gabarit premium');
+  await db.query(`update fiila.studio_jobs set status = 'failed' where id = $1`, [f.job]);
+  await db.query(`update fiila.shops set business_type = 'bijoux' where id = $1`, [A.id]);
+  assert.equal((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).premium, null, 'bijoux : jamais de premium');
+  await db.query(`update fiila.shops set business_type = 'mode' where id = $1`, [A.id]);
+  await ok('fiila_bo_setting_set', { p_key: 'studio_premium', p_value: 0 }, F);
+  assert.equal((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).premium, null);
+  await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2', p_mode: 'premium' }, 'studio_premium_off');
+  await ok('fiila_bo_setting_set', { p_key: 'studio_premium', p_value: 1 }, F);
+  await ko('fiila_bo_setting_set', { p_key: 'studio_premium_credits', p_value: 50 }, null, F);
+  assert.ok((await ok('fiila_bo_studio', {}, SUP)).jobs.some((x) => x.mode === 'premium'));
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL Studio réussis`);
 process.exit(passed === results.length ? 0 : 1);

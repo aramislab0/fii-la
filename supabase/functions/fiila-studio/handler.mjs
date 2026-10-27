@@ -1,6 +1,6 @@
 // Fii Studio : 3 versions « pro » d'une photo d'article (docs/PLAN-FII-STUDIO.md).
 // Appelée par l'application avec la clé de la boutique (ou la session) :
-//   { action: 'render', key, product, style }  ouvre une série (droits, crédits, budget vérifiés par la base), envoie la photo
+//   { action: 'render', key, product, style, mode }  ouvre une série (droits, crédits, budget vérifiés par la base), envoie la photo
 //                                             à fal (Bria Product Shot : le produit garde ses pixels, seul le décor est créé),
 //                                             enregistre les 3 adresses et le coût réel (clé de service) ;
 //   { action: 'take', key, job, index }        renvoie l'image choisie en base64 (l'application l'enregistre comme photo de
@@ -9,8 +9,10 @@
 // Secret (Supabase → Edge Functions → Secrets, saisi par le fondateur, jamais dans le dépôt) : FAL_KEY.
 // Sans FAL_KEY : { configured: false } et rien n'est ouvert. SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY : fournis.
 
-export const MODEL = 'fal-ai/bria/product-shot';
-export const PRICE_USD = 0.04;   // par image (fal, consulté le 26/10/2026)
+export const MODEL = 'bria/replace-background';            // mode « fidele »
+export const PRICE_USD = 0.04;                              // par image (fal, consulté le 27/10/2026)
+export const MODEL_PREMIUM = 'fal-ai/nano-banana-pro/edit'; // mode « premium »
+export const PRICE_PREMIUM_USD = 0.15;                      // par image 1K/2K (fal, consulté le 27/10/2026)
 // Décors : description en anglais (exigence du modèle), sans caractères spéciaux. Le texte (nom, prix) n'est jamais écrit par
 // l'IA : il est ajouté par les modèles de Fii (Publier).
 export const SCENES = {
@@ -38,19 +40,22 @@ export function makeHandler({ env, fetch }) {
     if (!r.ok) { const e = new Error((body && body.message) || 'rpc ' + r.status); e.status = r.status; e.code = /fiila:([a-z_]+)/.exec((body && body.message) || '')?.[1]; throw e; }
     return body;
   }
-  async function fal(image, scene) {
-    const r = await fetch(`https://fal.run/${MODEL}`, { method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Key ' + env('FAL_KEY') },
-      body: JSON.stringify({ image_url: image, scene_description: scene, optimize_description: true, num_results: 3, fast: true,
-        // « manual_placement » + une position = num_results images (« automatic » en produit 10 par résultat : 0,84 USD la série
-        // constatés le 26/10 au lieu de 0,12).
-        placement_type: 'manual_placement', manual_placement_selection: 'bottom_center', shot_size: [880, 1100], sync_mode: false }) });
+  // Deux modes (bench du 27/10/2026, base privée XEL) : « fidele » = Bria replace-background (le produit garde ses pixels,
+  // 0,04 USD) ; « premium » = Nano Banana Pro 2K (rendu studio hyperréaliste, 0,15 USD). Une version par série.
+  async function fal(image, prompt, mode) {
+    const premium = mode === 'premium';
+    const model = premium ? MODEL_PREMIUM : MODEL;
+    const input = premium
+      ? { prompt, image_urls: [image], num_images: 1, aspect_ratio: '4:5', resolution: '2K', output_format: 'jpeg' }
+      : { image_url: image, prompt };
+    const r = await fetch(`https://fal.run/${model}`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Key ' + env('FAL_KEY') }, body: JSON.stringify(input) });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) return { error: String((body && (body.detail && (body.detail[0]?.msg || body.detail))) || body.error || ('fal ' + r.status)).slice(0, 200) };
-    const urls = (body.images || []).map((x) => x && x.url).filter((u) => typeof u === 'string' && FAL_HOST.test(u)).slice(0, 3);
-    // Coût : toutes les images produites par fal (facturées), pas seulement les 3 gardées.
-    const billed = Math.max((body.images || []).length, urls.length);
-    return urls.length ? { results: urls, cost_usd: billed * PRICE_USD } : { error: 'Aucune image renvoyée', cost_usd: billed * PRICE_USD };
+    const imgs = body.images || (body.image ? [body.image] : []);
+    const urls = imgs.map((x) => x && x.url).filter((u) => typeof u === 'string' && FAL_HOST.test(u)).slice(0, 1);
+    const cost = Math.max(imgs.length, urls.length) * (premium ? PRICE_PREMIUM_USD : PRICE_USD);
+    return urls.length ? { results: urls, cost_usd: cost } : { error: 'Aucune image renvoyée', cost_usd: cost };
   }
   const configured = () => !!env('FAL_KEY');
 
@@ -77,12 +82,12 @@ export function makeHandler({ env, fetch }) {
       return json(200, { configured: true, image: `data:${type};base64,${btoa(s)}` });
     }
     let job;
-    try { job = await rpc('fiila_studio_reserve', { p_key: b.key || null, p_product: b.product, p_style: b.style }, auth); }
+    try { job = await rpc('fiila_studio_reserve', { p_key: b.key || null, p_product: b.product, p_style: b.style, p_mode: b.mode === 'premium' ? 'premium' : 'fidele' }, auth); }
     catch (e) { return json(e.status === 400 ? 409 : 502, { error: e.code || 'not_allowed' }); }
     let out;
     // Décor : prompt du pack de la catégorie (base, règle R2 d'Aramis Studio) ; repli sur les décors génériques.
     const scene = job.prompt || SCENES[job.style];
-    try { out = scene ? await fal(job.image, scene) : { error: 'Décor inconnu' }; } catch { out = { error: 'Fournisseur indisponible' }; }
+    try { out = scene ? await fal(job.image, scene, job.mode) : { error: 'Décor inconnu' }; } catch { out = { error: 'Fournisseur indisponible' }; }
     const done = await rpc('fiila_studio_complete', { p_job: job.job, p: out }, null);
     return json(200, { configured: true, job: job.job, status: done.status, results: done.results || [], error: done.error || null });
   };

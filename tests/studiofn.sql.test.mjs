@@ -36,20 +36,30 @@ await t('sans session (clé de boutique seule) : droits demandés à la base san
   assert.equal(s.calls.length, 0);
 });
 
-await t('série : droits avec l’identité de la personne ; fal appelé avec la photo, le décor du style, 3 versions au format 4:5 ; résultat écrit avec la clé de service', async () => {
+await t('série « fidèle » : droits avec l’identité de la personne ; Bria replace-background avec la photo et le décor ; 1 version (0,04 USD) écrite avec la clé de service', async () => {
   const s = sim();
   const r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'luxe' }, 'Bearer jwt-user'));
   const b = await r.json();
-  assert.equal(b.status, 'done'); assert.equal(b.results.length, 3);
+  assert.equal(b.status, 'done'); assert.equal(b.results.length, 1);
   const res = s.calls.find((c) => c.url.endsWith('fiila_studio_reserve'));
-  assert.equal(res.init.headers.Authorization, 'Bearer jwt-user'); assert.deepEqual(res.body, { p_key: 'cle', p_product: 'p1', p_style: 'luxe' });
+  assert.equal(res.init.headers.Authorization, 'Bearer jwt-user'); assert.deepEqual(res.body, { p_key: 'cle', p_product: 'p1', p_style: 'luxe', p_mode: 'fidele' });
   const f = s.calls.find((c) => c.url.startsWith('https://fal.run/'));
-  assert.equal(f.url, 'https://fal.run/' + MODEL); assert.equal(f.init.headers.Authorization, 'Key fal-test');
-  assert.equal(f.body.image_url, 'data:image/jpeg;base64,AAA'); assert.equal(f.body.scene_description, SCENES.luxe);
-  assert.equal(f.body.num_results, 3); assert.deepEqual(f.body.shot_size, [880, 1100]);
-  assert.equal(f.body.placement_type, 'manual_placement', '3 images facturées, pas 30'); assert.equal(f.body.manual_placement_selection, 'bottom_center');
+  assert.equal(f.url, 'https://fal.run/' + MODEL); assert.equal(MODEL, 'bria/replace-background'); assert.equal(f.init.headers.Authorization, 'Key fal-test');
+  assert.equal(f.body.image_url, 'data:image/jpeg;base64,AAA'); assert.equal(f.body.prompt, SCENES.luxe);
   const c = s.calls.find((x) => x.url.endsWith('fiila_studio_complete'));
-  assert.equal(c.init.headers.Authorization, 'Bearer service-test'); assert.equal(c.body.p.cost_usd, 0.12);
+  assert.equal(c.init.headers.Authorization, 'Bearer service-test'); assert.equal(c.body.p.cost_usd, 0.12, 'les 3 images renvoyées par le simulateur sont toutes comptées');
+});
+
+await t('série « premium » : Nano Banana Pro 2K, 4:5, une image, prompt de la base ; coût 0,15 USD par image', async () => {
+  const s = sim({ reserve: { job: 'j1', style: 'beaute-p1', mode: 'premium', prompt: 'CAM KEEP scene [TEST]', image: 'data:image/jpeg;base64,AAA' },
+    fal: () => json({ images: [{ url: 'https://v3.fal.media/files/x/p.jpg' }] }) });
+  const r = await (await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'beaute-p1', mode: 'premium' }))).json();
+  assert.equal(r.status, 'done');
+  assert.equal(s.calls.find((c) => c.url.endsWith('fiila_studio_reserve')).body.p_mode, 'premium');
+  const f = s.calls.find((c) => c.url.startsWith('https://fal.run/'));
+  assert.equal(f.url, 'https://fal.run/fal-ai/nano-banana-pro/edit');
+  assert.deepEqual(f.body, { prompt: 'CAM KEEP scene [TEST]', image_urls: ['data:image/jpeg;base64,AAA'], num_images: 1, aspect_ratio: '4:5', resolution: '2K', output_format: 'jpeg' });
+  assert.equal(s.calls.find((x) => x.url.endsWith('fiila_studio_complete')).body.p.cost_usd, 0.15);
 });
 
 await t('refus de la base (crédits) → 409 lisible, fal jamais appelé ; échec de fal → série en échec, message court', async () => {
@@ -84,7 +94,7 @@ await t('reprise de la version : droit vérifié par la base, image renvoyée en
 await t('décor du pack : le prompt renvoyé par la base est envoyé à fal (pas un décor codé ici)', async () => {
   const s = sim({ reserve: { job: 'j1', style: 'mode-2', prompt: 'light wooden clothing rail [TEST]', image: 'data:image/jpeg;base64,AAA' } });
   await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'mode-2' }));
-  assert.equal(s.calls.find((c) => c.url.startsWith('https://fal.run/')).body.scene_description, 'light wooden clothing rail [TEST]');
+  assert.equal(s.calls.find((c) => c.url.startsWith('https://fal.run/')).body.prompt, 'light wooden clothing rail [TEST]');
   const s2 = sim({ reserve: { job: 'j1', style: 'inconnu', image: 'data:image/jpeg;base64,AAA' } });
   const r2 = await (await makeHandler({ env: (k) => ENV[k], fetch: s2.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'inconnu' }))).json();
   assert.equal(r2.status, 'failed'); assert.ok(!s2.calls.some((c) => c.url.startsWith('https://fal.run/')), 'aucun appel payant sans décor');
