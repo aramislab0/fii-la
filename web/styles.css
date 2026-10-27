@@ -2161,3 +2161,50 @@ html.kbd .tabbar{display:none}
 .vt-edition .add-btn,.vt-edition .btn{background:#0E0E0E;border-color:#0E0E0E;color:#FFFFFF}
 .vt-edition .btn.ghost{background:transparent;color:#0E0E0E}
 .followed .post-av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:var(--on-green);font-weight:800}
+
+/* ----- Fii Édition V1 : rubriques, prix barré, fiche article qui rassure, « Complétez le look » */
+.vopen{cursor:pointer}
+.vname{all:unset;cursor:pointer;display:inline}
+.vname:focus-visible{outline:2px solid var(--accent,var(--green));outline-offset:2px}
+.vprice.sale{display:flex;flex-wrap:wrap;gap:0 8px;align-items:baseline}
+.vprice.sale s{color:var(--muted);font-weight:500;font-size:.9em}
+.vprice.sale b{color:var(--danger)}
+.vnew.vsale{color:var(--danger)}
+.vtabs .opt.sale:not(.on){color:var(--danger)}
+.opt.out,.opt:disabled{text-decoration:line-through;color:var(--muted);opacity:.6;cursor:default}
+.pill.out.on{background:var(--surface-2);border-color:var(--line);color:var(--muted);text-decoration:line-through}
+.vsheet{max-height:94vh;overflow-y:auto;overscroll-behavior:contain;padding-top:0;position:relative;gap:0}
+.vsheet .vmedia .vnew{top:auto;bottom:12px}
+.vsheet-close{position:sticky;top:12px;align-self:flex-start;flex:none;width:40px;height:40px;margin:12px 0 -52px;padding:0;min-width:0;min-height:0;aspect-ratio:1;display:grid;place-items:center;border:0;border-radius:50%;z-index:3;
+  background:rgba(255,255,255,.92);color:#17201B;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer}
+.vsheet-body{display:flex;flex-direction:column;gap:16px}
+.vsheet .vimg{width:auto;height:auto;min-height:0;aspect-ratio:4/5;border-radius:16px;overflow:hidden}
+.vsheet .vmedia{margin:0 -18px}
+.vsheet .vmedia .vimg{border-radius:0;max-height:56vh;width:100%}
+.vsheet .vmedia .vimg img{width:100%;height:100%;object-fit:cover}
+.vsheet .btn.link,.vt-edition .vsheet .btn.link{background:transparent;border-color:transparent;color:var(--ink);min-height:0;padding:4px 0;text-decoration:underline;text-underline-offset:3px}
+.vsheet h2{font-size:20px;line-height:1.2}
+.vlbl{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin:0}
+.vlbl .btn.link{text-transform:none;letter-spacing:0;font-weight:600}
+.vfacts{margin:0;display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.vfacts div{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}
+.vfacts dt{color:var(--muted);flex:none}
+.vfacts dd{margin:0;text-align:right;min-width:0}
+.vlook{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.vlook-it{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:3px;min-width:0}
+.vlook-it:focus-visible{outline:2px solid var(--accent,var(--green));outline-offset:2px}
+.vlook-img{display:block;aspect-ratio:4/5;border-radius:10px;background:var(--surface-2) center/cover;overflow:hidden}
+.vlook-img img{width:100%;height:100%;object-fit:cover;display:block}
+.vlook-n{font-size:12.5px;font-weight:600;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vlook-p{font-size:12.5px;color:var(--muted)}
+.vguide{width:100%;border-collapse:collapse;font-size:14px}
+.vguide th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--line)}
+.vguide td{padding:10px 0;border-bottom:1px solid var(--line)}
+.vguide tr.out td{color:var(--muted);text-decoration:line-through}
+.vt-edition.vt-sheet .sheet{border-radius:0;font-family:"Jost","Futura","Avenir Next",sans-serif}
+.vt-edition .vsheet h2,.vt-edition .vlbl{font-family:"Jost","Futura",sans-serif;text-transform:uppercase;letter-spacing:.14em;font-weight:600}
+.vt-edition .vsheet h2{font-size:16px}
+.vt-edition .vsheet .vimg,.vt-edition .vlook-img{border-radius:0}
+.vt-edition .vsheet .opt{border:1px solid var(--line);border-radius:0;min-width:52px;text-transform:none;letter-spacing:0;font-family:inherit;font-size:13px}
+.vt-edition .vsheet .opt.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.vt-edition .vtabs .opt.sale:not(.on),.vt-edition .vprice.sale b,.vt-edition .vnew.vsale{color:#B4232A}

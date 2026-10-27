@@ -172,6 +172,7 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   await D.selectOption('#bo-sugg-table select[data-sugg="shop_team"]', '1');
   await D.getByText('Suggestion activée.').waitFor();
   assert.match(await D.locator('#bo-premium-line').textContent(), /Modèles Premium \(30 jours\) : Atelier.*Boutiques Premium : \d+/);
+  assert.match(await D.locator('#bo-site-line').textContent(), /fiche article ouverte \d+ .*Promos \d+/); // Fii Édition V1
   // Messages WhatsApp (WHATSAPP-001) : registre, aperçu, état Meta saisi à la main et journalisé.
   await D.locator('#bo-wa-table').waitFor();
   assert.equal(await D.locator('#bo-wa-table tbody tr').count(), 6);
@@ -386,6 +387,7 @@ await t('identité du propriétaire (27/10) : fiche boutique, file « Identités
   await D.locator('#bo-shop-identity').getByText('Exigée, non envoyée').waitFor();
   await D.locator('#bo-kyc-blocked').waitFor();
   await D.locator('#bo-shop-audience').getByText('Abonnés').waitFor(); // Fii Édition : abonnés et favoris de la boutique
+  await D.locator('#bo-shop-sheet #bo-sheet-delivery').getByText('Non indiquée').waitFor(); // Fii Édition V1 : fiche article de la boutique
   const IMG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(4000, 7)]).toString('base64');
   await ok('fiila_shop_kyc_submit', { p_key: KEY, p_doc_type: 'passport', p_front: IMG });
   await D.goto(URL0 + '#/bo/identites');

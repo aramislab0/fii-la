@@ -469,6 +469,8 @@
     business_type_required: 'Choisissez votre type de commerce.',
     invalid_stock: 'Stock : indiquez un nombre (0 ou plus), ou laissez vide.',
     size_required: 'Choisissez votre taille ou pointure.',
+    size_sold_out: 'Une taille choisie vient d’être épuisée. Modifiez la commande.',
+    invalid_price_was: 'Prix barré : indiquez l’ancien prix, plus élevé que le prix actuel, ou laissez vide.',
     color_required: 'Choisissez une couleur.',
     out_of_stock: 'Un article n’est plus disponible en quantité suffisante. Modifiez la commande.',
     invalid_phone: 'Numéro non reconnu. Exemple : 77 123 45 67.',
@@ -853,6 +855,7 @@
      Envoi silencieux : un échec n'a aucun effet sur l'affichage ou la création. */
   var TRACKABLE = {
     app: ['android', 'ios'],
+    site: ['sheet:open', 'sheet:add', 'guide:open', 'look:click', 'tab:new', 'tab:cat', 'tab:promos'],
     studio: ['open', 'run', 'kept', 'cancel'].reduce(function (a, k) { return a.concat(['blanc', 'minimal', 'luxe', 'soleil', 'fete'].map(function (st) { return k + ':' + st; })); }, []),
     account_created: ['account', 'shop', 'nudge'],
     account_nudge: ['shown', 'dismissed'],
@@ -2180,6 +2183,24 @@
     ['magazine', 'Magazine', 'Une grande photo par article']];
   var VT_ACCENTS = { foret: ['Forêt', '#1E4A34'], nuit: ['Nuit', '#1F2A37'], indigo: ['Indigo', '#2F3E9E'], prune: ['Prune', '#5B2A86'],
     bordeaux: ['Bordeaux', '#7A1F3D'], terre: ['Terre', '#8A4B1F'] };
+  // Fii Édition V1 : conditions de la boutique (liste fermée, `shops.policies`) et guide des tailles (repères indicatifs).
+  var POLICY_DELIVERY = [['jour', 'Le jour même'], ['24h', 'Sous 24 h'], ['48h', 'Sous 48 h'], ['5j', 'De 2 à 5 jours']];
+  var POLICY_PAY = [['livraison', 'À la livraison'], ['wave', 'Wave'], ['om', 'Orange Money']];
+  var POLICY_EXCHANGE = [['non', 'Pas d’échange'], ['3j', 'Sous 3 jours'], ['7j', 'Sous 7 jours']];
+  var SIZE_GUIDE = {
+    letters: ['Tour de poitrine', { XS: '80 à 84 cm', S: '84 à 88 cm', M: '88 à 96 cm', L: '96 à 104 cm', XL: '104 à 112 cm', XXL: '112 à 120 cm' }],
+    kids: ['Taille de l’enfant', { '0-3 m': '56 à 62 cm', '3-6 m': '62 à 68 cm', '6-12 m': '68 à 80 cm', '2 ans': '86 à 92 cm', '4 ans': '98 à 104 cm',
+      '6 ans': '110 à 116 cm', '8 ans': '122 à 128 cm', '10 ans': '134 à 140 cm', '12 ans': '146 à 152 cm' }],
+    // Pointure européenne → longueur du pied (pointure ≈ 1,5 × longueur + 2).
+    shoes: ['Longueur du pied', (function () { var m = {}; for (var n = 18; n <= 48; n++) m[String(n)] = (Math.round((n - 2) / 1.5 * 10) / 10).toFixed(1).replace('.', ',') + ' cm'; return m; })()] };
+  function sizeGuide(sizes) {
+    var keys = Object.keys(SIZE_GUIDE);
+    for (var i = 0; i < keys.length; i++) {
+      var g = SIZE_GUIDE[keys[i]], rows = (sizes || []).filter(function (s) { return g[1][s]; });
+      if (rows.length && rows.length === sizes.length) return { head: g[0], rows: rows.map(function (s) { return [s, g[1][s]]; }) };
+    }
+    return null;
+  }
   function vitrineUrl(slug, productId) {
     if (SITE && slug === SITE.slug) return 'https://' + SITE.host + '/#/b/' + slug + (productId ? '?a=' + productId : '');
     // Adresse courte de la boutique (<lien>.getfii.app) dès que la zone des sites est en ligne (CFG.shopZone).
@@ -2197,7 +2218,8 @@
   function vitrinePage(slug, shop, products, q) {
     var cart = {}; // ligne (article, taille, couleur) → { id, size, color, qty }
     var byId = {}; products.forEach(function (p) { byId[p.id] = p; });
-    var filter = { cat: '', size: '', gender: '', age: '' };
+    var filter = { tab: '', size: '', gender: '', age: '' };
+    var sheetShown = false; // la fiche d'un lien d'article ne s'ouvre qu'une fois (pas au retour de « Modifier la commande »)
     // Fii Édition : cœur « Favoris » sur chaque article et « Suivre » la boutique (sans compte).
     var favs = {};
     if (!shop.demo && !shop.platform) {
@@ -2266,13 +2288,15 @@
       return box;
     }
     function choose(p, done) {
-      var pick = { size: p.sizes && p.sizes.length === 1 ? p.sizes[0] : (filter.size && p.sizes && p.sizes.indexOf(filter.size) >= 0 ? filter.size : ''),
+      var pick = { size: p.sizes && p.sizes.length === 1 && !soldOut(p, p.sizes[0]) ? p.sizes[0] : (filter.size && p.sizes && p.sizes.indexOf(filter.size) >= 0 && !soldOut(p, filter.size) ? filter.size : ''),
                    color: p.colors && p.colors.length === 1 ? p.colors[0] : '' };
       var note = h('p', { class: 'small', role: 'alert' });
       var body = h('div', { class: 'stack' });
       function chips(list, key, label) {
         return h('div', { class: 'stack tight' }, h('p', { class: 'small muted' }, label), h('div', { class: 'opt-row', role: 'group', 'aria-label': label }, list.map(function (v) {
-          return h('button', { class: 'opt' + (pick[key] === v ? ' on' : ''), type: 'button', 'aria-pressed': pick[key] === v ? 'true' : 'false', onclick: function () { pick[key] = v; draw(); } }, v);
+          var out = key === 'size' && soldOut(p, v);
+          return h('button', { class: 'opt' + (pick[key] === v ? ' on' : '') + (out ? ' out' : ''), type: 'button', disabled: out || null, 'aria-pressed': pick[key] === v ? 'true' : 'false',
+            'aria-label': out ? v + ', épuisé' : null, onclick: function () { pick[key] = v; draw(); } }, v);
         })));
       }
       function draw() {
@@ -2285,7 +2309,7 @@
       }
       draw();
       var back = h('div', { class: 'sheet-back', id: 'variant-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'variant-h', onclick: function (e) { if (e.target === back) close(); } },
-        h('div', { class: 'sheet' }, h('h2', { id: 'variant-h', class: 'wrapword' }, p.name), h('p', { class: 'vprice' }, fcfa(p.price)), body, note,
+        h('div', { class: 'sheet' }, h('h2', { id: 'variant-h', class: 'wrapword' }, p.name), priceEl(p), body, note,
           iconBtn('button', { class: 'btn', type: 'button', id: 'variant-add', onclick: function () {
             if (p.sizes && p.sizes.length && !pick.size) { note.textContent = 'Choisissez votre taille ou pointure.'; return; }
             if (p.colors && p.colors.length && !pick.color) { note.textContent = 'Choisissez une couleur.'; return; }
@@ -2295,6 +2319,117 @@
           } }, 'plus', 'Ajouter à la commande'),
           h('button', { class: 'btn ghost', type: 'button', onclick: close }, 'Annuler')));
       var closeSheet; function close() { closeSheet(); }
+      closeSheet = openSheet(back);
+    }
+    function soldOut(p, size) { return !!(p.sizes_out && p.sizes_out.indexOf(size) >= 0); }
+    function salePct(p) { return p.price_was ? Math.round((1 - p.price / p.price_was) * 100) : 0; }
+    function priceEl(p) {
+      return p.price_was ? h('p', { class: 'vprice sale' }, h('s', { 'aria-label': 'Avant ' + fcfa(p.price_was) }, fcfa(p.price_was)), ' ', h('b', null, fcfa(p.price)))
+        : h('p', { class: 'vprice' }, fcfa(p.price));
+    }
+    function saleBadge(p) { var n = salePct(p); return n > 0 ? h('span', { class: 'vnew vsale' }, '−' + n + ' %') : null; }
+    function policyText(list, k) { var x = list.filter(function (o) { return o[0] === k; })[0]; return x ? x[1] : ''; }
+    // Ce qui rassure (Fii Édition V1) : vendeur, livraison, paiement, échange — seulement ce que la boutique a choisi.
+    function facts() {
+      var po = shop.policies || {};
+      var rows = [['Vendu par', shop.name],
+        po.delivery ? ['Livraison', policyText(POLICY_DELIVERY, po.delivery) + ' · adresse exacte donnée sur Fii'] : null,
+        po.pay && po.pay.length ? ['Paiement', po.pay.map(function (k) { return policyText(POLICY_PAY, k); }).join(' ou ')] : null,
+        po.exchange ? ['Échange', po.exchange === 'non' ? 'Pas d’échange' : policyText(POLICY_EXCHANGE, po.exchange) + ', article non porté'] : null].filter(Boolean);
+      return h('dl', { class: 'vfacts', id: 'sheet-facts' }, rows.map(function (r) { return h('div', null, h('dt', null, r[0]), h('dd', { class: 'wrapword' }, r[1])); }));
+    }
+    // « Complétez le look » : articles de la même boutique, même rubrique et prix proche d'abord ; nombre réglé au back-office.
+    function lookFor(p) {
+      var n = shop.look == null ? 3 : shop.look;
+      if (!n) return [];
+      var others = products.filter(function (x) { return x.id !== p.id && x.stock !== 0 && x.has_photo; });
+      function score(x) { return (x.category && x.category === p.category ? 0 : 2) + (Math.abs(x.price - p.price) <= p.price * 0.5 ? 0 : 1); }
+      return others.map(function (x, i) { return [score(x), i, x]; }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; }).slice(0, n).map(function (a) { return a[2]; });
+    }
+    function guideSheet(p) {
+      var g = sizeGuide(p.sizes);
+      track('site', 'guide:open');
+      var back = h('div', { class: 'sheet-back', id: 'guide-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'guide-h', onclick: function (e) { if (e.target === back) close(); } },
+        h('div', { class: 'sheet' }, h('h2', { id: 'guide-h' }, 'Guide des tailles'),
+          h('table', { class: 'vguide' }, h('thead', null, h('tr', null, h('th', null, p.category === 'chaussures' || g.head === SIZE_GUIDE.shoes[0] ? 'Pointure' : 'Taille'), h('th', null, g.head))),
+            h('tbody', null, g.rows.map(function (r) { return h('tr', { class: soldOut(p, r[0]) ? 'out' : null }, h('td', null, r[0]), h('td', null, r[1])); }))),
+          h('p', { class: 'small muted' }, 'Repères habituels, à titre indicatif. En cas de doute, demandez à ' + shop.name + '.'),
+          h('button', { class: 'btn ghost', type: 'button', id: 'guide-close', onclick: function () { close(); } }, 'Fermer')));
+      var closeSheet; function close() { window.removeEventListener('hashchange', close); if (back.isConnected) closeSheet(); }
+      window.addEventListener('hashchange', close);
+      closeSheet = openSheet(back);
+    }
+    // Fiche article (Fii Édition V1) : photo, prix, tailles (épuisées barrées) avec le guide, une action « Ajouter à la
+    // commande », puis ce qui rassure et « Complétez le look ». Feuille plein écran, rien n'est écrit sur le téléphone.
+    function productSheet(p) {
+      track('site', 'sheet:open');
+      var pick = { size: p.sizes && p.sizes.length === 1 && !soldOut(p, p.sizes[0]) ? p.sizes[0] : '', color: p.colors && p.colors.length === 1 ? p.colors[0] : '' };
+      var note = h('p', { class: 'small', role: 'alert' });
+      var opts = h('div', { class: 'stack tight' });
+      var add = h('button', { class: 'btn big full', type: 'button', id: 'sheet-add' });
+      var media;
+      if (p.has_photo && p.photos > 1) media = photoCarousel(p.photos, function (k) { return api('fiila_vitrine_photo', { p_slug: slug, p_id: k ? p.id + ':' + k : p.id }).then(function (x) { return x.photo; }); }, p.name, 'vimg');
+      else {
+        media = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 40));
+        if (p.has_photo) lazyPhoto(media, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; }); }, p.name);
+      }
+      var guide = p.sizes && p.sizes.length > 1 && sizeGuide(p.sizes);
+      var out = p.stock === 0 || (p.sizes && p.sizes.length && p.sizes.every(function (z) { return soldOut(p, z); }));
+      function draw() {
+        var fixed = [p.sizes && p.sizes.length === 1 ? (p.category === 'chaussures' ? 'Pointure ' : 'Taille ') + p.sizes[0] : '', p.colors && p.colors.length === 1 ? p.colors[0] : ''].filter(Boolean);
+        setKids(opts,
+          fixed.length ? h('p', { class: 'small muted', id: 'sheet-fixed' }, fixed.join(' · ')) : null,
+          p.sizes && p.sizes.length > 1 ? h('div', { class: 'stack tight' },
+            h('div', { class: 'vlbl' }, h('span', null, p.category === 'chaussures' ? 'Pointure' : 'Taille'),
+              guide ? h('button', { class: 'btn link small', type: 'button', id: 'sheet-guide', onclick: function () { guideSheet(p); } }, 'Guide des tailles') : null),
+            h('div', { class: 'opt-row', role: 'group', 'aria-label': 'Taille', id: 'sheet-sizes' }, p.sizes.map(function (v) {
+              var o = soldOut(p, v);
+              return h('button', { class: 'opt' + (pick.size === v ? ' on' : '') + (o ? ' out' : ''), type: 'button', disabled: o || null, 'aria-pressed': pick.size === v ? 'true' : 'false',
+                'aria-label': o ? v + ', épuisé' : null, onclick: function () { pick.size = v; setKids(note); draw(); } }, v);
+            }))) : null,
+          p.colors && p.colors.length > 1 ? h('div', { class: 'stack tight' }, h('div', { class: 'vlbl' }, h('span', null, 'Couleur')),
+            h('div', { class: 'opt-row', role: 'group', 'aria-label': 'Couleur', id: 'sheet-colors' }, p.colors.map(function (v) {
+              return h('button', { class: 'opt' + (pick.color === v ? ' on' : ''), type: 'button', 'aria-pressed': pick.color === v ? 'true' : 'false', onclick: function () { pick.color = v; setKids(note); draw(); } }, v);
+            }))) : null);
+        add.disabled = !!out;
+        add.textContent = out ? 'Épuisé' : 'Ajouter à la commande' + (pick.size && p.sizes.length > 1 ? ' · ' + pick.size : '');
+      }
+      add.onclick = function () {
+        if (out) return;
+        if (p.sizes && p.sizes.length && !pick.size) { note.textContent = 'Choisissez votre ' + (p.category === 'chaussures' ? 'pointure.' : 'taille.'); return; }
+        if (p.colors && p.colors.length && !pick.color) { note.textContent = 'Choisissez une couleur.'; return; }
+        if (qtyOf(p.id) >= maxQty(p)) { note.textContent = 'Plus de stock disponible.'; return; }
+        var k = lineKey(p.id, pick.size, pick.color);
+        if (cart[k]) cart[k].qty++; else cart[k] = { id: p.id, size: pick.size || null, color: pick.color || null, qty: 1 };
+        track('site', 'sheet:add'); close(); drawGrid(); refreshBar(); toast('Ajouté à votre commande.');
+      };
+      draw();
+      var look = lookFor(p);
+      var body = h('div', { class: 'vsheet-body' },
+        h('div', { class: 'vmedia' }, media, heart(p), saleBadge(p)),
+        h('div', { class: 'stack' },
+          h('div', { class: 'stack tight' }, h('h2', { id: 'product-sheet-h', class: 'wrapword' }, p.name), priceEl(p),
+            p.reviews ? ratingEl(p.rating, p.reviews) : null,
+            p.description ? h('p', { class: 'muted wrapword' }, p.description) : null,
+            p.stock > 0 && p.stock <= 3 && !shop.platform ? h('p', { class: 'small muted' }, 'Plus que ' + p.stock + ' en stock') : null),
+          opts, note, add, facts(),
+          look.length ? h('section', { class: 'stack tight', id: 'sheet-look' }, h('h3', { class: 'vlbl' }, 'Complétez le look'),
+            h('div', { class: 'vlook' }, look.map(function (x) {
+              var im = h('span', { class: 'vlook-img loading-skel', 'aria-hidden': 'true' });
+              lazyPhoto(im, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: x.id }).then(function (r) { return r.photo; }); }, '');
+              return h('button', { type: 'button', class: 'vlook-it', 'data-look': x.id, onclick: function () { track('site', 'look:click'); close(); productSheet(x); } },
+                im, h('span', { class: 'vlook-n wrapword' }, x.name), h('span', { class: 'vlook-p' }, fcfa(x.price)));
+            }))) : null));
+      var back = h('div', { class: 'sheet-back vt-sheet', id: 'product-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'product-sheet-h', onclick: function (e) { if (e.target === back) close(); } },
+        h('div', { class: 'sheet vsheet' },
+          h('button', { class: 'iconbtn vsheet-close', type: 'button', 'aria-label': 'Fermer', id: 'product-sheet-close', onclick: function () { close(); } }, icon('close', 20)),
+          body));
+      // Le modèle du site (couleurs, écriture) suit la fiche, ouverte hors de la page.
+      back.classList.add('vt', 'vt-' + theme); if (isPremiumTheme(theme)) back.classList.add('vt-premium');
+      back.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.foret)[1]);
+      var closeSheet; function close() { window.removeEventListener('hashchange', close); if (back.isConnected) closeSheet(); }
+      // Changement de page (retour, autre écran) : la fiche se ferme avec la page qui l'a ouverte.
+      window.addEventListener('hashchange', close);
       closeSheet = openSheet(back);
     }
     function card(p) {
@@ -2307,11 +2442,13 @@
           return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; });
         }, p.name);
       }
+      // Toucher la photo ou le nom ouvre la fiche article (Fii Édition V1) ; « Ajouter » reste sur la carte.
+      function openIt() { productSheet(p); }
       return h('article', { class: 'vcard' + (q.a === p.id ? ' focus' : ''), id: 'p-' + p.id },
-        h('div', { class: 'vmedia' }, img, heart(p), p.is_new ? h('span', { class: 'vnew' }, 'Nouveau') : null),
+        h('div', { class: 'vmedia vopen', onclick: openIt }, img, heart(p), saleBadge(p) || (p.is_new ? h('span', { class: 'vnew' }, 'Nouveau') : null)),
         h('div', { class: 'vbody' },
-          h('h3', { class: 'wrapword' }, p.name),
-          h('p', { class: 'vprice' }, fcfa(p.price)),
+          h('h3', { class: 'wrapword' }, h('button', { class: 'vname', type: 'button', 'data-open': p.id, onclick: openIt }, p.name)),
+          priceEl(p),
           p.reviews ? ratingEl(p.rating, p.reviews) : null,
           // Une seule ligne d'informations, discrète (âge, taille, état) ; le genre est déjà dans le filtre.
           (function () {
@@ -2328,8 +2465,10 @@
     var grid = h('div', { class: 'vgrid', id: 'vitrine-products' });
     var filters = h('div', { class: 'stack tight', id: 'vitrine-filters' });
     function shown() {
-      return products.filter(function (p) { return (!filter.cat || p.category === filter.cat) && (!filter.size || (p.sizes && p.sizes.indexOf(filter.size) >= 0))
+      var l = products.filter(function (p) { return (!filter.tab || (filter.tab === 'promos' ? !!p.price_was : p.category === filter.tab)) && (!filter.size || (p.sizes && p.sizes.indexOf(filter.size) >= 0))
         && (!filter.gender || p.gender === filter.gender || p.gender === 'mixte') && (!filter.age || p.age_band === filter.age); });
+      // Première rubrique : les nouveautés d'abord (ordre stable sinon).
+      return filter.tab ? l : l.filter(function (p) { return p.is_new; }).concat(l.filter(function (p) { return !p.is_new; }));
     }
     function drawGrid() {
       var l = shown();
@@ -2343,17 +2482,24 @@
       var byGender = products.some(function (p) { return p.gender; });
       function chip(on, label, fn) { return h('button', { class: 'opt' + (on ? ' on' : ''), type: 'button', 'aria-pressed': on ? 'true' : 'false', onclick: fn }, label); }
       function set(k, v) { filter[k] = v; drawFilters(); drawGrid(); }
-      // Catégorie d'abord quand il y en a plusieurs (vide-dressing ouvert à tout article, 20/10) ; sinon « Pour » (enfants).
-      var primary = cats.length >= 2 ? h('div', { class: 'opt-row scroll', role: 'group', 'aria-label': 'Catégorie', id: 'filter-cat' },
-            chip(!filter.cat, 'Tout', function () { set('cat', ''); }),
-            cats.map(function (c) { return chip(filter.cat === c, catLabel(c) || c, function () { set('cat', c); }); }))
+      // Rubriques dans un ordre fixe (Fii Édition V1) : Nouveautés (ou Tout), les catégories s'il y en a au moins deux,
+      // Promos en dernier s'il y a un prix barré ; une seule rangée, affichée dès qu'il y a un vrai choix.
+      var order = CATEGORIES.map(function (c) { return c[0]; });
+      cats.sort(function (a, b) { return order.indexOf(a) - order.indexOf(b); });
+      var promos = products.some(function (p) { return p.price_was; });
+      var tabs = [['', products.some(function (p) { return p.is_new; }) ? 'Nouveautés' : 'Tout', 'new']]
+        .concat(cats.length >= 2 ? cats.map(function (c) { return [c, catLabel(c) || c, 'cat']; }) : [])
+        .concat(promos ? [['promos', 'Promos', 'promos']] : []);
+      var primary = tabs.length >= 2 ? h('div', { class: 'opt-row scroll vtabs', role: 'group', 'aria-label': 'Rubriques', id: 'filter-cat' },
+            tabs.map(function (t) { return h('button', { class: 'opt' + (filter.tab === t[0] ? ' on' : '') + (t[0] === 'promos' ? ' sale' : ''), type: 'button', 'data-tab': t[0] || 'new',
+              'aria-pressed': filter.tab === t[0] ? 'true' : 'false', onclick: function () { if (filter.tab !== t[0]) track('site', 'tab:' + t[2]); set('tab', t[0]); } }, t[1]); }))
         : byGender ? h('div', { class: 'opt-row', role: 'group', 'aria-label': 'Pour', id: 'filter-gender' },
             chip(!filter.gender, 'Tous', function () { set('gender', ''); }),
             VD_GENDERS.filter(function (g) { return g[0] !== 'mixte'; }).map(function (g) { return chip(filter.gender === g[0], g[1], function () { set('gender', g[0]); }); }))
         : null;
       // Filtres secondaires : dans une feuille, jamais affichés en rangées.
       var more = [];
-      if (byGender && cats.length >= 2) more.push(['gender', 'Pour (enfants)', VD_GENDERS.filter(function (g) { return g[0] !== 'mixte'; })]);
+      if (byGender && tabs.length >= 2) more.push(['gender', 'Pour (enfants)', VD_GENDERS.filter(function (g) { return g[0] !== 'mixte'; })]);
       if (ages.length >= 2) more.push(['age', 'Âge', ages]);
       if (sizes.length >= 2) more.push(['size', 'Taille ou pointure', sizes.map(function (z) { return [z, z]; })]);
       var active = more.filter(function (m) { return filter[m[0]]; }).length;
@@ -2393,7 +2539,10 @@
         h('p', { class: 'safe-line' }, icon('lock', 18), 'Commande sans compte. Vous donnez votre adresse à la dernière étape.'));
       if (products.length) { drawFilters(); drawGrid(); }
       refreshBar();
-      if (q.a && byId[q.a]) setTimeout(function () { var el = document.getElementById('p-' + q.a); if (el) el.scrollIntoView({ block: 'center' }); }, 60);
+      // Lien d'un article (partagé ou publié) : sa fiche s'ouvre sur la carte.
+      if (q.a && byId[q.a] && !sheetShown) setTimeout(function () {
+        if (!grid.isConnected) return; // on a déjà quitté le site
+        sheetShown = true; var el = document.getElementById('p-' + q.a); if (el) el.scrollIntoView({ block: 'center' }); productSheet(byId[q.a]); }, 60);
     }
     function followRow() {
       if (shop.demo || shop.platform) return null;
@@ -3143,7 +3292,8 @@
       var back = backBtn('Réglages', '#/boutique/reglages');
       if (SHOP_ROLE === 'editor') return page(back, stateCard('?', 'Réservé aux administrateurs', 'Seuls le propriétaire et les administrateurs de la boutique modifient le site.'), footer());
       var premium = v.plan === 'premium';
-      var saved = { theme: v.theme || 'galerie', accent: v.accent || 'foret', about: v.about || '', cover: v.cover || null, logo: v.logo || null, socials: Object.assign({}, v.socials || {}) };
+      var saved = { theme: v.theme || 'galerie', accent: v.accent || 'foret', about: v.about || '', cover: v.cover || null, logo: v.logo || null, socials: Object.assign({}, v.socials || {}),
+        policies: Object.assign({}, v.policies || {}) };
       var d = JSON.parse(JSON.stringify(saved));
       var err = h('div', { role: 'alert' });
       var prevBox = h('div', { class: 'look-prev', id: 'look-preview', 'aria-hidden': 'true' });
@@ -3156,6 +3306,7 @@
         if (d.cover !== saved.cover) p.cover = d.cover ? d.cover.replace(/^data:[^,]+,/, '') : '';
         if (d.logo !== saved.logo) p.logo = d.logo ? d.logo.replace(/^data:[^,]+,/, '') : '';
         if (JSON.stringify(d.socials) !== JSON.stringify(saved.socials)) { p.socials = {}; SOCIALS.forEach(function (o) { p.socials[o[0]] = (d.socials[o[0]] || '').trim(); }); }
+        if (JSON.stringify(d.policies) !== JSON.stringify(saved.policies)) p.policies = d.policies;
         return p;
       }
       function refresh() {
@@ -3170,7 +3321,8 @@
         setKids(err); saveBtn.disabled = true; saveBtn.textContent = 'Enregistrement…';
         sapi('fiila_shop_vitrine', { p: p }).then(function (r) {
           if (p.theme && isPremiumTheme(p.theme)) track('premium', p.theme + ':applied');
-          saved = { theme: r.theme || 'galerie', accent: r.accent || 'foret', about: r.about || '', cover: r.cover || null, logo: r.logo || null, socials: Object.assign({}, r.socials || {}) };
+          saved = { theme: r.theme || 'galerie', accent: r.accent || 'foret', about: r.about || '', cover: r.cover || null, logo: r.logo || null, socials: Object.assign({}, r.socials || {}),
+            policies: Object.assign({}, r.policies || {}) };
           d = JSON.parse(JSON.stringify(saved));
           saveBtn.textContent = 'Enregistrer'; toast('Site enregistré.'); drawAll();
         }, function (e) { saveBtn.textContent = 'Enregistrer'; saveBtn.disabled = false; errBox(err, e); err.scrollIntoView({ block: 'center' }); });
@@ -3227,7 +3379,31 @@
               : null),
           logoInput);
       }
-      function drawAll() { drawLogo(); drawThemes(); drawColors(); refresh(); setKids(socialFields, socialInputs()); setKids(aboutBox, aboutField()); setKids(coverBox, coverField()); }
+      // Livraison, paiement, échange (Fii Édition V1) : montrés sur la fiche de chaque article ; un toucher par choix,
+      // toucher à nouveau retire (rien n'est affiché sur le site pour ce qui n'est pas choisi).
+      var policyBox = h('div', { class: 'stack', id: 'look-policies' });
+      function drawPolicies() {
+        var po = d.policies;
+        function one(key, list, label) {
+          return h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'look-pol-' + key + '-l' }, label),
+            h('div', { class: 'pills', role: 'radiogroup', 'aria-labelledby': 'look-pol-' + key + '-l', id: 'look-pol-' + key }, list.map(function (o) {
+              var on = po[key] === o[0];
+              return h('button', { type: 'button', class: 'pill' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-v': o[0],
+                onclick: function () { if (on) delete po[key]; else po[key] = o[0]; drawPolicies(); refresh(); } }, o[1]);
+            })));
+        }
+        var pay = po.pay || [];
+        setKids(policyBox, one('delivery', POLICY_DELIVERY, 'Délai de livraison à Dakar'),
+          h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'look-pol-pay-l' }, 'Paiement accepté'),
+            h('div', { class: 'pills', role: 'group', 'aria-labelledby': 'look-pol-pay-l', id: 'look-pol-pay' }, POLICY_PAY.map(function (o) {
+              var on = pay.indexOf(o[0]) >= 0;
+              return h('button', { type: 'button', class: 'pill' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', 'data-v': o[0], onclick: function () {
+                var l = POLICY_PAY.map(function (x) { return x[0]; }).filter(function (k) { return k === o[0] ? !on : pay.indexOf(k) >= 0; });
+                if (l.length) po.pay = l; else delete po.pay; drawPolicies(); refresh(); } }, o[1]);
+            }))),
+          one('exchange', POLICY_EXCHANGE, 'Échange'));
+      }
+      function drawAll() { drawLogo(); drawThemes(); drawColors(); drawPolicies(); refresh(); setKids(socialFields, socialInputs()); setKids(aboutBox, aboutField()); setKids(coverBox, coverField()); }
       function socialInputs() {
         return SOCIALS.map(function (o) {
           return textField({ id: 'look-' + o[0], label: o[1], optional: true, max: 120, value: d.socials[o[0]] ? '@' + d.socials[o[0]] : '', placeholder: '@maboutique',
@@ -3252,6 +3428,8 @@
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Modèle'), themesBox),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couleur'), colorsBox),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Couverture et présentation'), coverBox, lookTips('cover'), aboutBox),
+        h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Livraison, paiement, échange'),
+          h('p', { class: 'small muted' }, 'Affichés sur la fiche de chaque article, pour rassurer vos clientes.'), policyBox),
         h('section', { class: 'stack tight look-sec' }, h('h2', null, 'Réseaux sociaux'),
           h('p', { class: 'small muted' }, 'Le nom du compte ou son lien.'), socialFields),
         err, h('div', { style: 'height:96px' }), footer());
@@ -7206,7 +7384,9 @@
     function toggleTag(key, val) {
       var l = tags(f[key]), i = l.indexOf(val);
       if (i >= 0) l.splice(i, 1); else l.push(val);
-      f[key] = l.join(', '); draw();
+      f[key] = l.join(', ');
+      if (key === 'sizes') f.sizes_out = f.sizes_out.filter(function (x) { return l.indexOf(x) >= 0; });
+      draw();
     }
     function sizeChoices() {
       var cat = f.category === 'chaussures' ? 'chaussures' : f.category === 'enfants' ? 'enfants' : f.category === 'mode' ? 'mode' : null;
@@ -7235,6 +7415,14 @@
             oninput: function (e) { extraSize = e.target.value; },
             onkeydown: function (e) { if (e.key === 'Enter' && extraSize.trim()) { e.preventDefault(); var v = extraSize.trim(); extraSize = ''; if (tags(f.sizes).indexOf(v) < 0) toggleTag('sizes', v); } },
             onblur: function () { if (extraSize.trim()) { var v = extraSize.trim(); extraSize = ''; if (tags(f.sizes).indexOf(v) < 0) toggleTag('sizes', v); } } })))),
+        // Tailles épuisées (Fii Édition V1) : barrées sur le site et refusées à la commande ; un toucher pour basculer.
+        curS.length >= 2 ? h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-sizes-out-l' }, f.category === 'chaussures' ? 'Pointures épuisées' : 'Tailles épuisées',
+            h('span', { class: 'opt' }, ' (barrées sur votre site)')),
+          h('div', { class: 'pills', role: 'group', 'aria-labelledby': 'product-sizes-out-l', id: 'product-sizes-out' }, curS.map(function (x) {
+            var on = f.sizes_out.indexOf(x) >= 0;
+            return h('button', { type: 'button', class: 'pill sm out' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', 'data-v': x, onclick: function () {
+              f.sizes_out = on ? f.sizes_out.filter(function (y) { return y !== x; }) : f.sizes_out.concat([x]); draw(); } }, x);
+          }))) : null,
         h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-colors-l' }, 'Couleurs'),
           h('div', { class: 'pills', role: 'group', 'aria-labelledby': 'product-colors-l', id: 'product-colors' }, COLOR_SET.map(function (c) {
             var on = curC.indexOf(c[0]) >= 0;
@@ -7388,6 +7576,7 @@
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
     f.category = pr && pr.category || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');
     f.stock = pr && pr.stock != null ? String(pr.stock) : '';
+    f.price_was = pr && pr.price_was ? String(pr.price_was) : ''; f.sizes_out = (pr && pr.sizes_out || []).slice();
     // Nouvel article : brouillon (nom, prix, description) gardé sur le téléphone, par boutique et rôle, pour « Reprendre l'article ».
     var pd = pr ? null : draftOf(PRODUCT_DRAFT, shop);
     if (pd) { f.name = pd.name || ''; f.price = pd.price || ''; f.description = pd.description || ''; }
@@ -7425,8 +7614,10 @@
       if (!(price >= 0)) return errBox(err, new ApiError('invalid_price'));
       var stock = f.stock.trim() === '' ? null : parseInt(f.stock.replace(/\D/g, ''), 10);
       if (stock !== null && !(stock >= 0)) return errBox(err, new ApiError('invalid_stock'));
+      var was = String(f.price_was).trim() === '' ? null : parseInt(String(f.price_was).replace(/\D/g, ''), 10);
+      if (was !== null && !(was > price)) return errBox(err, new ApiError('invalid_price_was'));
       var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active,
-        category: f.category || null, sizes: splitTags(f.sizes), colors: splitTags(f.colors), stock: stock };
+        category: f.category || null, sizes: splitTags(f.sizes), colors: splitTags(f.colors), stock: stock, price_was: was, sizes_out: f.sizes_out };
       btn.disabled = true;
       return photos.payload().then(function (pp) {
         if (pp) { p.photo = pp.photo; p.photos = pp.photos; }
@@ -7449,7 +7640,10 @@
       pr && pr.photo ? studioRow(pr, photos, function () { return save(true); }) : studioTeaser(),
       h('section', { class: 'pf-sec' },
         textField({ id: 'product-name', label: 'Nom', max: 80, value: f.name, placeholder: 'Ex. : Robe wax fille', onInput: function (v) { f.name = v; keepP(); } }),
-        textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; keepP(); } })),
+        textField({ id: 'product-price', label: 'Prix (FCFA)', inputmode: 'numeric', value: f.price, placeholder: 'Ex. : 12500', onInput: function (v) { f.price = v; keepP(); } }),
+        // Promo (Fii Édition V1) : l'ancien prix, barré sur le site ; l'article entre dans la rubrique « Promos ».
+        textField({ id: 'product-price-was', label: 'Prix barré (promo)', optional: true, inputmode: 'numeric', value: f.price_was, placeholder: 'Ex. : 15000',
+          onInput: function (v) { f.price_was = v; } })),
       productDetails(f),
       h('section', { class: 'pf-sec' },
         textField({ id: 'product-desc', label: 'Description', optional: true, multiline: true, max: 300, value: f.description, placeholder: 'Matière, coupe, conseils de taille…', onInput: function (v) { f.description = v; keepP(); } }),
@@ -8981,6 +9175,21 @@
     }, function (e) { setKids(box, h('h2', null, 'Audience'), h('p', { class: 'small muted' }, errText(e))); });
     return box;
   }
+  // Fiche article du site (Fii Édition V1) : conditions choisies par la boutique, articles en promo, tailles épuisées.
+  function boShopSheet(id) {
+    var box = h('section', { class: 'card stack tight', id: 'bo-shop-sheet' }, h('h2', null, 'Fiche article'), loading());
+    api('fiila_bo_shop_sheet', { p_shop: id }).then(function (a) {
+      var po = a.policies || {};
+      function lbl(list, k) { var x = list.filter(function (o) { return o[0] === k; })[0]; return x ? x[1] : 'Non indiqué'; }
+      setKids(box, h('h2', null, 'Fiche article'),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Livraison'), h('span', { id: 'bo-sheet-delivery' }, po.delivery ? lbl(POLICY_DELIVERY, po.delivery) : 'Non indiquée')),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Paiement'), h('span', { id: 'bo-sheet-pay' }, po.pay && po.pay.length ? po.pay.map(function (k) { return lbl(POLICY_PAY, k); }).join(', ') : 'Non indiqué')),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Échange'), h('span', { id: 'bo-sheet-exchange' }, po.exchange ? lbl(POLICY_EXCHANGE, po.exchange) : 'Non indiqué')),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Articles'), h('span', { id: 'bo-sheet-counts' }, boNum(a.promos) + ' en promo · ' + boNum(a.sold_out_sizes) + ' avec des tailles épuisées (sur ' + boNum(a.with_sizes) + ' à tailles)')),
+        h('p', { class: 'small muted' }, 'Choisis par la boutique dans « Personnaliser mon site » et sur chaque article.'));
+    }, function (e) { setKids(box, h('h2', null, 'Fiche article'), h('p', { class: 'small muted' }, errText(e))); });
+    return box;
+  }
   // Propriétaire et pièce d'identité d'une boutique (fondateur, 27/10) : voir, ouvrir la pièce (journalisé), valider ou refuser.
   function boShopIdentity(id) {
     var box = h('section', { class: 'card stack tight', id: 'bo-shop-identity' }, h('h2', null, 'Propriétaire et identité'), loading());
@@ -9214,6 +9423,7 @@
         boShopTeam(s, id),
         boCan('shops_write') && !s.platform ? boShopIdentity(id) : null,
         boShopAudience(id),
+        boShopSheet(id),
         s.recent_orders ? h('section', { class: 'stack tight' }, h('h2', null, 'Dernières commandes'),
           boTable([{ label: 'N°', get: function (o) { return String(o.number).padStart(4, '0'); } }, { label: 'Total', get: function (o) { return fcfa(o.total); }, cls: 'num' },
             { label: 'Statut', get: boOrderState }, { label: 'Date', get: function (o) { return boDate(o.created_at, true); } }], s.recent_orders || [],
@@ -9682,6 +9892,12 @@
             var pm = d.premium || {}; function q(a) { return boNum(Number(pm[t[0] + ':' + a] || 0)); }
             return t[1] + ' — touché verrouillé ' + q('locked') + ', aperçu ' + q('preview') + ', « Je veux ce modèle » ' + q('interest') + ', appliqué ' + q('applied');
           }).join(' · ') + '. Boutiques Premium : ' + boNum(d.premium_shops || 0) + '.'),
+          h('p', { class: 'small', id: 'bo-site-line' }, (function () {
+            var st = d.site || {}; function c(k) { return boNum(Number(st[k] || 0)); }
+            return 'Sites des boutiques (Fii Édition V1, 30 jours) : fiche article ouverte ' + c('sheet:open') + ' · ajout depuis la fiche ' + c('sheet:add') +
+              ' · guide des tailles ' + c('guide:open') + ' · « Complétez le look » touché ' + c('look:click') + ' · rubriques Nouveautés ' + c('tab:new') +
+              ', catégorie ' + c('tab:cat') + ', Promos ' + c('tab:promos') + '. Nombre d’articles du look : réglage « site_look ».';
+          })()),
           h('p', { class: 'small', id: 'bo-app-line' }, 'App mobile (ouvertures, 30 jours) : Android ' + boNum(Number((d.app_opens || {}).android || 0)) +
             ' · iPhone ' + boNum(Number((d.app_opens || {}).ios || 0)) + '.'),
           h('p', { class: 'small muted' }, 'Un partage touché ne prouve pas qu’un message est parti.'));
@@ -10055,7 +10271,8 @@
     studio_budget_usd: ['Budget mensuel du Studio', 'USD (au-delà, le Studio se met en pause)'],
     studio_daily: ['Séries Studio par boutique et par jour', 'séries'],
     studio_premium: ['Mode Studio premium (rendu de studio hyperréaliste)', '0 = coupé, 1 = proposé'], studio_premium_credits: ['Crédits pour garder une version Studio premium', 'crédits'],
-    kyc_required: ['Pièce d’identité exigée après la première vente', '0 = non exigée, 1 = exigée (nouvelles commandes bloquées sans pièce)'] };
+    kyc_required: ['Pièce d’identité exigée après la première vente', '0 = non exigée, 1 = exigée (nouvelles commandes bloquées sans pièce)'],
+    site_look: ['« Complétez le look » sur la fiche article', 'Nombre d’articles de la même boutique proposés (0 = masqué, 6 au plus)'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

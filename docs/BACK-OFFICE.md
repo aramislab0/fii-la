@@ -56,6 +56,8 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 
 Fiche d'une boutique, carte **Audience** (Fii Édition, 27/10) : abonnés (« Suivre ») et favoris (cœur), au total et sur 30 jours, et les 3 articles les plus mis en favori. Droit : `shops`.
 
+Fiche d'une boutique, carte **Fiche article** (Fii Édition V1, 27/10) : livraison, paiement et échange choisis par la boutique (« Non indiqué » sinon), nombre d'articles en promo (prix barré) et d'articles avec des tailles épuisées. Droit : `shops`. Croissance → ligne **Sites des boutiques** (`#bo-site-line`, 30 jours, anonyme) : fiche article ouverte, ajout depuis la fiche, guide des tailles, « Complétez le look » touché, rubriques touchées. Réglages → `site_look` : nombre d'articles de « Complétez le look » (0 = masqué, 6 au plus, 3 par défaut), journalisé. Tests : `editionv1.sql`, `backoffice`.
+
 Actions possibles sur la fiche d'une boutique :
 - suspendre, avec un motif obligatoire. Le site est mis hors ligne, la boutique sort du fil et ne peut pas rouvrir son site elle-même ;
 - réactiver ;

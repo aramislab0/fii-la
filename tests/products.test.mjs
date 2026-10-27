@@ -90,7 +90,7 @@ await t('cliente : filtre « ma taille », choix de taille et couleur obligatoir
   await vs.waitFor({ state: 'detached' });
   await robe.getByText('1 ajouté').waitFor();
   await robe.getByText('Plus que 2 en stock').waitFor();
-  await C.locator('#filter-cat').getByRole('button', { name: 'Tout' }).click();
+  await C.locator('#filter-cat [data-tab="new"]').click(); // Fii Édition V1 : « Nouveautés » (ou « Tout ») en premier
   await C.locator('article', { hasText: 'Sac (test)' }).getByText('Épuisé').waitFor();
   assert.equal(await C.locator('article', { hasText: 'Sac (test)' }).locator('[data-add]').count(), 0);
   await shot(C, '02-vitrine');
