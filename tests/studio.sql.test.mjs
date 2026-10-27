@@ -169,6 +169,15 @@ await t('back-office des décors : résultats par décor ; couper/activer réser
   assert.ok(await one(`select 1 from fiila.admin_log where action = 'studio_scene' and target_id = 'mode-1'`));
 });
 
+await t('export quotidien : réservé à la clé de service ; résumé par boutique sans donnée client', async () => {
+  await ko('fiila_studio_export', {}, null);
+  const e = await ok('fiila_studio_export', {}, SR);
+  const a = e.shops.find((x) => x.name === 'Studio A [TEST]');
+  assert.ok(a); assert.equal(a.category, 'mode'); assert.ok(a.series >= 1); assert.ok(a.styles['mode-2']);
+  assert.ok(a.journal.length >= 1); assert.ok('product' in a.journal[0]);
+  const keys = JSON.stringify(e); assert.ok(!/phone|whatsapp|address|key/i.test(Object.keys(a).join(',')), 'aucun champ sensible');
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL Studio réussis`);
 process.exit(passed === results.length ? 0 : 1);

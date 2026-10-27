@@ -1,6 +1,7 @@
 // Fonction fiila-studio : droits vérifiés avec l'identité de l'appelant, fal simulé (aucun appel réel, aucune clé réelle).
 import assert from 'node:assert/strict';
 import { makeHandler, SCENES, MODEL } from '../supabase/functions/fiila-studio/handler.mjs';
+import { makeHandler as makeExport } from '../supabase/functions/fiila-studio-export/handler.mjs';
 
 let passed = 0, failed = 0;
 async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
@@ -78,6 +79,29 @@ await t('reprise de la version : droit vérifié par la base, image renvoyée en
   s = sim({ result: 'https://evil.example/x.png' });
   r = await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'take', key: 'k', job: 'j1', index: 0 }));
   assert.equal(r.status, 404);
+});
+
+await t('décor du pack : le prompt renvoyé par la base est envoyé à fal (pas un décor codé ici)', async () => {
+  const s = sim({ reserve: { job: 'j1', style: 'mode-2', prompt: 'light wooden clothing rail [TEST]', image: 'data:image/jpeg;base64,AAA' } });
+  await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'mode-2' }));
+  assert.equal(s.calls.find((c) => c.url.startsWith('https://fal.run/')).body.scene_description, 'light wooden clothing rail [TEST]');
+  const s2 = sim({ reserve: { job: 'j1', style: 'inconnu', image: 'data:image/jpeg;base64,AAA' } });
+  const r2 = await (await makeHandler({ env: (k) => ENV[k], fetch: s2.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'inconnu' }))).json();
+  assert.equal(r2.status, 'failed'); assert.ok(!s2.calls.some((c) => c.url.startsWith('https://fal.run/')), 'aucun appel payant sans décor');
+});
+
+await t('export quotidien : jeton requis (absent, court ou faux → refusé), base appelée avec la clé de service', async () => {
+  const TOK = 'a'.repeat(64);
+  const calls = []; const fetch = async (url, init) => { calls.push({ url, init }); return json({ generated_at: 'x', shops: [] }); };
+  const exp = (env) => makeExport({ env: (k) => ({ ...ENV, ...env })[k], fetch });
+  const r = (h) => new Request('https://x/functions/v1/fiila-studio-export', { method: 'POST', headers: h || {}, body: '{}' });
+  assert.equal((await exp({})(r({ 'x-export-token': TOK }))).status, 503, 'non configuré');
+  assert.equal((await exp({ STUDIO_EXPORT_TOKEN: 'court' })(r({ 'x-export-token': 'court' }))).status, 503);
+  assert.equal((await exp({ STUDIO_EXPORT_TOKEN: TOK })(r({}))).status, 401);
+  assert.equal((await exp({ STUDIO_EXPORT_TOKEN: TOK })(r({ 'x-export-token': 'b'.repeat(64) }))).status, 401);
+  assert.equal(calls.length, 0);
+  const ok = await exp({ STUDIO_EXPORT_TOKEN: TOK })(r({ 'x-export-token': TOK }));
+  assert.equal(ok.status, 200); assert.ok(calls[0].url.endsWith('/rpc/fiila_studio_export')); assert.equal(calls[0].init.headers.Authorization, 'Bearer service-test');
 });
 
 console.log(`\n${passed}/${passed + failed} tests fonction Studio réussis`);
