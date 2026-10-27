@@ -10,7 +10,9 @@ const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
 function sim({ reserve = { job: 'j1', style: 'luxe', image: 'data:image/jpeg;base64,AAA' }, fal = null, result = 'https://v3.fal.media/files/x/1.png' } = {}) {
   const calls = [];
   const fetch = async (url, init = {}) => {
-    calls.push({ url, init, body: init.body ? JSON.parse(init.body) : null });
+    calls.push({ url, init, body: typeof init.body === 'string' ? JSON.parse(init.body) : null });
+    if (url.startsWith('https://rest.alpha.fal.ai/storage/upload/initiate')) return json({ upload_url: 'https://upload.fal.media/put/1', file_url: 'https://v3.fal.media/files/up/photo.jpeg' });
+    if (url === 'https://upload.fal.media/put/1') return new Response(null, { status: 200 });
     if (url.startsWith('https://fal.run/')) return fal ? fal() : json({ images: [1, 2, 3].map((i) => ({ url: `https://v3.fal.media/files/x/${i}.png` })) });
     if (url.startsWith('https://v3.fal.media/')) return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } });
     const fn = url.split('/rpc/')[1];
@@ -45,7 +47,10 @@ await t('série « fidèle » : droits avec l’identité de la personne ; Bria 
   assert.equal(res.init.headers.Authorization, 'Bearer jwt-user'); assert.deepEqual(res.body, { p_key: 'cle', p_product: 'p1', p_style: 'luxe', p_mode: 'fidele' });
   const f = s.calls.find((c) => c.url.startsWith('https://fal.run/'));
   assert.equal(f.url, 'https://fal.run/' + MODEL); assert.equal(MODEL, 'bria/replace-background'); assert.equal(f.init.headers.Authorization, 'Key fal-test');
-  assert.equal(f.body.image_url, 'data:image/jpeg;base64,AAA'); assert.equal(f.body.prompt, SCENES.luxe);
+  assert.equal(f.body.image_url, 'https://v3.fal.media/files/up/photo.jpeg', 'Bria refuse les data URI : photo déposée sur le stockage fal');
+  const put = s.calls.find((c) => c.url === 'https://upload.fal.media/put/1');
+  assert.equal(put.init.method, 'PUT'); assert.equal(put.init.headers['Content-Type'], 'image/jpeg'); assert.equal(put.init.body.length, 2);
+  assert.equal(f.body.prompt, SCENES.luxe);
   const c = s.calls.find((x) => x.url.endsWith('fiila_studio_complete'));
   assert.equal(c.init.headers.Authorization, 'Bearer service-test'); assert.equal(c.body.p.cost_usd, 0.12, 'les 3 images renvoyées par le simulateur sont toutes comptées');
 });

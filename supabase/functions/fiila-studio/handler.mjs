@@ -42,8 +42,25 @@ export function makeHandler({ env, fetch }) {
   }
   // Deux modes (bench du 27/10/2026, base privée XEL) : « fidele » = Bria replace-background (le produit garde ses pixels,
   // 0,04 USD) ; « premium » = Nano Banana Pro 2K (rendu studio hyperréaliste, 0,15 USD). Une version par série.
+  // Bria (mode fidèle) refuse les images en data URI : la photo est d'abord déposée sur le stockage de fal (adresse
+  // temporaire), même protocole que le client officiel. Repli sur la data URI si le dépôt échoue.
+  async function upload(image) {
+    const m = /^data:(image\/[a-z]+);base64,(.+)$/.exec(image || '');
+    if (!m) return image;
+    try {
+      const auth = { Authorization: 'Key ' + env('FAL_KEY') };
+      const r = await fetch('https://rest.alpha.fal.ai/storage/upload/initiate?storage_type=fal-cdn-v3', { method: 'POST',
+        headers: { ...auth, 'Content-Type': 'application/json' }, body: JSON.stringify({ content_type: m[1], file_name: 'photo.' + m[1].split('/')[1] }) });
+      const t = await r.json().catch(() => ({}));
+      if (!r.ok || !t.upload_url || !FAL_HOST.test(t.file_url || '')) return image;
+      const bin = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+      const p = await fetch(t.upload_url, { method: 'PUT', headers: { 'Content-Type': m[1] }, body: bin });
+      return p.ok ? t.file_url : image;
+    } catch { return image; }
+  }
   async function fal(image, prompt, mode) {
     const premium = mode === 'premium';
+    if (!premium) image = await upload(image);
     const model = premium ? MODEL_PREMIUM : MODEL;
     const input = premium
       ? { prompt, image_urls: [image], num_images: 1, aspect_ratio: '4:5', resolution: '2K', output_format: 'jpeg' }
