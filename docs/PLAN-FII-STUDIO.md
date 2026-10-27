@@ -43,6 +43,10 @@
 3. Me le dire. Je déploie la fonction et fais **une série de test sur un article de test**, soit 0,12 USD.
 4. Back-office → Réglages → `studio_ready` = 1. Puis Back-office → Studio : accorder des crédits aux boutiques fondatrices, par exemple 10 chacune.
 
+## 4 bis. Décors par catégorie (27/10/2026)
+
+Fondateur (27/10) : « Je ne veux pas un modèle de génération standard pour toutes les boutiques ». Les décors proposés viennent du **pack de la catégorie** de la boutique (base privée Aramis Studio, dépôt XEL, `Production/FII_STUDIO/packs/`), chargés comme données dans la table `fiila.studio_scenes` — aucun prompt propriétaire dans ce dépôt public. Les décors qu'une boutique garde le plus passent en tête de sa liste. Coiffure, esthétique et services : pas de Studio (pas de faux résultat). Back-office → Studio → « Décors par catégorie » : taux de versions gardées par décor, couper/activer un décor (motif, journal). Repli : les 5 décors génériques.
+
 ## 5. Suite (après le critère des 30 jours)
 
 - **Niveau 2 :** visuel pub (nom, prix, logo) avec le décor Studio comme fond des cartes de Publier. Petit travail : les modèles existent déjà.

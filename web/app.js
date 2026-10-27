@@ -6986,7 +6986,9 @@
     return row;
   }
   function studioSheet(pr, photos, saveStay, st) {
-    var style = 'blanc', job = null, pick = null, busy = false, closeSheet;
+    // Décors du pack de la catégorie de la boutique, ceux qu'elle garde le plus en premier (base Aramis Studio, règle R2).
+    var scenes = (st.scenes && st.scenes.length ? st.scenes : STUDIO_STYLES.map(function (x) { return { id: x[0], label: x[1], swatch: x[2] }; }));
+    var style = scenes[0].id, job = null, pick = null, busy = false, closeSheet;
     var credits = (st.credits && st.credits.total) || 0;
     var body = h('div', { class: 'stack', id: 'studio-body' });
     var err = h('div', { role: 'alert' });
@@ -6996,15 +6998,15 @@
           h('button', { class: 'iconbtn', type: 'button', 'aria-label': 'Fermer', id: 'studio-close', onclick: function () { if (!busy) closeSheet(); } }, icon('close', 20))),
         body, err));
     function styles() {
-      return h('div', { class: 'studio-styles', role: 'radiogroup', 'aria-label': 'Style du décor' }, STUDIO_STYLES.map(function (x) {
-        return h('button', { type: 'button', role: 'radio', 'aria-checked': String(style === x[0]), class: 'studio-style' + (style === x[0] ? ' on' : ''), 'data-style': x[0],
-          onclick: function () { style = x[0]; draw(); } }, h('span', { class: 'sw', style: 'background:' + x[2] }), h('span', null, x[1]));
+      return h('div', { class: 'studio-styles', role: 'radiogroup', 'aria-label': 'Style du décor' }, scenes.map(function (x) {
+        return h('button', { type: 'button', role: 'radio', 'aria-checked': String(style === x.id), class: 'studio-style' + (style === x.id ? ' on' : ''), 'data-style': x.id,
+          onclick: function () { style = x.id; draw(); } }, h('span', { class: 'sw', style: 'background:' + x.swatch }), h('span', null, x.label));
       }));
     }
     function draw() {
       setKids(err);
       if (busy) {
-        setKids(body, h('p', { class: 'small muted', role: 'status' }, 'Création des 3 versions… environ 10 secondes.'),
+        setKids(body, h('p', { class: 'small muted', role: 'status' }, 'Création des 3 versions… environ 20 secondes.'),
           h('div', { class: 'studio-grid' }, [0, 1, 2].map(function () { return h('div', { class: 'studio-tile loading-skel', 'aria-hidden': 'true' }); })));
         return;
       }
@@ -8623,7 +8625,25 @@
   // accorder ou retirer des crédits (motif obligatoire, au journal). docs/PLAN-FII-STUDIO.md.
   var STUDIO_ST = { running: ['warn', 'En cours'], done: ['info', 'Proposée'], kept: ['ok', 'Gardée'], failed: ['danger', 'Échec'] };
   function boStudio() {
-    return api('fiila_bo_studio', {}).then(function (d) {
+    return Promise.all([api('fiila_bo_studio', {}), api('fiila_bo_studio_scenes', {}).catch(function () { return []; })]).then(function (both) {
+      var d = both[0], scenes = both[1] || [];
+      var sceneLabel = {}; scenes.forEach(function (c) { sceneLabel[c.id] = c.label; });
+      var sReason = h('input', { type: 'text', id: 'bo-scene-reason', maxlength: 200, placeholder: 'Motif (journal)' });
+      // Décors par catégorie (packs Aramis Studio, base privée XEL) : ce que les boutiques gardent, et l'interrupteur de chaque décor.
+      var scenesBox = h('details', { class: 'card', id: 'bo-studio-scenes' }, h('summary', null, h('b', null, 'Décors par catégorie'),
+        h('small', { class: 'muted' }, ' · ' + scenes.filter(function (c) { return c.active; }).length + ' actifs')),
+        boCan('shops_write') ? h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif d’un changement'), sReason) : null,
+        boTable([
+          { label: 'Catégorie', get: function (x) { return x.category ? typeLabel(x.category) || x.category : 'Générique'; } },
+          { label: 'Décor', get: function (x) { return h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'sw', style: 'background:' + x.swatch + ';width:14px;height:14px;border-radius:50%;border:1px solid var(--line);display:inline-block' }), x.label); } },
+          { label: 'Gardées', get: function (x) { return x.series ? x.kept + ' / ' + x.series + ' (' + Math.round(x.kept / x.series * 100) + ' %)' : '—'; } },
+          { label: '', get: function (x) {
+            if (!boCan('shops_write')) return x.active ? boBadge('ok', 'Actif') : boBadge('muted', 'Coupé');
+            return h('button', { class: 'btn ghost small', type: 'button', 'data-scene': x.id, onclick: function () {
+              if (!sReason.value.trim()) { toast('Indiquez un motif.'); sReason.focus(); return; }
+              boAct(function () { return api('fiila_bo_studio_scene_set', { p_id: x.id, p_active: !x.active, p_reason: sReason.value }); }, x.active ? 'Décor coupé.' : 'Décor activé.', null, null, this);
+            } }, x.active ? 'Couper' : 'Activer');
+          } }], scenes, { id: 'bo-studio-scenes-t', empty: 'Aucun décor.' }));
       var m = d.month || {}, spent = Number(d.spent_usd || 0), budget = Number(d.budget_usd || 0);
       var pct = budget ? Math.min(100, Math.round(spent / budget * 100)) : 100;
       var q = h('input', { type: 'search', id: 'bo-studio-shop', placeholder: 'Nom de la boutique', autocomplete: 'off' });
@@ -8660,6 +8680,7 @@
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.failed || 0)), h('span', null, 'échecs')),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.shops || 0)), h('span', null, 'boutiques'))),
         grant,
+        scenesBox,
         h('h3', null, 'Crédits des boutiques'),
         boTable([
           { label: 'Boutique', get: function (x) { return h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop); } },
@@ -8668,7 +8689,7 @@
         h('h3', null, 'Dernières séries'),
         boTable([
           { label: 'Boutique', get: function (x) { return h('span', { class: 'stack tight', style: 'gap:0' }, h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop), h('small', { class: 'muted' }, x.product)); } },
-          { label: 'Style', get: function (x) { var t = STUDIO_STYLES.filter(function (y) { return y[0] === x.style; })[0]; return t ? t[1] : x.style; } },
+          { label: 'Décor', get: function (x) { return sceneLabel[x.style] || x.style; } },
           { label: 'Statut', get: function (x) { var t = STUDIO_ST[x.status] || ['muted', x.status]; return h('span', null, boBadge(t[0], t[1]), x.error ? h('small', { class: 'muted' }, ' ' + x.error) : null); } },
           { label: 'Coût', get: function (x) { return '$' + Number(x.cost_usd || 0).toFixed(2); }, cls: 'hide-s' },
           { label: 'Date', get: function (x) { return boDate(x.created_at); }, cls: 'hide-s' }], d.jobs || [], { id: 'bo-studio-jobs', empty: 'Aucune série pour le moment.' })
@@ -9605,7 +9626,7 @@
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
     vd_changes: 'a demandé une correction', vd_paid: 'a marqué un reversement de vide-dressing', reward_paid: 'a marqué un gain d’agent versé',
     reward_cancelled: 'a annulé un gain d’agent', reward_validated: 'a validé un gain d’agent', ambassador_active: 'a activé un agent',
-    domain_disconnect: 'a déconnecté le domaine', studio_grant: 'a modifié les crédits Studio de', ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
+    domain_disconnect: 'a déconnecté le domaine', studio_scene: 'a modifié le décor Studio', studio_grant: 'a modifié les crédits Studio de', ambassador_suspended: 'a suspendu un agent', ambassador_excluded: 'a exclu un agent', ambassador_reinstated: 'a réintégré un agent', reward_restored: 'a rétabli un gain d’agent', ambassador_training: 'a renvoyé un agent en formation', ambassador_deleted: 'a supprimé le profil agent de',
     view_order: 'a consulté la commande', view_account: 'a consulté le compte', shop_member_remove: 'a retiré un membre de l’équipe de la boutique',
     career_reply: 'a répondu à l’agent', career_objective: 'a fixé le cap du mois :', career_mission: 'a modifié la mission', career_note_accepted: 'a accepté la proposition du Manager', career_note_rejected: 'a écarté la proposition du Manager' };
   var BO_SETTINGS = { vd_commission: ['Commission du vide-dressing', '%'], amb_reward_1: ['Gain agent, niveau 1', 'FCFA'], amb_reward_2: ['Gain agent, niveau 2', 'FCFA'],

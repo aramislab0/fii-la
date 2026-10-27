@@ -38,10 +38,10 @@ export function makeHandler({ env, fetch }) {
     if (!r.ok) { const e = new Error((body && body.message) || 'rpc ' + r.status); e.status = r.status; e.code = /fiila:([a-z_]+)/.exec((body && body.message) || '')?.[1]; throw e; }
     return body;
   }
-  async function fal(image, style) {
+  async function fal(image, scene) {
     const r = await fetch(`https://fal.run/${MODEL}`, { method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Key ' + env('FAL_KEY') },
-      body: JSON.stringify({ image_url: image, scene_description: SCENES[style], optimize_description: true, num_results: 3, fast: true,
+      body: JSON.stringify({ image_url: image, scene_description: scene, optimize_description: true, num_results: 3, fast: true,
         // « manual_placement » + une position = num_results images (« automatic » en produit 10 par résultat : 0,84 USD la série
         // constatés le 26/10 au lieu de 0,12).
         placement_type: 'manual_placement', manual_placement_selection: 'bottom_center', shot_size: [880, 1100], sync_mode: false }) });
@@ -80,7 +80,9 @@ export function makeHandler({ env, fetch }) {
     try { job = await rpc('fiila_studio_reserve', { p_key: b.key || null, p_product: b.product, p_style: b.style }, auth); }
     catch (e) { return json(e.status === 400 ? 409 : 502, { error: e.code || 'not_allowed' }); }
     let out;
-    try { out = await fal(job.image, job.style); } catch { out = { error: 'Fournisseur indisponible' }; }
+    // Décor : prompt du pack de la catégorie (base, règle R2 d'Aramis Studio) ; repli sur les décors génériques.
+    const scene = job.prompt || SCENES[job.style];
+    try { out = scene ? await fal(job.image, scene) : { error: 'Décor inconnu' }; } catch { out = { error: 'Fournisseur indisponible' }; }
     const done = await rpc('fiila_studio_complete', { p_job: job.job, p: out }, null);
     return json(200, { configured: true, job: job.job, status: done.status, results: done.results || [], error: done.error || null });
   };

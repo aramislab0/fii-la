@@ -131,7 +131,42 @@ await t('back-office : réservé à l’équipe ; dépense, séries, crédits ; 
   const s = JSON.stringify(await ok('fiila_bo_settings', {}, F));
   assert.ok(s.includes('studio_ready') && s.includes('studio_budget_usd') && s.includes('studio_daily'));
   await ok('fiila_track', { p_event: 'studio', p_variant: 'kept:luxe' });
-  await ko('fiila_track', { p_event: 'studio', p_variant: 'kept:neon' });
+  await ok('fiila_track', { p_event: 'studio', p_variant: 'kept:mode-3' });
+  await ko('fiila_track', { p_event: 'studio', p_variant: 'kept:Néon !' });
+});
+
+await t('décors par catégorie : ceux du pack de la boutique (sinon génériques), ordonnés par ses versions gardées ; services sans Studio', async () => {
+  await db.query(`insert into fiila.studio_scenes (id, category, label, swatch, prompt, rank, version) values
+    ('mode-1', 'mode', 'Mur chaulé', '#EFEAE0', 'minimalist limewashed wall, soft window light [TEST]', 1, '0.1.0'),
+    ('mode-2', 'mode', 'Portant bois', '#E3D2B8', 'light wooden clothing rail, soft morning daylight [TEST]', 2, '0.1.0'),
+    ('bijoux-1', 'bijoux', 'Velours noir', '#151515', 'deep black velvet surface [TEST]', 1, '0.1.0')`);
+  const st = await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid });
+  assert.deepEqual(st.scenes.map((x) => x.id), ['mode-1', 'mode-2'], 'pack « mode », pas les génériques');
+  await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'bijoux-1' }, 'invalid_payload');
+  await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'blanc' }, 'invalid_payload');
+  await db.query(`update fiila.studio_jobs set status = 'failed' where shop_id = $1 and status = 'running'`, [A.id]);
+  const r = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2' });
+  assert.match(r.prompt, /wooden clothing rail/); assert.equal(r.style, 'mode-2');
+  assert.equal((await one(`select scene_version from fiila.studio_jobs where id = $1`, [r.job])).scene_version, '0.1.0');
+  await db.query(`update fiila.studio_jobs set status = 'kept', kept = 0 where id = $1`, [r.job]);
+  assert.deepEqual((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).scenes.map((x) => x.id), ['mode-2', 'mode-1'], 'le décor gardé passe en tête');
+  await db.query(`update fiila.shops set business_type = 'coiffure' where id = $1`, [A.id]);
+  assert.equal((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).ready, false);
+  await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-1' }, 'studio_off');
+  await db.query(`update fiila.shops set business_type = 'chaussures' where id = $1`, [A.id]);
+  assert.deepEqual((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).scenes.map((x) => x.id).sort(), ['blanc', 'fete', 'luxe', 'minimal', 'soleil'], 'catégorie sans pack → génériques');
+  await db.query(`update fiila.shops set business_type = 'mode' where id = $1`, [A.id]);
+});
+
+await t('back-office des décors : résultats par décor ; couper/activer réservé, motif obligatoire, au journal', async () => {
+  await ko('fiila_bo_studio_scenes', {}, null);
+  const l = await ok('fiila_bo_studio_scenes', {}, SUP);
+  const m2 = l.find((x) => x.id === 'mode-2'); assert.equal(m2.kept, 1); assert.equal(m2.series, 1);
+  await ko('fiila_bo_studio_scene_set', { p_id: 'mode-1', p_active: false, p_reason: 'x' }, null, SUP);
+  await ko('fiila_bo_studio_scene_set', { p_id: 'mode-1', p_active: false, p_reason: '' }, 'reason_required', F);
+  await ok('fiila_bo_studio_scene_set', { p_id: 'mode-1', p_active: false, p_reason: 'Peu gardé [TEST]' }, F);
+  assert.deepEqual((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).scenes.map((x) => x.id), ['mode-2']);
+  assert.ok(await one(`select 1 from fiila.admin_log where action = 'studio_scene' and target_id = 'mode-1'`));
 });
 
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
