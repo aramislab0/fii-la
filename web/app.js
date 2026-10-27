@@ -2198,6 +2198,31 @@
     var cart = {}; // ligne (article, taille, couleur) → { id, size, color, qty }
     var byId = {}; products.forEach(function (p) { byId[p.id] = p; });
     var filter = { cat: '', size: '', gender: '', age: '' };
+    // Fii Édition : cœur « Favoris » sur chaque article et « Suivre » la boutique (sans compte).
+    var favs = {};
+    if (!shop.demo && !shop.platform) {
+      api('fiila_favs_in', { p_slug: slug, p_device: deviceId(false) }).then(function (l) { (l || []).forEach(function (id) { favs[id] = true; }); syncHearts(); }, function () {});
+      api('fiila_follow_state', { p_slug: slug, p_device: deviceId(false) }).then(function (r) {
+        FOLLOW[slug] = !!r.following;
+        Array.prototype.forEach.call(document.querySelectorAll('[data-follow="' + slug + '"]'), function (x) { x.classList.toggle('on', !!r.following); x.setAttribute('aria-pressed', r.following ? 'true' : 'false'); x.textContent = r.following ? 'Suivi' : 'Suivre'; });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-followers="' + slug + '"]'), function (x) { x.textContent = countText(r.followers, 'abonné', 'abonnés'); x.hidden = !r.followers; });
+      }, function () {});
+    }
+    function syncHearts() {
+      Array.prototype.forEach.call(document.querySelectorAll('.vheart[data-fav]'), function (b) {
+        var on = !!favs[b.getAttribute('data-fav')]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.setAttribute('aria-label', on ? 'Retirer des favoris' : 'Ajouter aux favoris');
+      });
+    }
+    function heart(p) {
+      if (shop.demo || shop.platform) return null;
+      return h('button', { class: 'vheart' + (favs[p.id] ? ' on' : ''), type: 'button', 'data-fav': p.id, 'aria-pressed': favs[p.id] ? 'true' : 'false',
+        'aria-label': favs[p.id] ? 'Retirer des favoris' : 'Ajouter aux favoris', onclick: function (e) {
+          e.stopPropagation();
+          var on = !favs[p.id]; favs[p.id] = on; syncHearts(); toast(on ? 'Ajouté à vos favoris.' : 'Retiré de vos favoris.');
+          favCall(p.id, on).then(function (r) { favs[p.id] = !!r.fav; syncHearts(); }, function (er) { favs[p.id] = !on; syncHearts(); toast(errText(er)); });
+        } }, icon('heart', 20));
+    }
     function lineKey(id, size, color) { return id + '|' + (size || '') + '|' + (color || ''); }
     function qtyOf(id) { return Object.keys(cart).reduce(function (n, k) { return n + (cart[k].id === id ? cart[k].qty : 0); }, 0); }
     function lineLabel(l) { var v = [l.size, l.color].filter(Boolean).join(' · '); return byId[l.id].name + (v ? ' (' + v + ')' : ''); }
@@ -2283,7 +2308,7 @@
         }, p.name);
       }
       return h('article', { class: 'vcard' + (q.a === p.id ? ' focus' : ''), id: 'p-' + p.id },
-        img,
+        h('div', { class: 'vmedia' }, img, heart(p), p.is_new ? h('span', { class: 'vnew' }, 'Nouveau') : null),
         h('div', { class: 'vbody' },
           h('h3', { class: 'wrapword' }, p.name),
           h('p', { class: 'vprice' }, fcfa(p.price)),
@@ -2357,11 +2382,11 @@
           h('div', { class: 'vprof-top' }, shopLogo(shop), socialCircles(shop.socials, 'vitrine-socials', shop.name)),
           h('div', { class: 'vprof-txt' }, h('h1', { class: 'wrapword' }, shop.name),
             shop.reviews ? ratingEl(shop.rating, shop.reviews) : null,
-            shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null))
+            shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null), followRow())
         : h('header', { class: 'vhead' }, shopLogo(shop),
           h('div', null, h('h1', { class: 'wrapword' }, shop.name),
             shop.reviews ? ratingEl(shop.rating, shop.reviews) : null,
-            shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null)),
+            shop.about ? h('p', { class: 'muted wrapword' }, shop.about) : null, followRow())),
         shop.demo ? h('div', { class: 'demo-banner', id: 'vitrine-demo' }, h('span', null, h('b', null, 'Boutique fictive de démonstration.'), ' Les commandes passées ici ne sont pas livrées.')) : null,
         q.a && !byId[q.a] ? h('p', { class: 'msg', id: 'vitrine-gone' }, 'Cet article n’est plus proposé. Voici les autres articles de la boutique.') : null,
         products.length ? [filters, grid] : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun article pour le moment.')),
@@ -2369,6 +2394,11 @@
       if (products.length) { drawFilters(); drawGrid(); }
       refreshBar();
       if (q.a && byId[q.a]) setTimeout(function () { var el = document.getElementById('p-' + q.a); if (el) el.scrollIntoView({ block: 'center' }); }, 60);
+    }
+    function followRow() {
+      if (shop.demo || shop.platform) return null;
+      return h('div', { class: 'vfollow', id: 'vitrine-follow' }, followBtn(slug, null, 'v-follow'),
+        h('span', { class: 'small muted', 'data-followers': slug, hidden: true }));
     }
     function checkout() {
       var f = { name: '', phone: '', note: '' };
@@ -2403,7 +2433,7 @@
     list();
     // Aperçu d'un modèle premium (?modele=…) : la page seule change, rien n'est enregistré.
     var preview = q.modele && isPremiumTheme(q.modele) && q.modele !== shop.theme ? q.modele : null;
-    var theme = preview || (['galerie', 'catalogue', 'magazine', 'atelier', 'comptoir', 'maison'].indexOf(shop.theme) >= 0 ? shop.theme : 'galerie');
+    var theme = preview || (['galerie', 'catalogue', 'magazine', 'atelier', 'comptoir', 'maison', 'edition'].indexOf(shop.theme) >= 0 ? shop.theme : 'galerie');
     var cover = shop.has_cover ? h('div', { class: 'vcover loading-skel', id: 'vitrine-cover' }) : null;
     if (cover) lazyPhoto(cover, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: 'cover' }).then(function (x) { return x.photo; }); }, '');
     var pg = page(brandBar('Boutique'), cover, root, h('div', { style: 'height:80px' }), footer(true));
@@ -2692,9 +2722,31 @@
     return d;
   }
   var FEED_TABS = [['pour-vous', 'Pour vous'], ['ventes', 'Best-sellers'], ['coeur', 'Coups de cœur']];
+  // Favori (cœur) : fil et site de la boutique ; même identité sans compte que le reste du fil.
+  function favCall(id, on) { return api('fiila_fav', { p_product: id, p_on: on, p_device: deviceId(true) }); }
+  // « Suivre » une boutique (Fii Édition) : sans compte ; état partagé entre les boutons d'une même page.
+  var FOLLOW = {};
+  function followBtn(slug, init, cls) {
+    if (init && FOLLOW[slug] == null) FOLLOW[slug] = !!init.following;
+    var b = h('button', { class: 'follow-btn' + (cls ? ' ' + cls : ''), type: 'button', 'data-follow': slug, onclick: function () {
+      var on = !FOLLOW[slug]; FOLLOW[slug] = on; sync();
+      toast(on ? 'Vous suivez cette boutique : ses nouveautés passent en tête de votre fil.' : 'Vous ne suivez plus cette boutique.');
+      api('fiila_follow', { p_slug: slug, p_on: on, p_device: deviceId(true) }).then(function (r) { FOLLOW[slug] = !!r.following; sync(r.followers); },
+        function (e) { FOLLOW[slug] = !on; sync(); toast(errText(e)); });
+    } });
+    function sync(n) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-follow="' + slug + '"]'), function (x) {
+        x.classList.toggle('on', !!FOLLOW[slug]); x.setAttribute('aria-pressed', FOLLOW[slug] ? 'true' : 'false'); x.textContent = FOLLOW[slug] ? 'Suivi' : 'Suivre';
+      });
+      if (n != null) Array.prototype.forEach.call(document.querySelectorAll('[data-followers="' + slug + '"]'), function (x) { x.textContent = countText(n, 'abonné', 'abonnés'); x.hidden = !n; });
+    }
+    b.classList.toggle('on', !!FOLLOW[slug]); b.setAttribute('aria-pressed', FOLLOW[slug] ? 'true' : 'false'); b.textContent = FOLLOW[slug] ? 'Suivi' : 'Suivre';
+    return b;
+  }
   function countText(n, one, many) { return n === 1 ? '1 ' + one : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ' + many; }
   function postCard(p) {
-    var st = { liked: !!p.liked, saved: !!p.saved, likes: p.likes || 0, saves: p.saves || 0, comments: p.comments || 0 };
+    // Fii Édition (27/10) : un seul cœur « Favoris » (J'aime et Enregistrer réunis) ; « Suivre » la boutique.
+    var st = { fav: !!(p.liked || p.saved), favs: Math.max(p.likes || 0, p.saves || 0), comments: p.comments || 0 };
     var acc = (VT_ACCENTS[p.shop.accent] || VT_ACCENTS.foret)[1];
     var shopHref = '#/b/' + p.shop.slug, buyHref = shopHref + qs({ a: p.id });
     var img;
@@ -2704,35 +2756,31 @@
       lazyPhoto(img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, p.name);
     }
     var burst = h('span', { class: 'post-burst', 'aria-hidden': 'true' }, icon('heart', 72));
-    var likeBtn = h('button', { class: 'post-act', type: 'button', id: 'like-' + p.id, onclick: function () { react('like', !st.liked); } });
-    var saveBtn = h('button', { class: 'post-act', type: 'button', id: 'save-' + p.id, onclick: function () { react('save', !st.saved); } });
+    var likeBtn = h('button', { class: 'post-act', type: 'button', id: 'like-' + p.id, onclick: function () { react(!st.fav); } });
     var likesLine = h('p', { class: 'post-likes' });
     var cLink = h('button', { class: 'post-more', type: 'button', id: 'comments-' + p.id, onclick: function () { openComments(p, st, draw); } });
     function draw() {
-      likeBtn.className = 'post-act' + (st.liked ? ' on' : ''); likeBtn.setAttribute('aria-pressed', st.liked ? 'true' : 'false');
-      likeBtn.setAttribute('aria-label', st.liked ? 'Je n’aime plus' : 'J’aime'); setKids(likeBtn, icon('heart', 26));
-      saveBtn.className = 'post-act' + (st.saved ? ' on' : ''); saveBtn.setAttribute('aria-pressed', st.saved ? 'true' : 'false');
-      saveBtn.setAttribute('aria-label', st.saved ? 'Retirer des enregistrés' : 'Enregistrer'); setKids(saveBtn, icon('bookmark', 26));
-      likesLine.textContent = [st.likes ? countText(st.likes, 'j’aime', 'j’aime') : '', st.saves ? countText(st.saves, 'enregistrement', 'enregistrements') : ''].filter(Boolean).join(' · ');
-      likesLine.hidden = !st.likes && !st.saves;
+      likeBtn.className = 'post-act' + (st.fav ? ' on' : ''); likeBtn.setAttribute('aria-pressed', st.fav ? 'true' : 'false');
+      likeBtn.setAttribute('aria-label', st.fav ? 'Retirer des favoris' : 'Ajouter aux favoris'); setKids(likeBtn, icon('heart', 26));
+      likesLine.textContent = st.favs ? countText(st.favs, 'favori', 'favoris') : '';
+      likesLine.hidden = !st.favs;
       cLink.textContent = st.comments ? (st.comments === 1 ? 'Voir le commentaire' : 'Voir les ' + st.comments + ' commentaires') : 'Ajouter un commentaire';
     }
-    var reactSeq = { like: 0, save: 0 };
-    function react(kind, on) {
-      var key = kind === 'like' ? 'liked' : 'saved', cnt = kind === 'like' ? 'likes' : 'saves', mine = ++reactSeq[kind];
-      var before = { v: st[key], n: st[cnt] };
-      st[key] = on; st[cnt] = Math.max(0, st[cnt] + (on ? 1 : -1)); draw();
-      if (kind === 'save') toast(on ? 'Enregistré. Retrouvez-le dans vos enregistrés.' : 'Retiré des enregistrés.');
-      api('fiila_react', { p_product: p.id, p_kind: kind, p_on: on, p_device: deviceId(true), p_demo: demoMode() }).then(function (r) {
-        if (mine !== reactSeq[kind]) return; // un toucher plus récent fait foi
-        st.likes = r.likes; st.saves = r.saves; st.comments = r.comments; st.liked = !!r.liked; st.saved = !!r.saved; draw();
-      }, function (e) { if (mine !== reactSeq[kind]) return; st[key] = before.v; st[cnt] = before.n; draw(); toast(errText(e)); });
+    var reactSeq = 0;
+    function react(on) {
+      var mine = ++reactSeq, before = { v: st.fav, n: st.favs };
+      st.fav = on; st.favs = Math.max(0, st.favs + (on ? 1 : -1)); draw();
+      toast(on ? 'Ajouté à vos favoris.' : 'Retiré de vos favoris.');
+      favCall(p.id, on).then(function (r) {
+        if (mine !== reactSeq) return; // un toucher plus récent fait foi
+        st.favs = r.favs; st.comments = r.comments; st.fav = !!r.fav; draw();
+      }, function (e) { if (mine !== reactSeq) return; st.fav = before.v; st.favs = before.n; draw(); toast(errText(e)); });
     }
     // Double toucher sur la photo : j'aime (comme Instagram), avec un cœur qui apparaît puis s'efface.
     var lastTap = 0;
     img.addEventListener('click', function () {
       var now = Date.now();
-      if (now - lastTap < 350) { burst.classList.remove('go'); void burst.offsetWidth; burst.classList.add('go'); if (!st.liked) react('like', true); lastTap = 0; }
+      if (now - lastTap < 350) { burst.classList.remove('go'); void burst.offsetWidth; burst.classList.add('go'); if (!st.fav) react(true); lastTap = 0; }
       else lastTap = now;
     });
     function share() {
@@ -2744,15 +2792,17 @@
     var badges = [p.best ? h('span', { class: 'post-badge best' }, icon('star', 14), ' Best-seller' + (p.sold ? ' · ' + countText(p.sold, 'vendu', 'vendus') : '')) : null,
       p.heart ? h('span', { class: 'post-badge heart' }, icon('heart', 14), ' Coup de cœur') : null].filter(Boolean);
     return h('article', { class: 'post', id: 'post-' + p.id, style: '--accent:' + acc },
-      h('a', { class: 'post-head', href: shopHref },
-        h('span', { class: 'post-av', 'aria-hidden': 'true' }, (p.shop.name || '?').trim().charAt(0).toUpperCase()),
-        h('span', { class: 'post-who' }, h('b', { class: 'wrapword' }, p.shop.name), p.shop.type ? h('span', { class: 'small muted' }, typeLabel(p.shop.type)) : null),
-        p.shop.demo || p.shop.platform ? h('span', { class: 'demo-tag' + (p.shop.platform ? ' fl-tag' : '') }, p.shop.demo ? 'Démo' : 'Par Fii') : null),
+      h('div', { class: 'post-headrow' },
+        h('a', { class: 'post-head', href: shopHref },
+          h('span', { class: 'post-av', 'aria-hidden': 'true' }, (p.shop.name || '?').trim().charAt(0).toUpperCase()),
+          h('span', { class: 'post-who' }, h('b', { class: 'wrapword' }, p.shop.name), p.shop.type ? h('span', { class: 'small muted' }, typeLabel(p.shop.type)) : null),
+          p.shop.demo || p.shop.platform ? h('span', { class: 'demo-tag' + (p.shop.platform ? ' fl-tag' : '') }, p.shop.demo ? 'Démo' : 'Par Fii') : null),
+        p.shop.demo ? null : followBtn(p.shop.slug, { following: !!p.shop.following }, 'post-follow')),
       h('div', { class: 'post-media' }, img, burst),
       h('div', { class: 'post-bar' }, likeBtn,
         h('button', { class: 'post-act', type: 'button', 'aria-label': 'Commenter', onclick: function () { openComments(p, st, draw); } }, icon('bubble', 25)),
         h('button', { class: 'post-act', type: 'button', 'aria-label': 'Partager', onclick: share }, icon('share', 26)),
-        h('span', { class: 'grow' }), h('a', { class: 'post-buy', href: buyHref, id: 'buy-' + p.id }, 'Commander'), saveBtn),
+        h('span', { class: 'grow' }), h('a', { class: 'post-buy', href: buyHref, id: 'buy-' + p.id }, 'Commander')),
       h('div', { class: 'post-body' }, likesLine,
         h('p', { class: 'post-cap' }, h('b', { class: 'wrapword' }, p.name), h('span', { class: 'post-price' }, fcfa(p.price))),
         badges.length ? h('p', { class: 'post-badges' }, badges) : null,
@@ -2820,7 +2870,7 @@
     }));
     var empty = { 'pour-vous': 'Les premières publications arrivent bientôt.',
       ventes: 'Pas encore de meilleure vente : le classement se fait sur les commandes livrées des 30 derniers jours.',
-      coeur: 'Pas encore de coup de cœur : touchez ♥ ou Enregistrer sur les articles que vous aimez.' };
+      coeur: 'Pas encore de coup de cœur : touchez ♥ sur les articles que vous aimez.' };
     var pageNo = 0;
     function fetchPage() {
       return api('fiila_posts', { p_tab: tab, p_device: deviceId(false), p_demo: demoMode(), p_page: pageNo });
@@ -2850,21 +2900,29 @@
     }, function () {});
     return page(backBtn(), demoBanner(),
       h('header', { class: 'feed-top' }, h('h1', null, 'Fil Fii'),
-        h('a', { class: 'btn quiet icon-only', href: '#/enregistres', id: 'saved-link', 'aria-label': 'Mes enregistrés' }, icon('bookmark', 24))),
+        h('a', { class: 'btn quiet icon-only', href: '#/enregistres', id: 'saved-link', 'aria-label': 'Mes favoris' }, icon('heart', 24))),
       tabs, listBox, moreBox, join, footer(true));
   }
   function viewSaved() {
-    return api('fiila_saved', { p_device: deviceId(false) }).then(function (list) {
-      return page(backBtn('Fil', '#/boutiques'), h('h1', null, 'Mes enregistrés'),
+    return Promise.all([api('fiila_saved', { p_device: deviceId(false) }), api('fiila_follows', { p_device: deviceId(false) }).then(null, function () { return []; })]).then(function (rr) {
+      var list = rr[0], shops = rr[1] || [];
+      shops.forEach(function (x) { FOLLOW[x.slug] = true; });
+      return page(backBtn('Fil', '#/boutiques'), h('h1', null, 'Mes favoris'),
+        shops.length ? h('section', { class: 'stack tight', id: 'followed' }, h('h2', { class: 'fav-h' }, 'Boutiques suivies'),
+          h('div', { class: 'followed-row' }, shops.map(function (x) {
+            return h('a', { class: 'followed', href: '#/b/' + x.slug }, h('span', { class: 'post-av', 'aria-hidden': 'true' }, (x.name || '?').trim().charAt(0).toUpperCase()),
+              h('b', { class: 'wrapword' }, x.name), x.news ? h('span', { class: 'chip ok' }, x.news + ' nouveauté' + (x.news > 1 ? 's' : '')) : null);
+          }))) : null,
+        list.length || shops.length ? h('h2', { class: 'fav-h' }, 'Articles') : null,
         list.length ? h('div', { class: 'saved-grid', id: 'saved-grid' }, list.map(function (p) {
           var img = h('span', { class: 'saved-img loading-skel' });
           lazyPhoto(img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, '');
           return h('a', { class: 'saved-tile', href: '#/b/' + p.shop.slug + qs({ a: p.id }), 'aria-label': p.name + ', ' + fcfa(p.price) + ', ' + p.shop.name },
             img, h('span', { class: 'saved-cap' }, h('b', { class: 'wrapword' }, p.name), h('span', null, fcfa(p.price))));
-        })) : h('div', { class: 'card', id: 'saved-empty' }, h('p', { class: 'muted' }, 'Touchez l’icône Enregistrer sous une publication pour la retrouver ici.'),
+        })) : h('div', { class: 'card', id: 'saved-empty' }, h('p', { class: 'muted' }, 'Touchez le cœur d’un article pour le retrouver ici.'),
           h('a', { class: 'btn', href: '#/boutiques' }, 'Voir le fil')),
         footer(true));
-    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger vos enregistrés', errText(e), retryBtn()), footer()); });
+    }, function (e) { return page(backBtn(), stateCard('!', 'Impossible de charger vos favoris', errText(e), retryBtn()), footer()); });
   }
   function viewShops() {
     return loadFeed().then(function (d) {
@@ -3072,8 +3130,8 @@
      chaque choix se fait en un toucher (pas de double validation). Modèles premium : réservés aux abonnés Premium,
      visibles et prévisualisables par tous. */
   var VT_PREMIUM = [['atelier', 'Atelier', 'Mode, couture, prêt-à-porter'], ['comptoir', 'Comptoir', 'Restauration, traiteur, pâtisserie'],
-    ['maison', 'Maison', 'Beauté, cosmétiques, déco']];
-  function isPremiumTheme(t) { return t === 'atelier' || t === 'comptoir' || t === 'maison'; }
+    ['maison', 'Maison', 'Beauté, cosmétiques, déco'], ['edition', 'Édition', 'Mode, enfants, chaussures · noir et blanc']];
+  function isPremiumTheme(t) { return t === 'atelier' || t === 'comptoir' || t === 'maison' || t === 'edition'; }
   TRACKABLE.premium = [];
   VT_PREMIUM.forEach(function (t) { ['locked', 'preview', 'interest', 'applied'].forEach(function (a) { TRACKABLE.premium.push(t[0] + ':' + a); }); });
   function viewVitrineLook(q) {
@@ -7205,8 +7263,9 @@
   function productStats(id) {
     var line = h('p', { class: 'small muted', id: 'product-stats', hidden: true });
     sapi('fiila_product_stats', { p_id: id }).then(function (r) {
-      var parts = [r.likes ? countText(r.likes, 'j’aime', 'j’aime') : '', r.comments ? countText(r.comments, 'commentaire', 'commentaires') : '',
-        r.saves ? countText(r.saves, 'enregistrement', 'enregistrements') : '', r.sold ? countText(r.sold, 'vendu', 'vendus') + ' (30 j)' : ''].filter(Boolean);
+      var fv = Math.max(r.likes || 0, r.saves || 0);
+      var parts = [fv ? countText(fv, 'favori', 'favoris') : '', r.comments ? countText(r.comments, 'commentaire', 'commentaires') : '',
+        r.sold ? countText(r.sold, 'vendu', 'vendus') + ' (30 j)' : ''].filter(Boolean);
       if (parts.length) { line.textContent = 'Dans le fil : ' + parts.join(' · '); line.hidden = false; }
     }, function () {});
     return line;
@@ -8911,6 +8970,17 @@
   // ----- Fii Studio : ouvert ou non, dépense du mois face au budget, séries (gardées, en échec), crédits des boutiques ;
   // accorder ou retirer des crédits (motif obligatoire, au journal). docs/PLAN-FII-STUDIO.md.
   var STUDIO_ST = { running: ['warn', 'En cours'], done: ['info', 'Proposée'], kept: ['ok', 'Gardée'], failed: ['danger', 'Échec'] };
+  // Audience (Fii Édition, 27/10) : abonnés et favoris de la boutique, total et 30 jours, articles les plus mis en favori.
+  function boShopAudience(id) {
+    var box = h('section', { class: 'card stack tight', id: 'bo-shop-audience' }, h('h2', null, 'Audience'), loading());
+    api('fiila_bo_shop_audience', { p_shop: id }).then(function (a) {
+      setKids(box, h('h2', null, 'Audience'),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Abonnés'), h('span', { id: 'bo-followers' }, boNum(a.followers) + (a.followers_30 ? ' (+' + boNum(a.followers_30) + ' en 30 j)' : ''))),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Favoris'), h('span', { id: 'bo-favs' }, boNum(a.favs) + (a.favs_30 ? ' (+' + boNum(a.favs_30) + ' en 30 j)' : ''))),
+        a.top.length ? h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Les plus aimés'), h('span', null, a.top.map(function (x) { return x.name + ' (' + x.favs + ')'; }).join(' · '))) : null);
+    }, function (e) { setKids(box, h('h2', null, 'Audience'), h('p', { class: 'small muted' }, errText(e))); });
+    return box;
+  }
   // Propriétaire et pièce d'identité d'une boutique (fondateur, 27/10) : voir, ouvrir la pièce (journalisé), valider ou refuser.
   function boShopIdentity(id) {
     var box = h('section', { class: 'card stack tight', id: 'bo-shop-identity' }, h('h2', null, 'Propriétaire et identité'), loading());
@@ -9143,6 +9213,7 @@
           })) : '—')) : null,
         boShopTeam(s, id),
         boCan('shops_write') && !s.platform ? boShopIdentity(id) : null,
+        boShopAudience(id),
         s.recent_orders ? h('section', { class: 'stack tight' }, h('h2', null, 'Dernières commandes'),
           boTable([{ label: 'N°', get: function (o) { return String(o.number).padStart(4, '0'); } }, { label: 'Total', get: function (o) { return fcfa(o.total); }, cls: 'num' },
             { label: 'Statut', get: boOrderState }, { label: 'Date', get: function (o) { return boDate(o.created_at, true); } }], s.recent_orders || [],

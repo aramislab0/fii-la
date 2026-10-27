@@ -83,12 +83,13 @@ await t('fil : une publication par article (boutique, photo, actions, prix, « C
   await shot(A, '01-fil');
 });
 
-await t('j’aime : bouton, puis double toucher sur la photo ; gardé après rechargement', async () => {
+await t('favori (un seul cœur, Fii Édition) : bouton, puis double toucher sur la photo ; gardé après rechargement', async () => {
+  assert.equal(await A.locator(`#save-${P1.id}`).count(), 0, 'plus de bouton « Enregistrer » séparé');
   await A.click(`#like-${P1.id}`);
-  await A.locator(`#post-${P1.id} .post-likes`).getByText('1 j’aime').waitFor();
+  await A.locator(`#post-${P1.id} .post-likes`).getByText('1 favori').waitFor();
   assert.equal(await A.getAttribute(`#like-${P1.id}`, 'aria-pressed'), 'true');
   await A.locator(`#post-${P2.id} .post-img`).dblclick();
-  await A.locator(`#post-${P2.id} .post-likes`).getByText('1 j’aime').waitFor();
+  await A.locator(`#post-${P2.id} .post-likes`).getByText('1 favori').waitFor();
   await A.waitForTimeout(400);
   await A.reload();
   await A.locator(`#like-${P1.id}[aria-pressed="true"]`).waitFor();
@@ -98,16 +99,16 @@ await t('j’aime : bouton, puis double toucher sur la photo ; gardé après rec
   await A.locator(`#post-${P2.id} .post-likes`).waitFor({ state: 'hidden' });
 });
 
-await t('enregistrer : « Mes enregistrés » montre l’article, qui ouvre la vitrine sur lui', async () => {
-  await A.click(`#save-${P2.id}`);
-  await A.getByText('Enregistré. Retrouvez-le dans vos enregistrés.').waitFor();
-  await A.locator(`#post-${P2.id} .post-likes`).getByText('1 enregistrement').waitFor();
+await t('« Mes favoris » montre l’article (un cœur = J’aime + Enregistrer), qui ouvre la vitrine sur lui', async () => {
+  await A.click(`#like-${P2.id}`);
+  await A.getByText('Ajouté à vos favoris.').waitFor();
+  await A.locator(`#post-${P2.id} .post-likes`).getByText('1 favori').waitFor();
   await A.click('#saved-link');
   await A.locator('#saved-grid .saved-tile').first().waitFor();
-  assert.equal(await A.locator('#saved-grid .saved-tile').count(), 1);
-  await A.locator('#saved-grid .saved-img img').waitFor();
+  assert.equal(await A.locator('#saved-grid .saved-tile').count(), 2, 'P1 et P2 en favoris');
+  await A.locator('#saved-grid .saved-img img').first().waitFor();
   await shot(A, '02-enregistres');
-  await A.locator('#saved-grid .saved-tile').click();
+  await A.locator('#saved-grid .saved-tile').first().click();
   await A.locator(`#p-${P2.id}.focus`).waitFor();
 });
 
@@ -121,7 +122,7 @@ await t('onglets : Meilleures ventes (commande livrée) et Coups de cœur, avec 
   await A.click('#tab-coeur');
   await A.locator('#tab-coeur[aria-selected="true"]').waitFor();
   await A.locator(`#post-${P1.id}`).waitFor();
-  assert.equal(await A.locator('#posts .post').count(), 2, 'P1 (j’aime) et P2 (enregistré)');
+  assert.equal(await A.locator('#posts .post').count(), 2, 'P1 et P2 en favoris');
   await A.locator(`#post-${P1.id}`).getByText('Coup de cœur').waitFor();
   await shot(A, '04-coups-de-coeur');
 });
@@ -202,7 +203,32 @@ await t('modération : le fondateur voit le commentaire masqué (3 signalements)
 await t('page de l’article (boutique) : une ligne « Dans le fil »', async () => {
   const S = SHOP;
   await S.goto(URL0 + '#/boutique/article/' + P2.id);
-  await S.locator('#product-stats').getByText(/Dans le fil : .*1 enregistrement.*1 vendu/).waitFor();
+  await S.locator('#product-stats').getByText(/Dans le fil : .*1 favori.*1 vendu/).waitFor();
+});
+
+await t('Fii Édition : « Suivre » la boutique depuis son site (abonnés), cœur sur le site, « Boutiques suivies » ; modèle Édition', async () => {
+  const V = await newPhone();
+  await V.goto(URL0 + '#/b/' + SLUG);
+  await V.locator('#vitrine-follow .follow-btn').waitFor();
+  assert.equal(await V.textContent('#vitrine-follow .follow-btn'), 'Suivre');
+  await V.click('#vitrine-follow .follow-btn');
+  await V.locator('#vitrine-follow .follow-btn[aria-pressed="true"]').getByText('Suivi').waitFor();
+  await V.locator('#vitrine-follow [data-followers]').getByText('1 abonné').waitFor();
+  await V.click(`.vheart[data-fav="${P1.id}"]`);
+  await V.locator(`.vheart[data-fav="${P1.id}"][aria-pressed="true"]`).waitFor();
+  await V.reload();
+  await V.locator(`.vheart[data-fav="${P1.id}"][aria-pressed="true"]`).waitFor();
+  await V.locator('#vitrine-follow .follow-btn[aria-pressed="true"]').waitFor();
+  await V.goto(URL0 + '#/enregistres');
+  await V.locator('#followed .followed').getByText('Mode Awa (test)').waitFor();
+  await V.locator('#saved-grid .saved-tile').first().waitFor();
+  await shot(V, '06-favoris-suivies');
+  await local.db.query(`update fiila.shops set plan = 'premium', theme = 'edition' where slug = $1`, [SLUG]);
+  await V.goto(URL0 + '#/'); await V.goto(URL0 + '#/b/' + SLUG);
+  await V.locator('.vt-edition #vitrine-products').waitFor();
+  assert.equal(await V.evaluate(() => document.documentElement.getAttribute('data-vt')), 'edition');
+  await shot(V, '07-modele-edition');
+  await local.db.query(`update fiila.shops set plan = 'free', theme = 'galerie' where slug = $1`, [SLUG]);
 });
 
 await t('aucune erreur JavaScript', async () => { assert.deepEqual(pages.flatMap((p) => p.__errors), []); });

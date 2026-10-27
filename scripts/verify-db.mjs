@@ -36,7 +36,7 @@ const EXPECTED_FUNCTIONS = [
   // Ma boutique → Marketing (20261022300000)
   'fiila_shop_stats',
   // domaine propre d'une boutique (20261024100000) — fiila_domain_cf_update : clé de service seulement
-  'fiila_domains', 'fiila_domain_add', 'fiila_domain_remove', 'fiila_domain_target', 'fiila_domain_resolve', 'fiila_bo_domains', 'fiila_bo_domain_action', 'fiila_studio_state', 'fiila_studio_reserve', 'fiila_studio_keep', 'fiila_studio_result', 'fiila_bo_studio', 'fiila_bo_studio_grant', 'fiila_bo_studio_scenes', 'fiila_bo_studio_scene_set', 'fiila_studio_state_shop', 'fiila_shop_identity', 'fiila_shop_owner_save', 'fiila_shop_kyc_submit', 'fiila_bo_shop_identity', 'fiila_bo_kyc_doc', 'fiila_bo_kyc_decide', 'fiila_bo_kyc_list',
+  'fiila_domains', 'fiila_domain_add', 'fiila_domain_remove', 'fiila_domain_target', 'fiila_domain_resolve', 'fiila_bo_domains', 'fiila_bo_domain_action', 'fiila_studio_state', 'fiila_studio_reserve', 'fiila_studio_keep', 'fiila_studio_result', 'fiila_bo_studio', 'fiila_bo_studio_grant', 'fiila_bo_studio_scenes', 'fiila_bo_studio_scene_set', 'fiila_studio_state_shop', 'fiila_shop_identity', 'fiila_shop_owner_save', 'fiila_shop_kyc_submit', 'fiila_bo_shop_identity', 'fiila_bo_kyc_doc', 'fiila_bo_kyc_decide', 'fiila_bo_kyc_list', 'fiila_fav', 'fiila_favs_in', 'fiila_follow', 'fiila_follow_state', 'fiila_follows', 'fiila_bo_shop_audience',
 ].sort();
 const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 await c.connect();

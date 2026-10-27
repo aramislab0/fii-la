@@ -3,6 +3,8 @@
    (repère de carte en SVG, point central de la carte, champ du toast : la carte et le toast restent lisibles quel que soit le thème). */
 @font-face{font-family:"Cormorant Garamond";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/cormorant-garamond-latin-600-normal.woff2) format("woff2")}
 @font-face{font-family:"Bricolage Grotesque";font-style:normal;font-weight:800;font-display:swap;src:url(fonts/bricolage-grotesque-latin-800-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/jost-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Jost";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/jost-latin-600-normal.woff2) format("woff2")}
 @font-face{font-family:"Instrument Serif";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/instrument-serif-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Montserrat";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/montserrat-latin-400-normal.woff2) format("woff2")}
 @font-face{font-family:"Montserrat";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/montserrat-latin-600-normal.woff2) format("woff2")}
@@ -2108,3 +2110,54 @@ html.kbd .tabbar{display:none}
 .kyc-doc{display:grid;gap:10px}
 .kyc-doc img{width:100%;max-width:520px;border-radius:12px;border:1px solid var(--line)}
 @media (max-width:360px){.look-slots{grid-template-columns:1fr}}
+
+/* ===== Fii Édition, lot 1 (27/10) : cœur « Favoris », « Suivre », modèle premium Édition (noir et blanc). */
+.post-headrow{display:flex;align-items:center;gap:8px}
+.post-headrow .post-head{flex:1;min-width:0}
+.follow-btn{flex:none;min-height:34px;padding:0 14px;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--bg);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.follow-btn.on{background:transparent;color:var(--ink)}
+.vfollow{display:flex;align-items:center;gap:10px;margin-top:8px}
+.vmedia{position:relative}
+.vheart{position:absolute;top:8px;right:8px;width:38px;height:38px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;
+  background:rgba(255,255,255,.88);color:#17201B;box-shadow:0 2px 8px rgba(0,0,0,.12);transition:transform .12s}
+.vheart:active{transform:scale(.88)}
+.vheart .ico{fill:none}
+.vheart.on{color:#C0392B}.vheart.on .ico{fill:currentColor}
+.post-act.on .ico{fill:currentColor}
+.vnew{position:absolute;left:8px;top:10px;background:#FFFFFF;color:#17201B;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:5px 7px}
+.fav-h{font-size:17px;margin:6px 0 0}
+.followed-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.followed-row::-webkit-scrollbar{display:none}
+.followed{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;width:96px;padding:12px 8px;border-radius:18px;background:var(--surface);border:1px solid var(--line);text-decoration:none;color:var(--ink);text-align:center;font-size:13px}
+/* Modèle Édition : blanc, noir, capitales espacées (Jost), images bord à bord, angles droits. */
+:root:root[data-vt="edition"]{--bg:#FFFFFF;--surface:#FFFFFF;--surface-2:#F4F4F4;--surface-3:#E9E9E9;--ink:#0E0E0E;--muted:#7A7A7A;--line:#E7E7E7;--green:#0E0E0E;--green-press:#000;--on-green:#FFFFFF;--soft:#F4F4F4;color-scheme:light}
+.vt-edition .vhead,.vt-edition .vprof{text-align:center;align-items:center;justify-content:center}
+.vt-edition .vhead h1{font-family:"Jost","Futura","Avenir Next",sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.3em;font-size:24px;line-height:1.15}
+.vt-edition .vavatar{border-radius:50%;background:#0E0E0E}
+.vt-edition .vcover{border-radius:0;height:auto;aspect-ratio:4/5;max-height:72vh;margin:0 -16px}
+.vt-edition .vgrid{gap:18px 2px;margin:0 -16px}
+.vt-edition .vcard{border-radius:0;box-shadow:none;background:transparent;padding:0}
+.vt-edition .vimg{border-radius:0}
+.vt-edition .vbody{padding:8px 12px 2px;gap:2px}
+.vt-edition .vbody h3{font-family:"Jost","Futura",sans-serif;font-weight:600;font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+.vt-edition .vprice{font-weight:500;font-size:13px}
+.vt-edition .btn,.vt-edition .opt,.vt-edition .follow-btn,.vt-edition .vsoc{border-radius:0}
+.vt-edition .opt{font-family:"Jost",sans-serif;text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:500;border-color:transparent;background:transparent;border-bottom:2px solid transparent}
+.vt-edition .opt.on{background:transparent;color:var(--ink);border-bottom-color:var(--ink)}
+.vt-edition .vheart{background:transparent;box-shadow:none;color:#0E0E0E}
+.vt-edition .vheart.on{color:#0E0E0E}
+.vt-edition .safe-line{border-radius:0;background:var(--surface-2)}
+.vt-edition .vfollow{justify-content:center}
+.vt-mini-edition{grid-template-columns:1fr 1fr;grid-template-rows:1.4fr 1fr;background:#FFFFFF;border-radius:2px;gap:2px}
+.vt-mini-edition i{border-radius:0;background:#0E0E0E;opacity:.85}.vt-mini-edition i:first-child{grid-column:1/-1;opacity:1}
+.vtp-edition .lp-name{font-family:"Jost",sans-serif;font-weight:600;letter-spacing:.3em;text-transform:uppercase;font-size:18px}
+.vtp-edition{background:#FFFFFF;color:#0E0E0E;border-radius:4px}.vtp-edition .lp-grid i{border-radius:0}
+.vt-edition.vt{--accent:#0E0E0E !important}
+.vt-edition .vhead{flex-direction:column;gap:12px;text-align:center}
+.vt-edition .vhead > div{display:flex;flex-direction:column;align-items:center;gap:6px}
+.vt-edition .vprof-top{justify-content:center}
+.vt-edition .vprof-txt{align-items:center;text-align:center}
+.vt-edition .vcover{aspect-ratio:4/3}
+.vt-edition .add-btn,.vt-edition .btn{background:#0E0E0E;border-color:#0E0E0E;color:#FFFFFF}
+.vt-edition .btn.ghost{background:transparent;color:#0E0E0E}
+.followed .post-av{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--green);color:var(--on-green);font-weight:800}

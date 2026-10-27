@@ -54,6 +54,8 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 | Journal | Toutes les actions de l'équipe (qui, quoi, quand), non modifiables depuis le back-office |
 | Réglages | Nouvel accueil (`onboarding_v2` : 1 = nouvel accueil, 0 = ancien, sans redéploiement), suggestion après une action (`discover_after`), commission du vide-dressing, gains des 3 niveaux d'ambassadeur, plafond mensuel, code SMS obligatoire pour rejoindre une équipe de boutique, Manager avec IA (0/1), suggestions de découverte (0/1), API WhatsApp du Manager (0/1), carte image avec la demande d'adresse (`wa_card_media` : 1 = image + texte, 0 = texte seul), photos servies par le stockage (`media_cdn` : 1 = stockage, 0 = retour aux photos servies par la base), accueil adaptatif (`adaptive_home` : 1 = appris des réussites, 0 = règle d'avant), suggestions une par une (`sugg_home_shop`, `sugg_shop_more_products`, `sugg_shop_share_vitrine`, `sugg_shop_courier`, `sugg_shop_photos`, `sugg_shop_team` : 1 = active, 0 = coupée) ; en tête de page, **Photos (stockage)** (22/10) : photos copiées et espace utilisé, en attente, dernière copie, échecs des 7 derniers jours, bouton « Copier maintenant » ; bornes contrôlées |
 
+Fiche d'une boutique, carte **Audience** (Fii Édition, 27/10) : abonnés (« Suivre ») et favoris (cœur), au total et sur 30 jours, et les 3 articles les plus mis en favori. Droit : `shops`.
+
 Actions possibles sur la fiche d'une boutique :
 - suspendre, avec un motif obligatoire. Le site est mis hors ligne, la boutique sort du fil et ne peut pas rouvrir son site elle-même ;
 - réactiver ;

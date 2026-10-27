@@ -385,6 +385,7 @@ await t('identité du propriétaire (27/10) : fiche boutique, file « Identités
   await D.goto(URL0 + '#/bo/boutiques/' + SID);
   await D.locator('#bo-shop-identity').getByText('Exigée, non envoyée').waitFor();
   await D.locator('#bo-kyc-blocked').waitFor();
+  await D.locator('#bo-shop-audience').getByText('Abonnés').waitFor(); // Fii Édition : abonnés et favoris de la boutique
   const IMG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(4000, 7)]).toString('base64');
   await ok('fiila_shop_kyc_submit', { p_key: KEY, p_doc_type: 'passport', p_front: IMG });
   await D.goto(URL0 + '#/bo/identites');
