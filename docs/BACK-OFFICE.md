@@ -19,6 +19,8 @@
 - **Jamais sans super admin** : la base refuse de retirer, rétrograder ou supprimer le compte du dernier super admin.
 - **Consultations journalisées** : ouvrir une commande ou un compte laisse une ligne au journal. Le lien de facture d'un client n'est jamais montré au back-office.
 
+- **Code chargé à part** (27/10, HANDOFF #75) : le back-office est dans `web/bo.js`, téléchargé seulement à l'ouverture de `#/bo` ; la page reçue par les clientes ne le contient plus. Un outil de `app.js` utilisé dans `bo.js` doit être ajouté à `boShared()` (app.js) et à la ligne `var … = F.…` (bo.js) : `tests/bosplit.sql.test.mjs` le vérifie.
+
 ## Rôles
 
 | Rôle | Accès |
@@ -55,6 +57,8 @@ C'est la base qui vérifie chaque droit (`fiila.staff_can`). L'interface ne fait
 | Réglages | Nouvel accueil (`onboarding_v2` : 1 = nouvel accueil, 0 = ancien, sans redéploiement), suggestion après une action (`discover_after`), commission du vide-dressing, gains des 3 niveaux d'ambassadeur, plafond mensuel, code SMS obligatoire pour rejoindre une équipe de boutique, Manager avec IA (0/1), suggestions de découverte (0/1), API WhatsApp du Manager (0/1), carte image avec la demande d'adresse (`wa_card_media` : 1 = image + texte, 0 = texte seul), photos servies par le stockage (`media_cdn` : 1 = stockage, 0 = retour aux photos servies par la base), accueil adaptatif (`adaptive_home` : 1 = appris des réussites, 0 = règle d'avant), suggestions une par une (`sugg_home_shop`, `sugg_shop_more_products`, `sugg_shop_share_vitrine`, `sugg_shop_courier`, `sugg_shop_photos`, `sugg_shop_team` : 1 = active, 0 = coupée) ; en tête de page, **Photos (stockage)** (22/10) : photos copiées et espace utilisé, en attente, dernière copie, échecs des 7 derniers jours, bouton « Copier maintenant » ; bornes contrôlées |
 
 Fiche d'une boutique, carte **Audience** (Fii Édition, 27/10) : abonnés (« Suivre ») et favoris (cœur), au total et sur 30 jours, et les 3 articles les plus mis en favori. Droit : `shops`.
+
+Croissance → ligne **Réglages et Studio v2** (`#bo-settings-line`, 27/10, 30 jours, anonyme) : bouton « Compléter » de la carte « presque prête » par étape (site, article, logo, couverture, livraison, propriétaire), tuiles touchées, « Partager mon site » ; Studio : mode Fidèle / Premium choisi, comparaison avant / après utilisée, « Publier sur mes réseaux » après « Bravo », « Terminé ». Les séries, crédits et versions gardées restent dans la section Studio. Tests : `settingsv2.sql`, `backoffice`.
 
 Fiche d'une boutique, carte **Fiche article** (Fii Édition V1, 27/10) : livraison, paiement et échange choisis par la boutique (« Non indiqué » sinon), nombre d'articles en promo (prix barré) et d'articles avec des tailles épuisées. Droit : `shops`. Croissance → ligne **Sites des boutiques** (`#bo-site-line`, 30 jours, anonyme) : fiche article ouverte, ajout depuis la fiche, guide des tailles, « Complétez le look » touché, rubriques touchées. Réglages → `site_look` : nombre d'articles de « Complétez le look » (0 = masqué, 6 au plus, 3 par défaut), journalisé. Tests : `editionv1.sql`, `backoffice`.
 

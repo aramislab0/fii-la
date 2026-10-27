@@ -66,7 +66,7 @@ await t('commerçante : boutique sans compte, invitation du livreur sur son What
   await S.locator('#setup-later').click();
   await S.locator('#shop-title').waitFor();
   await S.getByRole('link', { name: 'Réglages' }).click();
-  if (!(await S.locator('#courier-section').evaluate((d) => d.open))) await S.locator('#courier-section summary').click();
+  await S.click('#tile-courier'); // Réglages v2 : le livreur s'ouvre depuis sa tuile
   await S.fill('#courier-name', 'Ibou');
   await S.fill('#courier-phone', '76 333 33 33');
   await S.click('#courier-invite');
@@ -88,10 +88,14 @@ await t('livreur : ouvre l’invitation, crée son espace sans compte, accepte',
   await L.getByText('Aucune course pour l’instant.').waitFor();
   await L.getByText('Livreur attitré de : Boutique Fatim (test).').waitFor();
   await S.reload();
-  // la boutique confirme que c'est bien son livreur (audit S4)
+  // la boutique confirme que c'est bien son livreur (audit S4) ; Réglages v2 : tuile « à confirmer », puis sa feuille
+  await S.locator('#tile-courier').getByText('Ibou · à confirmer').waitFor();
+  await S.click('#tile-courier');
   await S.locator('#courier-to-confirm').getByText('Ibou').waitFor();
   await S.click('#courier-confirm');
   await S.getByText('Ibou est votre livreur.').waitFor();
+  await S.locator('#tile-courier').getByText('Ibou', { exact: true }).waitFor();
+  await S.click('#tile-courier');
   await S.locator('#courier-auto').getByText('Automatique').waitFor();
 });
 

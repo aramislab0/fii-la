@@ -58,10 +58,10 @@ await t('propriétaire : Réglages → Équipe (section repliée), invitation av
   await O.click('#shop-save');
   await O.locator('#shop-setup[data-step="2"]').waitFor();
   await O.goto(URL0 + '#/boutique/reglages');
-  const sec = O.locator('#team-section');
-  await sec.waitFor();
-  assert.equal(await sec.evaluate((d) => d.open), false, 'section repliée par défaut');
-  await sec.locator('summary').click();
+  // Réglages v2 : l'équipe s'ouvre depuis sa tuile, dans une feuille.
+  await O.locator('#tile-team').getByText('Vous seul(e)').waitFor();
+  await O.click('#tile-team');
+  await O.locator('#team-section').waitFor();
   await O.locator('#team-list').getByText('Awa Ndiaye').waitFor();
   assert.match(await O.locator('#team-list').textContent(), /Propriétaire/);
   await O.click('#team-add');
@@ -121,7 +121,7 @@ await t('éditrice : crée un article ; pas de suppression ; Réglages réduits 
 
 await t('propriétaire : voit Fatou, la passe administratrice, puis la retire ; l’accès s’arrête aussitôt', async () => {
   await O.goto(URL0 + '#/'); await O.goto(URL0 + '#/boutique/reglages');
-  await O.locator('#team-section summary').click();
+  await O.click('#tile-team');
   const row = O.locator('#team-list li', { hasText: 'Fatou Sow' });
   await row.locator('.small.muted').getByText('Éditeur').waitFor();
   await row.getByRole('button', { name: 'Modifier' }).click();
@@ -131,7 +131,8 @@ await t('propriétaire : voit Fatou, la passe administratrice, puis la retire ; 
   await shot(O, '06-equipe');
   // Administratrice : elle voit les réglages et l'équipe, mais pas la suppression de la boutique.
   await E.goto(URL0 + '#/'); await E.goto(URL0 + '#/boutique/reglages');
-  await E.locator('#shop-name').waitFor();
+  await E.locator('#tile-info').waitFor();
+  await E.click('#tile-team');
   await E.locator('#team-section').waitFor();
   assert.equal(await E.locator('#shop-delete-box').count(), 0);
   await E.locator('#shop-leave-box').waitFor();
@@ -151,7 +152,7 @@ await t('lien déjà utilisé ; aucun débordement à 320 px', async () => {
   assert.ok(await noOverflow(S));
   await O.setViewportSize({ width: 320, height: 800 });
   await O.goto(URL0 + '#/'); await O.goto(URL0 + '#/boutique/reglages');
-  await O.locator('#team-section summary').click();
+  await O.click('#tile-team');
   await O.click('#team-add');
   await O.locator('#team-phone').waitFor();
   assert.ok(await noOverflow(O), 'réglages et équipe sans débordement à 320 px');
@@ -181,7 +182,7 @@ await t('code SMS exigé (réglage) : l’invitée confirme le numéro invité, 
   await local.db.query(`update fiila.settings set value = '1' where key = 'sms_verify'`);
   await O.setViewportSize(phone.viewport);
   await O.goto(URL0 + '#/'); await O.goto(URL0 + '#/boutique/reglages');
-  await O.locator('#team-section summary').click();
+  await O.click('#tile-team');
   await O.click('#team-add');
   await O.fill('#team-name', 'Mame Diarra');
   await O.fill('#team-phone', '77 333 44 55');
@@ -201,7 +202,7 @@ await t('code SMS exigé (réglage) : l’invitée confirme le numéro invité, 
   await M.click('#pv-ok');
   await M.getByText('Vous avez rejoint Boutique Awa (test).').waitFor();
   await O.goto(URL0 + '#/'); await O.goto(URL0 + '#/boutique/reglages');
-  await O.locator('#team-section summary').click();
+  await O.click('#tile-team');
   await O.locator('#team-list li', { hasText: 'Mame Diarra' }).getByText('numéro confirmé').waitFor();
   await local.db.query(`update fiila.settings set value = '0' where key = 'sms_verify'`);
 });

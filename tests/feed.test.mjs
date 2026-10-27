@@ -138,6 +138,8 @@ await t('boutique : place gratuite affichée dans les réglages ; « Ne pas appa
   await S.goto(URL0 + '#/confidentialite');
   await S.evaluate((k) => localStorage.setItem('fiila.shop', JSON.stringify({ key: k })), KEYS[1]);
   await S.goto(URL0 + '#/boutique/reglages');
+  await S.locator('#feed-row').getByText('Place gratuite n° 2').waitFor(); // Réglages v2 : une ligne dans « Mon site »
+  await S.click('#feed-row');
   await S.locator('#feed-status').waitFor();
   assert.match(await S.locator('#feed-status').textContent(), /Place gratuite n° 2 sur 25/);
   await S.locator('#feed-on').getByText('Ne pas apparaître').click();

@@ -141,7 +141,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --ignore-scripts
-      - name: Compresser le code (app.js, styles.css, theme.js)
+      - name: Compresser le code (app.js, bo.js, styles.css, theme.js)
         run: node scripts/minify.mjs web
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

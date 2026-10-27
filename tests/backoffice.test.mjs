@@ -173,6 +173,7 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   await D.getByText('Suggestion activée.').waitFor();
   assert.match(await D.locator('#bo-premium-line').textContent(), /Modèles Premium \(30 jours\) : Atelier.*Boutiques Premium : \d+/);
   assert.match(await D.locator('#bo-site-line').textContent(), /fiche article ouverte \d+ .*Promos \d+/); // Fii Édition V1
+  assert.match(await D.locator('#bo-settings-line').textContent(), /Réglages v2 \(30 jours\).*Studio v2 : Fidèle \d+/); // Réglages et Studio v2
   // Messages WhatsApp (WHATSAPP-001) : registre, aperçu, état Meta saisi à la main et journalisé.
   await D.locator('#bo-wa-table').waitFor();
   assert.equal(await D.locator('#bo-wa-table tbody tr').count(), 6);

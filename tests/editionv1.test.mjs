@@ -156,14 +156,15 @@ await t('boutique : prix barré et tailles épuisées sur l’article ; livraiso
   await B.waitForURL(/#\/boutique\/articles/);
   const r = (await local.db.query(`select price_was, sizes_out from fiila.products where id = $1`, [ROBE.id])).rows[0];
   assert.equal(Number(r.price_was), 15000); assert.deepEqual(r.sizes_out.sort(), ['6 ans', '8 ans']);
-  await B.goto(URL0 + '#/boutique/vitrine');
-  await B.locator('#look-pol-delivery [data-v="24h"][aria-checked="true"]').waitFor();
-  await B.locator('#look-pol-delivery [data-v="48h"]').click();
-  await B.locator('#look-pol-pay [data-v="om"]').click();
-  await B.locator('#look-policies').scrollIntoViewIfNeeded();
+  // Réglages v2 : « Livraison et paiement » est une tuile des réglages.
+  await B.goto(URL0 + '#/boutique/reglages');
+  await B.click('#tile-policies');
+  await B.locator('#pol-delivery [data-v="24h"][aria-checked="true"]').waitFor();
+  await B.locator('#pol-delivery [data-v="48h"]').click();
+  await B.locator('#pol-pay [data-v="om"]').click();
   await shot(B, '08-reglages-livraison');
-  await B.click('#look-save');
-  await B.getByText('Site enregistré.').waitFor();
+  await B.click('#policies-save');
+  await B.getByText('Enregistré : visible sur la fiche de vos articles.').waitFor();
   const po = (await local.db.query(`select policies from fiila.shops where id = $1`, [S.shop.id])).rows[0].policies;
   assert.deepEqual(po, { delivery: '48h', pay: ['livraison', 'wave', 'om'], exchange: '3j' });
 });

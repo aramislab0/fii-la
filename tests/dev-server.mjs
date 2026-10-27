@@ -14,7 +14,7 @@ const webRoot = fileURLToPath(new URL('../web/', import.meta.url));
 const MIN = process.env.FIILA_MIN !== '0';
 const minCache = new Map();
 function minified(path, data) {
-  const f = { '/app.js': minifyJs, '/styles.css': minifyCss, '/theme.js': minifyJs }['/' + path.replace(/^[/\\]+/, '')];
+  const f = { '/app.js': minifyJs, '/bo.js': minifyJs, '/styles.css': minifyCss, '/theme.js': minifyJs }['/' + path.replace(/^[/\\]+/, '')];
   if (!MIN || !f) return data;
   const key = createHash('sha1').update(data).digest('hex');
   if (!minCache.has(key)) minCache.set(key, Buffer.from(f(data.toString('utf8'))));

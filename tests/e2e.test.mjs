@@ -616,8 +616,9 @@ await t('page destinataire sur réseau lent (3G simulée) : poids et temps mesur
   writeFileSync(`${SHOTS}/../perf-${ENGINE}.json`, JSON.stringify(perf, null, 2));
   console.log('   perf', perf);
   assert.equal(perf.leaflet_charge, false, 'Leaflet chargé inutilement');
-  // Budget relevé de 250 à 260 Ko le 27/10 (recette Testo : +7 Ko) ; action HANDOFF #75 : charger le back-office à part.
-  assert.ok(perf.total_ko < 260, 'page trop lourde (poids compressé, comme en production)');
+  // Budget relevé de 250 à 260 Ko le 27/10 (recette Testo : +7 Ko), ramené à 250 le soir même : le back-office est chargé
+  // à part (bo.js, HANDOFF #75), la page reçue est passée de 264 à 230 Ko.
+  assert.ok(perf.total_ko < 250, 'page trop lourde (poids compressé, comme en production)');
   await p.ctx.close();
 });
 

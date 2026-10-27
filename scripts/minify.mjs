@@ -11,7 +11,7 @@ export function minifyCss(src) { return transformSync(src, { loader: 'css', mini
 
 if (process.argv[1] && process.argv[1].endsWith('minify.mjs')) {
   const dir = process.argv[2] || 'web';
-  for (const [f, fn] of [['app.js', minifyJs], ['styles.css', minifyCss], ['theme.js', minifyJs]]) {
+  for (const [f, fn] of [['app.js', minifyJs], ['bo.js', minifyJs], ['styles.css', minifyCss], ['theme.js', minifyJs]]) {
     const p = join(dir, f), before = readFileSync(p, 'utf8'), after = fn(before);
     writeFileSync(p, after);
     console.log(`${f} : ${before.length} → ${after.length} octets`);
