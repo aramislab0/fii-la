@@ -104,6 +104,8 @@ await t('mesures : événements « site » acceptés, inconnus refusés ; « Éd
 await t('table produits fermée : aucun droit direct d’anon sur les nouvelles colonnes', async () => {
   const r = await one(`select has_table_privilege('anon', 'fiila.products', 'select') a, has_table_privilege('anon', 'fiila.shops', 'select') b`);
   assert.equal(r.a, false); assert.equal(r.b, false);
+  const f = await one(`select has_function_privilege('anon', 'public.fiila_bo_shop_sheet(uuid)', 'execute') a, has_function_privilege('authenticated', 'public.fiila_bo_shop_sheet(uuid)', 'execute') b`);
+  assert.equal(f.a, false, 'back-office fermé à anon (migration 20261028100100)'); assert.equal(f.b, true);
 });
 
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n  ' + r[2] : '');
