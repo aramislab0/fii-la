@@ -1,8 +1,8 @@
-// Fii Studio : 3 versions « pro » d'une photo d'article (docs/PLAN-FII-STUDIO.md).
+// Fii Studio : une version « studio » d'une photo d'article (docs/PLAN-FII-STUDIO.md).
 // Appelée par l'application avec la clé de la boutique (ou la session) :
-//   { action: 'render', key, product, style, mode }  ouvre une série (droits, crédits, budget vérifiés par la base), envoie la photo
-//                                             à fal (Bria Product Shot : le produit garde ses pixels, seul le décor est créé),
-//                                             enregistre les 3 adresses et le coût réel (clé de service) ;
+//   { action: 'render', key, product, style, mode }  ouvre une série (droits, crédits, budget vérifiés par la base ; prompt
+//                                             composé par la base depuis les packs Aramis Studio), envoie la photo à fal selon
+//                                             le mode, enregistre l'adresse et le coût réel (clé de service) ;
 //   { action: 'take', key, job, index }        renvoie l'image choisie en base64 (l'application l'enregistre comme photo de
 //                                             l'article, avec les contrôles habituels) — évite tout accès direct à fal depuis
 //                                             le téléphone.
