@@ -2328,7 +2328,7 @@ html.kbd .tabbar{display:none}
 .sd .studio-mode{border:0;background:none;padding:0;box-shadow:none}
 .sd-orig{width:min(50%,200px)}
 .sd-foot .btn.lime{background:var(--lime);border-color:var(--lime);color:var(--on-lime)}
-.sd-foot .duo .btn{font-size:14px;padding:0 10px;white-space:nowrap}
+.sd-foot .duo .btn{font-size:14px;padding:6px 10px;white-space:normal;line-height:1.2;text-align:center}
 .st-sheet .pill{min-height:44px}
 
 /* ----- Audit du 27/10 : cibles tactiles (44 px), feuilles figées, contrastes, thème sombre */

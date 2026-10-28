@@ -7662,21 +7662,23 @@
   }
   function studioRow(pr, photos, saveStay) {
     var row = h('div', { id: 'studio-row' });
-    sapi('fiila_studio_state', { p_product: pr.id }).then(function (st) {
+    // Relu à la fermeture du Studio : solde et « Dernière création » à jour sans recharger la page (règle du 28/10).
+    function load() { sapi('fiila_studio_state', { p_product: pr.id }).then(function (st) {
       if (!st || !st.ready) return;
       var n = (st.credits && st.credits.total) || 0;
-      setKids(row, h('button', { type: 'button', class: 'studio-row', id: 'studio-open', onclick: function () { studioSheet(pr, photos, saveStay, st); } },
+      setKids(row, h('button', { type: 'button', class: 'studio-row', id: 'studio-open', onclick: function () { studioSheet(pr, photos, saveStay, st, load); } },
         h('span', { class: 'studio-ic', 'aria-hidden': 'true' }, icon('spark', 22)),
         h('span', { class: 'studio-t' }, h('b', null, 'Studio'), h('small', null, 'Rendre la photo pro')),
         h('span', { class: 'chip ' + (n ? 'ok' : 'neutral'), id: 'studio-credits' }, n + (n > 1 ? ' crédits' : ' crédit'))));
-    }, function () { /* Studio indisponible : rien n'est montré */ });
+    }, function () { /* Studio indisponible : rien n'est montré */ }); }
+    load();
     return row;
   }
   /* Studio v2 (fondateur, 27/10 soir, maquette T3zFpNLrgCYn5gjaNkwoJi validée) : trois étapes visibles (Décor → Création →
      Choix), crédits toujours affichés, mode Fidèle / Premium en sélecteur, décors en cartes, attente animée, comparaison
      avant / après au doigt, puis un écran « Bravo » animé (Publier sur mes réseaux, Terminé). Animations coupées si le
      téléphone demande moins de mouvement. */
-  function studioSheet(pr, photos, saveStay, st) {
+  function studioSheet(pr, photos, saveStay, st, reload) {
     // Décors du pack de la catégorie de la boutique, ceux qu'elle garde le plus en premier (base Aramis Studio, règle R2).
     var scenes = (st.scenes && st.scenes.length ? st.scenes : STUDIO_STYLES.map(function (x) { return { id: x[0], label: x[1], swatch: x[2] }; }));
     var style = scenes[0].id, job = null, pick = null, busy = false, step = 'decor', kept = false, closeSheet, timers = [], runId = 0;
@@ -7693,7 +7695,7 @@
       timers.forEach(clearTimeout);
       if (!kept && !busy) track('studio', 'cancel:' + style);
       closeSheet();
-      if (kept) render();
+      if (kept) render(); else if (reload) reload();
     }
     var back = h('div', { class: 'sheet-back', id: 'studio-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'studio-h', onclick: function (e) { if (e.target === back && !busy) close(); } },
       h('div', { class: 'sheet studio-sheet sd' },

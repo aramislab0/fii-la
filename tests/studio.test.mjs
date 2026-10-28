@@ -132,9 +132,11 @@ await t('dernière création : version payée puis fenêtre fermée → reprise 
   await p.click('#studio-run');
   await p.locator('#studio-res-0').waitFor();
   await p.locator('#studio-credits-pill').getByText('1 crédit').waitFor();
+  // Bouton « Autre proposition · 1 crédit » : le texte tient dans son cadre (vu débordant sur iPhone le 28/10).
+  assert.ok(await p.locator('#studio-again').evaluate((b) => b.scrollWidth <= b.clientWidth + 1), 'texte du bouton dans son cadre');
   await p.click('#studio-close');
   await p.locator('#studio-sheet').waitFor({ state: 'detached' });
-  await p.reload();
+  await p.locator('#studio-credits').getByText('1 crédit').waitFor();
   await p.click('#studio-open');
   await p.locator('#studio-resume').getByText('Dernière création').waitFor();
   await p.waitForTimeout(600);
