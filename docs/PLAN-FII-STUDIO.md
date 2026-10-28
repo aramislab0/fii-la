@@ -55,6 +55,8 @@ Bench « studio premium » (base privée XEL, `bench/STUDIO_PREMIUM.md`). **Fid�
 
 **Facturation depuis le 28/10/2026 (offre validée, `OFFRE-COMMERCIALE-001.md`)** : crédits retenus à la création, débités quand l'image est copiée dans le seau privé `studio`, rendus une seule fois sur échec, délai (3 min) ou image perdue ; « garder » ne coûte rien ; « Dernière création » reprend une version payée ; copies effacées après 7 jours. Migration `20261028700000_fiila_studio_billing`.
 
+**Décors depuis le 28/10/2026 (mesures, `20261028800000`)** : 6 décors visibles (favoris de la boutique, au plus un candidat de la semaine promu par le fondateur, puis les autres par rang), le reste dans « Plus de décors » ; mesures par décor et version/mode (vues, livrées, pannes, rejets, gardées, partages réussis) ; alerte de revue au back-office, jamais de retrait automatique.
+
 ## 5. Suite (après le critère des 30 jours)
 
 - **Niveau 2 :** visuel pub (nom, prix, logo) avec le décor Studio comme fond des cartes de Publier. Petit travail : les modèles existent déjà.

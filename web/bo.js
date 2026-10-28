@@ -605,12 +605,31 @@ window.FiiBO = function (F) {
       var sReason = h('input', { type: 'text', id: 'bo-scene-reason', maxlength: 200, placeholder: 'Motif (journal)' });
       // Décors par catégorie (packs Aramis Studio, base privée XEL) : ce que les boutiques gardent, et l'interrupteur de chaque décor.
       var scenesBox = h('details', { class: 'card', id: 'bo-studio-scenes' }, h('summary', null, h('b', null, 'Décors par catégorie'),
-        h('small', { class: 'muted' }, ' · ' + scenes.filter(function (c) { return c.active; }).length + ' actifs')),
+        h('small', { class: 'muted' }, ' · ' + scenes.filter(function (c) { return c.active; }).length + ' actifs' +
+          (scenes.some(function (c) { return c.alert; }) ? ' · ' + scenes.filter(function (c) { return c.alert; }).length + ' à revoir' : ''))),
+        h('p', { class: 'small muted' }, 'Six décors visibles par boutique (ses favoris, puis au plus un candidat de la semaine), les autres dans « Plus de décors ». Une alerte demande une revue ; rien n’est retiré ni promu automatiquement.'),
         boCan('shops_write') ? h('label', { class: 'field' }, h('span', { class: 'lbl' }, 'Motif d’un changement'), sReason) : null,
         boTable([
           { label: 'Catégorie', get: function (x) { return x.category ? typeLabel(x.category) || x.category : 'Générique'; } },
           { label: 'Décor', get: function (x) { return h('span', { class: 'row', style: 'gap:6px' }, h('span', { class: 'sw', style: 'background:' + x.swatch + ';width:14px;height:14px;border-radius:50%;border:1px solid var(--line);display:inline-block' }), x.label); } },
-          { label: 'Gardées', get: function (x) { return x.series ? x.kept + ' / ' + x.series + ' (' + Math.round(x.kept / x.series * 100) + ' %)' : '—'; } },
+          // Mesures par version et mode (28/10) : vues, livrées, pannes, rejets, gardées, partagées ; alerte = revue humaine.
+          { label: 'Mesures', get: function (x) {
+            var st = x.stats || [];
+            if (!st.length) return '—';
+            return h('span', { class: 'stack tight', style: 'gap:2px' }, st.map(function (m) {
+              return h('small', { 'data-stat': x.id + ':' + m.mode },
+                (m.mode === 'premium' ? 'Premium' : 'Fidèle') + ' v' + m.version + ' · ' + boNum(m.shown) + ' vues · ' + boNum(m.delivered) + ' livrées · ' +
+                boNum(m.kept) + ' gardées' + (m.keep_rate != null ? ' (' + Math.round(m.keep_rate * 100) + ' %)' : '') + ' · ' + boNum(m.rejected) + ' rejets · ' +
+                boNum(m.failed) + ' pannes · ' + boNum(m.shared) + ' partagées · ' + boNum(m.shops) + ' boutiques');
+            }), x.alert ? boBadge('warn', 'À revoir : moins de 40 % gardées') : null);
+          } },
+          { label: 'Candidat', get: function (x) {
+            if (!boCan('shops_write')) return x.candidate ? boBadge('info', 'Candidat') : '—';
+            return h('button', { class: 'btn ghost small', type: 'button', 'data-candidate': x.id, onclick: function () {
+              if (!sReason.value.trim()) { toast('Indiquez un motif.'); sReason.focus(); return; }
+              boAct(function () { return api('fiila_bo_studio_scene_candidate', { p_id: x.id, p_candidate: !x.candidate, p_reason: sReason.value }); }, x.candidate ? 'Décor retiré des candidats.' : 'Décor proposé en candidat.', null, null, this);
+            } }, x.candidate ? 'Retirer' : 'Proposer');
+          }, cls: 'hide-s' },
           { label: '', get: function (x) {
             if (!boCan('shops_write')) return x.active ? boBadge('ok', 'Actif') : boBadge('muted', 'Coupé');
             return h('button', { class: 'btn ghost small', type: 'button', 'data-scene': x.id, onclick: function () {

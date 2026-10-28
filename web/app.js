@@ -3762,7 +3762,11 @@
       if (navigator.share && canFiles) {
         // Image seule : avec un texte, l'appli Facebook ne garde que le lien et perd la photo (constaté sur iPhone, 23/10).
         // Le texte est déjà copié ; WhatsApp seul le reprend comme légende du statut.
-        navigator.share(net.k === 'whatsapp' ? { files: [f.file], text: text } : { files: [f.file] }).then(function () { logged(net); toast('Texte copié : collez-le dans ' + net.label + '.'); },
+        navigator.share(net.k === 'whatsapp' ? { files: [f.file], text: text } : { files: [f.file] }).then(function () {
+          logged(net); toast('Texte copié : collez-le dans ' + net.label + '.');
+          // Partage réussi (pas un simple clic ni un téléchargement) : compté pour la dernière version Studio gardée de l'article.
+          sapi('fiila_studio_shared', { p_product: pr.id }).then(null, function () { /* mesure seulement */ });
+        },
           function (e) { if (e && e.name === 'AbortError') return; fallback(net); });
       } else if (f) fallback(net);
       else prepare().then(function () { fallback(net); });
@@ -7682,6 +7686,8 @@
     // Décors du pack de la catégorie de la boutique, ceux qu'elle garde le plus en premier (base Aramis Studio, règle R2).
     var scenes = (st.scenes && st.scenes.length ? st.scenes : STUDIO_STYLES.map(function (x) { return { id: x[0], label: x[1], swatch: x[2] }; }));
     var style = scenes[0].id, job = null, pick = null, busy = false, step = 'decor', kept = false, closeSheet, timers = [], runId = 0;
+    // 6 décors visibles (favoris, au plus un nouveau décor à essayer, puis les autres), le reste derrière « Plus de décors ».
+    var more = false, seen = {};
     var credits = (st.credits && st.credits.total) || 0;
     var prem = st.premium || null, mode = 'fidele';
     // Dernière création payée et pas encore gardée (création interrompue, réseau coupé) : la boutique peut la reprendre sans frais.
@@ -7703,6 +7709,24 @@
           h('button', { class: 'sd-x', type: 'button', 'aria-label': 'Fermer', id: 'studio-close', onclick: function () { if (!busy) close(); } }, icon('close', 20))),
         steps, h('div', { class: 'sd-body' }, body, err), foot));
     function need() { return mode === 'premium' && prem ? prem.credits : 1; }
+    // Règle de débit (28/10) dans la même ligne discrète que l'aide du mode (règle d'interface : une seule ligne d'informations).
+    function rule() { return h('span', { id: 'studio-rule' }, 'Crédits utilisés à chaque création réussie ; « Garder » est gratuit, une panne est remboursée.'); }
+    function shown() {
+      if (more || !scenes.some(function (x) { return x.top; })) return scenes;
+      return scenes.filter(function (x) { return x.top || x.id === style; });
+    }
+    function hidden() { return scenes.length - shown().length; }
+    // Exposition réelle (mesures par décor, 28/10) : décors affichés, une fois par mode et par ouverture du Studio.
+    function markSeen() {
+      var ids = shown().map(function (x) { return x.id; }).filter(function (id) { return !seen[mode + ':' + id]; });
+      if (!ids.length || !st.scenes || !st.scenes.length) return;
+      ids.forEach(function (id) { seen[mode + ':' + id] = 1; });
+      sapi('fiila_studio_seen', { p_scenes: ids, p_mode: mode }).then(null, function () { /* mesure seulement */ });
+    }
+    // Rejet explicite d'une version vue (« Autre proposition », « Changer de décor ») : mesure par décor, sans effet sur les crédits.
+    function reject() {
+      if (job && job.id && !job.rejected) { job.rejected = true; sapi('fiila_studio_reject', { p_job: job.id }).then(null, function () { /* mesure seulement */ }); }
+    }
     function cr(n) { return n + (n > 1 ? ' crédits' : ' crédit'); }
     function drawSteps() {
       pill.textContent = cr(credits);
@@ -7724,8 +7748,8 @@
         h('div', { class: 'sd-segs', role: 'radiogroup', 'aria-label': 'Mode' },
           b('fidele', 'Fidèle', 'Décor seul · 1 crédit'), b('premium', 'Premium ✦', 'Studio · ' + cr(prem.credits))),
         h('p', { class: 'small muted', id: 'studio-mode-hint' }, mode === 'premium'
-          ? 'Studio premium : ' + (prem.wear ? 'porté par un mannequin, rendu hyperréaliste' : 'lumière et décor de studio hyperréalistes') + '. Comparez avec l’original avant de garder.'
-          : 'Le produit reste tel quel : seul le décor change.'));
+          ? 'Studio premium : ' + (prem.wear ? 'porté par un mannequin, rendu hyperréaliste' : 'lumière et décor de studio hyperréalistes') + '. Comparez avec l’original avant de garder. '
+          : 'Le produit reste tel quel : seul le décor change. ', rule()));
     }
     function draw() {
       setKids(err); drawSteps();
@@ -7764,9 +7788,9 @@
         setKids(foot,
           h('button', { class: 'btn big full', type: 'button', id: 'studio-keep', onclick: keep }, job.mode === 'premium' ? 'Oui, garder' : 'Garder cette photo'),
           h('div', { class: 'duo' },
-            h('button', { class: 'btn ghost', type: 'button', id: 'studio-again', onclick: run, disabled: credits < need() ? true : null },
+            h('button', { class: 'btn ghost', type: 'button', id: 'studio-again', onclick: function () { reject(); run(); }, disabled: credits < need() ? true : null },
               (job.mode === 'premium' ? 'Non, autre proposition · ' : 'Autre proposition · ') + cr(need())),
-            h('button', { class: 'btn ghost', type: 'button', id: 'studio-back', onclick: function () { job = null; step = 'decor'; draw(); } }, 'Changer de décor')));
+            h('button', { class: 'btn ghost', type: 'button', id: 'studio-back', onclick: function () { reject(); job = null; step = 'decor'; draw(); } }, 'Changer de décor')));
         return;
       }
       if (step === 'done') {
@@ -7792,13 +7816,16 @@
           icon('spark', 18), h('span', null, h('b', null, 'Dernière création'), ' — déjà payée : la voir et la garder')) : null,
         h('div', { class: 'sd-orig' }, h('img', { src: pr.photo, alt: 'Photo d’origine' }), h('span', null, 'Votre photo')),
         modes(),
-        h('p', { class: 'small muted', id: 'studio-rule' }, 'Les crédits sont utilisés à chaque création réussie ; « Garder » est gratuit, et une panne vous est remboursée.'),
+        prem ? null : h('p', { class: 'small muted' }, rule()),
         h('h3', { class: 'sd-h3' }, 'Choisissez un décor'),
-        h('div', { class: 'studio-styles sd-scenes', role: 'radiogroup', 'aria-label': 'Décor' }, scenes.map(function (x) {
+        h('div', { class: 'studio-styles sd-scenes', role: 'radiogroup', 'aria-label': 'Décor' }, shown().map(function (x) {
           var on = style === x.id;
           return h('button', { type: 'button', role: 'radio', 'aria-checked': String(on), class: 'studio-style' + (on ? ' on' : ''), 'data-style': x.id,
             onclick: function () { style = x.id; draw(); } }, h('span', { class: 'sw', style: 'background:' + x.swatch }), h('span', null, x.label));
-        })));
+        })),
+        hidden() ? h('button', { type: 'button', class: 'btn link small', id: 'studio-more', onclick: function () { more = true; draw(); } },
+          'Plus de décors (' + hidden() + ')') : null);
+      markSeen();
       setKids(foot, credits >= need() ? iconBtn('button', { class: 'btn big full', type: 'button', id: 'studio-run', onclick: run }, 'spark', 'Créer ma photo pro · ' + cr(need()))
         : h('p', { class: 'notice', id: 'studio-empty' }, credits ? 'Pas assez de crédits Studio pour ce mode.' : 'Plus de crédit Studio pour le moment.'));
     }

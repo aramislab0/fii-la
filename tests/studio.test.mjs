@@ -151,6 +151,34 @@ await t('dernière création : version payée puis fenêtre fermée → reprise 
   await p.context().close();
 });
 
+await t('décors : 6 visibles puis « Plus de décors » ; décors affichés comptés ; « Changer de décor » après une version = rejet compté', async () => {
+  for (let i = 1; i <= 8; i++) await local.db.query(`insert into fiila.studio_scenes (id, category, label, swatch, prompt, rank, version) values ($1, 'mode', $2, '#E3D2B8', 'test scene prompt [TEST]', $3, '0.2.0')`, ['tv-' + i, 'Décor ' + i, i]);
+  await ok('fiila_bo_studio_grant', { p_shop: S.shop.id, p_delta: 1, p_reason: 'Test décors' }, { uid: F });
+  const p = await newPhone(SHOP);
+  await p.goto(URL0 + '#/boutique/article/' + A.id);
+  await p.click('#studio-open');
+  await p.locator('#studio-sheet').waitFor();
+  assert.equal(await p.locator('.studio-style').count(), 6, '6 décors visibles');
+  assert.match(await p.locator('#studio-more').textContent(), /Plus de décors \(2\)/);
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: `${SHOTS}/${ENGINE}-08-six-decors.png` });
+  await p.click('#studio-more');
+  assert.equal(await p.locator('.studio-style').count(), 8);
+  assert.equal(await p.locator('#studio-more').count(), 0);
+  await p.click('#studio-run');
+  await p.locator('#studio-res-0').waitFor();
+  await p.click('#studio-back');
+  await p.locator('#studio-run').waitFor();
+  await p.waitForTimeout(300);
+  const views = (await local.db.query(`select count(*)::int n, coalesce(max(n), 0)::int top from fiila.studio_scene_views where shop_id = $1 and scene_id like 'tv-%'`, [S.shop.id])).rows[0];
+  assert.deepEqual(views, { n: 8, top: 1 }, 'les 8 décors affichés comptés une fois chacun (mode fidèle)');
+  const j = (await local.db.query(`select rejected_at is not null r from fiila.studio_jobs where product_id = $1 order by created_at desc limit 1`, [A.id])).rows[0];
+  assert.equal(j.r, true, 'rejet explicite enregistré');
+  assert.deepEqual(p.__errors, []);
+  await p.context().close();
+  await local.db.query(`delete from fiila.studio_scenes where id like 'tv-%'`);
+});
+
 await t('sans crédit : pas de bouton de création, message clair', async () => {
   // Retrait du solde exact (audit du 27/10 : un retrait plus grand que le solde est refusé).
   const left = (await local.db.query(`select credits from fiila.studio_wallets where shop_id = $1`, [S.shop.id])).rows[0].credits;
