@@ -2,6 +2,7 @@
 // enregistrée seulement si la photo n'a pas changé, adresse servie à la place du base64, retour arrière par réglage,
 // photo modifiée = nouvelle copie, photos orphelines retirées, état au back-office (droit « settings »).
 import assert from 'node:assert/strict';
+import jpeg from 'jpeg-js';
 import { createDb, rpc } from './db.mjs';
 
 const db = await createDb();
@@ -94,6 +95,45 @@ await t('back-office : état réservé au droit « settings » ; journal des éc
   assert.equal(m.errors[0].detail, 'stockage 500');
   await ko('fiila_bo_media', {}, null, SUP);
   assert.ok(JSON.stringify(await ok('fiila_bo_settings', {}, F)).includes('media_cdn'));
+});
+
+await t('miniatures : JPEG copié seulement, clé de service seule ; vitrine, fil et liste du commerçant reçoivent l’adresse de la carte', async () => {
+  const px = new Uint8Array(40 * 50 * 4).fill(200);
+  const jpg = Buffer.from(jpeg.encode({ data: px, width: 40, height: 50 }, 80).data).toString('base64');
+  const J = await ok('fiila_product_save', { p_key: S.key, p: { name: 'Pagne [TEST]', price: 2000, photo: jpg } });
+  assert.ok(!(await ok('fiila_media_thumbs_pending', {}, SVC)).some((x) => x.ref === J.id), 'pas avant la copie dans le seau');
+  const c = (await ok('fiila_media_pending', {}, SVC)).find((x) => x.ref === J.id);
+  assert.equal(c.ctype, 'image/jpeg');
+  await ok('fiila_media_done', { p_kind: 'product', p_ref: J.id, p_hash: c.hash, p_path: `p/${J.id}-${c.hash}.jpg`, p_bytes: 900 }, SVC);
+  const slug = (await one(`select slug from fiila.shops where id = (select shop_id from fiila.products where id = $1)`, [J.id])).slug;
+  let v = await ok('fiila_vitrine', { p_slug: slug });
+  assert.equal(v.products.find((x) => x.id === J.id).img, `${BASE}p/${J.id}-${c.hash}.jpg`, 'sans miniature : photo du seau');
+  const q = await ok('fiila_media_thumbs_pending', {}, SVC);
+  assert.deepEqual(q.filter((x) => x.ref === J.id), [{ ref: J.id, src: `p/${J.id}-${c.hash}.jpg`, hash: c.hash }]);
+  assert.ok(!q.some((x) => x.ref === P.id), 'photo PNG : pas de miniature');
+  await ko('fiila_media_thumbs_pending', {});
+  await ko('fiila_media_thumbs_pending', {}, null, F);
+  await ko('fiila_media_done', { p_kind: 'thumb', p_ref: J.id, p_hash: c.hash, p_path: `t/${J.id}-${c.hash}.png`, p_bytes: 10 }, 'invalid', SVC);
+  await ko('fiila_media_done', { p_kind: 'product', p_ref: J.id, p_hash: c.hash, p_path: `t/${J.id}-${c.hash}.jpg`, p_bytes: 10 }, 'invalid', SVC);
+  assert.equal((await ok('fiila_media_done', { p_kind: 'thumb', p_ref: J.id, p_hash: c.hash, p_path: `t/${J.id}-${c.hash}.jpg`, p_bytes: 120 }, SVC)).linked, true);
+  v = await ok('fiila_vitrine', { p_slug: slug });
+  assert.equal(v.products.find((x) => x.id === J.id).img, `${BASE}t/${J.id}-${c.hash}.jpg`);
+  await db.query(`update fiila.shops set platform = true, feed = true where slug = $1`, [slug]);
+  const posts = (await ok('fiila_posts', { p_tab: 'pour-vous' })).posts;
+  assert.equal(posts.find((x) => x.id === J.id).img, `${BASE}p/${J.id}-${c.hash}.jpg`, 'fil pleine largeur : photo du seau');
+  const mine = (await ok('fiila_products', { p_key: S.key, p_all: true })).find((x) => x.id === J.id);
+  assert.equal(mine.thumb, `${BASE}t/${J.id}-${c.hash}.jpg`); assert.equal(mine.photo, `${BASE}p/${J.id}-${c.hash}.jpg`);
+  const m = await ok('fiila_bo_media', {}, F);
+  assert.ok(m.thumbs >= 1); assert.equal(m.thumb_bytes, 120);
+  // Photo remplacée : miniature à refaire, l'ancienne devient orpheline ; réglage media_cdn = 0 : plus d'adresse, retour à l'appel d'avant.
+  await ok('fiila_product_save', { p_key: S.key, p: { id: J.id, name: 'Pagne [TEST]', price: 2000, photo: photo(11) } });
+  assert.equal((await one(`select thumb_path from fiila.products where id = $1`, [J.id])).thumb_path, null);
+  await db.query(`update fiila.media_objects set created_at = now() - interval '1 hour'`);
+  assert.ok((await ok('fiila_media_orphans', {}, SVC)).includes(`t/${J.id}-${c.hash}.jpg`));
+  await db.query(`update fiila.settings set value = '0' where key = 'media_cdn'`);
+  v = await ok('fiila_vitrine', { p_slug: slug });
+  assert.ok(v.products.every((x) => !x.img));
+  await db.query(`update fiila.settings set value = '1' where key = 'media_cdn'`);
 });
 
 await t('photos privées inchangées : la porte d’une adresse reste servie par la base', async () => {

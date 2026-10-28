@@ -107,6 +107,33 @@ await t('« Publier » : la photo du stockage est préparée pour l’enregistre
   await S.waitForFunction(() => /^data:image\//.test(document.getElementById('post-download').getAttribute('href') || ''));
 });
 
+await t('miniatures : la carte de la vitrine affiche la miniature fournie par la liste, sans appel par photo ; miniature introuvable → repli', async () => {
+  const sErr = S.__errors.length; // erreurs d'avant (rechargement du test « Publier ») non comptées ici
+  const THUMB = 'media/brand/fii-pin.png'; // fichier réel servi par le serveur local, à la place de la miniature du seau
+  await local.db.query(`update fiila.products set thumb_path = $2 where id = $1`, [PID, THUMB]);
+  const V = await newPhone();
+  const calls = [];
+  V.on('request', (r) => { if (r.url().includes('fiila_vitrine_photo')) calls.push(r.url()); });
+  await V.goto(URL0 + '#/b/' + SLUG);
+  await V.waitForFunction(() => { const i = document.querySelector('.vcard img'); return i && i.complete && i.naturalWidth > 0; });
+  const img = V.locator('.vcard img').first();
+  assert.equal(await img.getAttribute('src'), URL0 + THUMB);
+  assert.equal(await img.getAttribute('loading'), 'lazy');
+  assert.deepEqual(calls, [], 'aucun appel à la base pour la photo de la carte');
+  await V.screenshot({ path: `${SHOTS}/${ENGINE}-02-miniature.png` });
+  // Miniature absente du seau : la carte revient à l'appel d'avant et affiche la photo.
+  await local.db.query(`update fiila.products set thumb_path = 'media/brand/absente.png' where id = $1`, [PID]);
+  await V.reload();
+  await V.waitForFunction((u) => { const i = document.querySelector('.vcard img'); return i && i.complete && i.naturalWidth > 0 && i.getAttribute('src') === u; }, URL0 + SERVED);
+  assert.ok(calls.length >= 1, 'repli par l’appel d’avant');
+  // Liste du commerçant : la miniature.
+  await local.db.query(`update fiila.products set thumb_path = $2 where id = $1`, [PID, THUMB]);
+  await S.goto(URL0 + '#/boutique/articles');
+  await S.locator('#products .product-item img.thumb').first().waitFor();
+  assert.equal(await S.locator('#products .product-item img.thumb').first().getAttribute('src'), URL0 + THUMB);
+  assert.deepEqual(V.__errors, []); assert.deepEqual(S.__errors.slice(sErr), []);
+});
+
 await browser.close();
 local.server.close();
 console.log(`\n${passed}/${passed + failed} tests photos servies par le stockage (${ENGINE}) réussis`);

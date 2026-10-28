@@ -26,7 +26,11 @@ export function decode(b64) {
   return out;
 }
 
-export function makeHandler({ env, fetch }) {
+export const THUMBS = 3;
+export const thumbPathFor = (item) => `t/${item.ref}-${item.hash}.jpg`;
+
+// thumb (facultatif) : octets JPEG → octets de la miniature (thumb.mjs) ; absent = pas d'étape miniatures.
+export function makeHandler({ env, fetch, thumb }) {
   const base = () => String(env('SUPABASE_URL') || '').replace(/\/$/, '');
   const key = () => env('SUPABASE_SERVICE_ROLE_KEY');
   const auth = () => ({ apikey: key(), Authorization: 'Bearer ' + key() });
@@ -54,7 +58,7 @@ export function makeHandler({ env, fetch }) {
     if (req.method !== 'POST') return json(405, { error: 'method' });
     if (!key() || !base()) return json(500, { error: 'not_configured' });
     if (!(await allowed(req))) return json(401, { error: 'unauthorized' });
-    let copied = 0, failed = 0, removed = 0;
+    let copied = 0, failed = 0, removed = 0, thumbs = 0;
     try {
       const items = await rpc('fiila_media_pending', { p_limit: BATCH });
       for (const it of items || []) {
@@ -71,15 +75,35 @@ export function makeHandler({ env, fetch }) {
           await rpc('fiila_media_report', { p_action: 'failed', p_ref: it.kind + ':' + it.ref, p_detail: String((e && e.message) || e) }).catch(() => {});
         }
       }
+      // Miniatures, à partir de la photo déjà copiée dans le seau (adresse publique), quelques-unes par passage.
+      if (thumb) {
+        for (const it of (await rpc('fiila_media_thumbs_pending', { p_limit: THUMBS })) || []) {
+          const path = thumbPathFor(it);
+          try {
+            const src = await fetch(`${base()}/storage/v1/object/public/${BUCKET}/${it.src}`);
+            if (!src.ok) throw new Error('lecture ' + src.status);
+            const bytes = thumb(new Uint8Array(await src.arrayBuffer()));
+            const up = await fetch(`${base()}/storage/v1/object/${BUCKET}/${path}`, { method: 'POST',
+              headers: { ...auth(), 'Content-Type': 'image/jpeg', 'cache-control': 'max-age=31536000', 'x-upsert': 'true' }, body: bytes });
+            if (!up.ok) throw new Error('stockage ' + up.status);
+            await rpc('fiila_media_done', { p_kind: 'thumb', p_ref: it.ref, p_hash: it.hash, p_path: path, p_bytes: bytes.length });
+            thumbs++;
+          } catch (e) {
+            failed++;
+            await rpc('fiila_media_report', { p_action: 'failed', p_ref: 'thumb:' + it.ref, p_detail: 'miniature : ' + String((e && e.message) || e) }).catch(() => {});
+          }
+        }
+      }
       const orphans = await rpc('fiila_media_orphans', { p_limit: 50 });
       if (orphans && orphans.length) {
         const del = await fetch(`${base()}/storage/v1/object/${BUCKET}`, { method: 'DELETE', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: orphans }) });
         if (del.ok) removed = (await rpc('fiila_media_forget', { p_paths: orphans })).removed || 0;
         else await rpc('fiila_media_report', { p_action: 'failed', p_ref: 'nettoyage', p_detail: 'suppression refusée ' + del.status }).catch(() => {});
       }
-      const did = copied || failed || removed;
-      await rpc('fiila_media_report', { p_action: 'run', p_ref: null, p_detail: did ? `${copied} copiée(s), ${failed} échec(s), ${removed} retirée(s)` : null });
-      return json(200, { ok: true, copied, failed, removed });
+      const did = copied || failed || removed || thumbs;
+      await rpc('fiila_media_report', { p_action: 'run', p_ref: null,
+        p_detail: did ? `${copied} copiée(s), ${thumbs} miniature(s), ${failed} échec(s), ${removed} retirée(s)` : null });
+      return json(200, thumb ? { ok: true, copied, thumbs, failed, removed } : { ok: true, copied, failed, removed });
     } catch (e) {
       console.log(JSON.stringify({ media_sync: 'failed', error: String((e && e.message) || e).slice(0, 200) }));
       return json(502, { error: 'failed', copied, failed, removed });

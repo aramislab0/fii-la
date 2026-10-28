@@ -2466,7 +2466,7 @@
         img = photoCarousel(p.photos, function (k) { return api('fiila_vitrine_photo', { p_slug: slug, p_id: k ? p.id + ':' + k : p.id }).then(function (x) { return x.photo; }); }, p.name, 'vimg');
       } else {
         img = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 32));
-        if (p.has_photo) lazyPhoto(img, function () {
+        if (p.has_photo) cardPhoto(img, p.img, function () {
           return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; });
         }, p.name);
       }
@@ -2770,6 +2770,14 @@
     var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); go(); } }, { rootMargin: '200px' });
     setTimeout(function () { io.observe(box); }, 0);
   }
+  // Image d'une carte (28/10) : adresse fournie par la liste (miniature du seau) → image directe, chargée au défilement par
+  // le navigateur, sans appel à la base ; sinon (photo pas encore copiée, réglage media_cdn = 0) l'appel d'avant.
+  function cardPhoto(box, img, load, alt) {
+    if (!img) { lazyPhoto(box, load, alt); return; }
+    var el = h('img', { src: img, alt: alt || '', loading: 'lazy', decoding: 'async' });
+    el.onerror = function () { el.onerror = null; lazyPhoto(box, load, alt); };
+    setKids(box, el); box.classList.remove('loading-skel');
+  }
   /* ----- fil des boutiques : les 25 premières boutiques ouvertes, mises en avant gratuitement (fondateur, 19/10).
      Une image par boutique (couverture, sinon dernier article), chargée au défilement : peu de données mobiles. */
   var FEED_CACHE = null;
@@ -2930,7 +2938,7 @@
     if (p.photos > 1) img = photoCarousel(p.photos, function (k) { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: k ? p.id + ':' + k : p.id }).then(function (r) { return r.photo || null; }); }, p.name, 'post-img');
     else {
       img = h('div', { class: 'post-img loading-skel' });
-      lazyPhoto(img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, p.name);
+      cardPhoto(img, p.img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, p.name);
     }
     var burst = h('span', { class: 'post-burst', 'aria-hidden': 'true' }, icon('heart', 72));
     var likeBtn = h('button', { class: 'post-act', type: 'button', id: 'like-' + p.id, onclick: function () { react(!st.fav); } });
@@ -7118,14 +7126,14 @@
       h('span', { class: 'label' }, 'Ajouter depuis mes articles'),
       h('div', { class: 'pick-row' }, products.map(function (pr) {
         return h('button', { class: 'pick', type: 'button', onclick: function () { addProduct(pr); } },
-          pr.photo ? h('img', { src: pr.photo, alt: '' }) : null,
+          pr.photo ? h('img', { src: pr.thumb || pr.photo, alt: '' }) : null,
           h('span', null, h('strong', null, pr.name), h('span', { class: 'small muted' }, fcfa(pr.price))));
       }))) : null;
     function drawItems() {
       setKids(itemsBox, d.items.map(function (it, i) {
         var pr = it.product_id ? byId[it.product_id] : null;
         return h('div', { class: 'line-item' + (pr && pr.photo ? ' has-photo' : '') },
-          pr && pr.photo ? h('img', { class: 'li-photo', src: pr.photo, alt: '' }) : null,
+          pr && pr.photo ? h('img', { class: 'li-photo', src: pr.thumb || pr.photo, alt: '' }) : null,
           h('input', { type: 'text', class: 'li-label', placeholder: 'Article', maxlength: '80', value: it.label, 'aria-label': 'Article ' + (i + 1),
             oninput: function (e) { it.label = e.target.value; keep(); } }),
           h('input', { type: 'text', class: 'li-qty', inputmode: 'numeric', value: it.qty, placeholder: 'Qté', 'aria-label': 'Quantité', oninput: function (e) { it.qty = e.target.value; refreshTotal(); } }),
@@ -7532,7 +7540,7 @@
         rows.some(function (x) { return x.photo; }) ? studioPromo('products-studio', true) : null,
         rows.length ? h('div', { class: 'list', id: 'products' }, rows.map(function (pr) {
           return h('a', { class: 'item product-item', href: '#/boutique/article/' + pr.id },
-            pr.photo ? h('img', { class: 'thumb', src: pr.photo, alt: '' }) : h('span', { class: 'thumb empty', 'aria-hidden': 'true' }),
+            pr.photo ? h('img', { class: 'thumb', src: pr.thumb || pr.photo, alt: '', loading: 'lazy', decoding: 'async' }) : h('span', { class: 'thumb empty', 'aria-hidden': 'true' }),
             h('div', { style: 'flex:1;min-width:0' }, h('div', { class: 't' }, pr.name),
               h('div', { class: 'small muted' }, fcfa(pr.price), pr.reviews ? [' · ', ratingEl(pr.rating, pr.reviews)] : null)),
             h('span', { class: 'item-end' }, pr.active ? null : h('span', { class: 'chip neutral' }, 'Masqué'), h('span', { class: 'chev' }, icon('chev', 18))));

@@ -192,6 +192,7 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   await D.locator('#bo-media').getByText('Stockage non configuré').waitFor();
   assert.match(await D.locator('#bo-media').textContent(), /Copiées : 0 .*en attente : \d+/s);
   assert.equal(await D.locator('#bo-media-run').count(), 0);
+  assert.match(await D.locator('#bo-media-thumbs').textContent(), /Miniatures des grilles.*à faire : \d+/s);
   await D.locator('#bo-settings').getByText('Photos servies par le stockage', { exact: false }).waitFor();
 });
 
