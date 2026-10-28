@@ -1,6 +1,7 @@
 // Tests SQL : Fii Studio niveau 1 (26/10/2026, docs/PLAN-FII-STUDIO.md). Interrupteur, photo requise, crédits (essai partenaire
 // puis boutique), budget mensuel, limite du jour, une série à la fois, écriture du résultat réservée à la clé de service,
-// adresses filtrées (fal uniquement), version gardée = 1 crédit (une seule fois), droits entre boutiques, back-office et journal.
+// adresses filtrées (fal uniquement), droits entre boutiques, back-office et journal. Depuis le 28/10 : crédits retenus à la création,
+// débités si l'image est copiée dans le seau privé, rendus une seule fois sur panne, délai ou résultat perdu ; « garder » gratuit.
 import assert from 'node:assert/strict';
 import { createDb, rpc } from './db.mjs';
 
@@ -58,69 +59,120 @@ await t('crédits : accordés par l’équipe (droit d’écriture, motif obliga
   assert.equal((await one(`select count(*)::int n from fiila.admin_log where action = 'studio_grant' and target_id = $1`, [A.id])).n, 3);
 });
 
-await t('série : ouverte avec la photo d’origine ; une seule à la fois ; rien n’est débité à l’ouverture', async () => {
+const PATH = (id) => `s/${id}.jpg`;
+const credits = async () => (await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).credits;
+
+await t('série : crédits retenus dès l’ouverture (règle du 28/10) ; une seule à la fois ; photo d’origine envoyée', async () => {
   J = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'luxe' });
   assert.match(J.image, /^data:image\/jpeg;base64,\/9j\//); assert.equal(J.style, 'luxe');
+  assert.equal(J.credits.total, 1, '1 crédit retenu sur 2');
   await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'blanc' }, 'studio_busy');
-  assert.equal((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).credits.total, 2);
+  const row = await one(`select charge, credits_held, cost_reserved from fiila.studio_jobs where id = $1`, [J.job]);
+  assert.deepEqual([row.charge, row.credits_held, Number(row.cost_reserved)], ['held', 1, 0.04]);
 });
 
-await t('résultat : écriture réservée à la clé de service ; seules les adresses fal sont gardées (3 au plus) ; coût plafonné', async () => {
-  await ko('fiila_studio_complete', { p_job: J.job, p: { results: URLS } }, 'permission denied');
-  await ko('fiila_studio_complete', { p_job: J.job, p: { results: URLS } }, 'permission denied', F);
-  const r = await ok('fiila_studio_complete', { p_job: J.job, p: { results: [URLS[0], 'https://evil.example/x.png', 'javascript:alert(1)', URLS[1], URLS[2], 'https://v3.fal.media/files/a/4.png'], cost_usd: 99 } }, SR);
-  assert.equal(r.status, 'done'); assert.deepEqual(r.results, URLS);
-  assert.equal(Number((await one(`select cost_usd from fiila.studio_jobs where id = $1`, [J.job])).cost_usd), 5);
-  await db.query(`update fiila.studio_jobs set cost_usd = 0.12 where id = $1`, [J.job]);
+await t('résultat : écriture réservée à la clé de service ; réussite = copie durable de la série ; adresses fal filtrées ; coût plafonné ; idempotent', async () => {
+  await ko('fiila_studio_complete', { p_job: J.job, p: { results: URLS, path: PATH(J.job) } }, 'permission denied');
+  await ko('fiila_studio_complete', { p_job: J.job, p: { results: URLS, path: PATH(J.job) } }, 'permission denied', F);
+  const r = await ok('fiila_studio_complete', { p_job: J.job, p: { results: [URLS[0], 'https://evil.example/x.png', 'javascript:alert(1)', URLS[1], URLS[2], 'https://v3.fal.media/files/a/4.png'], path: PATH(J.job), cost_usd: 99 } }, SR);
+  assert.equal(r.status, 'done'); assert.deepEqual(r.results, URLS); assert.equal(r.charge, 'charged'); assert.equal(r.credits.total, 1);
+  const row = await one(`select cost_usd, result_path from fiila.studio_jobs where id = $1`, [J.job]);
+  assert.equal(Number(row.cost_usd), 5); assert.equal(row.result_path, PATH(J.job));
+  await db.query(`update fiila.studio_jobs set cost_usd = 0.04 where id = $1`, [J.job]);
   const again = await ok('fiila_studio_complete', { p_job: J.job, p: { results: [] } }, SR);
-  assert.equal(again.status, 'done', 'une série close ne se réécrit pas');
+  assert.equal(again.status, 'done', 'une série close ne se réécrit pas'); assert.equal(again.credits.total, 1, 'ni remboursée ni redébitée');
 });
 
-await t('garder une version : 1 crédit, une seule fois ; l’adresse n’est lisible que par la boutique', async () => {
+await t('garder : aucun débit, répétable ; image lisible par la boutique seule (adresse fal + copie durable)', async () => {
   await ko('fiila_studio_keep', { p_key: A.key, p_job: J.job, p_index: 3 }, 'invalid_state');
   await ko('fiila_studio_keep', { p_key: B.key, p_job: J.job, p_index: 0 }, 'not_found');
   const k = await ok('fiila_studio_keep', { p_key: A.key, p_job: J.job, p_index: 1 });
-  assert.equal(k.status, 'kept'); assert.equal(k.url, URLS[1]); assert.equal(k.credits.total, 1);
+  assert.equal(k.status, 'kept'); assert.equal(k.url, URLS[1]); assert.equal(k.credits.total, 1, 'garder ne débite rien');
   const k2 = await ok('fiila_studio_keep', { p_key: A.key, p_job: J.job, p_index: 2 });
-  assert.equal(k2.kept, 1); assert.equal(k2.credits.total, 1, 'pas de second débit');
-  assert.equal((await ok('fiila_studio_result', { p_key: A.key, p_job: J.job, p_index: 0 })).url, URLS[0]);
+  assert.equal(k2.kept, 1); assert.equal(k2.credits.total, 1, 'répétition sans effet');
+  assert.deepEqual(await ok('fiila_studio_result', { p_key: A.key, p_job: J.job, p_index: 0 }), { url: URLS[0], path: PATH(J.job), job: J.job });
   await ko('fiila_studio_result', { p_key: B.key, p_job: J.job, p_index: 0 }, 'not_found');
   const st = await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid });
-  assert.equal(st.jobs[0].status, 'kept'); assert.equal(st.jobs[0].kept, 1);
+  assert.equal(st.jobs[0].status, 'kept'); assert.equal(st.jobs[0].kept, 1); assert.equal(st.jobs[0].charge, 'charged'); assert.equal(st.jobs[0].durable, true);
 });
 
-await t('échec du fournisseur : série en échec, aucun crédit débité ; série bloquée close après 3 minutes', async () => {
+await t('pannes : échec, copie manquante ou délai dépassé → crédits rendus une seule fois ; fin tardive ignorée ; résultat perdu recrédité une fois', async () => {
+  await ok('fiila_bo_studio_grant', { p_shop: A.id, p_delta: 1, p_reason: 'Tests pannes [TEST]' }, F);
+  assert.equal((await credits()).total, 2);
+  // Échec du fournisseur.
   const j = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'blanc' });
-  const r = await ok('fiila_studio_complete', { p_job: j.job, p: { error: 'fal 500' } }, SR);
-  assert.equal(r.status, 'failed'); assert.equal(r.error, 'fal 500');
+  assert.equal(j.credits.total, 1);
+  const r = await ok('fiila_studio_complete', { p_job: j.job, p: { error: 'provider_error' } }, SR);
+  assert.equal(r.status, 'failed'); assert.equal(r.error, 'provider_error'); assert.equal(r.charge, 'refunded'); assert.equal(r.credits.total, 2);
+  await ok('fiila_studio_complete', { p_job: j.job, p: { error: 'provider_error' } }, SR);
+  assert.equal((await one(`select fiila.studio_refund($1, 'test') r`, [j.job])).r, false, 'pas de second remboursement');
+  assert.equal((await credits()).total, 2);
   await ko('fiila_studio_keep', { p_key: A.key, p_job: j.job, p_index: 0 }, 'invalid_state');
+  // Image renvoyée mais pas copiée dans le seau (ou copie d'une autre série) : pas « récupérable » → échec et remboursement.
+  const s1 = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'minimal' });
+  const r1 = await ok('fiila_studio_complete', { p_job: s1.job, p: { results: URLS, path: PATH(J.job) } }, SR);
+  assert.equal(r1.status, 'failed'); assert.equal(r1.error, 'provider_store'); assert.equal(r1.credits.total, 2);
+  // Délai dépassé : rendue à la réservation suivante ; sa fin tardive ne la débite ni ne la livre.
   const j2 = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'minimal' });
   await db.query(`update fiila.studio_jobs set created_at = now() - interval '4 minutes' where id = $1`, [j2.job]);
   const j3 = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'minimal' });
-  assert.equal((await one(`select status from fiila.studio_jobs where id = $1`, [j2.job])).status, 'failed');
-  await ok('fiila_studio_complete', { p_job: j3.job, p: { results: URLS } }, SR);
-  assert.equal((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).credits.total, 1);
+  const row2 = await one(`select status, charge, refund_reason from fiila.studio_jobs where id = $1`, [j2.job]);
+  assert.deepEqual([row2.status, row2.charge, row2.refund_reason], ['failed', 'refunded', 'timeout']);
+  assert.equal(j3.credits.total, 1, 'j2 rendu, j3 retenu');
+  assert.equal(Number((await one(`select cost_usd from fiila.studio_jobs where id = $1`, [j2.job])).cost_usd), 0.04, 'coût estimé gardé au délai');
+  const late = await ok('fiila_studio_complete', { p_job: j2.job, p: { results: URLS, path: PATH(j2.job), cost_usd: 0.058 } }, SR);
+  assert.equal(late.status, 'failed'); assert.equal(late.credits.total, 1);
+  assert.equal(Number((await one(`select cost_usd from fiila.studio_jobs where id = $1`, [j2.job])).cost_usd), 0.058, 'coût réel du fournisseur gardé, sans débit');
+  // Réussite puis résultat introuvable : recrédité une seule fois, par la clé de service seulement.
+  await ok('fiila_studio_complete', { p_job: j3.job, p: { results: URLS, path: PATH(j3.job), cost_usd: 0.04 } }, SR);
+  assert.equal((await credits()).total, 1);
+  await ko('fiila_studio_lost', { p_job: j3.job }, 'permission denied');
+  assert.equal((await ok('fiila_studio_lost', { p_job: j3.job }, SR)).refunded, true);
+  assert.equal((await ok('fiila_studio_lost', { p_job: j3.job }, SR)).refunded, false);
+  assert.equal((await credits()).total, 2);
+  // Ouvrir le Studio rend aussi les séries bloquées.
+  const j4 = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'blanc' });
+  await db.query(`update fiila.studio_jobs set created_at = now() - interval '5 minutes' where id = $1`, [j4.job]);
+  assert.equal((await credits()).total, 2);
+  assert.equal((await one(`select charge from fiila.studio_jobs where id = $1`, [j4.job])).charge, 'refunded');
 });
 
-await t('garde-fous de coût : budget du mois atteint → pause ; limite de séries par jour', async () => {
+await t('garde-fous de coût : budget du mois avec les séries en cours (coût réservé) ; limite de séries par jour', async () => {
   await ok('fiila_bo_setting_set', { p_key: 'studio_budget_usd', p_value: 0 }, F);
   await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'blanc' }, 'studio_budget');
+  await ok('fiila_bo_setting_set', { p_key: 'studio_budget_usd', p_value: 1 }, F);
+  const spent = Number((await one(`select fiila.studio_spent() s`)).s);
+  // Une autre boutique a une série en cours qui réserve presque tout le reste du budget.
+  const fake = await one(`insert into fiila.studio_jobs (shop_id, product_id, style, mode, status, charge, cost_reserved, created_at) values ($1, $2, 'blanc', 'fidele', 'running', 'held', $3, now()) returning id`, [B.id, B.pid, (1 - spent - 0.03).toFixed(4)]);
+  await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'blanc' }, 'studio_budget');
+  await db.query(`delete from fiila.studio_jobs where id = $1`, [fake.id]);
   await ok('fiila_bo_setting_set', { p_key: 'studio_budget_usd', p_value: 50 }, F);
-  await ok('fiila_bo_setting_set', { p_key: 'studio_daily', p_value: 4 }, F);
+  const today = Number((await one(`select count(*) n from fiila.studio_jobs where shop_id = $1 and created_at > now() - interval '1 day'`, [A.id])).n);
+  await ok('fiila_bo_setting_set', { p_key: 'studio_daily', p_value: today }, F);
   await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'blanc' }, 'studio_daily_limit');
-  await ok('fiila_bo_setting_set', { p_key: 'studio_daily', p_value: 10 }, F);
+  await ok('fiila_bo_setting_set', { p_key: 'studio_daily', p_value: 100 }, F);
 });
 
-await t('crédits d’essai d’un partenaire utilisés d’abord, puis ceux de la boutique', async () => {
+await t('crédits d’essai d’un partenaire utilisés d’abord, puis ceux de la boutique ; rendus au même endroit', async () => {
   await db.query(`insert into fiila.partner_packs (code, version, name, benefits, limits) values ('tstudio', 1, 'Pack test', '["Studio"]'::jsonb, '{"studio_credits": 2}'::jsonb)`);
   const inv = await one(`insert into fiila.partner_invites (token_hash, brand, pack_code, pack_version, months) values (extensions.gen_random_bytes(16), 'Marque test', 'tstudio', 1, 1) returning id`);
   await db.query(`insert into fiila.partner_trials (invite_id, shop_id, pack_code, pack_version, months, status, activated_at, ends_at) values ($1, $2, 'tstudio', 1, 1, 'active', now(), now() + interval '20 days')`, [inv.id, A.id]);
-  const c = await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid });
-  assert.deepEqual(c.credits, { trial: 2, wallet: 1, total: 3 });
-  const j = (await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).jobs.find((x) => x.status === 'done');
-  const k = await ok('fiila_studio_keep', { p_key: A.key, p_job: j.id, p_index: 0 });
-  assert.deepEqual(k.credits, { trial: 1, wallet: 1, total: 2 });
-  assert.equal((await one(`select credit_from from fiila.studio_jobs where id = $1`, [j.id])).credit_from, 'trial');
+  assert.deepEqual(await credits(), { trial: 2, wallet: 2, total: 4 });
+  const j = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'minimal' });
+  assert.deepEqual(j.credits, { trial: 1, wallet: 2, total: 3 });
+  assert.equal((await one(`select credit_from from fiila.studio_jobs where id = $1`, [j.job])).credit_from, 'trial');
+  await ok('fiila_studio_complete', { p_job: j.job, p: { error: 'provider_error' } }, SR);
+  assert.deepEqual(await credits(), { trial: 2, wallet: 2, total: 4 }, 'rendu à l’essai');
+  const j2 = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'minimal' });
+  await ok('fiila_studio_complete', { p_job: j2.job, p: { results: URLS, path: PATH(j2.job) } }, SR);
+  assert.deepEqual(await credits(), { trial: 1, wallet: 2, total: 3 });
+});
+
+await t('séries d’avant la règle (legacy) : « garder » les débite comme avant, une seule fois', async () => {
+  const old = await one(`insert into fiila.studio_jobs (shop_id, product_id, style, mode, status, charge, results) values ($1, $2, 'minimal', 'fidele', 'done', 'legacy', $3::jsonb) returning id`, [A.id, A.pid, JSON.stringify([URLS[0]])]);
+  const k = await ok('fiila_studio_keep', { p_key: A.key, p_job: old.id, p_index: 0 });
+  assert.equal(k.credits.total, 2);
+  assert.equal((await ok('fiila_studio_keep', { p_key: A.key, p_job: old.id, p_index: 0 })).credits.total, 2);
 });
 
 await t('back-office : réservé à l’équipe ; dépense, séries, crédits ; réglages bornés ; mesure anonyme', async () => {
@@ -128,7 +180,9 @@ await t('back-office : réservé à l’équipe ; dépense, séries, crédits ; 
   const d = await ok('fiila_bo_studio', {}, SUP);
   assert.equal(d.ready, true); assert.ok(Number(d.spent_usd) > 0); assert.ok(d.month.series >= 4); assert.ok(d.month.kept >= 1);
   assert.ok(d.jobs.some((x) => x.shop === 'Studio A [TEST]' && x.status === 'kept'));
-  assert.ok(d.wallets.some((x) => x.shop === 'Studio A [TEST]'));
+  assert.ok(d.jobs.some((x) => x.charge === 'refunded' && x.refund_reason === 'timeout')); assert.ok(d.month.charged_credits >= 1); assert.ok(d.month.refunded_credits >= 1); assert.equal(Number(d.reserved_usd), 0);
+  assert.ok(d.wallets.some((x) => x.shop === 'Studio A [TEST]' && x.reserved === 0 && typeof x.trial === 'number'));
+  assert.ok(d.jobs.some((x) => x.credit_from === 'wallet'));
   await ko('fiila_bo_setting_set', { p_key: 'studio_budget_usd', p_value: 5000 }, null, F);
   const s = JSON.stringify(await ok('fiila_bo_settings', {}, F));
   assert.ok(s.includes('studio_ready') && s.includes('studio_budget_usd') && s.includes('studio_daily'));
@@ -147,6 +201,7 @@ await t('décors par catégorie : ceux du pack de la boutique (sinon générique
   await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'bijoux-1' }, 'invalid_payload');
   await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'blanc' }, 'invalid_payload');
   await db.query(`update fiila.studio_jobs set status = 'failed' where shop_id = $1 and status = 'running'`, [A.id]);
+  await db.query(`update fiila.studio_wallets set credits = 5 where shop_id = $1`, [A.id]);
   const r = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2' });
   assert.match(r.prompt, /wooden clothing rail/); assert.equal(r.style, 'mode-2');
   assert.equal((await one(`select scene_version from fiila.studio_jobs where id = $1`, [r.job])).scene_version, '0.1.0');
@@ -202,9 +257,10 @@ await t('modes : premium proposé selon la catégorie (jamais bijoux), prompt = 
   await db.query(`update fiila.settings set value = '0' where key = 'studio_fibo'`);
   assert.equal(await eng('premium', 'beaute'), 'nano'); assert.equal(await eng('fidele', 'bijoux'), 'bria');
   await db.query(`update fiila.settings set value = '1' where key = 'studio_fibo'`);
-  await ok('fiila_studio_complete', { p_job: r.job, p: { results: ['https://v3.fal.media/files/x/p.jpg'], cost_usd: 0.15 } }, SR);
+  assert.equal(r.credits.wallet, 2, 'premium : 3 crédits retenus à la création');
+  await ok('fiila_studio_complete', { p_job: r.job, p: { results: ['https://v3.fal.media/files/x/p.jpg'], path: `s/${r.job}.jpg`, cost_usd: 0.04 } }, SR);
   const k = await ok('fiila_studio_keep', { p_key: A.key, p_job: r.job, p_index: 0 });
-  assert.equal(k.credits.wallet, 2, '3 crédits débités');
+  assert.equal(k.credits.wallet, 2, 'garder ne débite rien de plus');
   const f = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2' });
   assert.equal(f.mode, 'fidele'); assert.match(f.prompt, /^CAM\. light wooden/, 'fidèle : pas de gabarit premium');
   assert.equal(f.engine, 'bria', 'mode fidèle d’un vêtement : Bria, inchangé');

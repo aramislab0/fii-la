@@ -10,7 +10,7 @@ let passed = 0, failed = 0;
 async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
 const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test', SUPABASE_SERVICE_ROLE_KEY: 'service-test' };
 const ID = '2f6bd807-a43e-412f-ac96-24b5c6b51518', H = 'd5c881e6e40fefe3cbe7878f30de64a5';
-function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatus = 200, me = null, thumbs = [], purges = [], source = () => null }) {
+function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatus = 200, me = null, thumbs = [], purges = [], studioOld = [], source = () => null }) {
   const calls = [];
   const fetch = async (url, init = {}) => {
     calls.push({ url, init });
@@ -25,6 +25,8 @@ function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatu
     if (fn === 'fiila_media_pending') return new Response(JSON.stringify(pending), { status: 200 });
     if (fn === 'fiila_media_thumbs_pending') return new Response(JSON.stringify(thumbs), { status: 200 });
     if (fn === 'fiila_media_purge_pending') return new Response(JSON.stringify(purges), { status: 200 });
+    if (fn === 'fiila_studio_purgeable') return new Response(JSON.stringify(studioOld), { status: 200 });
+    if (fn === 'fiila_studio_forget') return new Response(JSON.stringify({ ok: true, forgotten: JSON.parse(init.body).p_paths.length }), { status: 200 });
     if (fn === 'fiila_media_purged') return new Response(JSON.stringify({ ok: true, purged: true }), { status: 200 });
     if (fn === 'fiila_media_orphans') return new Response(JSON.stringify(orphans), { status: 200 });
     if (fn === 'fiila_media_forget') return new Response(JSON.stringify({ ok: true, removed: JSON.parse(init.body).p_paths.length }), { status: 200 });
@@ -188,6 +190,20 @@ await t('retrait de la base : seulement si le fichier publié a la même emprein
   const s2 = sim({ purges: [{ kind: 'product', ref: ID, path: p1, sha }] });
   assert.equal((await (await makeHandler({ env, fetch: s2.fetch })(post())).json()).purged, 0);
   assert.equal(s2.rpcs('fiila_media_purged').length, 0);
+});
+
+await t('Studio : copies des résultats de plus de 7 jours effacées du seau privé puis oubliées ; refus journalisé', async () => {
+  const p = 's/2f6bd807-a43e-412f-ac96-24b5c6b51518.jpg';
+  let s = sim({ studioOld: [p] });
+  let r = await (await makeHandler({ env, fetch: s.fetch })(post())).json();
+  assert.equal(r.removed, 1);
+  const del = s.calls.find((c) => c.init.method === 'DELETE' && c.url.endsWith('/storage/v1/object/studio'));
+  assert.deepEqual(JSON.parse(del.init.body), { prefixes: [p] }); assert.equal(del.init.headers.Authorization, 'Bearer service-test');
+  assert.deepEqual(s.rpcs('fiila_studio_forget')[0], { p_paths: [p] });
+  s = sim({ studioOld: [p], deleteStatus: 403 });
+  r = await (await makeHandler({ env, fetch: s.fetch })(post())).json();
+  assert.equal(r.removed, 0); assert.equal(s.rpcs('fiila_studio_forget').length, 0);
+  assert.equal(s.rpcs('fiila_media_report').find((x) => x.p_action === 'failed').p_ref, 'studio');
 });
 
 console.log(`\n${passed}/${passed + failed} tests fonction de copie des photos réussis`);

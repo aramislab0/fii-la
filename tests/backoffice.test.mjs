@@ -112,6 +112,8 @@ await t('ordinateur : barre latérale avec les 18 sections du super admin, chacu
   }
   await D.locator('#bo-settings').waitFor();
   await shot(D, '03-reglages');
+  await D.click('#bo-nav-studio');
+  assert.match(await D.locator('#bo-studio-credits-kpi').textContent(), /crédits débités · \d+ rendus/, 'facturation du Studio visible (28/10)');
 });
 await t('Ambassadeurs (marques) : nouvelle version du pack, « Inviter une marque », aperçu et lien WhatsApp, invitation listée', async () => {
   await D.click('#bo-nav-ambassadeurs');

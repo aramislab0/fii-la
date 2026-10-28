@@ -5,7 +5,10 @@
 //                                             le mode, enregistre l'adresse et le coût réel (clé de service) ;
 //   { action: 'take', key, job, index }        renvoie l'image choisie en base64 (l'application l'enregistre comme photo de
 //                                             l'article, avec les contrôles habituels) — évite tout accès direct à fal depuis
-//                                             le téléphone.
+//                                             le téléphone. Gratuit et répétable : lue d'abord dans la copie durable (seau privé
+//                                             « studio ») ; copie introuvable → crédits rendus une seule fois (fiila_studio_lost).
+// Facturation (28/10, offre validée) : crédits retenus par la base à la réservation, débités seulement si l'image est
+// copiée dans le seau « studio » (s/<série>.<ext>) ; sinon la base les rend.
 // Secret (Supabase → Edge Functions → Secrets, saisi par le fondateur, jamais dans le dépôt) : FAL_KEY.
 // Sans FAL_KEY : { configured: false } et rien n'est ouvert. SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY : fournis.
 
@@ -34,6 +37,9 @@ export const SCENES = {
   fete: 'festive celebration table, warm golden lights bokeh, rich fabric textures, elegant holiday atmosphere'
 };
 const FAL_HOST = /^https:\/\/[a-z0-9.-]+\.fal\.(media|ai|run)\//;
+export const RESULT_BUCKET = 'studio';
+const MAX_RESULT = 12e6;
+const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 
 export function makeHandler({ env, fetch }) {
   const base = () => String(env('SUPABASE_URL') || '').replace(/\/$/, '');
@@ -88,10 +94,26 @@ export function makeHandler({ env, fetch }) {
     const r = await fetch(cut.urls[0]);
     if (!r.ok) return null;
     const m = await maskFromCutout(new Uint8Array(await r.arrayBuffer()));
-    let s = ''; for (let i = 0; i < m.png.length; i += 0x8000) s += String.fromCharCode.apply(null, m.png.subarray(i, i + 0x8000));
-    const url = await upload('data:image/png;base64,' + btoa(s));
+    const url = await upload('data:image/png;base64,' + b64(m.png));
     return FAL_HOST.test(url) ? url : null;
   }
+  // Copie durable du résultat dans le seau privé (clé de service) : c'est elle qui rend la génération « récupérable ».
+  async function store(url, job) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      const type = (r.headers.get('content-type') || '').split(';')[0];
+      const buf = new Uint8Array(await r.arrayBuffer());
+      if (!EXT[type] || !buf.length || buf.length > MAX_RESULT) return null;
+      const path = `s/${job}.${EXT[type]}`;
+      const key = env('SUPABASE_SERVICE_ROLE_KEY');
+      const up = await fetch(`${base()}/storage/v1/object/${RESULT_BUCKET}/${path}`, { method: 'POST',
+        headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': type, 'x-upsert': 'true' }, body: buf });
+      if (!up.ok) { console.log(JSON.stringify({ studio_store: 'failed', status: up.status })); return null; }
+      return path;
+    } catch (e) { console.log(JSON.stringify({ studio_store: 'failed', error: String((e && e.name) || 'error').slice(0, 60) })); return null; }
+  }
+  const b64 = (buf) => { let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000)); return btoa(s); };
   // engine (fiila.studio_engine) : bria | nano | fibo | fibo_mask ; absent (base pas encore à jour) = moteur d'avant selon le mode.
   async function fal(image, prompt, mode, engine) {
     const eng = engine || (mode === 'premium' ? 'nano' : 'bria');
@@ -129,15 +151,25 @@ export function makeHandler({ env, fetch }) {
     if (b.action === 'take') {
       let r; try { r = await rpc('fiila_studio_result', { p_key: b.key || null, p_job: b.job, p_index: b.index }, auth); }
       catch (e) { return json(e.status === 400 ? 403 : 502, { error: e.code || 'not_allowed' }); }
-      if (!r || !FAL_HOST.test(r.url || '')) return json(404, { error: 'not_found' });
-      const img = await fetch(r.url);
-      if (!img.ok) return json(410, { error: 'expired' });
-      const type = (img.headers.get('content-type') || 'image/png').split(';')[0];
+      let img = null, type = '';
+      if (r && r.path) {
+        const key = env('SUPABASE_SERVICE_ROLE_KEY');
+        const g = await fetch(`${base()}/storage/v1/object/${RESULT_BUCKET}/${r.path}`, { headers: { apikey: key, Authorization: 'Bearer ' + key } });
+        if (g.ok) { img = g; type = (g.headers.get('content-type') || '').split(';')[0]; }
+        else if (g.status === 400 || g.status === 404) {
+          // Copie durable introuvable : la génération payée est perdue → crédits rendus une seule fois.
+          const lost = await rpc('fiila_studio_lost', { p_job: r.job || b.job }, null).catch(() => null);
+          return json(410, { error: 'expired', refunded: !!(lost && lost.refunded), credits: lost && lost.credits });
+        } else return json(502, { error: 'storage' });
+      } else if (r && FAL_HOST.test(r.url || '')) {
+        const f = await fetch(r.url);
+        if (!f.ok) return json(410, { error: 'expired' });
+        img = f; type = (f.headers.get('content-type') || 'image/png').split(';')[0];
+      } else return json(404, { error: 'not_found' });
       if (!/^image\/(png|jpeg|webp)$/.test(type)) return json(502, { error: 'bad_image' });
       const buf = new Uint8Array(await img.arrayBuffer());
-      if (buf.length > 12e6) return json(502, { error: 'too_large' });
-      let s = ''; for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-      return json(200, { configured: true, image: `data:${type};base64,${btoa(s)}` });
+      if (buf.length > MAX_RESULT) return json(502, { error: 'too_large' });
+      return json(200, { configured: true, image: `data:${type};base64,${b64(buf)}` });
     }
     let job;
     try { job = await rpc('fiila_studio_reserve', { p_key: b.key || null, p_product: b.product, p_style: b.style, p_mode: b.mode === 'premium' ? 'premium' : 'fidele' }, auth); }
@@ -150,7 +182,12 @@ export function makeHandler({ env, fetch }) {
       console.log(JSON.stringify({ studio_fal: 'unreachable', error: String((e && e.name) || 'error').slice(0, 60) }));
       out = { error: 'provider_unavailable' };
     }
+    if (out.results && out.results.length) {
+      const path = await store(out.results[0], job.job);
+      if (path) out.path = path;
+    }
     const done = await rpc('fiila_studio_complete', { p_job: job.job, p: out }, null);
-    return json(200, { configured: true, job: job.job, status: done.status, results: done.results || [], error: done.error || null });
+    return json(200, { configured: true, job: job.job, status: done.status, results: done.status === 'done' ? done.results || [] : [],
+      error: done.error || null, credits: done.credits || null });
   };
 }

@@ -459,13 +459,14 @@
     studio_budget: 'Le Studio est en pause pour ce mois. Réessayez plus tard.',
     studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
     studio_busy: 'Une création est déjà en cours. Patientez quelques secondes.',
-    studio_failed: 'La création n’a pas abouti. Aucun crédit n’a été utilisé.',
+    studio_failed: 'La création n’a pas abouti. Aucun crédit n’a été utilisé (s’il avait été retenu, il vous est rendu).',
     shop_kyc_required: 'Cette boutique ne prend pas de nouvelle commande pour le moment.',
     owner_name_required: 'Indiquez le nom et le prénom du propriétaire.',
     kyc_image_invalid: 'Photo illisible ou trop lourde. Reprenez la photo, bien à plat et nette.',
     kyc_back_required: 'Ajoutez aussi le verso de la carte.',
     kyc_already_verified: 'Votre pièce est déjà validée.',
     studio_expired: 'Cette version n’est plus disponible : créez-en de nouvelles.',
+    studio_refunded: 'Cette version n’est plus disponible : ses crédits vous ont été rendus.',
     vd_photo_rule: 'Confirmez qu’aucune personne n’est reconnaissable sur la photo.',
     vd_photo_required: 'Ajoutez une photo de l’article.',
     vd_category_required: 'Choisissez la catégorie de l’article.',
@@ -563,13 +564,14 @@
     studio_budget: 'Le Studio est en pause pour ce mois. Réessayez plus tard.',
     studio_daily_limit: 'Limite du jour atteinte : réessayez demain.',
     studio_busy: 'Une création est déjà en cours. Patientez quelques secondes.',
-    studio_failed: 'La création n’a pas abouti. Aucun crédit n’a été utilisé.',
+    studio_failed: 'La création n’a pas abouti. Aucun crédit n’a été utilisé (s’il avait été retenu, il vous est rendu).',
     shop_kyc_required: 'Cette boutique ne prend pas de nouvelle commande pour le moment.',
     owner_name_required: 'Indiquez le nom et le prénom du propriétaire.',
     kyc_image_invalid: 'Photo illisible ou trop lourde. Reprenez la photo, bien à plat et nette.',
     kyc_back_required: 'Ajoutez aussi le verso de la carte.',
     kyc_already_verified: 'Votre pièce est déjà validée.',
     studio_expired: 'Cette version n’est plus disponible : créez-en de nouvelles.',
+    studio_refunded: 'Cette version n’est plus disponible : ses crédits vous ont été rendus.',
     shop_suspended: 'Votre boutique est suspendue par l’équipe Fii. Contactez-nous pour la réactiver.',
     invite_invalid: 'Invitation expirée, annulée ou déjà utilisée.',
     invite_email_mismatch: 'Cette invitation a été créée pour une autre adresse e-mail.',
@@ -7680,6 +7682,8 @@
     var style = scenes[0].id, job = null, pick = null, busy = false, step = 'decor', kept = false, closeSheet, timers = [], runId = 0;
     var credits = (st.credits && st.credits.total) || 0;
     var prem = st.premium || null, mode = 'fidele';
+    // Dernière création payée et pas encore gardée (création interrompue, réseau coupé) : la boutique peut la reprendre sans frais.
+    var resume = (st.jobs || []).filter(function (x) { return x.status === 'done' && x.charge === 'charged' && x.durable; })[0] || null;
     var body = h('div', { class: 'stack', id: 'studio-body' });
     var foot = h('div', { class: 'sd-foot', id: 'studio-foot' });
     var steps = h('ol', { class: 'sd-steps', id: 'studio-steps' });
@@ -7730,12 +7734,13 @@
         setKids(body, h('div', { class: 'sd-busy', role: 'status', 'aria-live': 'polite' },
           h('div', { class: 'sd-busy-img loading-skel' }, h('span', { class: 'sd-pulse', 'aria-hidden': 'true' }, icon('spark', 28))),
           line, h('div', { class: 'sd-bar', 'aria-hidden': 'true' }, h('i', { style: 'animation-duration:' + (mode === 'premium' ? 30 : 15) + 's' })),
-          h('p', { class: 'small muted' }, 'Environ ' + (mode === 'premium' ? 30 : 15) + ' secondes. Rien n’est débité si vous ne gardez pas.')));
-        // Sortie possible si la création traîne (audit du 27/10) : la série est abandonnée, rien n'est débité.
+          h('p', { class: 'small muted' }, 'Environ ' + (mode === 'premium' ? 30 : 15) + ' secondes. Les crédits sont utilisés si la photo est créée ; en cas de panne, ils vous sont rendus.')));
+        // Sortie possible si la création traîne (audit du 27/10). Règle du 28/10 : la création continue ; si elle aboutit, elle est
+        // payée et se retrouve ici (« Dernière création ») ; sinon ses crédits sont rendus.
         var cancel = h('button', { class: 'btn ghost full', type: 'button', id: 'studio-cancel', hidden: true, onclick: function () {
           runId++; busy = false; timers.forEach(clearTimeout); timers = []; step = 'decor'; draw();
-          toast('Création abandonnée : rien n’a été débité.');
-        } }, 'Annuler');
+          toast('Vous retrouverez cette création ici si elle aboutit ; sinon ses crédits vous sont rendus.');
+        } }, 'Ne plus attendre');
         timers.push(setTimeout(function () { cancel.hidden = false; }, (mode === 'premium' ? 45 : 30) * 1000));
         setKids(foot, cancel);
         return;
@@ -7755,9 +7760,10 @@
           }, onchange: function () { track('studio_ui', 'compare'); } }),
           job.mode === 'premium' ? h('p', { class: 'sd-check', id: 'studio-check' }, h('b', null, 'Le produit est-il identique à l’original ?'), ' Forme, couleurs, logo, texte de l’étiquette.') : null);
         setKids(foot,
-          h('button', { class: 'btn big full', type: 'button', id: 'studio-keep', onclick: keep }, job.mode === 'premium' ? 'Oui, garder · ' + cr(job.need) : 'Garder cette photo · ' + cr(job.need)),
+          h('button', { class: 'btn big full', type: 'button', id: 'studio-keep', onclick: keep }, job.mode === 'premium' ? 'Oui, garder' : 'Garder cette photo'),
           h('div', { class: 'duo' },
-            h('button', { class: 'btn ghost', type: 'button', id: 'studio-again', onclick: run }, job.mode === 'premium' ? 'Non, autre proposition' : 'Autre proposition'),
+            h('button', { class: 'btn ghost', type: 'button', id: 'studio-again', onclick: run, disabled: credits < need() ? true : null },
+              (job.mode === 'premium' ? 'Non, autre proposition · ' : 'Autre proposition · ') + cr(need())),
             h('button', { class: 'btn ghost', type: 'button', id: 'studio-back', onclick: function () { job = null; step = 'decor'; draw(); } }, 'Changer de décor')));
         return;
       }
@@ -7780,8 +7786,11 @@
         return;
       }
       setKids(body,
+        resume ? h('button', { type: 'button', class: 'notice studio-resume', id: 'studio-resume', onclick: reopen },
+          icon('spark', 18), h('span', null, h('b', null, 'Dernière création'), ' — déjà payée : la voir et la garder')) : null,
         h('div', { class: 'sd-orig' }, h('img', { src: pr.photo, alt: 'Photo d’origine' }), h('span', null, 'Votre photo')),
         modes(),
+        h('p', { class: 'small muted', id: 'studio-rule' }, 'Les crédits sont utilisés à chaque création réussie ; « Garder » est gratuit, et une panne vous est remboursée.'),
         h('h3', { class: 'sd-h3' }, 'Choisissez un décor'),
         h('div', { class: 'studio-styles sd-scenes', role: 'radiogroup', 'aria-label': 'Décor' }, scenes.map(function (x) {
           var on = style === x.id;
@@ -7798,8 +7807,21 @@
         if (me !== runId) return; // création annulée entre-temps
         busy = false; timers.forEach(clearTimeout); timers = [];
         if (r.configured === false) { step = 'decor'; draw(); errBox(err, new ApiError('studio_off')); return; }
+        if (r.credits) credits = r.credits.total || 0;
         if (r.error || r.status !== 'done') { step = 'decor'; draw(); errBox(err, new ApiError(STUDIO_ERR[r.error] ? r.error : 'studio_failed')); return; }
         job = { id: r.job, results: r.results, mode: mode, need: need() }; step = 'choose'; draw();
+      });
+    }
+    // Reprendre la dernière création payée : image lue dans sa copie durable (gratuit, répétable).
+    function reopen() {
+      var j = resume; if (!j || busy) return;
+      busy = true; setKids(err);
+      studioCall({ action: 'take', job: j.id, index: 0 }).then(function (t) {
+        busy = false;
+        if (t && t.credits) credits = t.credits.total || 0;
+        if (!t || !t.image) { resume = null; draw(); errBox(err, new ApiError(t && t.refunded ? 'studio_refunded' : 'studio_expired')); return; }
+        resume = null; mode = j.mode; style = j.style;
+        job = { id: j.id, results: [t.image], mode: j.mode, need: j.credits }; step = 'choose'; draw();
       });
     }
     function keep() {
@@ -7811,7 +7833,8 @@
         track('studio', 'kept:' + style);
         return studioCall({ action: 'take', job: job.id, index: pick });
       }).then(function (t) {
-        if (!t || !t.image) throw new ApiError(t && t.error === 'expired' ? 'studio_expired' : 'studio_failed');
+        if (t && t.credits) credits = t.credits.total || 0;
+        if (!t || !t.image) throw new ApiError(t && t.refunded ? 'studio_refunded' : t && t.error === 'expired' ? 'studio_expired' : 'studio_failed');
         // Sans fetch (la politique de sécurité de la page n'autorise pas les adresses data:) : décodage direct.
         var m = /^data:([^;,]+);base64,(.*)$/.exec(t.image);
         if (!m) throw new ApiError('studio_failed');
@@ -7827,7 +7850,7 @@
     draw();
     closeSheet = openSheet(back);
   }
-  var STUDIO_ERR = { studio_premium_off: 1, studio_off: 1, studio_no_photo: 1, studio_no_credits: 1, studio_budget: 1, studio_daily_limit: 1, studio_busy: 1, studio_failed: 1, studio_expired: 1 };
+  var STUDIO_ERR = { studio_premium_off: 1, studio_off: 1, studio_no_photo: 1, studio_no_credits: 1, studio_budget: 1, studio_daily_limit: 1, studio_busy: 1, studio_failed: 1, studio_expired: 1, studio_refunded: 1 };
   function productForm(pr, shop, fresh) {
     var f = { name: pr ? pr.name : '', price: pr ? String(pr.price) : '', description: pr ? pr.description || '' : '', active: pr ? pr.active : true, photo: pr ? pr.photo || null : null };
     f.category = pr && pr.category || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');

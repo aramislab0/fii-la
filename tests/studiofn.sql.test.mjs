@@ -9,19 +9,21 @@ let passed = 0, failed = 0;
 async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
 const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test', SUPABASE_SERVICE_ROLE_KEY: 'service-test', FAL_KEY: 'fal-test' };
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
-function sim({ reserve = { job: 'j1', style: 'luxe', image: 'data:image/jpeg;base64,AAA' }, fal = null, result = 'https://v3.fal.media/files/x/1.png', media = null } = {}) {
+function sim({ reserve = { job: 'j1', style: 'luxe', image: 'data:image/jpeg;base64,AAA' }, fal = null, result = 'https://v3.fal.media/files/x/1.png', media = null, storage = null } = {}) {
   const calls = [];
   const fetch = async (url, init = {}) => {
     calls.push({ url, init, body: typeof init.body === 'string' ? JSON.parse(init.body) : null });
     if (url.startsWith('https://rest.alpha.fal.ai/storage/upload/initiate')) return json({ upload_url: 'https://upload.fal.media/put/1', file_url: 'https://v3.fal.media/files/up/photo.jpeg' });
     if (url === 'https://upload.fal.media/put/1') return new Response(null, { status: 200 });
     if (url.startsWith('https://fal.run/')) return fal ? fal(url) : json({ images: [1, 2, 3].map((i) => ({ url: `https://v3.fal.media/files/x/${i}.png` })) });
+    if (url.startsWith('https://p.supabase.co/storage/') && storage) return storage(url, init);
     if (url.startsWith('https://v3.fal.media/') && media) return media(url);
     if (url.startsWith('https://v3.fal.media/')) return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } });
     const fn = url.split('/rpc/')[1];
     if (fn === 'fiila_studio_reserve') return reserve ? json(reserve) : json({ message: 'fiila:studio_no_credits' }, 400);
-    if (fn === 'fiila_studio_complete') { const p = calls.at(-1).body.p; return json({ id: 'j1', status: p.results ? 'done' : 'failed', results: p.results || [], error: p.error || null }); }
-    if (fn === 'fiila_studio_result') return result ? json({ url: result }) : json({ message: 'fiila:not_found' }, 400);
+    if (fn === 'fiila_studio_complete') { const p = calls.at(-1).body.p; const ok = !!(p.results && p.path); return json({ id: 'j1', status: ok ? 'done' : 'failed', results: p.results || [], error: ok ? null : p.error || 'provider_store', credits: { total: 2 } }); }
+    if (fn === 'fiila_studio_result') return result ? json(typeof result === 'string' ? { url: result } : result) : json({ message: 'fiila:not_found' }, 400);
+    if (fn === 'fiila_studio_lost') return json({ refunded: true, credits: { total: 3 } });
     return json({});
   };
   return { fetch, calls };
@@ -132,6 +134,43 @@ await t('moteur « fibo » (vêtement porté) : FIBO 2.0 sans masque, 4:5, promp
   const s2 = sim({ reserve: { job: 'j1', style: 'mode-2', mode: 'premium', prompt: 'P', image: 'data:image/jpeg;base64,AAA' }, fal: () => json({ images: [{ url: 'https://v3.fal.media/files/x/p.jpg' }] }) });
   await makeHandler({ env: (k) => ENV[k], fetch: s2.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'mode-2', mode: 'premium' }));
   assert.equal(s2.calls.find((c) => c.url.startsWith('https://fal.run/')).url, 'https://fal.run/fal-ai/nano-banana-pro/edit');
+});
+
+await t('copie durable : image de fal copiée dans le seau privé « studio » (s/<série>.<ext>, clé de service) avant la fin ; sans copie : la base rend les crédits', async () => {
+  const s = sim({ reserve: { job: '2f6bd807-a43e-412f-ac96-24b5c6b51518', style: 'luxe', engine: 'bria', prompt: 'P', image: 'data:image/jpeg;base64,AAA' },
+    fal: () => json({ images: [{ url: 'https://v3.fal.media/files/x/r.jpg' }] }),
+    media: () => new Response(new Uint8Array([255, 216, 255, 1, 2]), { headers: { 'content-type': 'image/jpeg' } }) });
+  const r = await (await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'luxe' }))).json();
+  assert.equal(r.status, 'done'); assert.deepEqual(r.credits, { total: 2 });
+  const up = s.calls.find((c) => c.url.startsWith('https://p.supabase.co/storage/v1/object/studio/'));
+  assert.equal(up.url, 'https://p.supabase.co/storage/v1/object/studio/s/2f6bd807-a43e-412f-ac96-24b5c6b51518.jpg');
+  assert.equal(up.init.headers.Authorization, 'Bearer service-test'); assert.equal(up.init.headers['Content-Type'], 'image/jpeg'); assert.equal(up.init.body.length, 5);
+  assert.equal(s.calls.find((x) => x.url.endsWith('fiila_studio_complete')).body.p.path, 's/2f6bd807-a43e-412f-ac96-24b5c6b51518.jpg');
+  // Seau indisponible : pas de chemin envoyé, la base classe la série en échec (crédits rendus), l'application ne reçoit pas d'image.
+  const s2 = sim({ reserve: { job: 'j1', style: 'luxe', engine: 'bria', prompt: 'P', image: 'https://exemple/p.jpg' },
+    fal: () => json({ images: [{ url: 'https://v3.fal.media/files/x/r.jpg' }] }),
+    media: () => new Response(new Uint8Array([1, 2]), { headers: { 'content-type': 'image/jpeg' } }), storage: () => new Response('{}', { status: 500 }) });
+  const r2 = await (await makeHandler({ env: (k) => ENV[k], fetch: s2.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'luxe' }))).json();
+  assert.equal(r2.status, 'failed'); assert.deepEqual(r2.results, []); assert.equal(r2.error, 'provider_store');
+  assert.equal(s2.calls.find((x) => x.url.endsWith('fiila_studio_complete')).body.p.path, undefined);
+});
+
+await t('reprendre l’image (« take ») : copie durable lue avec la clé de service ; introuvable → crédits rendus une fois (410) ; sans copie : adresse fal comme avant', async () => {
+  const path = 's/2f6bd807-a43e-412f-ac96-24b5c6b51518.png';
+  const s = sim({ result: { url: 'https://v3.fal.media/files/x/1.png', path, job: '2f6bd807-a43e-412f-ac96-24b5c6b51518' },
+    storage: () => new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } }) });
+  const b = await (await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'take', key: 'cle', job: '2f6bd807-a43e-412f-ac96-24b5c6b51518', index: 0 }))).json();
+  assert.equal(b.image, 'data:image/png;base64,iVBORw==');
+  const g = s.calls.find((c) => c.url.startsWith('https://p.supabase.co/storage/'));
+  assert.equal(g.url, 'https://p.supabase.co/storage/v1/object/studio/' + path); assert.equal(g.init.headers.Authorization, 'Bearer service-test');
+  assert.ok(!s.calls.some((c) => c.url.startsWith('https://v3.fal.media/')), 'fal pas sollicité');
+  const s2 = sim({ result: { url: 'https://v3.fal.media/files/x/1.png', path, job: 'j1' }, storage: () => new Response('{"error":"not_found"}', { status: 404 }) });
+  const r2 = await makeHandler({ env: (k) => ENV[k], fetch: s2.fetch })(req({ action: 'take', key: 'cle', job: 'j1', index: 0 }));
+  assert.equal(r2.status, 410); assert.deepEqual(await r2.json(), { error: 'expired', refunded: true, credits: { total: 3 } });
+  const lost = s2.calls.find((c) => c.url.endsWith('fiila_studio_lost'));
+  assert.deepEqual(lost.body, { p_job: 'j1' }); assert.equal(lost.init.headers.Authorization, 'Bearer service-test');
+  const s3 = sim({ result: { url: 'https://v3.fal.media/files/x/1.png' } });
+  assert.equal((await (await makeHandler({ env: (k) => ENV[k], fetch: s3.fetch })(req({ action: 'take', key: 'cle', job: 'j1', index: 0 }))).json()).image, 'data:image/png;base64,iVBORw==');
 });
 
 await t('refus de la base (crédits) → 409 lisible, fal jamais appelé ; échec de fal → série en échec, code interne (jamais le message de fal)', async () => {

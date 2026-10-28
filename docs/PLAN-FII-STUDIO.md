@@ -53,6 +53,8 @@ Bench « studio premium » (base privée XEL, `bench/STUDIO_PREMIUM.md`). **Fid�
 
 **Moteurs depuis le 28/10/2026** (comparatif FIBO 2.0, XEL `bench/FIBO.md`, validé par le fondateur) : les deux modes ne changent pas pour la boutique ; la base choisit le moteur de chaque série (`fiila.studio_engine`, enregistré dans `studio_jobs.engine`). Fidèle : **FIBO 2.0 avec masque** pour bijoux et restauration (produit gardé au pixel près ; masque tiré du détourage Bria RMBG, 0,04 + 0,018 USD), Bria replace-background pour les autres catégories. Premium : **FIBO 2.0 sans masque** pour mode et couture (porté, ≈ 1 Mpx, 0,04 USD), **FIBO avec masque** pour les objets et emballages. Réglage `studio_fibo` = 0 : retour à Bria et Nano Banana Pro sans redéploiement. Crédits inchangés.
 
+**Facturation depuis le 28/10/2026 (offre validée, `OFFRE-COMMERCIALE-001.md`)** : crédits retenus à la création, débités quand l'image est copiée dans le seau privé `studio`, rendus une seule fois sur échec, délai (3 min) ou image perdue ; « garder » ne coûte rien ; « Dernière création » reprend une version payée ; copies effacées après 7 jours. Migration `20261028700000_fiila_studio_billing`.
+
 ## 5. Suite (après le critère des 30 jours)
 
 - **Niveau 2 :** visuel pub (nom, prix, logo) avec le décor Studio comme fond des cartes de Publier. Petit travail : les modèles existent déjà.

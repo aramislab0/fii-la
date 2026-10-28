@@ -8,6 +8,7 @@ import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import { createDb, rpc } from './db.mjs';
 import { minifyJs, minifyCss } from '../scripts/minify.mjs';
 import { newSecret, totpOk } from './totp.mjs';
+const STUDIO_STORE = new Map();
 
 const webRoot = fileURLToPath(new URL('../web/', import.meta.url));
 // Comme en production : app.js, styles.css et theme.js compressés (scripts/minify.mjs). FIILA_MIN=0 sert les sources (débogage).
@@ -267,6 +268,14 @@ export async function startServer(port = 0) {
         if (String(u).startsWith('https://fal.run/')) {
           if (process.env.FIILA_STUDIO_FAIL === '1') return new Response(JSON.stringify({ detail: 'test failure' }), { status: 500 });
           return new Response(JSON.stringify({ images: [0, 1, 2].map((i) => ({ url: `https://v3.fal.media/files/test/studio-${i}.png`, content_type: 'image/png' })) }), { status: 200 });
+        }
+        // Seau privé « studio » simulé en mémoire (copie durable des résultats ; clé de service exigée).
+        if (String(u).startsWith(origin + '/storage/v1/object/studio/')) {
+          const key = String(u).slice((origin + '/storage/v1/object/studio/').length);
+          if ((init && init.headers && init.headers.Authorization) !== 'Bearer local-service-key') return new Response('{}', { status: 403 });
+          if (init && init.method === 'POST') { STUDIO_STORE.set(key, { type: init.headers['Content-Type'], bytes: new Uint8Array(init.body) }); return new Response('{}', { status: 200 }); }
+          const f = STUDIO_STORE.get(key);
+          return f ? new Response(f.bytes, { status: 200, headers: { 'content-type': f.type } }) : new Response('{"error":"not_found"}', { status: 404 });
         }
         if (String(u).startsWith('https://v3.fal.media/files/test/')) {
           const { default: sharp } = await import('sharp');

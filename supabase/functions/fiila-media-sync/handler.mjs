@@ -9,6 +9,7 @@
 // Miniatures (28/10) : la photo principale JPEG de chaque article, lue dans le seau, réduite à 640 px (thumb.mjs), déposée sous t/.
 // Retrait de la copie de la base (28/10, accord du fondateur) : le fichier publié est téléchargé, son empreinte SHA-256
 // comparée à celle de la base ; la copie n'est retirée (fiila_media_purged) que si elles sont identiques.
+// Studio (28/10) : copies des résultats (seau privé « studio ») effacées après 7 jours (fiila_studio_purgeable / _forget).
 // SUPABASE_URL, SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase. Module sans dépendance (testé sous Node).
 import { corsFor } from '../_shared/http.mjs';
 
@@ -122,6 +123,15 @@ export function makeHandler({ env, fetch, thumb }) {
         if (del.ok) removed = (await rpc('fiila_media_forget', { p_paths: orphans })).removed || 0;
         else await rpc('fiila_media_report', { p_action: 'failed', p_ref: 'nettoyage', p_detail: 'suppression refusée ' + del.status }).catch(() => {});
       }
+      // Copies des résultats du Studio de plus de 7 jours (seau privé) : effacées, puis oubliées par la base.
+      let studio = 0;
+      const old = await rpc('fiila_studio_purgeable', { p_limit: 50 }).catch(() => []);
+      if (old && old.length) {
+        const del = await fetch(`${base()}/storage/v1/object/studio`, { method: 'DELETE', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: old }) });
+        if (del.ok) studio = (await rpc('fiila_studio_forget', { p_paths: old })).forgotten || 0;
+        else await rpc('fiila_media_report', { p_action: 'failed', p_ref: 'studio', p_detail: 'effacement des copies Studio refusé ' + del.status }).catch(() => {});
+      }
+      removed += studio;
       const did = copied || failed || removed || thumbs || purged;
       await rpc('fiila_media_report', { p_action: 'run', p_ref: null,
         p_detail: did ? `${copied} copiée(s), ${thumbs} miniature(s), ${purged} retirée(s) de la base, ${failed} échec(s), ${removed} retirée(s) du stockage` : null });

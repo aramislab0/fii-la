@@ -517,6 +517,9 @@ window.FiiBO = function (F) {
   // accorder ou retirer des crédits (motif obligatoire, au journal). docs/PLAN-FII-STUDIO.md.
   var STUDIO_ST = { running: ['warn', 'En cours'], done: ['info', 'Proposée'], kept: ['ok', 'Gardée'], failed: ['danger', 'Échec'] };
   var STUDIO_ENGINE = { bria: 'Bria', nano: 'Nano Banana Pro', fibo: 'FIBO', fibo_mask: 'FIBO + masque' };
+  // Facturation des séries (28/10) : crédits retenus à la création, débités si l'image est copiée, rendus une fois sinon.
+  var STUDIO_CHARGE = { held: 'retenus', charged: 'débités', refunded: 'rendus' };
+  var STUDIO_REFUND = { failed: 'échec', timeout: 'délai dépassé', result_lost: 'image perdue' };
   // Audience (Fii Édition, 27/10) : abonnés et favoris de la boutique, total et 30 jours, articles les plus mis en favori.
   function boShopAudience(id) {
     var box = h('section', { class: 'card stack tight', id: 'bo-shop-audience' }, h('h2', null, 'Audience'), loading());
@@ -648,23 +651,26 @@ window.FiiBO = function (F) {
           ? 'Moteurs : FIBO 2.0 avec masque pour les bijoux, les plats et le premium des objets ; FIBO 2.0 sans masque pour les vêtements portés ; Bria pour le mode fidèle des autres catégories. Retour aux moteurs d’avant : Réglages (studio_fibo = 0).'
           : 'Moteurs d’avant : Bria (fidèle) et Nano Banana Pro (premium) ; FIBO coupé (studio_fibo = 0).') : null,
         h('div', { class: 'bo-kpis small' },
-          h('div', { class: 'bo-kpi' }, h('strong', { id: 'bo-studio-spent' }, '$' + spent.toFixed(2)), h('span', null, 'dépensés ce mois sur $' + budget + ' (' + pct + ' %)')),
+          h('div', { class: 'bo-kpi' }, h('strong', { id: 'bo-studio-spent' }, '$' + spent.toFixed(2)), h('span', null, 'dépensés ce mois sur $' + budget + ' (' + pct + ' %)' + (Number(d.reserved_usd) > 0 ? ', dont $' + Number(d.reserved_usd).toFixed(2) + ' réservés par les séries en cours' : ''))),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.series || 0)), h('span', null, 'séries')),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.kept || 0)), h('span', null, 'versions gardées')),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.failed || 0)), h('span', null, 'échecs')),
+          m.charged_credits != null ? h('div', { class: 'bo-kpi', id: 'bo-studio-credits-kpi' }, h('strong', null, boNum(m.charged_credits)), h('span', null, 'crédits débités · ' + boNum(m.refunded_credits || 0) + ' rendus')) : null,
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.shops || 0)), h('span', null, 'boutiques'))),
         grant,
         scenesBox,
         h('h3', null, 'Crédits des boutiques'),
         boTable([
           { label: 'Boutique', get: function (x) { return h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop); } },
-          { label: 'Crédits', get: function (x) { return boNum(x.credits); } },
+          { label: 'Disponibles', get: function (x) { return boNum(x.credits) + (x.trial ? ' + ' + boNum(x.trial) + ' d’essai' : ''); } },
+          { label: 'Réservés', get: function (x) { return boNum(x.reserved || 0); }, cls: 'hide-s' },
           { label: 'Mis à jour', get: function (x) { return boDate(x.updated_at); }, cls: 'hide-s' }], d.wallets || [], { id: 'bo-studio-wallets', empty: 'Aucun crédit accordé.' }),
         h('h3', null, 'Dernières séries'),
         boTable([
           { label: 'Boutique', get: function (x) { return h('span', { class: 'stack tight', style: 'gap:0' }, h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop), h('small', { class: 'muted' }, x.product)); } },
           { label: 'Décor', get: function (x) { return (sceneLabel[x.style] || x.style) + (x.mode === 'premium' ? ' · premium' : ''); } },
           { label: 'Moteur', get: function (x) { return STUDIO_ENGINE[x.engine] || '—'; }, cls: 'hide-s' },
+          { label: 'Crédits', get: function (x) { return x.charge === 'legacy' || !x.credits ? '—' : x.credits + ' ' + (STUDIO_CHARGE[x.charge] || x.charge) + (x.charge === 'refunded' && x.refund_reason ? ' (' + (STUDIO_REFUND[x.refund_reason] || x.refund_reason) + ')' : '') + (x.credit_from === 'trial' ? ' · essai' : ''); } },
           { label: 'Statut', get: function (x) { var t = STUDIO_ST[x.status] || ['muted', x.status]; return h('span', null, boBadge(t[0], t[1]), x.error ? h('small', { class: 'muted' }, ' ' + x.error) : null); } },
           { label: 'Coût', get: function (x) { return '$' + Number(x.cost_usd || 0).toFixed(2); }, cls: 'hide-s' },
           { label: 'Date', get: function (x) { return boDate(x.created_at); }, cls: 'hide-s' }], d.jobs || [], { id: 'bo-studio-jobs', empty: 'Aucune série pour le moment.' })
