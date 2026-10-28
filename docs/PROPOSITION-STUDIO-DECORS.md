@@ -1,5 +1,7 @@
 # Proposition : coûts du Studio, formats, bibliothèque de décors
 
+> **Mise à jour VP du 28/10 :** avis rendu dans `REVUE-VP.md`, entrée Studio #82. La grille et le débit par génération techniquement réussie ont été validés par le fondateur : `OFFRE-COMMERCIALE-001.md` fait foi pour le commercial. Les mentions « prix à décider » et « débit seulement si gardée » ci-dessous décrivent l'ancien état, pas la cible validée. Pilote recommandé réduit à 9 nouveaux décors / 3 catégories ; plafond de recherche de 5 USD proposé, non autorisé. Inventaire à réconcilier : 195 spécifiques + 5 génériques = 200, soit 118 nouveaux à partir du seed de 77 spécifiques. Aucun coût n'est engagé par cette note.
+
 > Document interne, 28/10/2026. Réponse à la demande du fondateur du 28/10 au soir : renseigner les coûts de génération (le VP fixe les prix officiels), donner les formats du Studio, préparer une bibliothèque de 15 décors par catégorie, donner l'avis du Builder et demander celui du VP. **Rien n'est construit ni dépensé avant la validation du fondateur.**
 > Coûts vérifiés sur les pages fal (27 et 28/10) et mesurés en production et aux bancs d'essai. Conversion indicative : **1 USD ≈ 600 FCFA** (même convention que `PROPOSITION-SITES-STUDIO-ASSISTANT.md`), à confirmer au moment de fixer les prix.
 > Les recettes de décor (prompts, règles d'éclairage) sont propriétaires : elles restent dans le dépôt privé XEL (`Production/FII_STUDIO/`), jamais ici.

@@ -4,6 +4,47 @@
 > Une entrée par revue, la plus récente en haut. Statuts : **ALIGNÉ** / **ALIGNÉ AVEC RÉSERVES** / **NON ALIGNÉ**.
 > Chaque point : FAIT (vérifié, avec la preuve) / ANALYSE / RECOMMANDATION / priorité (bloquant, important, plus tard).
 
+## 28/10/2026 — Studio, décors et offre commerciale (#82)
+
+**Verdict : ALIGNÉ AVEC RÉSERVES.** Bibliothèque utile pour la qualité, sans économie automatique démontrée. La grille vient d'être validée par le fondateur : [OFFRE-COMMERCIALE-001](OFFRE-COMMERCIALE-001.md).
+
+**Base :** `33f25b2593e80d4f37e69ab819103165e4032ea4` ; proposition décors, HANDOFF, migrations Studio/scènes/modes/audit/FIBO, handler, export et interface relus. CI `40769041524` vérifiée : tests, base, déploiement et Chrome/Safari réussis. **Lecture statique : aucun parcours rejoué, test exécuté ni génération payante.** XEL #130 vérifiée ouverte/non fusionnée ; aucune recette privée reproduite ici.
+
+### Constats
+
+| # | FAIT et preuve | ANALYSE |
+|---|---|---|
+| 1 | Dossier §2 et `fiila_studio_keep` (audit lot 1) : débit à « garder ». | Nouvelle décision : débit par génération réussie. « Gardable » au bench n'est pas « gardée » par un client ; bench non reproduit ici. |
+| 2 | `fiila_studio_reserve` (migration FIBO) compare la dépense terminée au plafond, sans réservation des appels en vol. | Le verrou de portefeuille ajouté à « garder » ne protège pas le budget global. |
+| 3 | `studio_scenes_for` trie par nombre de gardes ; compteurs agrégés par style, sans exposition ni séparation des versions. | Popularité, visibilité et qualité sont confondues. |
+| 4 | `handler.mjs` ne conserve pas le VGL ; `app.js` affiche tous les décors et réduit à **au plus** 864 × 1080. | VGL et « 6 + Plus » restent à construire. Stockage : quotas consommés, pas gratuité intrinsèque. |
+| 5 | Seed privé : 77 spécifiques ; dossier : 82 avec 5 génériques. | Pour 195 spécifiques : **118 nouveaux**, pas 113 si les génériques restent. Réconcilier l'inventaire actif avant devis. |
+
+### Recommandations
+
+| # | Priorité | Action Builder / réussite attendue |
+|---|---|---|
+| R1 | **Bloquant avant vente** | Appliquer le mandat : 1 crédit Fidèle / 3 Premium par génération réussie et durablement récupérable ; panne recréditée une fois, « garder » sans second débit. Réservations atomiques crédits/budget ; tester concurrence, reprise et répétition. Préserver les acquis. |
+| R2 | **Avant dépense** | Pilote recommandé : **9 nouveaux décors**, 3 pour chacune des catégories mode / chaussures / beauté-produits. Au plus 2 aperçus + 2 essais synthétiques : 9 × (2 × 0,04 + 2 × 0,058) = **1,764 USD** théoriques. Proposer **5 USD tout compris**, non encore autorisés ; fidélité/lumière contrôlées avant ACTIVE. Les 15/catégorie restent la cible ultérieure. |
+| R3 | **Important** | « < 40 % après 20 séries » devient une **alerte humaine**, pas un retrait automatique. Mesurer exposition, génération livrée, panne, rejet/abandon, garde et publication, par catégorie/mode/version et boutiques distinctes. Objectif 70 % = hypothèse. Bilan à 30 jours ; données insuffisantes ⇒ pas de conclusion forcée. |
+| R4 | **Important** | Accord pour 6 + « Plus » ; au plus un candidat nouveau parmi les six, rotation hebdomadaire, ordre stable pendant la session. VP : direction/contrôle ; Builder : essais/intégration ; fondateur : promotion ACTIVE. Fiches et VGL expurgé dans XEL privé ; aucune auto-modification de prompt. |
+| R5 | **Avant campagne** | Séparer production, bonus et recherche. Maintenir 10 USD actuel sans hausse implicite ; chiffrer l'enveloppe financée avant vente, sans blocage silencieux de crédits vendus. Viser environ 50 % de contribution Studio dans le scénario du mandat, avant charges communes/fiscalité ; aucun bénéfice net garanti. |
+
+### Réponses aux six questions du Builder
+
+1. **Prix tranchés :** 25/2 500, 60/5 900, 120/10 900, 300/24 900 FCFA ; Premium 3 crédits. Bienvenue 24 crédits = 2 400 FCFA de valeur client, pas 4 USD de dépense.
+2. **Catégories :** mode, chaussures, beauté-produits ; services toujours fermés.
+3. **Rôles :** R4 ; maître 4:5, 1024 × 1280 sRGB, décor vide sans texte/marque/personne, aperçu explicite, fiches privées. Aucune image produite ici.
+4. **Visibilité :** 6 + « Plus », R4.
+5. **Apprentissage :** R3 ; aucun retrait ou promotion automatique.
+6. **Marge/budget :** mandat et R5 ; 5 USD de recherche proposés séparément. XEL #130 reste une décision distincte : brouillon de 73 fichiers, pas seulement un export.
+
+### Arbitrages restants / alignement Rali
+
+Avis rendu ; restent budget du pilote, date de campagne, HT/TTC et contrats d'encaissement. **Ne pas redemander l'accord général sur les offres déjà validées.** Améliorer catalogue et commande existants ; aucune agence publicitaire ou réentraînement avant preuve d'usage.
+
+---
+
 ## 23/10/2026 — Algorithmes v2.1 rendue (note du Builder)
 
 Contre-lecture acceptée : C1 et C2 avaient raison, vérifiés dans les migrations **et** en production (lecture seule).
