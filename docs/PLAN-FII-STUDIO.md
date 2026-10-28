@@ -51,6 +51,8 @@ Fondateur (27/10) : « Je ne veux pas un modèle de génération standard pour t
 
 Bench « studio premium » (base privée XEL, `bench/STUDIO_PREMIUM.md`). **Fidèle** (Bria replace-background, 0,04 USD) : le produit garde ses pixels, 1 crédit. **Studio premium** (Nano Banana Pro 2K, 0,15 USD) : rendu de studio hyperréaliste ; pour mode et couture, porté par un mannequin ; la boutique voit l'original et la version côte à côte (« Le produit est-il identique ? ») ; garder coûte `studio_premium_credits` crédits (3 par défaut, **à confirmer par le fondateur**). Jamais de premium pour bijoux, plats, pâtisserie, fleurs. Une version par série, « Autre proposition » relance. Recettes v0.2 (77, schémas d'éclairage nommés) et gabarits de prompt chargés depuis XEL dans la base.
 
+**Moteurs depuis le 28/10/2026** (comparatif FIBO 2.0, XEL `bench/FIBO.md`, validé par le fondateur) : les deux modes ne changent pas pour la boutique ; la base choisit le moteur de chaque série (`fiila.studio_engine`, enregistré dans `studio_jobs.engine`). Fidèle : **FIBO 2.0 avec masque** pour bijoux et restauration (produit gardé au pixel près ; masque tiré du détourage Bria RMBG, 0,04 + 0,018 USD), Bria replace-background pour les autres catégories. Premium : **FIBO 2.0 sans masque** pour mode et couture (porté, ≈ 1 Mpx, 0,04 USD), **FIBO avec masque** pour les objets et emballages. Réglage `studio_fibo` = 0 : retour à Bria et Nano Banana Pro sans redéploiement. Crédits inchangés.
+
 ## 5. Suite (après le critère des 30 jours)
 
 - **Niveau 2 :** visuel pub (nom, prix, logo) avec le décor Studio comme fond des cartes de Publier. Petit travail : les modèles existent déjà.

@@ -1,19 +1,22 @@
 // Fonction fiila-studio : droits vérifiés avec l'identité de l'appelant, fal simulé (aucun appel réel, aucune clé réelle).
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
 import { makeHandler, SCENES, MODEL } from '../supabase/functions/fiila-studio/handler.mjs';
+import { maskFromCutout, pngAlpha } from '../supabase/functions/fiila-studio/mask.mjs';
 import { makeHandler as makeExport } from '../supabase/functions/fiila-studio-export/handler.mjs';
 
 let passed = 0, failed = 0;
 async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
 const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test', SUPABASE_SERVICE_ROLE_KEY: 'service-test', FAL_KEY: 'fal-test' };
 const json = (b, s = 200) => new Response(JSON.stringify(b), { status: s });
-function sim({ reserve = { job: 'j1', style: 'luxe', image: 'data:image/jpeg;base64,AAA' }, fal = null, result = 'https://v3.fal.media/files/x/1.png' } = {}) {
+function sim({ reserve = { job: 'j1', style: 'luxe', image: 'data:image/jpeg;base64,AAA' }, fal = null, result = 'https://v3.fal.media/files/x/1.png', media = null } = {}) {
   const calls = [];
   const fetch = async (url, init = {}) => {
     calls.push({ url, init, body: typeof init.body === 'string' ? JSON.parse(init.body) : null });
     if (url.startsWith('https://rest.alpha.fal.ai/storage/upload/initiate')) return json({ upload_url: 'https://upload.fal.media/put/1', file_url: 'https://v3.fal.media/files/up/photo.jpeg' });
     if (url === 'https://upload.fal.media/put/1') return new Response(null, { status: 200 });
-    if (url.startsWith('https://fal.run/')) return fal ? fal() : json({ images: [1, 2, 3].map((i) => ({ url: `https://v3.fal.media/files/x/${i}.png` })) });
+    if (url.startsWith('https://fal.run/')) return fal ? fal(url) : json({ images: [1, 2, 3].map((i) => ({ url: `https://v3.fal.media/files/x/${i}.png` })) });
+    if (url.startsWith('https://v3.fal.media/') && media) return media(url);
     if (url.startsWith('https://v3.fal.media/')) return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } });
     const fn = url.split('/rpc/')[1];
     if (fn === 'fiila_studio_reserve') return reserve ? json(reserve) : json({ message: 'fiila:studio_no_credits' }, 400);
@@ -65,6 +68,70 @@ await t('série « premium » : Nano Banana Pro 2K, 4:5, une image, prompt de la
   assert.equal(f.url, 'https://fal.run/fal-ai/nano-banana-pro/edit');
   assert.deepEqual(f.body, { prompt: 'CAM KEEP scene [TEST]', image_urls: ['data:image/jpeg;base64,AAA'], num_images: 1, aspect_ratio: '4:5', resolution: '2K', output_format: 'jpeg' });
   assert.equal(s.calls.find((x) => x.url.endsWith('fiila_studio_complete')).body.p.cost_usd, 0.15);
+});
+
+// Détourage simulé : PNG RVBA 20 × 25 dont le rectangle central (8 × 10) est opaque (le produit).
+const { PNG } = createRequire(import.meta.url)('pngjs');
+function cutoutPng(w = 20, h = 25) {
+  const p = new PNG({ width: w, height: h });
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, inside = x >= 6 && x < 14 && y >= 8 && y < 18;
+    p.data[i] = 200; p.data[i + 1] = 100; p.data[i + 2] = 50; p.data[i + 3] = inside ? 255 : (x + y) % 2 ? 40 : 0;
+  }
+  return PNG.sync.write(p);
+}
+
+await t('masque FIBO : produit (opacité ≥ 50 %) en noir, décor en blanc, même taille ; PNG relu par une bibliothèque indépendante ; détourage vide refusé', async () => {
+  const m = await maskFromCutout(cutoutPng());
+  assert.equal(m.width, 20); assert.equal(m.height, 25); assert.equal(m.share, 80 / 500);
+  const back = PNG.sync.read(Buffer.from(m.png));
+  assert.equal(back.width, 20); assert.equal(back.height, 25);
+  assert.equal(back.data[(10 * 20 + 8) * 4], 0, 'produit gardé : noir'); assert.equal(back.data[(1 * 20 + 1) * 4], 255, 'décor refait : blanc');
+  assert.equal((await pngAlpha(cutoutPng())).alpha[(10 * 20 + 8)], 255);
+  const empty = new PNG({ width: 10, height: 10 }); // tout transparent
+  await assert.rejects(() => maskFromCutout(PNG.sync.write(empty)), /mask_unusable/);
+  await assert.rejects(() => maskFromCutout(new Uint8Array([1, 2, 3])), /png_invalid/);
+});
+
+await t('moteur « fibo_mask » : détourage, masque déposé sur le stockage fal, FIBO 2.0 avec mask_url ; coût 0,058 USD ; sans détourage : échec propre, détourage compté', async () => {
+  const urls = [];
+  const s = sim({ reserve: { job: 'j1', style: 'bijoux-p2', mode: 'fidele', engine: 'fibo_mask', prompt: 'CAM scene [TEST]', image: 'data:image/jpeg;base64,AAA' },
+    fal: (u) => { urls.push(u); return json(u.endsWith('/fal-ai/bria/background/remove') ? { image: { url: 'https://v3.fal.media/files/x/cut.png' } }
+      : { image: { url: 'https://v3.fal.media/files/x/fibo.jpg' }, images: [{ url: 'https://v3.fal.media/files/x/fibo.jpg' }], vgl: { edit_instruction: 'x' } }); },
+    media: () => new Response(cutoutPng(), { headers: { 'content-type': 'image/png' } }) });
+  const r = await (await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'bijoux-p2' }))).json();
+  assert.equal(r.status, 'done'); assert.deepEqual(r.results, ['https://v3.fal.media/files/x/fibo.jpg']);
+  assert.deepEqual(urls, ['https://fal.run/fal-ai/bria/background/remove', 'https://fal.run/bria/fibo-2/edit']);
+  const cut = s.calls.find((c) => c.url.endsWith('/background/remove'));
+  assert.deepEqual(cut.body, { image_url: 'https://v3.fal.media/files/up/photo.jpeg' });
+  const puts = s.calls.filter((c) => c.url === 'https://upload.fal.media/put/1');
+  assert.equal(puts.length, 2, 'photo puis masque déposés');
+  assert.equal(puts[1].init.headers['Content-Type'], 'image/png');
+  const m = PNG.sync.read(Buffer.from(puts[1].init.body));
+  assert.equal(m.data[(10 * 20 + 8) * 4], 0); assert.equal(m.data[0], 255);
+  const f = s.calls.find((c) => c.url.endsWith('/bria/fibo-2/edit'));
+  assert.deepEqual(f.body, { image_urls: ['https://v3.fal.media/files/up/photo.jpeg'], mask_url: 'https://v3.fal.media/files/up/photo.jpeg', instruction: 'CAM scene [TEST]' });
+  assert.equal(s.calls.find((x) => x.url.endsWith('fiila_studio_complete')).body.p.cost_usd, 0.058);
+  // Détourage refusé par fal : pas d'appel FIBO, échec « provider_mask », le détourage reste compté.
+  const s2 = sim({ reserve: { job: 'j1', style: 'bijoux-p2', engine: 'fibo_mask', prompt: 'P', image: 'https://exemple/p.jpg' }, fal: () => json({ detail: 'x' }, 500) });
+  const r2 = await (await makeHandler({ env: (k) => ENV[k], fetch: s2.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'bijoux-p2' }))).json();
+  assert.equal(r2.status, 'failed'); assert.equal(r2.error, 'provider_mask');
+  assert.equal(s2.calls.filter((c) => c.url.startsWith('https://fal.run/')).length, 1);
+  assert.equal(s2.calls.find((x) => x.url.endsWith('fiila_studio_complete')).body.p.cost_usd, 0.018);
+});
+
+await t('moteur « fibo » (vêtement porté) : FIBO 2.0 sans masque, 4:5, prompt de la base ; 0,04 USD ; moteur absent = moteur d’avant selon le mode', async () => {
+  const s = sim({ reserve: { job: 'j1', style: 'mode-2', mode: 'premium', engine: 'fibo', prompt: 'CAM WEAR scene [TEST]', image: 'data:image/jpeg;base64,AAA' },
+    fal: () => json({ image: { url: 'https://v3.fal.media/files/x/w.jpg' }, images: [{ url: 'https://v3.fal.media/files/x/w.jpg' }] }) });
+  const r = await (await makeHandler({ env: (k) => ENV[k], fetch: s.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'mode-2', mode: 'premium' }))).json();
+  assert.equal(r.status, 'done');
+  const f = s.calls.filter((c) => c.url.startsWith('https://fal.run/'));
+  assert.equal(f.length, 1); assert.equal(f[0].url, 'https://fal.run/bria/fibo-2/edit');
+  assert.deepEqual(f[0].body, { image_urls: ['https://v3.fal.media/files/up/photo.jpeg'], instruction: 'CAM WEAR scene [TEST]', aspect_ratio: '4:5' });
+  assert.equal(s.calls.find((x) => x.url.endsWith('fiila_studio_complete')).body.p.cost_usd, 0.04);
+  const s2 = sim({ reserve: { job: 'j1', style: 'mode-2', mode: 'premium', prompt: 'P', image: 'data:image/jpeg;base64,AAA' }, fal: () => json({ images: [{ url: 'https://v3.fal.media/files/x/p.jpg' }] }) });
+  await makeHandler({ env: (k) => ENV[k], fetch: s2.fetch })(req({ action: 'render', key: 'cle', product: 'p1', style: 'mode-2', mode: 'premium' }));
+  assert.equal(s2.calls.find((c) => c.url.startsWith('https://fal.run/')).url, 'https://fal.run/fal-ai/nano-banana-pro/edit');
 });
 
 await t('refus de la base (crédits) → 409 lisible, fal jamais appelé ; échec de fal → série en échec, code interne (jamais le message de fal)', async () => {

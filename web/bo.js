@@ -516,6 +516,7 @@ window.FiiBO = function (F) {
   // ----- Fii Studio : ouvert ou non, dépense du mois face au budget, séries (gardées, en échec), crédits des boutiques ;
   // accorder ou retirer des crédits (motif obligatoire, au journal). docs/PLAN-FII-STUDIO.md.
   var STUDIO_ST = { running: ['warn', 'En cours'], done: ['info', 'Proposée'], kept: ['ok', 'Gardée'], failed: ['danger', 'Échec'] };
+  var STUDIO_ENGINE = { bria: 'Bria', nano: 'Nano Banana Pro', fibo: 'FIBO', fibo_mask: 'FIBO + masque' };
   // Audience (Fii Édition, 27/10) : abonnés et favoris de la boutique, total et 30 jours, articles les plus mis en favori.
   function boShopAudience(id) {
     var box = h('section', { class: 'card stack tight', id: 'bo-shop-audience' }, h('h2', null, 'Audience'), loading());
@@ -643,6 +644,9 @@ window.FiiBO = function (F) {
       return boShell('studio', 'Studio', [
         h('p', { class: 'small', id: 'bo-studio-state' }, d.ready ? boBadge('ok', 'Ouvert') : boBadge('muted', 'Fermé'),
           ' Ouvert ou fermé, budget du mois et séries par boutique : Réglages (studio_ready, studio_budget_usd, studio_daily).'),
+        d.fibo != null ? h('p', { class: 'small muted', id: 'bo-studio-engine' }, d.fibo
+          ? 'Moteurs : FIBO 2.0 avec masque pour les bijoux, les plats et le premium des objets ; FIBO 2.0 sans masque pour les vêtements portés ; Bria pour le mode fidèle des autres catégories. Retour aux moteurs d’avant : Réglages (studio_fibo = 0).'
+          : 'Moteurs d’avant : Bria (fidèle) et Nano Banana Pro (premium) ; FIBO coupé (studio_fibo = 0).') : null,
         h('div', { class: 'bo-kpis small' },
           h('div', { class: 'bo-kpi' }, h('strong', { id: 'bo-studio-spent' }, '$' + spent.toFixed(2)), h('span', null, 'dépensés ce mois sur $' + budget + ' (' + pct + ' %)')),
           h('div', { class: 'bo-kpi' }, h('strong', null, boNum(m.series || 0)), h('span', null, 'séries')),
@@ -660,6 +664,7 @@ window.FiiBO = function (F) {
         boTable([
           { label: 'Boutique', get: function (x) { return h('span', { class: 'stack tight', style: 'gap:0' }, h('a', { href: '#/bo/boutiques/' + x.shop_id }, x.shop), h('small', { class: 'muted' }, x.product)); } },
           { label: 'Décor', get: function (x) { return (sceneLabel[x.style] || x.style) + (x.mode === 'premium' ? ' · premium' : ''); } },
+          { label: 'Moteur', get: function (x) { return STUDIO_ENGINE[x.engine] || '—'; }, cls: 'hide-s' },
           { label: 'Statut', get: function (x) { var t = STUDIO_ST[x.status] || ['muted', x.status]; return h('span', null, boBadge(t[0], t[1]), x.error ? h('small', { class: 'muted' }, ' ' + x.error) : null); } },
           { label: 'Coût', get: function (x) { return '$' + Number(x.cost_usd || 0).toFixed(2); }, cls: 'hide-s' },
           { label: 'Date', get: function (x) { return boDate(x.created_at); }, cls: 'hide-s' }], d.jobs || [], { id: 'bo-studio-jobs', empty: 'Aucune série pour le moment.' })
@@ -1645,6 +1650,7 @@ window.FiiBO = function (F) {
     studio_budget_usd: ['Budget mensuel du Studio', 'USD (au-delà, le Studio se met en pause)'],
     studio_daily: ['Séries Studio par boutique et par jour', 'séries'],
     studio_premium: ['Mode Studio premium (rendu de studio hyperréaliste)', '0 = coupé, 1 = proposé'], studio_premium_credits: ['Crédits pour garder une version Studio premium', 'crédits'],
+    studio_fibo: ['Moteur FIBO 2.0 du Studio (bijoux, plats, premium)', '1 = FIBO, 0 = retour à Bria et Nano Banana Pro'],
     kyc_required: ['Pièce d’identité exigée après la première vente', '0 = non exigée, 1 = exigée (nouvelles commandes bloquées sans pièce)'],
     site_look: ['« Complétez le look » sur la fiche article', 'Nombre d’articles de la même boutique proposés (0 = masqué, 6 au plus)'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.

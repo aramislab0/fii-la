@@ -192,11 +192,22 @@ await t('modes : premium proposé selon la catégorie (jamais bijoux), prompt = 
   await db.query(`update fiila.studio_wallets set credits = 5 where shop_id = $1`, [A.id]);
   const r = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2', p_mode: 'premium' });
   assert.equal(r.mode, 'premium'); assert.match(r.prompt, /^CAM\. WEAR\. light wooden clothing rail/);
+  // Moteur (28/10, comparatif FIBO) : vêtement porté → FIBO sans masque ; enregistré sur la série.
+  assert.equal(r.engine, 'fibo');
+  assert.equal((await db.query(`select engine from fiila.studio_jobs where id = $1`, [r.job])).rows[0].engine, 'fibo');
+  const eng = async (m, t) => (await db.query(`select fiila.studio_engine($1, $2) e`, [m, t])).rows[0].e;
+  assert.equal(await eng('fidele', 'mode'), 'bria'); assert.equal(await eng('fidele', 'chaussures'), 'bria');
+  assert.equal(await eng('fidele', 'bijoux'), 'fibo_mask'); assert.equal(await eng('fidele', 'restauration'), 'fibo_mask');
+  assert.equal(await eng('premium', 'couture'), 'fibo'); assert.equal(await eng('premium', 'beaute'), 'fibo_mask');
+  await db.query(`update fiila.settings set value = '0' where key = 'studio_fibo'`);
+  assert.equal(await eng('premium', 'beaute'), 'nano'); assert.equal(await eng('fidele', 'bijoux'), 'bria');
+  await db.query(`update fiila.settings set value = '1' where key = 'studio_fibo'`);
   await ok('fiila_studio_complete', { p_job: r.job, p: { results: ['https://v3.fal.media/files/x/p.jpg'], cost_usd: 0.15 } }, SR);
   const k = await ok('fiila_studio_keep', { p_key: A.key, p_job: r.job, p_index: 0 });
   assert.equal(k.credits.wallet, 2, '3 crédits débités');
   const f = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2' });
   assert.equal(f.mode, 'fidele'); assert.match(f.prompt, /^CAM\. light wooden/, 'fidèle : pas de gabarit premium');
+  assert.equal(f.engine, 'bria', 'mode fidèle d’un vêtement : Bria, inchangé');
   await db.query(`update fiila.studio_jobs set status = 'failed' where id = $1`, [f.job]);
   // Photo déjà retirée de la base (copie dans le seau seulement) : le Studio reçoit l'adresse du seau.
   await db.query(`insert into fiila.settings (key, value) values ('media_base', 'https://exemple.supabase.co/storage/v1/object/public/media/') on conflict (key) do nothing`);
@@ -212,7 +223,8 @@ await t('modes : premium proposé selon la catégorie (jamais bijoux), prompt = 
   await ko('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2', p_mode: 'premium' }, 'studio_premium_off');
   await ok('fiila_bo_setting_set', { p_key: 'studio_premium', p_value: 1 }, F);
   await ko('fiila_bo_setting_set', { p_key: 'studio_premium_credits', p_value: 50 }, null, F);
-  assert.ok((await ok('fiila_bo_studio', {}, SUP)).jobs.some((x) => x.mode === 'premium'));
+  const bo = await ok('fiila_bo_studio', {}, SUP);
+  assert.ok(bo.jobs.some((x) => x.mode === 'premium')); assert.ok(bo.jobs.some((x) => x.engine === 'fibo'), 'moteur visible au back-office'); assert.equal(bo.fibo, true);
 });
 
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');

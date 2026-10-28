@@ -10,6 +10,7 @@
 // Sans FAL_KEY : { configured: false } et rien n'est ouvert. SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY : fournis.
 
 import { corsFor, readText, MB } from '../_shared/http.mjs';
+import { maskFromCutout } from './mask.mjs';
 // Corps limité à 14 Mo (marge pour une photo en base64 ; aujourd'hui l'image est lue en base, le corps reste petit).
 const MAX_BODY = 14 * MB;
 
@@ -17,6 +18,12 @@ export const MODEL = 'bria/replace-background';            // mode « fidele »
 export const PRICE_USD = 0.04;                              // par image (fal, consulté le 27/10/2026)
 export const MODEL_PREMIUM = 'fal-ai/nano-banana-pro/edit'; // mode « premium »
 export const PRICE_PREMIUM_USD = 0.15;                      // par image 1K/2K (fal, consulté le 27/10/2026)
+// Comparatif du 28/10/2026 (base privée XEL, bench/FIBO.md) : FIBO 2.0 Edit, avec masque (produit gardé au pixel près,
+// décor refait) ou sans masque (vêtement porté). Le moteur de chaque série est choisi par la base (fiila.studio_engine).
+export const MODEL_FIBO = 'bria/fibo-2/edit';
+export const PRICE_FIBO_USD = 0.04;                         // par image (fal, consulté le 28/10/2026)
+export const MODEL_CUTOUT = 'fal-ai/bria/background/remove';
+export const PRICE_CUTOUT_USD = 0.018;                      // détourage qui donne le masque (fal, 28/10/2026)
 // Décors : description en anglais (exigence du modèle), sans caractères spéciaux. Le texte (nom, prix) n'est jamais écrit par
 // l'IA : il est ajouté par les modèles de Fii (Publier).
 export const SCENES = {
@@ -42,8 +49,8 @@ export function makeHandler({ env, fetch }) {
     if (!r.ok) { const e = new Error((body && body.message) || 'rpc ' + r.status); e.status = r.status; e.code = /fiila:([a-z_]+)/.exec((body && body.message) || '')?.[1]; throw e; }
     return body;
   }
-  // Deux modes (bench du 27/10/2026, base privée XEL) : « fidele » = Bria replace-background (le produit garde ses pixels,
-  // 0,04 USD) ; « premium » = Nano Banana Pro 2K (rendu studio hyperréaliste, 0,15 USD). Une version par série.
+  // Deux modes vus par la boutique (« fidele », « premium ») ; le moteur de chaque série est choisi par la base (28/10/2026) :
+  // Bria replace-background, Nano Banana Pro 2K, FIBO 2.0 avec ou sans masque. Une version par série.
   // Bria (mode fidèle) refuse les images en data URI : la photo est d'abord déposée sur le stockage de fal (adresse
   // temporaire), même protocole que le client officiel. Repli sur la data URI si le dépôt échoue.
   async function upload(image) {
@@ -60,13 +67,7 @@ export function makeHandler({ env, fetch }) {
       return p.ok ? t.file_url : image;
     } catch { return image; }
   }
-  async function fal(image, prompt, mode) {
-    const premium = mode === 'premium';
-    if (!premium) image = await upload(image);
-    const model = premium ? MODEL_PREMIUM : MODEL;
-    const input = premium
-      ? { prompt, image_urls: [image], num_images: 1, aspect_ratio: '4:5', resolution: '2K', output_format: 'jpeg' }
-      : { image_url: image, prompt };
+  async function run(model, input) {
     const r = await fetch(`https://fal.run/${model}`, { method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Key ' + env('FAL_KEY') }, body: JSON.stringify(input) });
     const body = await r.json().catch(() => ({}));
@@ -75,12 +76,40 @@ export function makeHandler({ env, fetch }) {
       // la base et l'application ne reçoivent qu'un code interne.
       const detail = (body && (body.detail && (body.detail[0]?.msg || body.detail))) || body.error || null;
       console.log(JSON.stringify({ studio_fal: 'failed', model, status: r.status, detail: detail == null ? null : String(typeof detail === 'string' ? detail : JSON.stringify(detail)).slice(0, 200) }));
-      return { error: 'provider_error' };
+      return null;
     }
     const imgs = body.images || (body.image ? [body.image] : []);
-    const urls = imgs.map((x) => x && x.url).filter((u) => typeof u === 'string' && FAL_HOST.test(u)).slice(0, 1);
-    const cost = Math.max(imgs.length, urls.length) * (premium ? PRICE_PREMIUM_USD : PRICE_USD);
-    return urls.length ? { results: urls, cost_usd: cost } : { error: 'provider_no_image', cost_usd: cost };
+    return { count: imgs.length, urls: imgs.map((x) => x && x.url).filter((u) => typeof u === 'string' && FAL_HOST.test(u)).slice(0, 1) };
+  }
+  // Masque FIBO : détourage Bria (PNG transparent) → noir = produit gardé, blanc = décor refait ; déposé sur le stockage de fal.
+  async function mask(image) {
+    const cut = await run(MODEL_CUTOUT, { image_url: image });
+    if (!cut || !cut.urls.length) return null;
+    const r = await fetch(cut.urls[0]);
+    if (!r.ok) return null;
+    const m = await maskFromCutout(new Uint8Array(await r.arrayBuffer()));
+    let s = ''; for (let i = 0; i < m.png.length; i += 0x8000) s += String.fromCharCode.apply(null, m.png.subarray(i, i + 0x8000));
+    const url = await upload('data:image/png;base64,' + btoa(s));
+    return FAL_HOST.test(url) ? url : null;
+  }
+  // engine (fiila.studio_engine) : bria | nano | fibo | fibo_mask ; absent (base pas encore à jour) = moteur d'avant selon le mode.
+  async function fal(image, prompt, mode, engine) {
+    const eng = engine || (mode === 'premium' ? 'nano' : 'bria');
+    if (eng !== 'nano') image = await upload(image);
+    let cost = 0, model, input;
+    if (eng === 'nano') { model = MODEL_PREMIUM; input = { prompt, image_urls: [image], num_images: 1, aspect_ratio: '4:5', resolution: '2K', output_format: 'jpeg' }; }
+    else if (eng === 'fibo') { model = MODEL_FIBO; input = { image_urls: [image], instruction: prompt, aspect_ratio: '4:5' }; }
+    else if (eng === 'fibo_mask') {
+      cost += PRICE_CUTOUT_USD;
+      let m = null;
+      try { m = await mask(image); } catch (e) { console.log(JSON.stringify({ studio_mask: 'failed', error: String((e && e.message) || e).slice(0, 60) })); }
+      if (!m) return { error: 'provider_mask', cost_usd: cost };
+      model = MODEL_FIBO; input = { image_urls: [image], mask_url: m, instruction: prompt };
+    } else { model = MODEL; input = { image_url: image, prompt }; }
+    const out = await run(model, input);
+    if (!out) return cost ? { error: 'provider_error', cost_usd: cost } : { error: 'provider_error' };
+    cost += Math.max(out.count, out.urls.length) * (eng === 'nano' ? PRICE_PREMIUM_USD : eng === 'bria' ? PRICE_USD : PRICE_FIBO_USD);
+    return out.urls.length ? { results: out.urls, cost_usd: +cost.toFixed(4) } : { error: 'provider_no_image', cost_usd: +cost.toFixed(4) };
   }
   const configured = () => !!env('FAL_KEY');
 
@@ -116,7 +145,7 @@ export function makeHandler({ env, fetch }) {
     let out;
     // Décor : prompt du pack de la catégorie (base, règle R2 d'Aramis Studio) ; repli sur les décors génériques.
     const scene = job.prompt || SCENES[job.style];
-    try { out = scene ? await fal(job.image, scene, job.mode) : { error: 'unknown_scene' }; }
+    try { out = scene ? await fal(job.image, scene, job.mode, job.engine) : { error: 'unknown_scene' }; }
     catch (e) {
       console.log(JSON.stringify({ studio_fal: 'unreachable', error: String((e && e.name) || 'error').slice(0, 60) }));
       out = { error: 'provider_unavailable' };

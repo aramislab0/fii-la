@@ -325,6 +325,7 @@ await t('équipe : inviter un membre (lien à usage unique), il s’inscrit avec
 
 await t('réglages et journal : modification bornée, tracée avec le nom et le rôle', async () => {
   await D.click('#bo-nav-reglages');
+  assert.equal(await D.locator('#bo-set-studio_fibo').inputValue(), '1', 'moteur FIBO du Studio réglable (28/10)');
   await D.fill('#bo-set-vd_commission', '60');
   await D.click('#bo-save-vd_commission');
   await D.getByText('Valeur hors des limites autorisées.').waitFor();
