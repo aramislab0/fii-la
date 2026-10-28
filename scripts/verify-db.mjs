@@ -39,6 +39,8 @@ const EXPECTED_FUNCTIONS = [
   // audit du 27/10 (20261028300000) : effacer ses favoris faits sans compte
   'fiila_forget_device',
   'fiila_domains', 'fiila_domain_add', 'fiila_domain_remove', 'fiila_domain_target', 'fiila_domain_resolve', 'fiila_bo_domains', 'fiila_bo_domain_action', 'fiila_studio_state', 'fiila_studio_reserve', 'fiila_studio_keep', 'fiila_studio_result', 'fiila_bo_studio', 'fiila_bo_studio_grant', 'fiila_bo_studio_scenes', 'fiila_bo_studio_scene_set', 'fiila_studio_state_shop', 'fiila_shop_identity', 'fiila_shop_owner_save', 'fiila_shop_kyc_submit', 'fiila_bo_shop_identity', 'fiila_bo_kyc_doc', 'fiila_bo_kyc_decide', 'fiila_bo_kyc_list', 'fiila_fav', 'fiila_favs_in', 'fiila_follow', 'fiila_follow_state', 'fiila_follows', 'fiila_bo_shop_audience',
+  // mesures du Studio (20261028800000) : décors affichés, rejets, partages (boutiques sans compte comprises)
+  'fiila_studio_seen', 'fiila_studio_reject', 'fiila_studio_shared',
 // Audit du 27/10 (20261028300000) : le back-office est fermé à anon, sauf l'ouverture d'une invitation et le portail.
 ].filter((f) => !/^fiila_(bo|admin)_/.test(f) || f === 'fiila_bo_invite_get' || f === 'fiila_bo_me').sort();
 // Certificat public de Supabase (Supabase Root 2021 CA, jusqu'en 2031) : la connexion qui porte le mot de passe de la base
