@@ -1,6 +1,7 @@
 # OFFRE-COMMERCIALE-001 — Grille validée et mandat Builder
 
 > Décision du fondateur, 28/10/2026 : « ok je valide », après la proposition du VP dans ChatGPT (quatre offres, crédits, domaine, conditions et calculs ci-dessous).
+> Révision du 28/10/2026 : le fondateur remplace le bonus initial par **10 crédits de bienvenue**, confirme son financement avant lancement et donne le feu vert au chantier Studio. Cette règle remplace les propositions de 24 puis 6 crédits.
 > Statut : **VALIDÉ COMMERCIALEMENT, NON IMPLÉMENTÉ / NON ENCAISSÉ**. Cette validation ne signifie pas que les droits, la facturation ou l'achat des domaines existent déjà.
 > Base inspectée : `33f25b2593e80d4f37e69ab819103165e4032ea4`. Les recettes Aramis, prompts, profils et références restent exclusivement dans XEL privé.
 > L'offre ci-dessous remplace la proposition historique Business à 24 900 FCFA. Le pack Studio Volume à 24 900 FCFA est un autre produit.
@@ -20,7 +21,7 @@
 | Domaine personnalisé | Non | Non | Promotion du §2 | Achat et renouvellement sous conditions du §2 |
 | Crédits Studio mensuels | Aucun | Aucun | Aucun | 60 |
 | Assistance | Autonomie | Standard | Prioritaire | Prioritaire + 30 minutes d'accompagnement / mois |
-| Bienvenue, une seule fois par commerçant éligible | 24 crédits | Même bonus, sans cumul | Même bonus, sans cumul | Même bonus + crédits mensuels |
+| Bienvenue, une seule fois par commerçant éligible | 10 crédits | Même bonus, sans cumul | Même bonus, sans cumul | Même bonus + crédits mensuels |
 
 Les capacités de catalogue et d'équipe sont une grille commerciale validée, **pas une capacité technique mesurée ni les droits actuellement appliqués**. Le Builder cartographie chaque ligne à une fonction réelle et signale ce qui manque. Ne pas retirer silencieusement des droits acquis, supprimer des produits ou exclure des membres existants ; préparer une transition explicite et non destructive. Pas de refonte de la charte ni de multiplication des CTA pour présenter les offres.
 
@@ -41,7 +42,9 @@ L'achat client automatisé et la connexion effective restent à construire/véri
 
 ## 3. Bienvenue et crédits
 
-**4 USD = valeur commerciale offerte**, avec la convention budgétaire 1 USD = 600 FCFA : 2 400 FCFA = **24 crédits au prix catalogue de 100 FCFA/crédit**. Ce n'est pas un portefeuille fournisseur de 4 USD.
+**10 crédits offerts**, soit **1 000 FCFA de valeur commerciale** au prix catalogue de 100 FCFA/crédit (environ 1,67 USD avec la convention budgétaire 600 FCFA/USD). Le bonus est désormais défini en crédits : ne pas l'annoncer comme « 1 dollar » ou « 4 dollars ». Ce n'est pas un portefeuille fournisseur. Utilisation : 10 résultats Fidèle, ou 3 Premium + 1 Fidèle, ou un autre mélange.
+
+Le fondateur financera les cadeaux **avant le lancement**. L'enveloppe totale et le nombre de bénéficiaires ne sont pas encore fixés : attribution automatique/campagne désactivées jusqu'au financement constaté. Ne pas augmenter implicitement le plafond de production.
 
 - Une fois par commerçant vérifié, après mise en ligne de la boutique et publication d'un premier produit réel ; pas à chaque recréation de boutique ni à chaque changement de plan.
 - Bonus offert utilisable 30 jours ; expiration annoncée avant son attribution.
@@ -83,17 +86,17 @@ Le code FIBO vérifié utilise 0,04 USD par image, plus 0,018 USD de détourage 
 | Recettes | 14 700 | 29 700 | 89 700 |
 | Paiement | -294 | -594 | -1 794 |
 | Support provisionné | -1 500 | -3 000 | -6 000 |
-| Bienvenue, 24 × 40 | -960 | -960 | -960 |
+| Bienvenue, 10 × 40 | -400 | -400 | -400 |
 | Domaine annuel offert, plafond | 0 | -10 000 | -10 000 |
 | Crédits mensuels inclus | 0 | 0 | -7 200 |
-| **Contribution** | **11 946** | **15 146** | **63 746** |
-| **Taux** | **81,3 %** | **51,0 %** | **71,1 %** |
+| **Contribution** | **12 506** | **15 706** | **64 306** |
+| **Taux** | **85,1 %** | **52,9 %** | **71,7 %** |
 
 Ce sont des contributions **avant fiscalité, infrastructure commune, acquisition / primes Agents, développement et autres charges**, pas des marges nettes. Les montants de support et de paiement ne sont pas des coûts constatés. Si les prix sont TTC avec une taxe à reverser, recalculer sur la recette hors taxe applicable ; faire fixer HT/TTC avant publication ou encaissement, sans inventer le régime de l'entreprise.
 
 L'enveloppe d'infrastructure de 35 000 FCFA/mois discutée avec le fondateur reste une hypothèse de planification, pas une facture ni une limite de consommation. Les utilisateurs gratuits consomment eux aussi les ressources.
 
-100 bonus intégralement consommés = **96 000 FCFA de provision de production** (et aucune recette obligatoire). Le budget Studio courant de 10 USD/mois ne finance pas ce déploiement général. La validation de la grille ne modifie pas automatiquement ce plafond.
+Un bonus intégralement consommé = **400 FCFA de provision de production** ; 100 bonus = **40 000 FCFA**, sans recette obligatoire. Le coût fournisseur théorique de 10 résultats Fidèle avec masque est 10 × 0,058 = 0,58 USD (≈ 348 FCFA), hors échecs et frais annexes. Le plafond de production courant de 10 USD/mois reste inchangé tant qu'une enveloppe financée n'a pas été fixée. Le financement promis n'est pas un paiement déjà constaté.
 
 Sources publiques de tarif consultées le 28/10/2026 :
 - https://fal.ai/models/bria/fibo-2/edit
@@ -105,7 +108,7 @@ Les prix et le change doivent être relus au moment du devis.
 
 ## 5. Mandat d'intégration pour Claude
 
-Construire par lots dans l'architecture actuelle, en commençant par les prérequis de fiabilité. Le fondateur a validé la grille ; ne pas lui redemander une validation générale déjà acquise. Signaler précisément les éléments réellement manquants (contrats de paiement, HT/TTC, date de campagne, enveloppe de dépenses). Aucun achat ni hausse de plafond n'est exécuté par ce document.
+**Feu vert du fondateur le 28/10 : « informe claude et démarrons ».** Exécuter d'abord `docs/MANDAT-STUDIO-FIABLE-001.md`, puis les lots commerciaux ci-dessous dans l'architecture actuelle. Ne pas attendre une nouvelle validation de principe. Le fondateur a validé la grille ; ne pas lui redemander une validation générale déjà acquise. Signaler précisément les éléments réellement manquants (contrats de paiement, HT/TTC, date de campagne, enveloppe de dépenses). Aucun achat ni hausse de plafond n'est exécuté par ce document.
 
 1. **Cartographie et transition** : présenter les écarts entre droits actuels et cible, conserver les acquis pendant la migration, définir fin d'essai, changement de plan et résiliation sans perte des données. Vérifications des droits côté serveur, pas seulement masquage d'interface.
 2. **Studio fiable avant vente** : réservation atomique des crédits et du budget fournisseur avant appel ; coût réservé selon moteur ; finalisation idempotente du débit après résultat durablement récupérable ; libération / recrédit sur échec et reprise contrôlée en cas de délai réseau. Ne pas confondre facture fournisseur et crédit client. Une répétition de « garder », une reconnexion ou deux téléphones ne doivent ni redébiter ni produire gratuitement.

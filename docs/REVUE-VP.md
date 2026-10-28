@@ -4,6 +4,18 @@
 > Une entrée par revue, la plus récente en haut. Statuts : **ALIGNÉ** / **ALIGNÉ AVEC RÉSERVES** / **NON ALIGNÉ**.
 > Chaque point : FAIT (vérifié, avec la preuve) / ANALYSE / RECOMMANDATION / priorité (bloquant, important, plus tard).
 
+## 28/10/2026 — Feu vert d'exécution et bienvenue à 10 crédits
+
+**Décision du fondateur, transmise au Builder :** « arrondis a 10 credit de bienvenue. je financerai les cadeaux avant lancement. informe claude et demmarons ».
+
+- **Bonus en vigueur : 10 crédits**, une seule fois par commerçant éligible. Valeur catalogue 1 000 FCFA ; provision de production 400 FCFA. Cette décision remplace les 24 crédits de la revue initiale et les 6 proposés ensuite. Business reste à 60 crédits/mois.
+- **Démarrer maintenant** le lot Studio fiable, puis les mesures et 6 + Plus ; pilote 9 décors sous le plafond de recherche de 5 USD présenté. VP produit les aperçus, Builder les teste et intègre, fondateur valide chaque promotion ACTIVE.
+- Le financement des cadeaux est **promis avant lancement**, pas constaté aujourd'hui. Préparer les lots mais garder attribution globale/campagne inactives ; plafond de production actuel inchangé. XEL #130 ne se fusionne pas implicitement.
+- Ordre et critères : [MANDAT-STUDIO-FIABLE-001](MANDAT-STUDIO-FIABLE-001.md). Grille/contributions révisées : [OFFRE-COMMERCIALE-001](OFFRE-COMMERCIALE-001.md).
+- Les cinq constats précédents ont été confirmés par le Builder (HANDOFF, 28/10 22:07). Cette transmission documentaire ne prétend pas que le code a déjà été exécuté.
+
+---
+
 ## 28/10/2026 — Studio, décors et offre commerciale (#82)
 
 **Verdict : ALIGNÉ AVEC RÉSERVES.** Bibliothèque utile pour la qualité, sans économie automatique démontrée. La grille vient d'être validée par le fondateur : [OFFRE-COMMERCIALE-001](OFFRE-COMMERCIALE-001.md).
