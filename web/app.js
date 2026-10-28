@@ -2463,7 +2463,7 @@
     function card(p) {
       var img;
       if (p.has_photo && p.photos > 1) {
-        img = photoCarousel(p.photos, function (k) { return api('fiila_vitrine_photo', { p_slug: slug, p_id: k ? p.id + ':' + k : p.id }).then(function (x) { return x.photo; }); }, p.name, 'vimg');
+        img = photoCarousel(p.photos, function (k) { return !k && p.img ? Promise.resolve(p.img) : api('fiila_vitrine_photo', { p_slug: slug, p_id: k ? p.id + ':' + k : p.id }).then(function (x) { return x.photo; }); }, p.name, 'vimg');
       } else {
         img = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 32));
         if (p.has_photo) cardPhoto(img, p.img, function () {
@@ -2935,7 +2935,7 @@
     var acc = (VT_ACCENTS[p.shop.accent] || VT_ACCENTS.foret)[1];
     var shopHref = '#/b/' + p.shop.slug, buyHref = shopHref + qs({ a: p.id });
     var img;
-    if (p.photos > 1) img = photoCarousel(p.photos, function (k) { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: k ? p.id + ':' + k : p.id }).then(function (r) { return r.photo || null; }); }, p.name, 'post-img');
+    if (p.photos > 1) img = photoCarousel(p.photos, function (k) { return !k && p.img ? Promise.resolve(p.img) : api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: k ? p.id + ':' + k : p.id }).then(function (r) { return r.photo || null; }); }, p.name, 'post-img');
     else {
       img = h('div', { class: 'post-img loading-skel' });
       cardPhoto(img, p.img, function () { return api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: p.id }).then(function (r) { return r.photo || null; }); }, p.name);

@@ -6,6 +6,7 @@
 // Chaque photo est déposée à une adresse qui contient l'empreinte de son contenu (mise en cache d'un an sans risque),
 // puis l'adresse est enregistrée par fiila_media_done, seulement si la photo n'a pas changé entre-temps.
 // Les photos du seau qui ne servent plus (article supprimé, photo remplacée) sont retirées.
+// Miniatures (28/10) : la photo principale JPEG de chaque article, lue dans le seau, réduite à 640 px (thumb.mjs), déposée sous t/.
 // SUPABASE_URL, SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase. Module sans dépendance (testé sous Node).
 import { corsFor } from '../_shared/http.mjs';
 
