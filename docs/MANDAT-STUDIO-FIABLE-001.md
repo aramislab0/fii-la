@@ -2,6 +2,7 @@
 
 > Fondateur, 28/10/2026, ChatGPT : « arrondis a 10 credit de bienvenue. je financerai les cadeaux avant lancement. informe claude et demmarons ».
 > **Exécution autorisée maintenant** : Studio fiable avant vente, mesures par décor, affichage 6 + Plus, et pilote de 9 décors dans le plafond de recherche de **5 USD au plus** présenté au fondateur. Ce plafond est distinct des cadeaux et n'augmente pas le budget de production.
+> Livraison VP : neuf propositions générées ; kit et limites décrits dans `LIVRAISON-DECORS-PILOTE-001.md`. Sources 1122 × 1402 ; normalisation et 18 essais applicatifs à faire. Aucun décor ACTIVE.
 > Source des prix et droits : `OFFRE-COMMERCIALE-001.md`, révisée au bonus de 10. Source de la revue : `REVUE-VP.md`, avis du 28/10.
 > Base examinée : `d65d01750f3145811cdda075cb3903ffc48007c3`. Ce commit transmet le mandat, ne prétend pas avoir exécuté le code ou engagé une dépense.
 
