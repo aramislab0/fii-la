@@ -1693,11 +1693,14 @@ window.FiiBO = function (F) {
         '. Les photos de porte et les repères vocaux restent dans la base, jamais publics.'),
       m.thumbs != null ? h('p', { class: 'small muted', id: 'bo-media-thumbs' }, 'Miniatures des grilles (640 px) : ' + boNum(m.thumbs) + ' (' +
         Math.round(Number(m.thumb_bytes || 0) / 1024) + ' Ko) · à faire : ' + boNum(m.thumbs_pending) + '. Photos PNG ou WebP : pas de miniature, la photo d’origine est affichée.') : null,
+      m.purged != null ? h('p', { class: 'small muted', id: 'bo-media-purge' }, 'Copies retirées de la base : ' + boNum(m.purged) + ' · reste dans la base : ' +
+        Math.round(Number(m.db_bytes || 0) / 1024) + ' Ko' + (m.purge_on ? '' : ' (retrait arrêté : media_purge = 0)') +
+        '. Une copie n’est retirée qu’après vérification du fichier en ligne, identique octet pour octet.') : null,
       (m.errors || []).length ? h('ul', { class: 'small', id: 'bo-media-errors' }, m.errors.map(function (e) { return h('li', null, shortDate(e.at) + ' · ' + (e.ref || '') + ' · ' + (e.detail || '')); })) : null,
       m.ready ? h('button', { class: 'btn ghost small', type: 'button', id: 'bo-media-run', onclick: function (ev) {
         var b = ev.currentTarget; b.disabled = true; status.textContent = 'Copie en cours…';
         fetch(API_URL + '/functions/v1/fiila-media-sync', { method: 'POST', headers: apiHeaders(), body: '{}' }).then(function (r) { return r.json(); }).then(function (x) {
-          b.disabled = false; status.textContent = x && x.ok ? (x.copied + ' copiée(s), ' + (x.thumbs != null ? x.thumbs + ' miniature(s), ' : '') + x.failed + ' échec(s), ' + x.removed + ' retirée(s).') : 'Copie impossible pour le moment.';
+          b.disabled = false; status.textContent = x && x.ok ? (x.copied + ' copiée(s), ' + (x.thumbs != null ? x.thumbs + ' miniature(s), ' : '') + (x.purged != null ? x.purged + ' retirée(s) de la base, ' : '') + x.failed + ' échec(s), ' + x.removed + ' retirée(s).') : 'Copie impossible pour le moment.';
         }, function () { b.disabled = false; status.textContent = 'Copie impossible pour le moment.'; });
       } }, 'Copier maintenant') : null, status);
   }

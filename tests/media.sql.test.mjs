@@ -3,6 +3,7 @@
 // photo modifiée = nouvelle copie, photos orphelines retirées, état au back-office (droit « settings »).
 import assert from 'node:assert/strict';
 import jpeg from 'jpeg-js';
+import { createHash } from 'node:crypto';
 import { createDb, rpc } from './db.mjs';
 
 const db = await createDb();
@@ -109,31 +110,114 @@ await t('miniatures : JPEG copié seulement, clé de service seule ; vitrine, fi
   let v = await ok('fiila_vitrine', { p_slug: slug });
   assert.equal(v.products.find((x) => x.id === J.id).img, `${BASE}p/${J.id}-${c.hash}.jpg`, 'sans miniature : photo du seau');
   const q = await ok('fiila_media_thumbs_pending', {}, SVC);
-  assert.deepEqual(q.filter((x) => x.ref === J.id), [{ ref: J.id, src: `p/${J.id}-${c.hash}.jpg`, hash: c.hash }]);
+  const th = createHash('md5').update(`p/${J.id}-${c.hash}.jpg`).digest('hex');
+  assert.deepEqual(q.filter((x) => x.ref === J.id), [{ ref: J.id, src: `p/${J.id}-${c.hash}.jpg`, hash: th }]);
   assert.ok(!q.some((x) => x.ref === P.id), 'photo PNG : pas de miniature');
   await ko('fiila_media_thumbs_pending', {});
   await ko('fiila_media_thumbs_pending', {}, null, F);
-  await ko('fiila_media_done', { p_kind: 'thumb', p_ref: J.id, p_hash: c.hash, p_path: `t/${J.id}-${c.hash}.png`, p_bytes: 10 }, 'invalid', SVC);
-  await ko('fiila_media_done', { p_kind: 'product', p_ref: J.id, p_hash: c.hash, p_path: `t/${J.id}-${c.hash}.jpg`, p_bytes: 10 }, 'invalid', SVC);
-  assert.equal((await ok('fiila_media_done', { p_kind: 'thumb', p_ref: J.id, p_hash: c.hash, p_path: `t/${J.id}-${c.hash}.jpg`, p_bytes: 120 }, SVC)).linked, true);
+  await ko('fiila_media_done', { p_kind: 'thumb', p_ref: J.id, p_hash: th, p_path: `t/${J.id}-${th}.png`, p_bytes: 10 }, 'invalid', SVC);
+  await ko('fiila_media_done', { p_kind: 'product', p_ref: J.id, p_hash: c.hash, p_path: `t/${J.id}-${th}.jpg`, p_bytes: 10 }, 'invalid', SVC);
+  assert.equal((await ok('fiila_media_done', { p_kind: 'thumb', p_ref: J.id, p_hash: th, p_path: `t/${J.id}-${th}.jpg`, p_bytes: 120 }, SVC)).linked, true);
   v = await ok('fiila_vitrine', { p_slug: slug });
-  assert.equal(v.products.find((x) => x.id === J.id).img, `${BASE}t/${J.id}-${c.hash}.jpg`);
+  assert.equal(v.products.find((x) => x.id === J.id).img, `${BASE}t/${J.id}-${th}.jpg`);
   await db.query(`update fiila.shops set platform = true, feed = true where slug = $1`, [slug]);
   const posts = (await ok('fiila_posts', { p_tab: 'pour-vous' })).posts;
   assert.equal(posts.find((x) => x.id === J.id).img, `${BASE}p/${J.id}-${c.hash}.jpg`, 'fil pleine largeur : photo du seau');
   const mine = (await ok('fiila_products', { p_key: S.key, p_all: true })).find((x) => x.id === J.id);
-  assert.equal(mine.thumb, `${BASE}t/${J.id}-${c.hash}.jpg`); assert.equal(mine.photo, `${BASE}p/${J.id}-${c.hash}.jpg`);
+  assert.equal(mine.thumb, `${BASE}t/${J.id}-${th}.jpg`); assert.equal(mine.photo, `${BASE}p/${J.id}-${c.hash}.jpg`);
   const m = await ok('fiila_bo_media', {}, F);
   assert.ok(m.thumbs >= 1); assert.equal(m.thumb_bytes, 120);
   // Photo remplacée : miniature à refaire, l'ancienne devient orpheline ; réglage media_cdn = 0 : plus d'adresse, retour à l'appel d'avant.
   await ok('fiila_product_save', { p_key: S.key, p: { id: J.id, name: 'Pagne [TEST]', price: 2000, photo: photo(11) } });
   assert.equal((await one(`select thumb_path from fiila.products where id = $1`, [J.id])).thumb_path, null);
   await db.query(`update fiila.media_objects set created_at = now() - interval '1 hour'`);
-  assert.ok((await ok('fiila_media_orphans', {}, SVC)).includes(`t/${J.id}-${c.hash}.jpg`));
+  assert.ok((await ok('fiila_media_orphans', {}, SVC)).includes(`t/${J.id}-${th}.jpg`));
   await db.query(`update fiila.settings set value = '0' where key = 'media_cdn'`);
   v = await ok('fiila_vitrine', { p_slug: slug });
   assert.ok(v.products.every((x) => !x.img));
   await db.query(`update fiila.settings set value = '1' where key = 'media_cdn'`);
+});
+
+await t('copie de la base retirée (étape 3) : après vérification de l’empreinte seulement ; la photo reste affichée partout', async () => {
+  const sha = (b64) => createHash('sha256').update(Buffer.from(b64, 'base64')).digest('hex');
+  const S2 = await ok('fiila_shop_save', { p_key: null, p: { name: 'Boutique Retrait [TEST]', business_type: 'mode' } });
+  const px = new Uint8Array(40 * 50 * 4).fill(90);
+  const jpg = Buffer.from(jpeg.encode({ data: px, width: 40, height: 50 }, 80).data).toString('base64');
+  S2.id = (await one(`select id from fiila.shops where name = 'Boutique Retrait [TEST]'`)).id;
+  const R = await ok('fiila_product_save', { p_key: S2.key, p: { name: 'Boubou [TEST]', price: 5000, photo: jpg, photos: [photo(21)] } });
+  await ok('fiila_shop_vitrine', { p_key: S2.key, p: { public: true, cover: photo(22) } });
+  const paths = {};
+  for (const c of (await ok('fiila_media_pending', { p_limit: 20 }, SVC)).filter((x) => x.ref.startsWith(R.id) || x.ref === S2.id)) {
+    const ext = c.ctype === 'image/jpeg' ? 'jpg' : 'png';
+    paths[c.kind] = c.kind === 'cover' ? `c/${c.ref}-${c.hash}.${ext}` : c.kind === 'product_extra' ? `p/${R.id}-1-${c.hash}.${ext}` : `p/${R.id}-${c.hash}.${ext}`;
+    await ok('fiila_media_done', { p_kind: c.kind, p_ref: c.ref, p_hash: c.hash, p_path: paths[c.kind], p_bytes: 100 }, SVC);
+  }
+  assert.deepEqual(Object.keys(paths).sort(), ['cover', 'product', 'product_extra']);
+  let q = (await ok('fiila_media_purge_pending', { p_limit: 20 }, SVC)).filter((x) => x.ref.startsWith(R.id) || x.ref === S2.id);
+  assert.deepEqual(q.map((x) => x.kind).sort(), ['cover', 'product_extra'], 'photo principale JPEG : pas avant sa miniature');
+  await ko('fiila_media_purge_pending', {});
+  await ko('fiila_media_purge_pending', {}, null, F);
+  await ko('fiila_media_purged', { p_kind: 'cover', p_ref: S2.id, p_path: paths.cover, p_sha: sha(photo(22)) });
+  const th = createHash('md5').update(paths.product).digest('hex');
+  await ok('fiila_media_done', { p_kind: 'thumb', p_ref: R.id, p_hash: th, p_path: `t/${R.id}-${th}.jpg`, p_bytes: 50 }, SVC);
+  q = (await ok('fiila_media_purge_pending', { p_limit: 20 }, SVC)).filter((x) => x.ref.startsWith(R.id) || x.ref === S2.id);
+  assert.deepEqual(q.find((x) => x.kind === 'product'), { kind: 'product', ref: R.id, path: paths.product, sha: sha(jpg) });
+  const before = (await ok('fiila_bo_media', {}, F)).db_bytes;
+  // Empreinte ou adresse différente : rien n'est retiré.
+  assert.equal((await ok('fiila_media_purged', { p_kind: 'product', p_ref: R.id, p_path: paths.product, p_sha: '0'.repeat(64) }, SVC)).purged, false);
+  assert.equal((await ok('fiila_media_purged', { p_kind: 'product', p_ref: R.id, p_path: paths.cover, p_sha: sha(jpg) }, SVC)).purged, false);
+  await ko('fiila_media_purged', { p_kind: 'product', p_ref: R.id, p_path: paths.product, p_sha: 'abc' }, 'invalid', SVC);
+  for (const x of q) assert.equal((await ok('fiila_media_purged', { p_kind: x.kind, p_ref: x.ref, p_path: x.path, p_sha: x.sha }, SVC)).purged, true);
+  const row = await one(`select photo, photo_path, thumb_path from fiila.products where id = $1`, [R.id]);
+  assert.equal(row.photo, null); assert.equal(row.photo_path, paths.product); assert.ok(row.thumb_path, 'miniature gardée');
+  assert.equal((await one(`select data, path from fiila.product_photos where product_id = $1`, [R.id])).data, null);
+  assert.equal((await one(`select cover, cover_path from fiila.shops where id = $1`, [S2.id])).cover_path, paths.cover);
+  const m = await ok('fiila_bo_media', {}, F);
+  assert.ok(m.purged >= 3); assert.ok(m.db_bytes < before); assert.equal(m.purge_on, true);
+  assert.equal((await one(`select count(*)::int n from fiila.media_log where action = 'purged' and ref like $1`, ['%' + R.id + '%'])).n, 2);
+  assert.ok(!(await ok('fiila_media_pending', { p_limit: 20 }, SVC)).some((x) => x.ref.startsWith(R.id) || x.ref === S2.id), 'pas de nouvelle copie');
+  // Affichage : vitrine, photos, couverture, liste du commerçant, fil — même avec media_cdn = 0.
+  const slug = (await one(`select slug from fiila.shops where id = $1`, [S2.id])).slug;
+  const check = async () => {
+    const v = await ok('fiila_vitrine', { p_slug: slug });
+    const card = v.products.find((x) => x.id === R.id);
+    assert.equal(card.has_photo, true); assert.equal(card.photos, 2); assert.equal(v.shop.has_cover ?? v.has_cover, true);
+    assert.equal((await ok('fiila_vitrine_photo', { p_slug: slug, p_id: R.id })).photo, BASE + paths.product);
+    assert.equal((await ok('fiila_vitrine_photo', { p_slug: slug, p_id: R.id + ':1' })).photo, BASE + paths.product_extra);
+    assert.equal((await ok('fiila_vitrine_photo', { p_slug: slug, p_id: 'cover' })).photo, BASE + paths.cover);
+    assert.equal((await ok('fiila_products', { p_key: S2.key, p_all: true })).find((x) => x.id === R.id).photo, BASE + paths.product);
+    assert.deepEqual(await ok('fiila_product_photos', { p_key: S2.key, p_id: R.id }), [BASE + paths.product_extra]);
+    assert.equal((await ok('fiila_shop_vitrine', { p_key: S2.key, p: null })).cover, BASE + paths.cover);
+  };
+  await check();
+  await db.query(`update fiila.shops set platform = true, feed = true where id = $1`, [S2.id]);
+  assert.ok((await ok('fiila_posts', { p_tab: 'pour-vous' })).posts.some((x) => x.id === R.id), 'toujours dans le fil');
+  await db.query(`update fiila.settings set value = '0' where key = 'media_cdn'`);
+  await check();
+  await db.query(`update fiila.settings set value = '1' where key = 'media_cdn'`);
+  // Modification sans toucher aux photos : rien ne bouge.
+  await ok('fiila_product_save', { p_key: S2.key, p: { id: R.id, name: 'Boubou bleu [TEST]', price: 5500 } });
+  assert.equal((await one(`select photo_path from fiila.products where id = $1`, [R.id])).photo_path, paths.product);
+  // Photo principale retirée : la supplémentaire (déjà retirée de la base) devient principale avec son adresse.
+  await ok('fiila_product_save', { p_key: S2.key, p: { id: R.id, name: 'Boubou bleu [TEST]', price: 5500, photo: '' } });
+  let r2 = await one(`select photo, photo_path, thumb_path from fiila.products where id = $1`, [R.id]);
+  assert.equal(r2.photo_path, paths.product_extra); assert.equal(r2.thumb_path, null);
+  assert.equal((await one(`select count(*)::int n from fiila.product_photos where product_id = $1`, [R.id])).n, 0);
+  assert.equal((await ok('fiila_vitrine_photo', { p_slug: slug, p_id: R.id })).photo, BASE + paths.product_extra);
+  // Photo retirée sans autre photo : l'article n'a plus de photo (adresse effacée aussi).
+  await ok('fiila_product_save', { p_key: S2.key, p: { id: R.id, name: 'Boubou bleu [TEST]', price: 5500, photo: '' } });
+  r2 = await one(`select photo, photo_path from fiila.products where id = $1`, [R.id]);
+  assert.equal(r2.photo_path, null);
+  assert.equal((await ok('fiila_vitrine', { p_slug: slug })).products.find((x) => x.id === R.id).has_photo, false);
+  // Nouvelle photo : nouvelle copie ; couverture retirée : plus de couverture.
+  await ok('fiila_product_save', { p_key: S2.key, p: { id: R.id, name: 'Boubou bleu [TEST]', price: 5500, photo: photo(23) } });
+  assert.ok((await ok('fiila_media_pending', { p_limit: 20 }, SVC)).some((x) => x.ref === R.id));
+  await ok('fiila_shop_vitrine', { p_key: S2.key, p: { cover: '' } });
+  assert.equal((await one(`select cover_path from fiila.shops where id = $1`, [S2.id])).cover_path, null);
+  // Réglage media_purge = 0 : plus aucun retrait.
+  await db.query(`insert into fiila.settings (key, value) values ('media_purge', '0') on conflict (key) do update set value = '0'`);
+  assert.deepEqual(await ok('fiila_media_purge_pending', { p_limit: 20 }, SVC), []);
+  await db.query(`update fiila.settings set value = '1' where key = 'media_purge'`);
 });
 
 await t('photos privées inchangées : la porte d’une adresse reste servie par la base', async () => {

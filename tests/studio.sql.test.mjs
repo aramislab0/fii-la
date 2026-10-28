@@ -198,6 +198,12 @@ await t('modes : premium proposé selon la catégorie (jamais bijoux), prompt = 
   const f = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2' });
   assert.equal(f.mode, 'fidele'); assert.match(f.prompt, /^CAM\. light wooden/, 'fidèle : pas de gabarit premium');
   await db.query(`update fiila.studio_jobs set status = 'failed' where id = $1`, [f.job]);
+  // Photo déjà retirée de la base (copie dans le seau seulement) : le Studio reçoit l'adresse du seau.
+  await db.query(`insert into fiila.settings (key, value) values ('media_base', 'https://exemple.supabase.co/storage/v1/object/public/media/') on conflict (key) do nothing`);
+  await db.query(`update fiila.products set photo_path = 'p/x.jpg', photo = null where id = $1`, [A.pid]);
+  const g = await ok('fiila_studio_reserve', { p_key: A.key, p_product: A.pid, p_style: 'mode-2' });
+  assert.equal(g.image, 'https://exemple.supabase.co/storage/v1/object/public/media/p/x.jpg');
+  await db.query(`update fiila.studio_jobs set status = 'failed' where id = $1`, [g.job]);
   await db.query(`update fiila.shops set business_type = 'bijoux' where id = $1`, [A.id]);
   assert.equal((await ok('fiila_studio_state', { p_key: A.key, p_product: A.pid })).premium, null, 'bijoux : jamais de premium');
   await db.query(`update fiila.shops set business_type = 'mode' where id = $1`, [A.id]);

@@ -193,6 +193,7 @@ await t('Croissance : « Parcours d’accueil » (gestes et tâches réussies) ;
   assert.match(await D.locator('#bo-media').textContent(), /Copiées : 0 .*en attente : \d+/s);
   assert.equal(await D.locator('#bo-media-run').count(), 0);
   assert.match(await D.locator('#bo-media-thumbs').textContent(), /Miniatures des grilles.*à faire : \d+/s);
+  assert.match(await D.locator('#bo-media-purge').textContent(), /Copies retirées de la base : \d+ · reste dans la base : \d+ Ko/);
   await D.locator('#bo-settings').getByText('Photos servies par le stockage', { exact: false }).waitFor();
 });
 

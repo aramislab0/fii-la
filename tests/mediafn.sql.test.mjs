@@ -3,14 +3,14 @@
 // CORS limité aux origines de Fii. Supabase est simulé (aucun appel réel, aucune clé réelle).
 import assert from 'node:assert/strict';
 import jpeg from 'jpeg-js';
-import { makeHandler, pathFor, decode, thumbPathFor } from '../supabase/functions/fiila-media-sync/handler.mjs';
+import { makeHandler, pathFor, decode, thumbPathFor, sha256hex } from '../supabase/functions/fiila-media-sync/handler.mjs';
 import { makeThumb, shrink } from '../supabase/functions/fiila-media-sync/thumb.mjs';
 
 let passed = 0, failed = 0;
 async function t(name, fn) { try { await fn(); passed++; console.log('PASS', name); } catch (e) { failed++; console.log('FAIL', name, '\n   ', e.message); } }
 const ENV = { SUPABASE_URL: 'https://p.supabase.co', SUPABASE_ANON_KEY: 'anon-test', SUPABASE_SERVICE_ROLE_KEY: 'service-test' };
 const ID = '2f6bd807-a43e-412f-ac96-24b5c6b51518', H = 'd5c881e6e40fefe3cbe7878f30de64a5';
-function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatus = 200, me = null, thumbs = [], source = () => null }) {
+function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatus = 200, me = null, thumbs = [], purges = [], source = () => null }) {
   const calls = [];
   const fetch = async (url, init = {}) => {
     calls.push({ url, init });
@@ -24,6 +24,8 @@ function sim({ pending = [], orphans = [], uploadStatus = () => 200, deleteStatu
     if (fn === 'fiila_bo_me') return new Response(JSON.stringify(me), { status: 200 });
     if (fn === 'fiila_media_pending') return new Response(JSON.stringify(pending), { status: 200 });
     if (fn === 'fiila_media_thumbs_pending') return new Response(JSON.stringify(thumbs), { status: 200 });
+    if (fn === 'fiila_media_purge_pending') return new Response(JSON.stringify(purges), { status: 200 });
+    if (fn === 'fiila_media_purged') return new Response(JSON.stringify({ ok: true, purged: true }), { status: 200 });
     if (fn === 'fiila_media_orphans') return new Response(JSON.stringify(orphans), { status: 200 });
     if (fn === 'fiila_media_forget') return new Response(JSON.stringify({ ok: true, removed: JSON.parse(init.body).p_paths.length }), { status: 200 });
     return new Response(JSON.stringify({ ok: true, linked: true }), { status: 200 });
@@ -45,7 +47,7 @@ await t('copie : dépôt avec la clé de service, cache d’un an, puis adresse 
   const s = sim({ pending: [{ kind: 'product', ref: ID, hash: H, ctype: 'image/jpeg', b64: B64 }] });
   const r = await makeHandler({ env, fetch: s.fetch })(post());
   assert.equal(r.status, 200);
-  assert.deepEqual(await r.json(), { ok: true, copied: 1, failed: 0, removed: 0 });
+  assert.deepEqual(await r.json(), { ok: true, copied: 1, purged: 0, failed: 0, removed: 0 });
   const up = s.calls.find((c) => c.url.includes('/storage/v1/object/media/'));
   assert.equal(up.url, `https://p.supabase.co/storage/v1/object/media/p/${ID}-${H}.jpg`);
   assert.equal(up.init.headers.Authorization, 'Bearer service-test');
@@ -59,7 +61,7 @@ await t('échec d’un dépôt : journalisé, les autres photos continuent, pas 
   const s = sim({ pending: [{ kind: 'product', ref: ID, hash: H, ctype: 'image/jpeg', b64: B64 }, { kind: 'cover', ref: ID, hash: H, ctype: 'image/png', b64: B64 }],
     uploadStatus: (url) => (url.includes('/p/') ? 500 : 200) });
   const r = await makeHandler({ env, fetch: s.fetch })(post());
-  assert.deepEqual(await r.json(), { ok: true, copied: 1, failed: 1, removed: 0 });
+  assert.deepEqual(await r.json(), { ok: true, copied: 1, purged: 0, failed: 1, removed: 0 });
   assert.equal(s.rpcs('fiila_media_done').length, 1);
   const fail = s.rpcs('fiila_media_report').find((x) => x.p_action === 'failed');
   assert.match(fail.p_detail, /stockage 500/); assert.equal(fail.p_ref, 'product:' + ID);
@@ -68,7 +70,7 @@ await t('échec d’un dépôt : journalisé, les autres photos continuent, pas 
 await t('orphelines : supprimées du seau puis oubliées ; refus de suppression journalisé', async () => {
   let s = sim({ orphans: [`p/${ID}-${H}.jpg`] });
   let r = await makeHandler({ env, fetch: s.fetch })(post());
-  assert.deepEqual(await r.json(), { ok: true, copied: 0, failed: 0, removed: 1 });
+  assert.deepEqual(await r.json(), { ok: true, copied: 0, purged: 0, failed: 0, removed: 1 });
   const del = s.calls.find((c) => c.init.method === 'DELETE');
   assert.deepEqual(JSON.parse(del.init.body), { prefixes: [`p/${ID}-${H}.jpg`] });
   s = sim({ orphans: [`p/${ID}-${H}.jpg`], deleteStatus: 403 });
@@ -80,7 +82,7 @@ await t('orphelines : supprimées du seau puis oubliées ; refus de suppression 
 await t('rien à faire : aucun dépôt, « dernière copie » mise à jour sans entrée au journal ; GET refusé ; non configurée', async () => {
   const s = sim({});
   const r = await makeHandler({ env, fetch: s.fetch })(post());
-  assert.deepEqual(await r.json(), { ok: true, copied: 0, failed: 0, removed: 0 });
+  assert.deepEqual(await r.json(), { ok: true, copied: 0, purged: 0, failed: 0, removed: 0 });
   assert.deepEqual(s.rpcs('fiila_media_report'), [{ p_action: 'run', p_ref: null, p_detail: null }]);
   assert.equal((await makeHandler({ env, fetch: s.fetch })(new Request('https://x/', { method: 'GET' }))).status, 405);
   assert.equal((await makeHandler({ env: () => undefined, fetch: s.fetch })(post())).status, 500);
@@ -145,7 +147,7 @@ await t('miniatures : lues depuis le seau public, déposées sous t/ (cache d’
   const big = sampleJpeg();
   const s = sim({ thumbs: [{ ref: ID, src: `p/${ID}-${H}.jpg`, hash: H }], source: (u) => (u.endsWith(`/public/media/p/${ID}-${H}.jpg`) ? big : null) });
   const r = await makeHandler({ env, fetch: s.fetch, thumb: makeThumb(jpeg) })(post());
-  assert.deepEqual(await r.json(), { ok: true, copied: 0, thumbs: 1, failed: 0, removed: 0 });
+  assert.deepEqual(await r.json(), { ok: true, copied: 0, thumbs: 1, purged: 0, failed: 0, removed: 0 });
   assert.equal(thumbPathFor({ ref: ID, hash: H }), `t/${ID}-${H}.jpg`);
   const up = s.calls.find((c) => c.url.endsWith(`/storage/v1/object/media/t/${ID}-${H}.jpg`));
   assert.equal(up.init.headers['Content-Type'], 'image/jpeg'); assert.equal(up.init.headers['cache-control'], 'max-age=31536000');
@@ -161,11 +163,31 @@ await t('miniatures : photo absente du seau ou illisible → échec journalisé 
   const s = sim({ thumbs: [{ ref: ID, src: `p/${ID}-${H}.jpg`, hash: H }, { ref: ID2, src: `p/${ID2}-${H}.jpg`, hash: H }],
     source: (u) => (u.includes(ID2) ? new Uint8Array([0xff, 0xd8, 0, 1]) : null) });
   const r = await makeHandler({ env, fetch: s.fetch, thumb: makeThumb(jpeg) })(post());
-  assert.deepEqual(await r.json(), { ok: true, copied: 0, thumbs: 0, failed: 2, removed: 0 });
+  assert.deepEqual(await r.json(), { ok: true, copied: 0, thumbs: 0, purged: 0, failed: 2, removed: 0 });
   const fails = s.rpcs('fiila_media_report').filter((x) => x.p_action === 'failed');
   assert.deepEqual(fails.map((f) => f.p_ref), ['thumb:' + ID, 'thumb:' + ID2]);
   assert.match(fails[0].p_detail, /lecture 404/);
   assert.equal(s.rpcs('fiila_media_done').length, 0);
+});
+
+await t('retrait de la base : seulement si le fichier publié a la même empreinte SHA-256 ; sinon journalisé, rien retiré', async () => {
+  const good = Buffer.from('photo publiée'), bad = Buffer.from('autre contenu');
+  const sha = await sha256hex(new Uint8Array(good));
+  assert.equal(sha, (await import('node:crypto')).createHash('sha256').update(good).digest('hex'));
+  const p1 = `p/${ID}-${H}.jpg`, p2 = `c/${ID}-${H}.png`;
+  const s = sim({ purges: [{ kind: 'product', ref: ID, path: p1, sha }, { kind: 'cover', ref: ID, path: p2, sha }],
+    source: (url) => (url.endsWith(p1) ? good : url.endsWith(p2) ? bad : null) });
+  const r = await makeHandler({ env, fetch: s.fetch })(post());
+  assert.deepEqual(await r.json(), { ok: true, copied: 0, purged: 1, failed: 1, removed: 0 });
+  assert.ok(s.calls.some((c) => c.url === `https://p.supabase.co/storage/v1/object/public/media/${p1}`));
+  assert.deepEqual(s.rpcs('fiila_media_purged'), [{ p_kind: 'product', p_ref: ID, p_path: p1, p_sha: sha }]);
+  const fail = s.rpcs('fiila_media_report').find((x) => x.p_action === 'failed');
+  assert.equal(fail.p_ref, 'purge:cover:' + ID); assert.match(fail.p_detail, /différent/);
+  assert.match(s.rpcs('fiila_media_report').at(-1).p_detail, /1 retirée\(s\) de la base/);
+  // Fichier absent du stockage : rien n'est retiré.
+  const s2 = sim({ purges: [{ kind: 'product', ref: ID, path: p1, sha }] });
+  assert.equal((await (await makeHandler({ env, fetch: s2.fetch })(post())).json()).purged, 0);
+  assert.equal(s2.rpcs('fiila_media_purged').length, 0);
 });
 
 console.log(`\n${passed}/${passed + failed} tests fonction de copie des photos réussis`);

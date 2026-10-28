@@ -7,6 +7,8 @@
 // puis l'adresse est enregistrée par fiila_media_done, seulement si la photo n'a pas changé entre-temps.
 // Les photos du seau qui ne servent plus (article supprimé, photo remplacée) sont retirées.
 // Miniatures (28/10) : la photo principale JPEG de chaque article, lue dans le seau, réduite à 640 px (thumb.mjs), déposée sous t/.
+// Retrait de la copie de la base (28/10, accord du fondateur) : le fichier publié est téléchargé, son empreinte SHA-256
+// comparée à celle de la base ; la copie n'est retirée (fiila_media_purged) que si elles sont identiques.
 // SUPABASE_URL, SUPABASE_ANON_KEY et SUPABASE_SERVICE_ROLE_KEY sont fournis par Supabase. Module sans dépendance (testé sous Node).
 import { corsFor } from '../_shared/http.mjs';
 
@@ -29,6 +31,13 @@ export function decode(b64) {
 
 export const THUMBS = 3;
 export const thumbPathFor = (item) => `t/${item.ref}-${item.hash}.jpg`;
+export const PURGES = 8;
+export async function sha256hex(bytes) {
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+  let s = '';
+  for (const b of d) s += b.toString(16).padStart(2, '0');
+  return s;
+}
 
 // thumb (facultatif) : octets JPEG → octets de la miniature (thumb.mjs) ; absent = pas d'étape miniatures.
 export function makeHandler({ env, fetch, thumb }) {
@@ -59,7 +68,7 @@ export function makeHandler({ env, fetch, thumb }) {
     if (req.method !== 'POST') return json(405, { error: 'method' });
     if (!key() || !base()) return json(500, { error: 'not_configured' });
     if (!(await allowed(req))) return json(401, { error: 'unauthorized' });
-    let copied = 0, failed = 0, removed = 0, thumbs = 0;
+    let copied = 0, failed = 0, removed = 0, thumbs = 0, purged = 0;
     try {
       const items = await rpc('fiila_media_pending', { p_limit: BATCH });
       for (const it of items || []) {
@@ -95,16 +104,28 @@ export function makeHandler({ env, fetch, thumb }) {
           }
         }
       }
+      // Retrait des copies de la base, après vérification du fichier publié (jamais à l'aveugle).
+      for (const it of (await rpc('fiila_media_purge_pending', { p_limit: PURGES })) || []) {
+        try {
+          const src = await fetch(`${base()}/storage/v1/object/public/${BUCKET}/${it.path}`);
+          if (!src.ok) throw new Error('lecture ' + src.status);
+          if ((await sha256hex(new Uint8Array(await src.arrayBuffer()))) !== it.sha) throw new Error('fichier du stockage différent de la base');
+          if ((await rpc('fiila_media_purged', { p_kind: it.kind, p_ref: it.ref, p_path: it.path, p_sha: it.sha })).purged) purged++;
+        } catch (e) {
+          failed++;
+          await rpc('fiila_media_report', { p_action: 'failed', p_ref: 'purge:' + it.kind + ':' + it.ref, p_detail: 'retrait de la base : ' + String((e && e.message) || e) }).catch(() => {});
+        }
+      }
       const orphans = await rpc('fiila_media_orphans', { p_limit: 50 });
       if (orphans && orphans.length) {
         const del = await fetch(`${base()}/storage/v1/object/${BUCKET}`, { method: 'DELETE', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ prefixes: orphans }) });
         if (del.ok) removed = (await rpc('fiila_media_forget', { p_paths: orphans })).removed || 0;
         else await rpc('fiila_media_report', { p_action: 'failed', p_ref: 'nettoyage', p_detail: 'suppression refusée ' + del.status }).catch(() => {});
       }
-      const did = copied || failed || removed || thumbs;
+      const did = copied || failed || removed || thumbs || purged;
       await rpc('fiila_media_report', { p_action: 'run', p_ref: null,
-        p_detail: did ? `${copied} copiée(s), ${thumbs} miniature(s), ${failed} échec(s), ${removed} retirée(s)` : null });
-      return json(200, thumb ? { ok: true, copied, thumbs, failed, removed } : { ok: true, copied, failed, removed });
+        p_detail: did ? `${copied} copiée(s), ${thumbs} miniature(s), ${purged} retirée(s) de la base, ${failed} échec(s), ${removed} retirée(s) du stockage` : null });
+      return json(200, thumb ? { ok: true, copied, thumbs, purged, failed, removed } : { ok: true, copied, purged, failed, removed });
     } catch (e) {
       console.log(JSON.stringify({ media_sync: 'failed', error: String((e && e.message) || e).slice(0, 200) }));
       return json(502, { error: 'failed', copied, failed, removed });
