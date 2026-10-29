@@ -337,6 +337,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 29/10 21:10 | CI run 40953144991 : migration `20261029300000` appliquée, mais `verify-db` a vu les 2 fonctions back-office du modèle Concept ouvertes à anon (droit accordé par défaut par Supabase ; elles exigent un membre de l'équipe, rien de lisible). Correctif `20261029310000` (revoke from anon) ; site pas encore mis à jour, production cohérente (l'ancienne application ignore les nouveaux champs) | run 40953144991 |
 | 29/10 21:45 | Modèle Premium **Concept** construit (rayons, rubriques propres, couleurs Noir et Rose, style, animations, carte « Site » au back-office) ; #85 a) b) corrigés ; SQL vertes en local (suites existantes + 8/8 Concept), navigateur Chrome vert (Concept, vitrine, Édition V1, back-office, E2E 38/38, page 237 Ko) | voir commit |
 | 29/10 19:45 | Rayons validés (#86) ; maquette v2 « Édition rose » avec 7 animations commutables publiée ; XEL `Production/FII/` mis à jour | artefact TTdAFFP8jgeFpWTSTqxmaG v2 ; PR XEL #136 |
 | 29/10 19:40 | Lenteur des photos expliquée (copie vers le stockage en retard après l'import BAe : 136/334 principales, 0/447 secondaires) ; proposition Rayons + maquette (#86) ; dossier XEL `Production/FII/` créé (retours du fondateur, historique, BAe) et règle 10 ajoutée | XEL `96c0d24`, PR XEL #136 ; artefact TTdAFFP8jgeFpWTSTqxmaG |
