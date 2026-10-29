@@ -191,7 +191,31 @@ await t('sans crédit : pas de bouton de création, message clair', async () => 
   await p.context().close();
 });
 
-await local.db.exec(`delete from fiila.studio_jobs; delete from fiila.studio_wallets`);
+await t('bonus de bienvenue (activé pour le test) : annoncé une fois, échéance dans la ligne d’aide du Studio', async () => {
+  // Boutique synthétique rattachée à un compte propriétaire et publique : conditions du bonus.
+  const O = (await local.db.query(`insert into auth.users (id, email) values (gen_random_uuid(), 'proprio.studio@example.test') returning id`)).rows[0].id;
+  await local.db.query(`update fiila.shops set user_id = $2, public = true where id = $1`, [S.shop.id, O]);
+  await ok('fiila_bo_setting_set', { p_key: 'studio_welcome', p_value: 1 }, { uid: F });
+  const p = await newPhone(SHOP);
+  await p.goto(URL0 + '#/boutique/article/' + A.id);
+  await p.locator('#studio-open').waitFor();
+  assert.match(await p.locator('#toast').textContent(), /Bienvenue : 10 crédits Fii Studio offerts, valables jusqu’au/);
+  assert.match(await p.locator('#studio-credits').textContent(), /10 crédits/);
+  await p.click('#studio-open');
+  await p.locator('#studio-rule').waitFor();
+  assert.match(await p.locator('#studio-rule').textContent(), /10 crédits valables jusqu’au \d+ \S+\./);
+  await p.screenshot({ path: `${SHOTS}/${ENGINE}-07-bienvenue.png` });
+  await p.context().close();
+  const p2 = await newPhone(SHOP);
+  await p2.goto(URL0 + '#/boutique/article/' + A.id);
+  await p2.locator('#studio-open').waitFor(); await p2.waitForTimeout(600);
+  assert.equal(await p2.locator('#toast:visible', { hasText: 'Bienvenue' }).count(), 0, 'une seule annonce');
+  assert.deepEqual(p.__errors.concat(p2.__errors), []);
+  await p2.context().close();
+  await ok('fiila_bo_setting_set', { p_key: 'studio_welcome', p_value: 0 }, { uid: F });
+});
+
+await local.db.exec(`delete from fiila.studio_jobs; delete from fiila.studio_wallets; delete from fiila.studio_welcome; delete from fiila.studio_credit_lots`);
 await browser.close();
 local.server.close();
 console.log(`\n${passed}/${passed + failed} tests Studio réussis — ${ENGINE} ${version}`);

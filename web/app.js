@@ -6459,10 +6459,16 @@
       h('p', { class: 'hint' }, icon('lock', 14), ' Visible seulement par vous et l’équipe Fii.'),
       err, btn);
   }
+  // Bonus de bienvenue du Studio (29/10) : annoncé une fois, à l'appel qui l'accorde.
+  function studioDay(iso) { return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: DAKAR }); }
+  function studioWelcome(st) {
+    if (st && st.welcome) toast('Bienvenue : ' + st.welcome.credits + ' crédits Fii Studio offerts, valables jusqu’au ' + studioDay(st.welcome.expires_at) + '.');
+  }
   // Fii Studio proposé partout (fondateur, 27/10 : « toujours proposer Fii Studio ») : carte vers les articles.
   function studioPromo(id, compact) {
     var box = h('div', { id: id });
     sapi('fiila_studio_state_shop', {}).then(function (st) {
+      studioWelcome(st);
       if (!st || !st.ready) return;
       var n = (st.credits && st.credits.total) || 0;
       setKids(box, h(compact ? 'div' : 'a', { class: 'studio-promo' + (compact ? ' compact' : ''), href: compact ? null : '#/boutique/articles' },
@@ -7668,6 +7674,7 @@
     var row = h('div', { id: 'studio-row' });
     // Relu à la fermeture du Studio : solde et « Dernière création » à jour sans recharger la page (règle du 28/10).
     function load() { sapi('fiila_studio_state', { p_product: pr.id }).then(function (st) {
+      studioWelcome(st);
       if (!st || !st.ready) return;
       var n = (st.credits && st.credits.total) || 0;
       setKids(row, h('button', { type: 'button', class: 'studio-row', id: 'studio-open', onclick: function () { studioSheet(pr, photos, saveStay, st, load); } },
@@ -7710,7 +7717,12 @@
         steps, h('div', { class: 'sd-body' }, body, err), foot));
     function need() { return mode === 'premium' && prem ? prem.credits : 1; }
     // Règle de débit (28/10) dans la même ligne discrète que l'aide du mode (règle d'interface : une seule ligne d'informations).
-    function rule() { return h('span', { id: 'studio-rule' }, 'Crédits utilisés à chaque création réussie ; « Garder » est gratuit, une panne est remboursée.'); }
+    // Crédits offerts datés (bienvenue, Business) : leur échéance tient dans la même ligne.
+    var expiring = st.credits && st.credits.expiring;
+    function rule() {
+      return h('span', { id: 'studio-rule' }, 'Crédits utilisés à chaque création réussie ; « Garder » est gratuit, une panne est remboursée.'
+        + (expiring ? ' ' + expiring.credits + (expiring.credits > 1 ? ' crédits valables' : ' crédit valable') + ' jusqu’au ' + studioDay(expiring.at) + '.' : ''));
+    }
     function shown() {
       if (more || !scenes.some(function (x) { return x.top; })) return scenes;
       return scenes.filter(function (x) { return x.top || x.id === style; });
