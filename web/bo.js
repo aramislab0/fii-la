@@ -3,7 +3,7 @@
    outils partagés (BO_SHARED dans app.js). Contrôle : tests/bosplit.sql.test.mjs (tout nom utilisé ici est fourni). */
 window.FiiBO = function (F) {
   'use strict';
-  var ADAPT = F.ADAPT, AMB_QUIZ = F.AMB_QUIZ, API_URL = F.API_URL, ApiError = F.ApiError, BO_ROLES = F.BO_ROLES, BUSINESS_TYPES = F.BUSINESS_TYPES, GRADES = F.GRADES, NUDGE_IDS = F.NUDGE_IDS, PAYOUT = F.PAYOUT, POLICY_DELIVERY = F.POLICY_DELIVERY, POLICY_EXCHANGE = F.POLICY_EXCHANGE, POLICY_PAY = F.POLICY_PAY, RET_TEXT = F.RET_TEXT, SERVICES = F.SERVICES, SOCIALS = F.SOCIALS, SUCC_SVC = F.SUCC_SVC, VD_AGES = F.VD_AGES, VD_CATS = F.VD_CATS, VD_CONDITIONS = F.VD_CONDITIONS, VD_GENDERS = F.VD_GENDERS, VT_PREMIUM = F.VT_PREMIUM, VT_THEMES = F.VT_THEMES, WA_CARDS = F.WA_CARDS, account = F.account, adaptPick = F.adaptPick, add = F.add, agoLong = F.agoLong, api = F.api, apiHeaders = F.apiHeaders, authed = F.authed, backBtn = F.backBtn, baseUrl = F.baseUrl, brandLogo = F.brandLogo, copy = F.copy, errBox = F.errBox, errText = F.errText, fcfa = F.fcfa, footer = F.footer, freshToken = F.freshToken, go = F.go, h = F.h, icon = F.icon, iconBtn = F.iconBtn, inviteCard = F.inviteCard, ivcBtn = F.ivcBtn, lbl = F.lbl, loading = F.loading, openSheet = F.openSheet, page = F.page, qs = F.qs, render = F.render, retryBtn = F.retryBtn, segField = F.segField, setKids = F.setKids, shortDate = F.shortDate, socialUrl = F.socialUrl, stateCard = F.stateCard, svcOf = F.svcOf, textField = F.textField, toast = F.toast, typeLabel = F.typeLabel, viewStats = F.viewStats, waLink = F.waLink;
+  var ADAPT = F.ADAPT, AMB_QUIZ = F.AMB_QUIZ, API_URL = F.API_URL, ApiError = F.ApiError, BO_ROLES = F.BO_ROLES, BUSINESS_TYPES = F.BUSINESS_TYPES, GRADES = F.GRADES, NUDGE_IDS = F.NUDGE_IDS, PAYOUT = F.PAYOUT, POLICY_DELIVERY = F.POLICY_DELIVERY, POLICY_EXCHANGE = F.POLICY_EXCHANGE, POLICY_PAY = F.POLICY_PAY, RET_TEXT = F.RET_TEXT, SERVICES = F.SERVICES, SOCIALS = F.SOCIALS, SUCC_SVC = F.SUCC_SVC, VD_AGES = F.VD_AGES, VD_CATS = F.VD_CATS, VD_CONDITIONS = F.VD_CONDITIONS, VD_GENDERS = F.VD_GENDERS, VT_ACCENTS = F.VT_ACCENTS, VT_PREMIUM = F.VT_PREMIUM, VT_THEMES = F.VT_THEMES, conceptStyle = F.conceptStyle, WA_CARDS = F.WA_CARDS, account = F.account, adaptPick = F.adaptPick, add = F.add, agoLong = F.agoLong, api = F.api, apiHeaders = F.apiHeaders, authed = F.authed, backBtn = F.backBtn, baseUrl = F.baseUrl, brandLogo = F.brandLogo, copy = F.copy, errBox = F.errBox, errText = F.errText, fcfa = F.fcfa, footer = F.footer, freshToken = F.freshToken, go = F.go, h = F.h, icon = F.icon, iconBtn = F.iconBtn, inviteCard = F.inviteCard, ivcBtn = F.ivcBtn, lbl = F.lbl, loading = F.loading, openSheet = F.openSheet, page = F.page, qs = F.qs, render = F.render, retryBtn = F.retryBtn, segField = F.segField, setKids = F.setKids, shortDate = F.shortDate, socialUrl = F.socialUrl, stateCard = F.stateCard, svcOf = F.svcOf, textField = F.textField, toast = F.toast, typeLabel = F.typeLabel, viewStats = F.viewStats, waLink = F.waLink;
 
   /* ================================================================ BACK-OFFICE (#/bo)
      Portail unique de l'équipe Fii (fondateur, 19/10 10:41). Chaque membre a son propre compte et un rôle ;
@@ -532,6 +532,36 @@ window.FiiBO = function (F) {
     }, function (e) { setKids(box, h('h2', null, 'Audience'), h('p', { class: 'small muted' }, errText(e))); });
     return box;
   }
+  // Site (modèle Concept, 29/10) : modèle, couleur des boutons, style, rubriques de la boutique ; réglage par l'équipe,
+  // tracé dans le journal (« shop_look »). Les modèles Premium restent réservés aux boutiques Premium.
+  function boShopSite(id) {
+    var box = h('section', { class: 'card stack tight', id: 'bo-shop-site' }, h('h2', null, 'Site'), loading());
+    function name(k) { var x = VT_THEMES.concat(VT_PREMIUM).filter(function (t) { return t[0] === k; })[0]; return x ? x[1] : k; }
+    function draw(a) {
+      var st = conceptStyle(a.style), edit = boCan('shops_write');
+      function set(p, okMsg) { return api('fiila_bo_shop_look', { p_shop: id, p: p }).then(function (r) { toast(okMsg); draw(r); }, function (e) { toast(errText(e)); draw(a); }); }
+      function sel(idv, label, opts, cur, fn) {
+        return h('select', { id: idv, 'aria-label': label, onchange: function (e) { fn(e.target.value); } },
+          opts.map(function (o) { return h('option', { value: o[0], selected: o[0] === cur || null, disabled: o[2] || null }, o[1]); }));
+      }
+      var themes = VT_THEMES.map(function (t) { return [t[0], t[1]]; }).concat(VT_PREMIUM.map(function (t) { return [t[0], t[1] + ' (Premium)', a.plan !== 'premium']; }));
+      setKids(box, h('h2', null, 'Site'),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Modèle'), edit ? sel('bo-site-theme', 'Modèle', themes, a.theme, function (v) { set({ theme: v }, 'Modèle enregistré.'); })
+          : h('span', { id: 'bo-site-theme' }, name(a.shown_theme))),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Couleur des boutons'), edit ? sel('bo-site-accent', 'Couleur des boutons', Object.keys(VT_ACCENTS).map(function (k) { return [k, VT_ACCENTS[k][0]]; }), a.accent,
+            function (v) { set({ accent: v }, 'Couleur enregistrée.'); }) : h('span', { id: 'bo-site-accent' }, (VT_ACCENTS[a.accent] || [a.accent])[0])),
+        a.theme === 'concept' ? h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Style'), edit ? h('span', { class: 'row', id: 'bo-site-style' },
+            sel('bo-site-corners', 'Coins', [['doux', 'Coins arrondis'], ['nets', 'Coins droits']], st.corners, function (v) { set({ style: Object.assign({}, st, { corners: v }) }, 'Style enregistré.'); }),
+            sel('bo-site-anim', 'Animations', [['1', 'Animations'], ['0', 'Sans animation']], st.anim ? '1' : '0', function (v) { set({ style: Object.assign({}, st, { anim: v === '1' }) }, 'Style enregistré.'); }),
+            sel('bo-site-season', 'Cœurs de saison', [['0', 'Sans cœurs flottants'], ['1', 'Cœurs flottants']], st.season ? '1' : '0', function (v) { set({ style: Object.assign({}, st, { season: v === '1' }) }, 'Style enregistré.'); }))
+          : h('span', { id: 'bo-site-style' }, [st.corners === 'nets' ? 'coins droits' : 'coins arrondis', st.anim ? 'animations' : 'sans animation', st.season ? 'cœurs flottants' : null].filter(Boolean).join(' · '))) : null,
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Rubriques'), h('span', { id: 'bo-site-rubrics', class: 'wrapword' },
+          a.rubrics.length ? a.rubrics.map(function (r) { return r.name + ' (' + r.n + ')'; }).join(' · ') + (a.no_rubric ? ' · ' + boNum(a.no_rubric) + ' sans rubrique' : '')
+            : 'Aucune : le site range les ' + boNum(a.active) + ' articles visibles par catégorie de Fii')));
+    }
+    api('fiila_bo_shop_site', { p_shop: id }).then(draw, function (e) { setKids(box, h('h2', null, 'Site'), h('p', { class: 'small muted' }, errText(e))); });
+    return box;
+  }
   // Fiche article du site (Fii Édition V1) : conditions choisies par la boutique, articles en promo, tailles épuisées.
   function boShopSheet(id) {
     var box = h('section', { class: 'card stack tight', id: 'bo-shop-sheet' }, h('h2', null, 'Fiche article'), loading());
@@ -810,6 +840,7 @@ window.FiiBO = function (F) {
         boShopTeam(s, id),
         boCan('shops_write') && !s.platform ? boShopIdentity(id) : null,
         boShopAudience(id),
+        boShopSite(id),
         boShopSheet(id),
         s.recent_orders ? h('section', { class: 'stack tight' }, h('h2', null, 'Dernières commandes'),
           boTable([{ label: 'N°', get: function (o) { return String(o.number).padStart(4, '0'); } }, { label: 'Total', get: function (o) { return fcfa(o.total); }, cls: 'num' },
@@ -1656,7 +1687,7 @@ window.FiiBO = function (F) {
   // ----- Journal
   var BO_ACTIONS = { partner_reply: 'a répondu à la marque', partner_invite: 'a invité la marque', partner_regenerate: 'a renouvelé le lien d’invitation de', partner_revoke: 'a retiré l’invitation de', partner_extend: 'a prolongé l’essai de',
     partner_suspend: 'a suspendu l’essai de', partner_resume: 'a repris l’essai de', pack_saved: 'a enregistré une version du pack', shop_suspend: 'a suspendu la boutique', shop_unsuspend: 'a réactivé la boutique', shop_feed_off: 'a retiré la boutique du fil',
-    shop_feed_on: 'a remis la boutique dans le fil', shop_free_place: 'a libéré la place du fil', shop_set_type: 'a changé le type de la boutique',
+    shop_feed_on: 'a remis la boutique dans le fil', shop_free_place: 'a libéré la place du fil', shop_set_type: 'a changé le type de la boutique', shop_look: 'a changé le site (modèle, couleur ou style) de',
     team_invite: 'a invité', team_invite_revoke: 'a annulé l’invitation de', team_join: 'a rejoint l’équipe', team_role: 'a changé le rôle de',
     team_remove: 'a retiré de l’équipe', setting: 'a modifié le réglage', comment_delete: 'a supprimé un commentaire', comment_hide: 'a masqué un commentaire',
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
@@ -1684,7 +1715,9 @@ window.FiiBO = function (F) {
     studio_welcome: ['Bonus de bienvenue du Studio (une fois par compte propriétaire)', '0 = coupé (enveloppe non financée), 1 = accordé aux boutiques publiques avec un article photographié'],
     studio_welcome_credits: ['Crédits du bonus de bienvenue', 'crédits'], studio_welcome_days: ['Validité du bonus de bienvenue', 'jours'],
     kyc_required: ['Pièce d’identité exigée après la première vente', '0 = non exigée, 1 = exigée (nouvelles commandes bloquées sans pièce)'],
-    site_look: ['« Complétez le look » sur la fiche article', 'Nombre d’articles de la même boutique proposés (0 = masqué, 6 au plus)'] };
+    site_look: ['« Complétez le look » sur la fiche article', 'Nombre d’articles de la même boutique proposés (0 = masqué, 6 au plus)'],
+    site_rail: ['Articles par rangée (modèle Concept)', 'Nombre d’articles montrés dans chaque rayon avant « Tout voir » (4 à 20)'],
+    site_anim: ['Animations des sites (modèle Concept)', '0 = coupées pour toutes les boutiques, 1 = selon le choix de chaque boutique'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

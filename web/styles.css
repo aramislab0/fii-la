@@ -2355,3 +2355,74 @@ html.sheet-open,html.sheet-open body{overflow:hidden;overscroll-behavior:none}
 .st-badge{background:color-mix(in srgb,var(--warn) 16%,var(--surface));color:var(--warn)}
 .st-tile.todo .st-tile-ic{background:color-mix(in srgb,var(--warn) 16%,var(--surface));color:var(--warn)}
 .input[aria-invalid="true"],input[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--danger);box-shadow:0 0 0 1px var(--danger)}
+/* Modèle Premium Concept (29/10) : grand catalogue en rayons. Blanc et noir, boutons à la couleur choisie (noir par
+   défaut), capitales espacées (Jost), une rangée par rubrique qui défile de côté ; coins arrondis ou droits ; animations. */
+:root:root[data-vt="concept"]{--bg:#FFFFFF;--surface:#FFFFFF;--surface-2:#F5F3F4;--surface-3:#ECE8EA;--ink:#16121A;--muted:#6B6470;--line:#ECE7EA;--green:#16121A;--green-press:#000;--on-green:#FFFFFF;--soft:#F7F4F6;color-scheme:light}
+.vt-concept{--r:16px;--rp:999px}
+.vt-concept.vt-sharp{--r:0px;--rp:0px}
+.vt-concept .vhead,.vt-concept .vprof{position:relative;text-align:center;align-items:center;justify-content:center}
+.vt-concept .vhead{flex-direction:column;gap:10px}
+.vt-concept .vhead > div{display:flex;flex-direction:column;align-items:center;gap:6px}
+.vt-concept .vprof-top{justify-content:center}
+.vt-concept .vprof-txt{align-items:center;text-align:center}
+.vt-concept .vhead h1{font-family:"Jost","Futura","Avenir Next",sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.3em;font-size:24px;line-height:1.15;padding-left:.3em}
+.vt-concept .vcover{position:relative;border-radius:0;height:auto;aspect-ratio:16/10;max-height:46vh;margin:0 -16px}
+.vt-concept .vfollow{justify-content:center}
+.vt-concept .btn,.vt-concept .follow-btn,.vt-concept .vsoc,.vt-concept .opt,.vt-concept .qbtn{border-radius:var(--rp)}
+.vt-concept .btn:not(.ghost):not(.link):not(.quiet),.vt-concept .add-btn{background:var(--accent);border-color:var(--accent);color:#FFFFFF}
+.vt-concept .btn.ghost{color:var(--accent);border-color:var(--accent)}
+.vt-concept .btn.link{color:var(--accent)}
+.vt-concept .cartbar .btn{border-radius:var(--rp)}
+.vt-concept .vimg{border-radius:var(--r);overflow:hidden}
+.vt-concept .vcard{border-radius:0;box-shadow:none;background:transparent;padding:0;gap:6px}
+.vt-concept .vgrid{gap:20px 10px}
+.vt-concept .vheart{width:36px;height:36px;top:6px;right:6px;background:rgba(255,255,255,.9);box-shadow:none;color:var(--accent)}
+.vt-concept .vheart.on{color:var(--accent)}
+.vt-concept .vprice{font-weight:500;font-size:13px}
+.vt-concept .vnew{border-radius:var(--rp)}
+.vt-concept .safe-line{border-radius:var(--r);background:var(--surface-2)}
+.rname{font-family:"Jost","Futura",sans-serif;font-weight:500;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;line-height:1.35;text-align:left;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;background:none;border:0;padding:0;color:var(--ink);cursor:pointer}
+.rcard .vprice{margin:0}
+.vrail-nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;background:var(--bg);margin:0 -16px;padding:8px 16px}
+.vrail-nav::-webkit-scrollbar{display:none}
+.vrail-nav .opt{position:relative;z-index:1;flex:none;border:0;background:transparent;font-family:"Jost",sans-serif;text-transform:uppercase;letter-spacing:.12em;font-size:12px;font-weight:500;color:var(--muted);padding:8px 14px;min-height:36px}
+.vrail-nav .opt.on{color:#FFFFFF;background:var(--accent)}
+.vt-anim .vrail-nav .opt.on{background:transparent}
+.vrail-nav .rind{position:absolute;z-index:0;top:8px;height:36px;border-radius:var(--rp);background:var(--accent);transition:left .35s cubic-bezier(.3,1.4,.5,1),width .35s cubic-bezier(.3,1.4,.5,1);pointer-events:none}
+.vrail{scroll-margin-top:60px;display:flex;flex-direction:column;gap:12px}
+.vrail + .vrail{padding-top:6px}
+.vrail-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.vrail-h h2{margin:0;font-family:"Jost","Futura",sans-serif;font-weight:600;font-size:14px;letter-spacing:.2em;text-transform:uppercase;min-width:0}
+.vrail-h .btn.link{flex:none;min-height:0;padding:4px 0;text-decoration:underline;text-underline-offset:3px}
+.vrail-track{display:grid;grid-auto-flow:column;grid-auto-columns:43%;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-padding-left:16px;margin:0 -16px;padding:0 16px 6px;scrollbar-width:none}
+.vrail-track::-webkit-scrollbar{display:none}
+.vrail-track > *{scroll-snap-align:start;min-width:0}
+@media (min-width:700px){.vrail-track{grid-auto-columns:28%}}
+.vrail-all{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;aspect-ratio:4/5;border-radius:var(--r);background:var(--surface-2);border:0;color:var(--accent);
+  font-family:"Jost",sans-serif;font-size:12px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
+.vrail-all b{font-size:28px;font-weight:500;letter-spacing:0;color:var(--ink)}
+.vrail-back{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.vrail-back .btn.link{min-height:0;padding:6px 0}
+/* Animations (style « Animations ») : cœur qui pétille, envol vers le panier, boutons qui rebondissent, paillettes. */
+.vt-anim .btn,.vt-anim .opt,.vt-anim .qbtn,.vt-anim .vheart{transition:transform .35s cubic-bezier(.3,1.8,.5,1),background-color .2s,color .25s}
+.vt-anim .btn:active,.vt-anim .opt:active,.vt-anim .qbtn:active{transform:scale(.93);transition-duration:.08s}
+.vt-anim .vheart.pop .ico{animation:vpop .45s cubic-bezier(.3,1.6,.5,1)}
+.vt-anim .bump,.cartbar .btn.bump{animation:vpop .4s cubic-bezier(.3,1.6,.5,1)}
+@keyframes vpop{0%{transform:scale(1)}40%{transform:scale(1.3)}100%{transform:scale(1)}}
+.vmini{position:fixed;z-index:2000;pointer-events:none;width:12px;height:12px;margin:-6px 0 0 -6px;animation:vmini .7s ease-out forwards}
+.vmini .ico{width:12px;height:12px;display:block}.vmini .ico path,.vfl .ico path{fill:currentColor;stroke:none}
+@keyframes vmini{0%{transform:translate(0,0) scale(.4);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
+.vfly{position:fixed;z-index:2000;pointer-events:none;object-fit:cover;border-radius:16px}
+.vspk{position:absolute;pointer-events:none;color:#F6A9C6;line-height:1;opacity:0;animation:vspk 1.6s ease-in-out forwards}
+@keyframes vspk{0%{opacity:0;transform:scale(.2) rotate(0)}35%{opacity:1;transform:scale(1.15) rotate(25deg)}70%{opacity:.9;transform:scale(.9) rotate(45deg)}100%{opacity:0;transform:scale(.3) rotate(70deg)}}
+.vfl{position:absolute;bottom:-20px;pointer-events:none;opacity:0;animation:vfl linear infinite}
+.vfl .ico{display:block}
+@keyframes vfl{0%{transform:translateY(0);opacity:0}10%{opacity:.9}100%{transform:translateY(-260px) translateX(var(--sx));opacity:0}}
+.vt-concept .vcover{overflow:hidden}
+@media (prefers-reduced-motion:reduce){.vmini,.vspk,.vfl,.vfly{display:none}.vt-anim .btn,.vt-anim .opt{transition:none}}
+.vt-concept .vheart.on .ico path{fill:currentColor}
+.vt-concept .cartbar .btn{font-size:15px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vt-mini-concept{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1.2fr 1fr 1fr;background:#FFFFFF;border-radius:6px;gap:3px}
+.vt-mini-concept i{border-radius:4px;background:var(--accent);opacity:.7}.vt-mini-concept i:first-child{grid-column:1/-1;opacity:1}
+.vtp-concept{background:#FFFFFF;color:#16121A;border-radius:12px}.vtp-concept .lp-name{font-family:"Jost",sans-serif;font-weight:600;letter-spacing:.3em;text-transform:uppercase;font-size:18px}
