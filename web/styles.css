@@ -2426,3 +2426,4 @@ html.sheet-open,html.sheet-open body{overflow:hidden;overscroll-behavior:none}
 .vt-mini-concept{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1.2fr 1fr 1fr;background:#FFFFFF;border-radius:6px;gap:3px}
 .vt-mini-concept i{border-radius:4px;background:var(--accent);opacity:.7}.vt-mini-concept i:first-child{grid-column:1/-1;opacity:1}
 .vtp-concept{background:#FFFFFF;color:#16121A;border-radius:12px}.vtp-concept .lp-name{font-family:"Jost",sans-serif;font-weight:600;letter-spacing:.3em;text-transform:uppercase;font-size:18px}
+.vt-concept .follow-btn{background:var(--accent);border-color:var(--accent);color:#FFFFFF}.vt-concept .follow-btn.on{background:transparent;color:var(--accent)}
