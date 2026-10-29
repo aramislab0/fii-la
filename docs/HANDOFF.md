@@ -97,6 +97,8 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | Date | Décision | Par |
 |---|---|---|
+| 29/10 01:02 | Décision du fondateur : le candidat reste en tête et présélectionné (§3) ; aucun changement de code | — |
+| 29/10 | **Décor candidat laissé en tête et présélectionné** quand la boutique n'a pas de favori (y compris Maison OUMY : Laque Bordeaux) ; candidats : Jade Architectural, Galerie Obsidienne, Laque Bordeaux | Fondateur (01:02, « Laisser en tête » ; « Les trois ») |
 | 29/10 00:58 | Décision du fondateur « Les trois » : 3 décors premium v2 chargés en production comme candidats (`fiila.studio_scenes`, recettes d'intégration de XEL). Vérifié en lecture : un candidat parmi les 6 visibles par boutique (mode, chaussures, beauté), le 6e décor du pack passe dans « Plus » ; sans favori, le candidat est en tête et présélectionné (Maison OUMY : Laque Bordeaux) | SQL ; XEL `claude/fii-studio/decors-premium-v2-derives` |
 | 29/10 00:50 | Décors premium v2 : sources vérifiées, dérivés exacts, 8 essais (0,32 USD, clé de production, relais `fiila-studio-bench` réactivé puis neutralisé, jeton effacé), grille et planches dans XEL (`cce5d8c`), accusé de réception publié sur XEL #135. Rien d'activé, rien de propriétaire dans ce dépôt | XEL `cce5d8c` ; XEL #135 |
 | 29/10 00:31 | Mesures par décor et 6 + Plus **en production** (run 40790752354) ; seul échec des tests en production : un délai de 15 s sur l'écran de double authentification (parrainage, Safari), sans lien avec le Studio, vert en local et à la relance. Testo : modèles premium verrouillés car offre gratuite (règle prévue) ; passage en Premium possible au back-office pour l'essai | run 40790752354 |
