@@ -341,6 +341,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 30/10 20:05 | MIMI : la propriétaire (accord donné au fondateur, pour le test) porte 10 articles (5 jeans, 4 hauts, lunettes) ; photos générées à partir de ses photos Snapchat, silhouette conservée (2ᵉ prise après une 1ʳᵉ qui l'affinait), en 2ᵉ photo du carrousel à la place du mannequin anonyme ; Higgsfield ≈ 36 crédits ; vérifié sur iPhone | SQL ; capture |
 | 30/10 19:40 | MIMI : 20 articles de démonstration sans marque (jeans, t-shirts, accessoires), prix fictifs, 3 photos générées chacun (produit, porté, détail ; Higgsfield ≈ 90 crédits), carrousel vérifié sur iPhone. Défaut vu : dans la fiche (modèle Concept aussi), le cœur recouvre le compteur de photos « 1/3 » (#85 c) | SQL ; capture |
 | 30/10 17:20 | MIMI remise dans le fil (place n° 5) à la demande du fondateur ; articles et prix toujours provisoires | SQL |
 | 30/10 17:20 | **Nouvelle boutique MIMI** (ex-Mimi Glamour Shop, demande du fondateur 16:30) : https://getfii.app/#/b/mimi, Premium, modèle Concept, boutons noirs ; logo typographique et couverture faits par Claude ; 11 articles **temporaires** tirés de ses stories Snapchat publiques, prix indicatifs à valider ; **retirée du fil** (place 5 gardée) jusqu'à l'onboarding. Détail : XEL `Production/FII/boutiques/mimi/` | SQL ; capture |
