@@ -341,6 +341,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 30/10 17:20 | **Nouvelle boutique MIMI** (ex-Mimi Glamour Shop, demande du fondateur 16:30) : https://getfii.app/#/b/mimi, Premium, modèle Concept, boutons noirs ; logo typographique et couverture faits par Claude ; 11 articles **temporaires** tirés de ses stories Snapchat publiques, prix indicatifs à valider ; **retirée du fil** (place 5 gardée) jusqu'à l'onboarding. Détail : XEL `Production/FII/boutiques/mimi/` | SQL ; capture |
 | 30/10 16:40 | CI run 41089475309 : test navigateur « Réglages v2 » à mettre à jour (Wave exige désormais son numéro ; libellé « Wave, avant la livraison ») ; rien n'a été mis en ligne. Test corrigé, vert en local | run 41089475309 |
 | 30/10 17:10 | Paiement avant la livraison + article sans prix : migration `20261030100000`, écrans boutique/commande/facture, back-office ; SQL vertes (paiement 5/5, Édition V1 8/8 mise à jour, vitrine, back-office, 37/37), navigateur Chrome vert (paiement, Édition V1, vitrine, articles, fil, comptes) | voir commit |
 | 30/10 16:15 | Validation du fondateur (Concept, BAe). Run 40957032188 (`8335029`) : tests en production en échec au contrôle « le site ne sert pas encore cette version après 10 minutes » (délai de propagation) ; vérifié ensuite : getfii.app sert bien la dernière feuille de style ; étape relancée | run 40957032188 |
