@@ -99,6 +99,7 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 | Date | Décision | Par |
 |---|---|---|
+| 30/10 16:10 | **Modèle Concept et BAe validés** (« ok validé ») | Fondateur |
 | 29/10 20:38 | **BAe Rayons devient le modèle Premium « Concept »** ; boutons **noirs par défaut** (le rose n'est plus une couleur prédéfinie du modèle, il reste un choix de couleur) ; couleur des boutons et style personnalisables par chaque boutique | Fondateur (« standardise BAe Rayons… allons sur des boutons noirs… possibilité de changer la couleur ») |
 | 29/10 19:24 | **Mise en page Rayons et design validés pour BAe**, en version girly : boutons rose, page animée « sans en faire trop » ; animations à choisir sur la maquette v2 | Fondateur (« Je valide les Rayons et le design ») |
 | 29/10 18:52 | **Consigner tous les retours et l'historique du projet dans XEL, dossier `Production/FII/`** (règle 10 du `CLAUDE.md`) | Fondateur (« N'oublie pas de consigner… ») |
@@ -337,6 +338,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 30/10 16:15 | Validation du fondateur (Concept, BAe). Run 40957032188 (`8335029`) : tests en production en échec au contrôle « le site ne sert pas encore cette version après 10 minutes » (délai de propagation) ; vérifié ensuite : getfii.app sert bien la dernière feuille de style ; étape relancée | run 40957032188 |
 | 29/10 21:55 | Modèle Concept **en production** (run 40954888323). **BAe** passée sur Concept, couleur Rose (son choix ; noir reste la valeur du modèle) ; 12 rubriques reprises de beforebae.com posées sur ses 334 articles par sa clé de boutique (`fiila_product_save`, 334/334, descriptions intactes), ordre « Derniers ajouts » = ordre de son site. Vérifié sur getfii.app (iPhone) : 13 rangées, miniatures servies par le stockage, aucune erreur. Bouton « Suivre » à la couleur de la boutique | SQL de lecture ; capture |
 | 29/10 21:10 | CI run 40953144991 : migration `20261029300000` appliquée, mais `verify-db` a vu les 2 fonctions back-office du modèle Concept ouvertes à anon (droit accordé par défaut par Supabase ; elles exigent un membre de l'équipe, rien de lisible). Correctif `20261029310000` (revoke from anon) ; site pas encore mis à jour, production cohérente (l'ancienne application ignore les nouveaux champs) | run 40953144991 |
 | 29/10 21:45 | Modèle Premium **Concept** construit (rayons, rubriques propres, couleurs Noir et Rose, style, animations, carte « Site » au back-office) ; #85 a) b) corrigés ; SQL vertes en local (suites existantes + 8/8 Concept), navigateur Chrome vert (Concept, vitrine, Édition V1, back-office, E2E 38/38, page 237 Ko) | voir commit |
