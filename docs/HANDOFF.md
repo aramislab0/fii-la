@@ -341,6 +341,7 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
+| 30/10 16:40 | CI run 41089475309 : test navigateur « Réglages v2 » à mettre à jour (Wave exige désormais son numéro ; libellé « Wave, avant la livraison ») ; rien n'a été mis en ligne. Test corrigé, vert en local | run 41089475309 |
 | 30/10 17:10 | Paiement avant la livraison + article sans prix : migration `20261030100000`, écrans boutique/commande/facture, back-office ; SQL vertes (paiement 5/5, Édition V1 8/8 mise à jour, vitrine, back-office, 37/37), navigateur Chrome vert (paiement, Édition V1, vitrine, articles, fil, comptes) | voir commit |
 | 30/10 16:15 | Validation du fondateur (Concept, BAe). Run 40957032188 (`8335029`) : tests en production en échec au contrôle « le site ne sert pas encore cette version après 10 minutes » (délai de propagation) ; vérifié ensuite : getfii.app sert bien la dernière feuille de style ; étape relancée | run 40957032188 |
 | 29/10 21:55 | Modèle Concept **en production** (run 40954888323). **BAe** passée sur Concept, couleur Rose (son choix ; noir reste la valeur du modèle) ; 12 rubriques reprises de beforebae.com posées sur ses 334 articles par sa clé de boutique (`fiila_product_save`, 334/334, descriptions intactes), ordre « Derniers ajouts » = ordre de son site. Vérifié sur getfii.app (iPhone) : 13 rangées, miniatures servies par le stockage, aucune erreur. Bouton « Suivre » à la couleur de la boutique | SQL de lecture ; capture |

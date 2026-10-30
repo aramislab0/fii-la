@@ -64,10 +64,11 @@ await t('tuile « Livraison et paiement » : à faire, feuille en pastilles, un 
   assert.equal(await P.locator('#policies-sheet .btn').count(), 1);
   await P.locator('#pol-delivery [data-v="jour"]').click();
   await P.locator('#pol-pay [data-v="wave"]').click();
+  await P.fill('#pol-wave-to', '77 123 45 67'); // paiement avant la livraison (30/10) : numéro qui reçoit obligatoire
   await P.screenshot({ path: `${SHOTS}/${ENGINE}-02-livraison.png` });
   await P.click('#policies-save');
   await P.locator('#policies-sheet').waitFor({ state: 'detached' });
-  await P.locator('#tile-policies').getByText('Le jour même · Wave').waitFor();
+  await P.locator('#tile-policies').getByText('Le jour même · Wave, avant la livraison').waitFor();
   assert.equal(await P.locator('#tile-policies .st-badge').count(), 0);
   assert.equal(await P.locator('#st-ready .st-ring').getAttribute('aria-label'), '3 sur 6 prêts');
   assert.equal(await metric('tile:policies'), 1);
