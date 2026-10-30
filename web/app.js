@@ -479,6 +479,10 @@
     size_required: 'Choisissez votre taille ou pointure.',
     size_sold_out: 'Une taille choisie vient d’être épuisée. Modifiez la commande.',
     invalid_price_was: 'Prix barré : indiquez l’ancien prix, plus élevé que le prix actuel, ou laissez vide.',
+    price_required: 'Ajoutez un prix pour publier l’article. Sans prix, il reste masqué.',
+    pay_required: 'Choisissez comment vous payez.',
+    invalid_pay: 'Ce mode de paiement n’est plus proposé par la boutique. Choisissez-en un autre.',
+    pay_number_required: 'Indiquez le numéro Wave ou Orange Money qui reçoit les paiements.',
     color_required: 'Choisissez une couleur.',
     out_of_stock: 'Un article n’est plus disponible en quantité suffisante. Modifiez la commande.',
     invalid_phone: 'Numéro non reconnu. Exemple : 77 123 45 67.',
@@ -2215,7 +2219,9 @@
     bordeaux: ['Bordeaux', '#7A1F3D'], terre: ['Terre', '#8A4B1F'], noir: ['Noir', '#0E0E0E'], rose: ['Rose', '#D63A76'] };
   // Fii Édition V1 : conditions de la boutique (liste fermée, `shops.policies`) et guide des tailles (repères indicatifs).
   var POLICY_DELIVERY = [['jour', 'Le jour même'], ['24h', 'Sous 24 h'], ['48h', 'Sous 48 h'], ['5j', 'De 2 à 5 jours']];
-  var POLICY_PAY = [['livraison', 'À la livraison'], ['wave', 'Wave'], ['om', 'Orange Money']];
+  // Paiement (30/10) : à la livraison (cash on delivery), ou avant la livraison sur le numéro Wave / Orange Money de la boutique.
+  var POLICY_PAY = [['livraison', 'À la livraison'], ['wave', 'Wave, avant la livraison'], ['om', 'Orange Money, avant la livraison']];
+  var PAY_SHORT = { livraison: 'À la livraison', wave: 'Wave', om: 'Orange Money' };
   var POLICY_EXCHANGE = [['non', 'Pas d’échange'], ['3j', 'Sous 3 jours'], ['7j', 'Sous 7 jours']];
   var SIZE_GUIDE = {
     letters: ['Tour de poitrine', { XS: '80 à 84 cm', S: '84 à 88 cm', M: '88 à 96 cm', L: '96 à 104 cm', XL: '104 à 112 cm', XXL: '112 à 120 cm' }],
@@ -2688,14 +2694,31 @@
     }
     function checkout() {
       var f = { name: '', phone: '', note: '' };
+      // Paiement (30/10) : parmi les modes de la boutique ; un seul mode = affiché en texte (règle 7).
+      var payModes = ((shop.policies && shop.policies.pay) || []).filter(function (k) { return !(shop.pay_before_off && k !== 'livraison'); });
+      f.pay = payModes.length === 1 ? payModes[0] : '';
+      var payBox = h('div', { class: 'field', id: 'v-pay' });
+      function drawPay() {
+        if (!payModes.length) { setKids(payBox); return; }
+        setKids(payBox, h('span', { class: 'lbl', id: 'v-pay-l' }, 'Paiement'),
+          payModes.length === 1 ? h('p', { class: 'small', id: 'v-pay-one' }, lbl(POLICY_PAY, payModes[0]))
+            : h('div', { class: 'opt-row', role: 'radiogroup', 'aria-labelledby': 'v-pay-l' }, payModes.map(function (k) {
+              var on = f.pay === k;
+              return h('button', { type: 'button', class: 'opt' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-pay': k, onclick: function () { f.pay = k; setKids(err); drawPay(); } }, PAY_SHORT[k]);
+            })),
+          f.pay === 'wave' || f.pay === 'om' ? h('p', { class: 'small muted', id: 'v-pay-hint' }, 'Après la commande, vous verrez le numéro ' + PAY_SHORT[f.pay] + ' de ' + shop.name + '. La boutique livre après réception du paiement.')
+            : f.pay === 'livraison' ? h('p', { class: 'small muted', id: 'v-pay-hint' }, 'Vous payez à la réception de votre commande.') : null);
+      }
+      drawPay();
       var err = h('div', { role: 'alert' });
       var send = iconBtn('button', { class: 'btn big', type: 'button', id: 'order-send', onclick: function () {
         setKids(err);
         if (!f.name.trim()) return errBox(err, new ApiError('your_name_required'), 'v-name');
         if (f.phone.replace(/\D/g, '').length < 9) return errBox(err, new ApiError('phone_required'), 'v-phone');
+        if (payModes.length && !f.pay) return errBox(err, new ApiError('pay_required'));
         send.disabled = true;
         api('fiila_vitrine_order', { p_slug: slug, p: { items: Object.keys(cart).map(function (k) { var l = cart[k]; return { product_id: l.id, qty: l.qty, size: l.size || undefined, color: l.color || undefined }; }),
-          customer: { name: f.name.trim(), phone: f.phone.trim() }, note: f.note.trim() || null } }).then(function (r) {
+          customer: { name: f.name.trim(), phone: f.phone.trim() }, note: f.note.trim() || null, pay: f.pay || undefined } }).then(function (r) {
           go('#/f/' + r.invoice + '?nouvelle=1');
         }, function (e) { send.disabled = false; errBox(err, e); });
       } }, 'send', 'Envoyer la commande');
@@ -2712,6 +2735,7 @@
         textField({ id: 'v-name', label: 'Votre nom', max: 60, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
         textField({ id: 'v-phone', label: 'Votre numéro WhatsApp', type: 'tel', inputmode: 'tel', autocomplete: 'tel', placeholder: 'Ex. : 77 123 45 67', onInput: function (v) { f.phone = v; } }),
         textField({ id: 'v-note', label: 'Précision pour la boutique', optional: true, max: 200, placeholder: 'Ex. : livrer après 18 h, appeler avant', onInput: function (v) { f.note = v; } }),
+        payBox,
         h('p', { class: 'safe-line' }, icon('lock', 18), 'Votre nom et votre numéro vont uniquement à ' + shop.name + '.'),
         err, send);
       window.scrollTo(0, 0);
@@ -6318,18 +6342,27 @@
               var on = pay.indexOf(o[0]) >= 0;
               return h('button', { type: 'button', class: 'pill' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', 'data-v': o[0], onclick: function () {
                 var l = POLICY_PAY.map(function (x) { return x[0]; }).filter(function (k2) { return k2 === o[0] ? !on : pay.indexOf(k2) >= 0; });
-                if (l.length) po.pay = l; else delete po.pay; drawP(); } }, o[1]);
-            }))),
+                if (l.length) po.pay = l; else delete po.pay;
+                // Numéro qui reçoit : le téléphone de la boutique proposé d'office, modifiable.
+                if (!on && o[0] !== 'livraison' && !po[o[0] + '_to'] && shop.phone) po[o[0] + '_to'] = shop.phone;
+                drawP(); } }, o[1]);
+            })),
+            pay.indexOf('wave') >= 0 || pay.indexOf('om') >= 0 ? h('p', { class: 'small muted', id: 'pol-pay-hint' }, 'Avant la livraison : la cliente paie sur votre numéro, vous confirmez la réception dans la commande, puis vous livrez.') : null),
+          ['wave', 'om'].filter(function (k) { return pay.indexOf(k) >= 0; }).map(function (k) {
+            return textField({ id: 'pol-' + k + '-to', label: 'Numéro ' + PAY_SHORT[k] + ' qui reçoit les paiements', type: 'tel', inputmode: 'tel', value: po[k + '_to'] || '',
+              placeholder: 'Ex. : 77 123 45 67', onInput: function (v) { po[k + '_to'] = v; } });
+          }),
           one('exchange', POLICY_EXCHANGE, 'Échange'));
       }
       drawP();
       var close;
       var btn = h('button', { class: 'btn big full', type: 'button', id: 'policies-save', onclick: function () {
         setKids(err); btn.disabled = true;
-        sapi('fiila_shop_vitrine', { p: { policies: po } }).then(function (r) { d.site = Object.assign({}, d.site, { policies: r.policies }); toast('Enregistré : visible sur la fiche de vos articles.'); close(); draw(); },
+        var out = Object.assign({}, po); ['wave', 'om'].forEach(function (k) { if (!(po.pay || []).some(function (x) { return x === k; })) delete out[k + '_to']; });
+        sapi('fiila_shop_vitrine', { p: { policies: out } }).then(function (r) { d.site = Object.assign({}, d.site, { policies: r.policies }); toast('Enregistré : visible sur la fiche de vos articles.'); close(); draw(); },
           function (e) { btn.disabled = false; errBox(err, e); });
       } }, 'Enregistrer');
-      close = hubSheet('policies-sheet', 'Livraison et paiement', 'Affichés sur la fiche de chaque article, pour rassurer vos clientes.', h('div', { class: 'stack' }, box, err, btn));
+      close = hubSheet('policies-sheet', 'Livraison et paiement', 'Vos clientes choisissent parmi vos modes de paiement en commandant.', h('div', { class: 'stack' }, box, err, btn));
     }
     function openOwner() {
       var close = hubSheet('owner-sheet', 'Qui tient la boutique ?', 'Obligatoire : le nom et le numéro du propriétaire.',
@@ -7060,9 +7093,11 @@
   }
 
   // L'étape suivante d'une commande, en un seul repère.
+  function prepayWaiting(o) { return (o.pay_mode === 'wave' || o.pay_mode === 'om') && o.pay_state !== 'paid' && o.delivery_state !== 'delivered'; }
   function orderStage(o) {
     if (o.status === 'cancelled') return ['off', 'Annulée'];
     var paid = o.pay_state === 'paid';
+    if (prepayWaiting(o) && o.delivery_state !== 'on_the_way' && o.delivery_state !== 'arrived') return ['wait', 'Paiement attendu'];
     if (o.delivery_state === 'delivered') return paid ? ['ok', 'Terminée'] : ['wait', 'À encaisser'];
     if (o.address_state === 'pending') return ['wait', 'Adresse attendue'];
     if (o.address_state !== 'received') return ['off', 'Adresse à redemander'];
@@ -7073,6 +7108,7 @@
   // Pastille d'état d'une commande (pictogramme compris sans lire) : [classe, icône].
   function stageIcon(o) {
     if (o.status === 'cancelled') return ['off', 'ban'];
+    if (prepayWaiting(o) && o.delivery_state !== 'on_the_way' && o.delivery_state !== 'arrived') return ['wait', 'cash'];
     var paid = o.pay_state === 'paid';
     if (o.delivery_state === 'delivered') return paid ? ['ok', 'check'] : ['wait', 'cash'];
     if (o.address_state === 'pending') return ['wait', 'pin'];
@@ -7422,11 +7458,18 @@
 
     // 4. Paiement
     var remaining = Math.max(0, o.total - o.paid);
-    var pay = { amount: remaining ? String(remaining) : '', method: 'cash' };
+    var pay = { amount: remaining ? String(remaining) : '', method: o.pay_mode === 'wave' ? 'wave' : o.pay_mode === 'om' ? 'orange_money' : 'cash' };
     var pErr = h('div', { role: 'alert' });
     var payments = o.payments || [];
     var paySec = o.status === 'cancelled' ? null : h('section', { class: 'card', id: 'order-payment' },
       h('h2', null, 'Paiement'),
+      o.pay_mode ? h('p', { class: 'small', id: 'order-pay-mode' }, h('strong', null, 'Choix de la cliente : '), lbl(POLICY_PAY, o.pay_mode)) : null,
+      prepayWaiting(o) ? h('div', { class: 'stack tight', id: 'prepay-box' },
+        h('p', { class: 'small muted' }, 'Livrez après réception : vérifiez votre ' + PAY_SHORT[o.pay_mode] + ', puis confirmez.'),
+        h('button', { class: 'btn', type: 'button', id: 'prepay-received', onclick: function (ev) {
+          ev.currentTarget.disabled = true;
+          call('fiila_order_payment_add', { p_amount: remaining, p_method: o.pay_mode === 'wave' ? 'wave' : 'orange_money' }, 'Paiement enregistré : vous pouvez livrer.').catch(function () {});
+        } }, PAY_SHORT[o.pay_mode] + ' reçu · ' + fcfa(remaining))) : null,
       h('div', { class: 'total-row' }, h('span', null, 'Total'), h('strong', null, fcfa(o.total))),
       o.paid ? h('div', { class: 'total-row' }, h('span', null, 'Reçu'), h('span', null, fcfa(o.paid))) : null,
       h('div', { class: 'total-row' }, h('span', null, 'Reste'), h('strong', { id: 'remaining' }, remaining ? fcfa(remaining) : 'Payée')),
@@ -8100,6 +8143,7 @@
       var price = parseInt(String(f.price).replace(/\D/g, ''), 10);
       if (!f.name.trim()) return errBox(err, new ApiError('item_label_required'), 'product-name');
       if (!(price >= 0)) return errBox(err, new ApiError('invalid_price'), 'product-price');
+      if (price === 0 && f.active) return errBox(err, new ApiError('price_required'), 'product-price');
       var stock = f.stock.trim() === '' ? null : parseInt(f.stock.replace(/\D/g, ''), 10);
       if (stock !== null && !(stock >= 0)) return errBox(err, new ApiError('invalid_stock'), 'product-stock');
       var was = String(f.price_was).trim() === '' ? null : parseInt(String(f.price_was).replace(/\D/g, ''), 10);
@@ -8331,6 +8375,17 @@
       if (q && q.nouvelle === '1' && o.address_state !== 'pending' && !shopKey() && !(ME && ME.shop)) {
         var at = afterTask('order', { icon: 'shop', title: 'Vous vendez aussi ?', cta: 'Ouvrir ma boutique gratuite', href: '#/boutique' });
         if (at) act.push(h('div', { class: 'no-print' }, at));
+      }
+      // Paiement avant la livraison (30/10) : montant, mode et numéro de la boutique, tant que ce n'est pas réglé.
+      if ((o.pay_mode === 'wave' || o.pay_mode === 'om') && o.pay_state !== 'paid' && !delivered && o.pay_to) {
+        act.push(h('section', { class: 'card highlight no-print', id: 'pay-before' },
+          h('p', { class: 'eyebrow' }, 'Paiement avant la livraison'),
+          h('p', null, 'Envoyez ', h('strong', null, fcfa(remaining)), ' par ', h('strong', null, PAY_SHORT[o.pay_mode]), ' au :'),
+          h('p', { class: 'pay-to', id: 'pay-to' }, o.pay_to),
+          h('button', { class: 'btn ghost small', type: 'button', id: 'pay-to-copy', onclick: function () { copy(o.pay_to.replace(/\s/g, ''), 'Numéro'); } }, 'Copier le numéro'),
+          h('p', { class: 'small muted' }, s.name + ' confirme la réception de votre paiement, puis prépare la livraison.')));
+      } else if (o.pay_mode === 'livraison' && !delivered && o.pay_state !== 'paid') {
+        act.push(h('p', { class: 'small muted no-print', id: 'pay-on-delivery' }, 'Paiement à la livraison : ' + fcfa(remaining) + '.'));
       }
       if (o.address_state === 'pending' && o.request_token && !delivered) {
         act.push(iconBtn('a', { class: 'btn big no-print', id: 'give-address-btn', href: '#/d/' + o.request_token + qs({ f: token }) }, 'pin', 'Donner mon adresse de livraison'));

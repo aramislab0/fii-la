@@ -51,7 +51,7 @@ await save({ name: 'Boubou brodé (test)', price: 18000, category: 'mode', sizes
 await save({ name: 'Sandales (test)', price: 11000, category: 'chaussures', sizes: ['24', '25'] });
 await local.db.query(`update fiila.products set created_at = now() - interval '30 days' where id = any($1)`, [[BASK.id, ENS.id]]);
 await local.db.query(`update fiila.shops set plan = 'premium' where id = $1`, [S.shop.id]);
-const V = await ok('fiila_shop_vitrine', { p_key: KEY, p: { public: true, theme: 'edition', policies: { delivery: '24h', pay: ['livraison', 'wave'], exchange: '3j' } } });
+const V = await ok('fiila_shop_vitrine', { p_key: KEY, p: { public: true, theme: 'edition', policies: { delivery: '24h', pay: ['livraison', 'wave'], wave_to: '771112233', exchange: '3j' } } });
 const SITE = URL0 + '#/b/' + V.slug;
 
 const C = await newPhone();
@@ -122,6 +122,7 @@ await t('commande : une taille épuisée entre-temps est refusée avec un messag
   await C.click('#cart-go');
   await C.fill('#v-name', 'Cliente test');
   await C.fill('#v-phone', '77 000 00 02');
+  await C.click('#v-pay [data-pay="livraison"]');
   await C.click('#order-send');
   await C.getByText('Une taille choisie vient d’être épuisée').waitFor();
   await save({ id: ROBE.id, name: 'Robe wax (test)', price: 12500, sizes_out: ['8 ans'] });
@@ -163,10 +164,12 @@ await t('boutique : prix barré et tailles épuisées sur l’article ; livraiso
   await B.locator('#pol-delivery [data-v="24h"][aria-checked="true"]').waitFor();
   await B.locator('#pol-delivery [data-v="48h"]').click();
   await B.locator('#pol-pay [data-v="om"]').click();
+  await B.fill('#pol-om-to', '78 111 22 33');
   await shot(B, '08-reglages-livraison');
   await B.click('#policies-save');
   await B.getByText('Enregistré : visible sur la fiche de vos articles.').waitFor();
   const po = (await local.db.query(`select policies from fiila.shops where id = $1`, [S.shop.id])).rows[0].policies;
+  assert.ok(po.wave_to && po.om_to, 'numéros Wave et Orange Money gardés (30/10)'); delete po.wave_to; delete po.om_to;
   assert.deepEqual(po, { delivery: '48h', pay: ['livraison', 'wave', 'om'], exchange: '3j' });
 });
 

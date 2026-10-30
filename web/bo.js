@@ -570,7 +570,7 @@ window.FiiBO = function (F) {
       function lbl(list, k) { var x = list.filter(function (o) { return o[0] === k; })[0]; return x ? x[1] : 'Non indiqué'; }
       setKids(box, h('h2', null, 'Fiche article'),
         h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Livraison'), h('span', { id: 'bo-sheet-delivery' }, po.delivery ? lbl(POLICY_DELIVERY, po.delivery) : 'Non indiquée')),
-        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Paiement'), h('span', { id: 'bo-sheet-pay' }, po.pay && po.pay.length ? po.pay.map(function (k) { return lbl(POLICY_PAY, k); }).join(', ') : 'Non indiqué')),
+        h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Paiement'), h('span', { id: 'bo-sheet-pay' }, po.pay && po.pay.length ? po.pay.map(function (k) { return lbl(POLICY_PAY, k) + (po[k + '_to'] ? ' (' + po[k + '_to'] + ')' : ''); }).join(', ') : 'Non indiqué')),
         h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Échange'), h('span', { id: 'bo-sheet-exchange' }, po.exchange ? lbl(POLICY_EXCHANGE, po.exchange) : 'Non indiqué')),
         h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, 'Articles'), h('span', { id: 'bo-sheet-counts' }, boNum(a.promos) + ' en promo · ' + boNum(a.sold_out_sizes) + ' avec des tailles épuisées (sur ' + boNum(a.with_sizes) + ' à tailles)')),
         h('p', { class: 'small muted' }, 'Choisis par la boutique dans « Personnaliser mon site » et sur chaque article.'));
@@ -873,6 +873,7 @@ window.FiiBO = function (F) {
           h('section', { class: 'card stack tight', id: 'bo-order-info' }, h('h2', null, 'Commande'),
             row('Boutique', h('a', { href: '#/bo/boutiques/' + o.shop.id }, o.shop.name)),
             row('Client', o.customer), row('Téléphone', o.phone || '—'),
+            o.pay_mode ? row('Paiement choisi', lbl(POLICY_PAY, o.pay_mode)) : null,
             row('Adresse', o.address === 'received' ? 'Reçue' : o.address === 'pending' ? 'Demandée, pas encore donnée' : 'Aucune'),
             row('Créée', boDate(o.created_at, true)),
             o.delivered_at ? row('Livrée', boDate(o.delivered_at, true)) : null,
@@ -1717,6 +1718,7 @@ window.FiiBO = function (F) {
     kyc_required: ['Pièce d’identité exigée après la première vente', '0 = non exigée, 1 = exigée (nouvelles commandes bloquées sans pièce)'],
     site_look: ['« Complétez le look » sur la fiche article', 'Nombre d’articles de la même boutique proposés (0 = masqué, 6 au plus)'],
     site_rail: ['Articles par rangée (modèle Concept)', 'Nombre d’articles montrés dans chaque rayon avant « Tout voir » (4 à 20)'],
+    pay_before: ['Paiement avant la livraison (Wave, Orange Money)', '0 = coupé pour toutes les boutiques (seul le paiement à la livraison reste proposé), 1 = selon le choix de chaque boutique'],
     site_anim: ['Animations des sites (modèle Concept)', '0 = coupées pour toutes les boutiques, 1 = selon le choix de chaque boutique'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }

@@ -2427,3 +2427,4 @@ html.sheet-open,html.sheet-open body{overflow:hidden;overscroll-behavior:none}
 .vt-mini-concept i{border-radius:4px;background:var(--accent);opacity:.7}.vt-mini-concept i:first-child{grid-column:1/-1;opacity:1}
 .vtp-concept{background:#FFFFFF;color:#16121A;border-radius:12px}.vtp-concept .lp-name{font-family:"Jost",sans-serif;font-weight:600;letter-spacing:.3em;text-transform:uppercase;font-size:18px}
 .vt-concept .follow-btn{background:var(--accent);border-color:var(--accent);color:#FFFFFF}.vt-concept .follow-btn.on{background:transparent;color:var(--accent)}
+.pay-to{font-size:26px;font-weight:700;letter-spacing:.04em;font-variant-numeric:tabular-nums;margin:2px 0}

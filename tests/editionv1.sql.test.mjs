@@ -61,18 +61,20 @@ await t('commande : une taille épuisée est refusée par le serveur, une autre 
 });
 
 await t('conditions de la boutique : liste fermée, doublons retirés, relues par la boutique et montrées sur le site', async () => {
-  const r = await ok('fiila_shop_vitrine', { p_key: S.key, p: { policies: { delivery: '24h', pay: ['livraison', 'wave', 'wave'], exchange: '3j' } } });
+  const r = await ok('fiila_shop_vitrine', { p_key: S.key, p: { policies: { delivery: '24h', pay: ['livraison', 'wave', 'wave'], wave_to: '771112233', exchange: '3j' } } });
+  assert.equal(r.policies.wave_to.replace(/\D/g, '').slice(-9), '771112233');
+  delete r.policies.wave_to;
   assert.deepEqual(r.policies, { delivery: '24h', pay: ['livraison', 'wave'], exchange: '3j' });
-  assert.deepEqual((await vitrine()).shop.policies, r.policies);
+  assert.deepEqual((await vitrine()).shop.policies, r.policies, 'numéro Wave jamais montré sur le site (30/10)');
   await ko('fiila_shop_vitrine', { p_key: S.key, p: { policies: { delivery: 'demain' } } }, 'invalid_payload');
   await ko('fiila_shop_vitrine', { p_key: S.key, p: { policies: { pay: ['carte'] } } }, 'invalid_payload');
   await ko('fiila_shop_vitrine', { p_key: S.key, p: { policies: { exchange: '30j' } } }, 'invalid_payload');
   await ko('fiila_shop_vitrine', { p_key: S.key, p: { policies: 'tout' } }, 'invalid_payload');
   const off = await ok('fiila_shop_vitrine', { p_key: S.key, p: { about: 'Sans changer les conditions' } });
-  assert.deepEqual(off.policies, r.policies, 'absent = inchangé');
+  delete off.policies.wave_to; assert.deepEqual(off.policies, r.policies, 'absent = inchangé');
   await ok('fiila_shop_vitrine', { p_key: S.key, p: { policies: {} } });
   assert.equal((await vitrine()).shop.policies, undefined, 'vidées : rien sur le site');
-  await ok('fiila_shop_vitrine', { p_key: S.key, p: { policies: { delivery: 'jour', pay: ['om'], exchange: 'non' } } });
+  await ok('fiila_shop_vitrine', { p_key: S.key, p: { policies: { delivery: 'jour', pay: ['om'], om_to: '781112233', exchange: 'non' } } });
 });
 
 await t('« Complétez le look » : 3 par défaut, réglé de 0 à 6 au back-office (journalisé), hors bornes refusé', async () => {
@@ -89,6 +91,7 @@ await t('back-office : carte « Fiche article » réservée à l’équipe', asy
   const shopId = (await one(`select id from fiila.shops where slug = $1`, [slug])).id;
   await ko('fiila_bo_shop_sheet', { p_shop: shopId });
   const r = await ok('fiila_bo_shop_sheet', { p_shop: shopId }, { uid: F.uid });
+  assert.ok(r.policies.om_to, 'l’équipe voit le numéro Orange Money'); delete r.policies.om_to;
   assert.deepEqual(r.policies, { delivery: 'jour', pay: ['om'], exchange: 'non' });
   assert.equal(r.promos, 1); assert.equal(r.sold_out_sizes, 1); assert.equal(r.with_sizes, 1);
 });
