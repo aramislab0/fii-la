@@ -2480,7 +2480,7 @@
     var sparkled = false;
     function railCard(p) {
       var img = h('div', { class: 'vimg' + (p.has_photo ? ' loading-skel' : ''), 'aria-hidden': p.has_photo ? null : 'true' }, p.has_photo ? null : icon('shop', 28));
-      if (p.has_photo) cardPhoto(img, p.img, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; }); }, p.name);
+      if (p.has_photo) cardPhoto(img, p.img, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; }); }, p.name, true);
       function openIt() { productSheet(p); }
       return h('article', { class: 'vcard rcard', id: 'p-' + p.id },
         h('div', { class: 'vmedia vopen', onclick: openIt }, img, heart(p), saleBadge(p)),
@@ -2909,10 +2909,26 @@
   }
   // Image d'une carte (28/10) : adresse fournie par la liste (miniature du seau) → image directe, chargée au défilement par
   // le navigateur, sans appel à la base ; sinon (photo pas encore copiée, réglage media_cdn = 0) l'appel d'avant.
-  function cardPhoto(box, img, load, alt) {
+  // defer (rayons, 30/10) : l'adresse n'est posée qu'à l'arrivée de la carte à l'écran, rangée défilée comprise (le
+  // chargement différé du navigateur prend toute la rangée : 91 photos, 3,4 Mo d'un coup sur BAe).
+  var DEFER_IO = null;
+  function deferSrc(el, src) {
+    if (!('IntersectionObserver' in window)) { el.src = src; return; }
+    if (!DEFER_IO) DEFER_IO = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { DEFER_IO.unobserve(e.target); e.target.src = e.target.getAttribute('data-src'); } });
+    }, { rootMargin: '300px 120px' });
+    el.setAttribute('data-src', src);
+    DEFER_IO.observe(el);
+  }
+  function cardPhoto(box, img, load, alt, defer) {
     if (!img) { lazyPhoto(box, load, alt); return; }
-    var el = h('img', { src: img, alt: alt || '', loading: 'lazy', decoding: 'async' });
+    var el = h('img', defer ? { alt: '', decoding: 'async' } : { src: img, alt: alt || '', loading: 'lazy', decoding: 'async' });
     el.onerror = function () { el.onerror = null; lazyPhoto(box, load, alt); };
+    if (defer) {
+      el.onload = function () { el.alt = alt || ''; box.classList.remove('loading-skel'); };
+      setKids(box, el); setTimeout(function () { deferSrc(el, img); }, 0);
+      return;
+    }
     setKids(box, el); box.classList.remove('loading-skel');
   }
   /* ----- fil des boutiques : les 25 premières boutiques ouvertes, mises en avant gratuitement (fondateur, 19/10).
