@@ -2243,8 +2243,17 @@
     if (CFG.shopZone && /^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])$/.test(slug)) return 'https://' + slug + '.' + CFG.shopZone + '/#/b/' + slug + (productId ? '?a=' + productId : '');
     return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : '');
   }
+  // Couverture (30/10) : son adresse est demandée en même temps que le site, pas après (une attente de moins avant
+  // la première image) ; la promesse ne sert qu'une fois.
+  var COVER_P = {};
+  function coverLoad(slug) {
+    var p = COVER_P[slug]; delete COVER_P[slug];
+    return p || api('fiila_vitrine_photo', { p_slug: slug, p_id: 'cover' }).then(function (x) { return x.photo; });
+  }
   function viewVitrine(slug, q) {
     if (!/^[a-z0-9-]{3,40}$/.test(slug)) return page(brandBar('Boutique'), stateCard('?', 'Site introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
+    var cp = api('fiila_vitrine_photo', { p_slug: slug, p_id: 'cover' }).then(function (x) { return x.photo; });
+    cp.catch(function () {}); COVER_P[slug] = cp;
     return api('fiila_vitrine', { p_slug: slug }).then(function (r) {
       if (r.state === 'closed') return page(brandBar('Boutique'), stateCard('⦸', r.shop.name, 'Ce site est hors ligne pour le moment.'), footer(true));
       if (r.state !== 'ok') return page(brandBar('Boutique'), stateCard('?', 'Site introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
@@ -2747,7 +2756,7 @@
     var ANIM = CONCEPT && STYLE.anim && !shop.anim_off && !REDUCED;
     list();
     var cover = shop.has_cover ? h('div', { class: 'vcover loading-skel', id: 'vitrine-cover' }) : null;
-    if (cover) lazyPhoto(cover, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: 'cover' }).then(function (x) { return x.photo; }); }, '');
+    if (cover) lazyPhoto(cover, function () { return coverLoad(slug); }, ''); else delete COVER_P[slug];
     var pg = page(brandBar('Boutique'), cover, root, h('div', { style: 'height:80px' }), footer(true));
     pg.classList.add('vt', 'vt-' + theme);
     if (CONCEPT) { pg.classList.add(STYLE.corners === 'nets' ? 'vt-sharp' : 'vt-round'); if (ANIM) pg.classList.add('vt-anim'); }

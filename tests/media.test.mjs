@@ -113,7 +113,8 @@ await t('miniatures : la carte de la vitrine affiche la miniature fournie par la
   await local.db.query(`update fiila.products set thumb_path = $2 where id = $1`, [PID, THUMB]);
   const V = await newPhone();
   const calls = [];
-  V.on('request', (r) => { if (r.url().includes('fiila_vitrine_photo')) calls.push(r.url()); });
+  // La couverture est demandée en parallèle du site (30/10) : seule la photo des articles compte ici.
+  V.on('request', (r) => { if (r.url().includes('fiila_vitrine_photo') && !/"p_id":"cover"/.test(r.postData() || '')) calls.push(r.url()); });
   await V.goto(URL0 + '#/b/' + SLUG);
   await V.waitForFunction(() => { const i = document.querySelector('.vcard img'); return i && i.complete && i.naturalWidth > 0; });
   const img = V.locator('.vcard img').first();
