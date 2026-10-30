@@ -253,6 +253,12 @@
     var named = label == null || label !== '';
     return h('span', { class: 'logo' + (size ? ' ' + size : ''), role: named ? 'img' : null, 'aria-label': named ? (label || 'Fii') : null, 'aria-hidden': named ? null : 'true' });
   }
+  function madeBy() {
+    return h('footer', { class: 'foot foot-min foot-made', id: 'made-by' },
+      h('a', { href: '#/', class: 'made-by', 'aria-label': 'Conçu par Fii Boutique' },
+        h('span', { 'aria-hidden': 'true' }, 'Conçu par'), brandLogo('small', ''), h('span', { 'aria-hidden': 'true' }, 'Boutique')),
+      h('div', { class: 'foot-links' }, h('a', { href: '#/confidentialite' }, 'Données et confidentialité')));
+  }
   function brandBar(kind) {
     if (SITE) return h('div', { class: 'brand-bar site-bar' }); // Site Pro : aucune marque Fii
     return h('div', { class: 'brand-bar' }, brandLogo('small'), kind ? h('span', { class: 'brand-kind' }, kind) : null);
@@ -2757,7 +2763,9 @@
     list();
     var cover = shop.has_cover ? h('div', { class: 'vcover loading-skel', id: 'vitrine-cover' }) : null;
     if (cover) lazyPhoto(cover, function () { return coverLoad(slug); }, ''); else delete COVER_P[slug];
-    var pg = page(brandBar('Boutique'), cover, root, h('div', { style: 'height:80px' }), footer(true));
+    // Modèles Premium (fondateur, 30/10 22:11) : pas d'en-tête Fii, la marque passe en pied de page (« Conçu par Fii Boutique »).
+    var PREM = isPremiumTheme(theme) && !SITE;
+    var pg = page(PREM ? h('div', { class: 'brand-bar nobrand' }) : brandBar('Boutique'), cover, root, h('div', { style: 'height:80px' }), PREM ? madeBy() : footer(true));
     pg.classList.add('vt', 'vt-' + theme);
     if (CONCEPT) { pg.classList.add(STYLE.corners === 'nets' ? 'vt-sharp' : 'vt-round'); if (ANIM) pg.classList.add('vt-anim'); }
     if (CONCEPT && STYLE.season && !shop.anim_off && !REDUCED && cover) floaters(cover);

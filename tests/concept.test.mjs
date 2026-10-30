@@ -65,6 +65,8 @@ await t('rayons : Derniers ajouts puis une rangée par rubrique (la plus grande 
   assert.equal(await C.locator('section[data-rail="r:Beauté"] [data-all]').count(), 0, 'rubrique courte : pas de « Tout voir »');
   assert.equal(await C.locator('.vrail-track').first().evaluate((el) => getComputedStyle(el).overflowX), 'auto', 'la rangée défile de côté');
   assert.equal(await C.locator('.add-btn').count(), 0, 'carte allégée : pas de bouton Ajouter');
+  assert.equal(await C.locator('.brand-bar .logo').count(), 0, 'Premium : pas de logo Fii en tête (fondateur, 30/10)');
+  assert.match(await C.locator('#made-by .made-by').getAttribute('aria-label'), /Conçu par Fii Boutique/);
   const bg = await C.locator('#rail-nav .rind').evaluate((el) => getComputedStyle(el).backgroundColor);
   assert.equal(bg, 'rgb(14, 14, 14)', 'boutons noirs par défaut');
   await C.waitForTimeout(500);
