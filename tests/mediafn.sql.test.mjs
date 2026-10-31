@@ -42,6 +42,8 @@ await t('chemins : empreinte du contenu dans l’adresse, extension selon le typ
   assert.equal(pathFor({ kind: 'product', ref: ID, hash: H, ctype: 'image/jpeg' }), `p/${ID}-${H}.jpg`);
   assert.equal(pathFor({ kind: 'product_extra', ref: ID + ':3', hash: H, ctype: 'image/webp' }), `p/${ID}-3-${H}.webp`);
   assert.equal(pathFor({ kind: 'cover', ref: ID, hash: H, ctype: 'image/png' }), `c/${ID}-${H}.png`);
+  assert.equal(pathFor({ kind: 'reel', ref: ID, hash: H, ctype: 'video/mp4' }), `r/${ID}-${H}.mp4`);
+  assert.equal(pathFor({ kind: 'reel_poster', ref: ID, hash: H, ctype: 'image/jpeg' }), `r/${ID}-${H}.jpg`);
   assert.equal(Buffer.from(decode(B64)).toString(), 'photo de test');
 });
 

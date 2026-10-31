@@ -15,11 +15,13 @@ import { corsFor } from '../_shared/http.mjs';
 
 export const BUCKET = 'media';
 export const BATCH = 8;
-export const ext = (ctype) => (ctype === 'image/png' ? 'png' : ctype === 'image/webp' ? 'webp' : 'jpg');
+export const ext = (ctype) => (ctype === 'image/png' ? 'png' : ctype === 'image/webp' ? 'webp' : ctype === 'video/mp4' ? 'mp4' : 'jpg');
 export function pathFor(item) {
   const [id, pos] = String(item.ref).split(':');
   const e = ext(item.ctype);
   if (item.kind === 'cover') return `c/${id}-${item.hash}.${e}`;
+  // Réalisations des salons (31/10) : photo et vidéo MP4 courte.
+  if (item.kind === 'reel' || item.kind === 'reel_poster') return `r/${id}-${item.hash}.${e}`;
   if (item.kind === 'product_extra') return `p/${id}-${pos}-${item.hash}.${e}`;
   return `p/${id}-${item.hash}.${e}`;
 }

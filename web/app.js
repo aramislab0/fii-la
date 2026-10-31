@@ -481,6 +481,21 @@
     vd_condition_required: 'Indiquez l’état de l’article.',
     vd_blocked: 'Plusieurs articles ont été refusés récemment : réessayez dans quelques semaines.',
     business_type_required: 'Choisissez votre type de commerce.',
+    slot_taken: 'Ce créneau n’est plus libre. Choisissez-en un autre.',
+    invalid_slot: 'Choisissez un jour et une heure.',
+    invalid_day: 'Choisissez un jour dans les 30 prochains jours.',
+    invalid_hours: 'Horaires invalides : l’heure de fermeture doit suivre l’heure d’ouverture.',
+    invalid_duration: 'Durée invalide (5 minutes à 10 heures).',
+    invalid_deposit: 'La caution doit être comprise entre 0 et le prix de la prestation.',
+    invalid_seats: 'Nombre de postes invalide (1 à 20).',
+    invalid_step: 'Intervalle des créneaux invalide.',
+    place_not_found: 'Lien d’adresse Fii introuvable. Collez le lien de votre fiche adresse.',
+    not_cancellable: 'Ce rendez-vous ne peut plus être annulé.',
+    too_late: 'Moins de 2 heures avant le rendez-vous : écrivez directement au salon.',
+    invalid_action: 'Action impossible pour ce rendez-vous.',
+    invalid_video: 'Vidéo non reconnue : choisissez une vidéo MP4.',
+    video_too_large: 'Vidéo trop lourde (4 Mo au plus, environ 20 secondes).',
+    photo_required: 'Ajoutez une photo.',
     invalid_stock: 'Stock : indiquez un nombre (0 ou plus), ou laissez vide.',
     size_required: 'Choisissez votre taille ou pointure.',
     size_sold_out: 'Une taille choisie vient d’être épuisée. Modifiez la commande.',
@@ -2249,6 +2264,268 @@
     if (CFG.shopZone && /^[a-z0-9]([a-z0-9-]{1,38}[a-z0-9])$/.test(slug)) return 'https://' + slug + '.' + CFG.shopZone + '/#/b/' + slug + (productId ? '?a=' + productId : '');
     return baseUrl() + '#/b/' + slug + (productId ? '?a=' + productId : '');
   }
+  /* ================================================================ SALONS (beauté & bien-être, 31/10)
+     Coiffure, barbier, ongles, cils, spa, massage : prestations à durée, réservation d'un créneau, caution par Wave ou
+     Orange Money confirmée par le salon, réalisations en format vertical (photo tout de suite, vidéo au toucher),
+     adresse par une fiche Fii. Modèle Premium « Rituel » ; les autres modèles gardent la même page, plus sobre. */
+  var DAYS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  var MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+  // Dakar = UTC toute l'année : les dates du salon se calculent en UTC, quel que soit le fuseau du téléphone.
+  function dkNow() { return new Date(); }
+  function dkIso(d) { return d.toISOString().slice(0, 10); }
+  function dkAdd(n) { var d = dkNow(); d.setUTCHours(12, 0, 0, 0); d.setUTCDate(d.getUTCDate() + n); return d; }
+  function hm(m) { return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+  function durText(m) { if (!m) return ''; var hh = Math.floor(m / 60), mm = m % 60; return hh ? hh + ' h' + (mm ? ' ' + String(mm).padStart(2, '0') : '') : mm + ' min'; }
+  function openState(hours) {
+    var now = dkNow(), d = now.getUTCDay(), cur = now.getUTCHours() * 60 + now.getUTCMinutes();
+    var t = hours && hours[String(d)];
+    var mins = function (s) { var p = s.split(':'); return +p[0] * 60 + +p[1]; };
+    if (t && cur >= mins(t[0]) && cur < mins(t[1])) return { open: true, text: 'Ouvert · ferme à ' + t[1] };
+    if (t && cur < mins(t[0])) return { open: false, text: 'Fermé · ouvre à ' + t[0] };
+    for (var i = 1; i <= 7; i++) { var n = hours && hours[String((d + i) % 7)]; if (n) return { open: false, text: 'Fermé · ouvre ' + (i === 1 ? 'demain' : DAYS_FR[(d + i) % 7]) + ' à ' + n[0] }; }
+    return null;
+  }
+  function bookDateText(iso) {
+    var d = new Date(iso);
+    return DAYS_FR[d.getUTCDay()].replace(/^./, function (c) { return c.toUpperCase(); }) + ' ' + d.getUTCDate() + ' ' + MONTHS_FR[d.getUTCMonth()] + ' · ' + hm(d.getUTCHours() * 60 + d.getUTCMinutes());
+  }
+
+  // Lecteur des réalisations : plein écran vertical, une à la fois (glisser ou toucher à droite / à gauche), vidéo
+  // chargée seulement à l'ouverture (preload none), muette au départ comme Instagram ; « Réserver ce style ».
+  function reelViewer(reels, start, onBook) {
+    var idx = start, vid = null, timer = null;
+    var stage = h('div', { class: 'rv-stage' }), cap = h('p', { class: 'rv-cap' });
+    var bars = h('div', { class: 'rv-bars' }, reels.map(function () { return h('span', null, h('i')); }));
+    var mute = h('button', { class: 'rv-mute', type: 'button', 'aria-label': 'Activer le son', hidden: true, onclick: function (e) {
+      e.stopPropagation(); if (!vid) return; vid.muted = !vid.muted; mute.setAttribute('aria-label', vid.muted ? 'Activer le son' : 'Couper le son'); mute.classList.toggle('on', !vid.muted); } }, icon('mic', 18));
+    var back = h('div', { class: 'rv-back', id: 'reel-viewer', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Réalisations' },
+      bars, stage,
+      h('button', { class: 'rv-close', type: 'button', 'aria-label': 'Fermer', onclick: function () { close(); } }, icon('close', 22)),
+      mute,
+      h('div', { class: 'rv-foot' }, cap, iconBtn('button', { class: 'btn big', type: 'button', id: 'reel-book', onclick: function () { close(); onBook(); } }, 'cal', 'Réserver')));
+    function fill(k, f) { var i = bars.children[k] && bars.children[k].firstChild; if (i) i.style.width = Math.round(f * 100) + '%'; }
+    function show(k) {
+      clearInterval(timer); if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); vid = null; }
+      idx = (k + reels.length) % reels.length;
+      for (var j = 0; j < reels.length; j++) fill(j, j < idx ? 1 : 0);
+      var r = reels[idx];
+      cap.textContent = r.caption || '';
+      var img = h('img', { src: r.poster, alt: r.caption || 'Réalisation', class: 'rv-media', decoding: 'async' });
+      setKids(stage, img);
+      mute.hidden = !r.video;
+      if (r.video) {
+        vid = h('video', { class: 'rv-media', playsinline: '', 'webkit-playsinline': '', muted: '', autoplay: '', preload: 'auto', poster: r.poster });
+        vid.muted = true; vid.src = r.video;
+        vid.addEventListener('playing', function () { if (img.isConnected) img.remove(); });
+        vid.addEventListener('timeupdate', function () { if (vid && vid.duration) fill(idx, vid.currentTime / vid.duration); });
+        vid.addEventListener('ended', function () { show(idx + 1); });
+        stage.appendChild(vid);
+        var pr = vid.play(); if (pr && pr.catch) pr.catch(function () {});
+      } else {
+        var t0 = Date.now();
+        timer = setInterval(function () { var f = (Date.now() - t0) / 5000; fill(idx, Math.min(1, f)); if (f >= 1) show(idx + 1); }, 80);
+      }
+    }
+    var x0 = null;
+    stage.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+    stage.addEventListener('touchend', function (e) {
+      if (x0 == null) return; var dx = e.changedTouches[0].clientX - x0; x0 = null;
+      if (Math.abs(dx) > 40) show(idx + (dx < 0 ? 1 : -1));
+    });
+    stage.addEventListener('click', function (e) { var w = stage.clientWidth || 1; show(idx + (e.clientX - stage.getBoundingClientRect().left < w / 3 ? -1 : 1)); });
+    var closeSheet = openSheet(back, { onClose: function () { clearInterval(timer); if (vid) { vid.pause(); vid.removeAttribute('src'); vid.load(); } } });
+    function close() { window.removeEventListener('hashchange', close); if (back.isConnected) closeSheet(); }
+    window.addEventListener('hashchange', close);
+    show(idx);
+  }
+
+  function salonPage(slug, shop, products, q) {
+    var theme = ['galerie', 'catalogue', 'magazine', 'atelier', 'comptoir', 'maison', 'edition', 'concept', 'rituel'].indexOf(shop.theme) >= 0 ? shop.theme : 'galerie';
+    var reels = (shop.reels || []).filter(function (r) { return r.poster; });
+    var byId = {}; products.forEach(function (p) { byId[p.id] = p; });
+    var groups = {}, order = [];
+    products.slice().sort(function (a, b) { return (a.price || 0) - (b.price || 0); }).forEach(function (p) {
+      var k = p.rubric || 'Prestations'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(p);
+    });
+    var st = openState(shop.hours);
+    var cover = shop.has_cover ? h('div', { class: 'sl-cover loading-skel', id: 'vitrine-cover' }) : null;
+    if (cover) lazyPhoto(cover, function () { return coverLoad(slug); }, '');
+    else delete COVER_P[slug];
+    var wa = shop.phone ? waTo(shop.phone, 'Bonjour ' + shop.name + ', ') : null;
+    var ig = shop.socials && shop.socials.instagram ? socialUrl('instagram', shop.socials.instagram) : null;
+    var quick = h('div', { class: 'sl-quick' },
+      shop.place ? h('a', { class: 'sl-q', href: '#/a/' + shop.place.token, id: 'salon-route' }, icon('nav', 20), h('span', null, 'Itinéraire')) : null,
+      wa ? h('a', { class: 'sl-q', href: wa, target: '_blank', rel: 'noopener noreferrer', id: 'salon-wa' }, icon('whatsapp', 20), h('span', null, 'WhatsApp')) : null,
+      ig ? h('a', { class: 'sl-q', href: ig, target: '_blank', rel: 'noopener noreferrer', id: 'salon-ig' }, icon('instagram', 20), h('span', null, 'Instagram')) : null);
+    var head = h('header', { class: 'sl-head' },
+      shop.logo ? h('img', { class: 'sl-logo', src: shop.logo, alt: '' }) : null,
+      h('h1', { class: 'sl-name' }, shop.name),
+      shop.about ? h('p', { class: 'sl-about' }, shop.about) : null,
+      st ? h('p', { class: 'sl-open' + (st.open ? ' on' : ''), id: 'salon-open' }, h('i', { 'aria-hidden': 'true' }), st.text) : null,
+      quick.children.length ? quick : null);
+    var reelRow = reels.length ? h('section', { class: 'sl-sec', id: 'salon-reels' },
+      h('div', { class: 'sl-h' }, h('h2', null, 'Réalisations'), h('span', { class: 'small muted' }, reels.length + (reels.length > 1 ? ' looks' : ' look'))),
+      h('div', { class: 'sl-reels' }, reels.map(function (r, i) {
+        var im = h('img', { alt: r.caption || 'Réalisation', decoding: 'async' }); deferSrc(im, r.poster);
+        return h('button', { class: 'sl-reel', type: 'button', 'data-reel': i, onclick: function () { reelViewer(reels, i, function () { book(null); }); } },
+          im, r.video ? h('span', { class: 'sl-play', 'aria-hidden': 'true' }, icon('play', 16)) : null,
+          r.caption ? h('span', { class: 'sl-reel-cap' }, r.caption) : null);
+      }))) : null;
+    var menu = h('section', { class: 'sl-sec', id: 'salon-menu' },
+      h('div', { class: 'sl-h' }, h('h2', null, 'Prestations')),
+      order.map(function (k) {
+        return h('div', { class: 'sl-grp' }, order.length > 1 ? h('h3', null, k) : null,
+          groups[k].map(function (p) {
+            return h('button', { class: 'sl-svc', type: 'button', 'data-svc': p.id, onclick: function () { book(p); } },
+              h('span', { class: 'sl-svc-t' }, h('b', null, p.name), h('span', { class: 'small muted' }, [durText(p.duration), p.deposit ? 'caution ' + fcfa(p.deposit) : ''].filter(Boolean).join(' · '))),
+              h('span', { class: 'sl-svc-p' }, fcfa(p.price)), icon('chev', 16));
+          }));
+      }));
+    var hoursBox = shop.hours ? h('section', { class: 'sl-sec', id: 'salon-hours' }, h('div', { class: 'sl-h' }, h('h2', null, 'Horaires')),
+      h('div', { class: 'sl-hours' }, [1, 2, 3, 4, 5, 6, 0].map(function (d) {
+        var t = shop.hours[String(d)];
+        return h('div', { class: 'sl-hr' + (d === dkNow().getUTCDay() ? ' on' : '') }, h('span', null, DAYS_FR[d].replace(/^./, function (c) { return c.toUpperCase(); })), h('span', null, t ? t[0] + ' – ' + t[1] : 'Fermé'));
+      })),
+      shop.place ? iconBtn('a', { class: 'btn ghost full', href: '#/a/' + shop.place.token, id: 'salon-route-2' }, 'pin', [shop.place.label, shop.place.locality].filter(Boolean).join(', ')) : null) : null;
+    var bar = h('div', { class: 'cartbar sl-bar' }, iconBtn('button', { class: 'btn big', type: 'button', id: 'salon-book', onclick: function () { book(null); } }, 'cal', 'Réserver'));
+    var pg = page(h('div', { class: 'brand-bar nobrand' }), cover, head, reelRow, menu, hoursBox, h('div', { style: 'height:90px' }), isPremiumTheme(theme) && !SITE ? madeBy() : footer(true));
+    pg.classList.add('vt', 'vt-' + theme, 'sl');
+    if (isPremiumTheme(theme)) { pg.classList.add('vt-premium'); document.documentElement.setAttribute('data-vt', theme); }
+    pg.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.noir)[1]);
+    pg.appendChild(bar);
+    if (q && q.s && byId[q.s]) setTimeout(function () { if (pg.isConnected) book(byId[q.s]); }, 80);
+
+    // Réservation en trois temps dans une feuille : prestation → jour et heure → coordonnées (et caution).
+    function book(pre) {
+      var f = { p: pre, day: null, time: null, name: LS.get('fiila.rdv.name', ''), phone: LS.get('fiila.rdv.phone', ''), pay: '' };
+      var payModes = shop.pay_before_off ? [] : ((shop.policies && shop.policies.pay) || []).filter(function (k) { return k === 'wave' || k === 'om'; });
+      var body = h('div', { class: 'stack' }), err = h('div', { role: 'alert' });
+      var title = h('h2', { id: 'book-h' });
+      var back = h('div', { class: 'sheet-back vt-sheet', id: 'book-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'book-h', onclick: function (e) { if (e.target === back) close(); } },
+        h('div', { class: 'sheet vsheet sl-sheet' },
+          h('button', { class: 'iconbtn vsheet-close', type: 'button', 'aria-label': 'Fermer', id: 'book-close', onclick: function () { close(); } }, icon('close', 20)),
+          title, body, err));
+      back.classList.add('vt', 'vt-' + theme, 'sl'); if (isPremiumTheme(theme)) back.classList.add('vt-premium');
+      back.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.noir)[1]);
+      var closeSheet = openSheet(back);
+      function close() { window.removeEventListener('hashchange', close); if (back.isConnected) closeSheet(); }
+      window.addEventListener('hashchange', close);
+      function chosen() {
+        return h('button', { class: 'sl-chosen', type: 'button', id: 'book-change', onclick: function () { f.p = null; f.day = null; f.time = null; draw(); } },
+          h('span', null, h('b', null, f.p.name), h('span', { class: 'small muted' }, [durText(f.p.duration), fcfa(f.p.price)].filter(Boolean).join(' · '))), h('span', { class: 'small' }, 'Changer'));
+      }
+      function draw() {
+        setKids(err);
+        if (!f.p) {
+          title.textContent = 'Choisir une prestation';
+          setKids(body, products.slice().sort(function (a, b) { return (a.price || 0) - (b.price || 0); }).map(function (p) {
+            return h('button', { class: 'sl-svc', type: 'button', 'data-pick': p.id, onclick: function () { f.p = p; draw(); } },
+              h('span', { class: 'sl-svc-t' }, h('b', null, p.name), h('span', { class: 'small muted' }, durText(p.duration))), h('span', { class: 'sl-svc-p' }, fcfa(p.price)));
+          }));
+          return;
+        }
+        if (!f.day || !f.time) { drawWhen(); return; }
+        drawWho();
+      }
+      function drawWhen() {
+        title.textContent = 'Jour et heure';
+        if (!f.day) f.day = dkIso(dkAdd(0));
+        var slotsBox = h('div', { class: 'sl-slots', id: 'book-slots' }, loading('Créneaux…'));
+        var days = h('div', { class: 'sl-days', id: 'book-days', role: 'radiogroup', 'aria-label': 'Jour' });
+        for (var i = 0; i < 21; i++) (function (i) {
+          var d = dkAdd(i), iso = dkIso(d), open = shop.hours && shop.hours[String(d.getUTCDay())], on = f.day === iso;
+          days.appendChild(h('button', { type: 'button', class: 'sl-day' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-day': iso, disabled: open ? null : '',
+            onclick: function () { f.day = iso; f.time = null; drawWhen(); } },
+            h('span', null, i === 0 ? 'Auj.' : i === 1 ? 'Dem.' : DAYS_FR[d.getUTCDay()].slice(0, 3) + '.'), h('b', null, String(d.getUTCDate())), h('span', null, MONTHS_FR[d.getUTCMonth()])));
+        })(i);
+        setKids(body, chosen(), days, slotsBox);
+        setTimeout(function () { var on = days.querySelector('.on'); if (on && on.scrollIntoView) on.scrollIntoView({ inline: 'center', block: 'nearest' }); }, 0);
+        api('fiila_vitrine_slots', { p_slug: slug, p_product: f.p.id, p_day: f.day }).then(function (r) {
+          if (!slotsBox.isConnected) return;
+          if (r.closed || !r.slots.length) { setKids(slotsBox, h('p', { class: 'muted small', id: 'book-none' }, r.closed ? 'Le salon est fermé ce jour-là.' : 'Plus de créneau libre ce jour-là. Essayez un autre jour.')); return; }
+          setKids(slotsBox, r.slots.map(function (t) {
+            return h('button', { type: 'button', class: 'sl-slot', 'data-time': t, onclick: function () { f.time = t; draw(); } }, t);
+          }));
+        }, function (e) { setKids(slotsBox); errBox(err, e); });
+      }
+      function drawWho() {
+        title.textContent = 'Vos coordonnées';
+        if (f.p.deposit && payModes.length === 1) f.pay = payModes[0];
+        var dep = f.p.deposit && payModes.length;
+        var when = h('div', { class: 'sl-when' }, icon('cal', 18), h('span', null, bookDateText(f.day + 'T' + f.time + ':00Z')),
+          h('button', { class: 'btn link small', type: 'button', id: 'book-when', onclick: function () { f.time = null; draw(); } }, 'Changer'));
+        var payBox = h('div', { class: 'field', id: 'book-pay' });
+        function drawPay() {
+          if (!dep) { setKids(payBox); return; }
+          setKids(payBox, h('span', { class: 'lbl', id: 'book-pay-l' }, 'Caution de ' + fcfa(f.p.deposit)),
+            payModes.length === 1 ? h('p', { class: 'small' }, PAY_SHORT[payModes[0]])
+              : h('div', { class: 'opt-row', role: 'radiogroup', 'aria-labelledby': 'book-pay-l' }, payModes.map(function (k) {
+                var on = f.pay === k;
+                return h('button', { type: 'button', class: 'opt' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-pay': k, onclick: function () { f.pay = k; drawPay(); } }, PAY_SHORT[k]);
+              })),
+            h('p', { class: 'small muted' }, 'Elle réserve votre créneau et sera déduite du prix. Le numéro s’affiche à l’étape suivante.'));
+        }
+        drawPay();
+        var send = iconBtn('button', { class: 'btn big full', type: 'button', id: 'book-send', onclick: function () {
+          setKids(err);
+          if (!f.name.trim()) return errBox(err, new ApiError('your_name_required'), 'book-name');
+          if (f.phone.replace(/\D/g, '').length < 9) return errBox(err, new ApiError('phone_required'), 'book-phone');
+          if (dep && !f.pay) return errBox(err, new ApiError('pay_required'));
+          send.disabled = true;
+          LS.set('fiila.rdv.name', f.name.trim()); LS.set('fiila.rdv.phone', f.phone.trim());
+          api('fiila_vitrine_book', { p_slug: slug, p: { product_id: f.p.id, day: f.day, time: f.time, pay: f.pay || undefined, customer: { name: f.name.trim(), phone: f.phone.trim() } } }).then(function (r) {
+            close(); go('#/rdv/' + r.token + '?nouveau=1');
+          }, function (e) {
+            send.disabled = false;
+            if (e && e.code === 'slot_taken') { f.time = null; toast('Ce créneau vient d’être pris. Choisissez-en un autre.'); draw(); return; }
+            errBox(err, e);
+          });
+        } }, 'check', dep ? 'Réserver et payer la caution' : 'Confirmer le rendez-vous');
+        setKids(body, chosen(), when,
+          textField({ id: 'book-name', label: 'Votre nom', value: f.name, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
+          textField({ id: 'book-phone', label: 'Votre numéro WhatsApp', type: 'tel', value: f.phone, autocomplete: 'tel', onInput: function (v) { f.phone = v; } }),
+          payBox, send);
+      }
+      draw();
+    }
+    return pg;
+  }
+
+  // Page du rendez-vous (lien gardé par la cliente) : statut, caution à payer (numéro, montant, délai), adresse, annulation.
+  function viewBooking(token, q) {
+    return api('fiila_booking_public', { p_token: token }).then(function (r) {
+      if (r.state !== 'ok') return page(brandBar('Rendez-vous'), stateCard('?', 'Rendez-vous introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
+      var b = r.booking, s = r.shop;
+      var ST = { pending: ['wait', 'clock', 'En attente de la caution'], confirmed: ['ok', 'check', 'Rendez-vous confirmé'], cancelled: ['no', 'ban', 'Rendez-vous annulé'],
+        expired: ['no', 'hourglass', 'Caution non reçue à temps'], done: ['ok', 'check', 'Prestation réalisée'], no_show: ['no', 'ban', 'Rendez-vous manqué'] }[b.status] || ['wait', 'clock', ''];
+      var payCard = b.pay_to ? h('div', { class: 'card sl-pay', id: 'rdv-pay' },
+        h('p', null, 'Envoyez ', h('b', null, fcfa(b.deposit)), ' par ', h('b', null, PAY_SHORT[b.pay_mode]), ' au :'),
+        h('div', { class: 'pay-to' }, h('b', { id: 'rdv-pay-to' }, b.pay_to),
+          iconBtn('button', { class: 'btn ghost small', type: 'button', id: 'rdv-pay-copy', onclick: function () { copy(b.pay_to.replace(/\s/g, ''), 'Numéro'); } }, 'copy', 'Copier')),
+        h('p', { class: 'small muted' }, 'Le salon confirme dès réception. Sans caution avant ' + hm(new Date(b.hold_until).getUTCHours() * 60 + new Date(b.hold_until).getUTCMinutes()) + ', le créneau est libéré.')) : null;
+      var err = h('div', { role: 'alert' });
+      var cancel = b.can_cancel ? h('button', { class: 'btn link', type: 'button', id: 'rdv-cancel', onclick: function () {
+        if (cancel.getAttribute('data-sure') !== '1') { cancel.setAttribute('data-sure', '1'); cancel.textContent = 'Confirmer l’annulation'; return; }
+        cancel.disabled = true;
+        api('fiila_booking_cancel', { p_token: token }).then(function () { toast('Rendez-vous annulé.'); render(); }, function (e) { cancel.disabled = false; errBox(err, e); });
+      } }, 'Annuler le rendez-vous') : null;
+      var pg = page(brandBar('Rendez-vous'),
+        h('div', { class: 'card sl-rdv', id: 'rdv-card' },
+          s.logo ? h('img', { class: 'sl-logo sm', src: s.logo, alt: '' }) : null,
+          h('p', { class: 'small muted' }, s.name + ' · ' + b.ref),
+          h('h1', { id: 'rdv-status', 'data-status': b.status }, statePill(ST[0], ST[1]), ' ', ST[2]),
+          h('div', { class: 'sl-when big' }, icon('cal', 20), h('span', { id: 'rdv-when' }, bookDateText(b.start_at))),
+          h('p', null, h('b', null, b.service), ' · ', durText(b.duration), ' · ', fcfa(b.price))),
+        payCard,
+        s.place ? iconBtn('a', { class: 'btn ghost full', href: '#/a/' + s.place.token, id: 'rdv-route' }, 'nav', 'Itinéraire jusqu’au salon') : null,
+        s.phone ? iconBtn('a', { class: 'btn ghost full', href: waTo(s.phone, 'Bonjour, c’est au sujet de mon rendez-vous ' + b.ref + '.'), target: '_blank', rel: 'noopener noreferrer', id: 'rdv-wa' }, 'whatsapp', 'Écrire au salon') : null,
+        s.slug ? h('a', { class: 'btn link', href: '#/b/' + s.slug }, 'Voir le salon') : null,
+        cancel, err, footer(true));
+      if (q && q.nouveau) setTimeout(function () { toast(b.status === 'pending' ? 'Créneau réservé. Payez la caution pour le confirmer.' : 'Rendez-vous confirmé.'); }, 200);
+      return pg;
+    }, function (e) { return page(brandBar('Rendez-vous'), stateCard('!', 'Impossible d’afficher le rendez-vous', errText(e), retryBtn()), footer(true)); });
+  }
+
   // Couverture (30/10) : son adresse est demandée en même temps que le site, pas après (une attente de moins avant
   // la première image) ; la promesse ne sert qu'une fois.
   var COVER_P = {};
@@ -2263,6 +2540,7 @@
     return api('fiila_vitrine', { p_slug: slug }).then(function (r) {
       if (r.state === 'closed') return page(brandBar('Boutique'), stateCard('⦸', r.shop.name, 'Ce site est hors ligne pour le moment.'), footer(true));
       if (r.state !== 'ok') return page(brandBar('Boutique'), stateCard('?', 'Site introuvable', 'Vérifiez que le lien a été copié en entier.'), footer(true));
+      if (r.shop.salon) return salonPage(slug, r.shop, r.products, q || {});
       return vitrinePage(slug, r.shop, r.products, q || {});
     }, function (e) { return page(brandBar('Boutique'), stateCard('!', 'Impossible d’afficher le site', errText(e), retryBtn()), footer(true)); });
   }
@@ -3492,7 +3770,7 @@
      visibles et prévisualisables par tous. */
   var VT_PREMIUM = [['atelier', 'Atelier', 'Mode, couture, prêt-à-porter'], ['comptoir', 'Comptoir', 'Restauration, traiteur, pâtisserie'],
     ['maison', 'Maison', 'Beauté, cosmétiques, déco'], ['edition', 'Édition', 'Mode, enfants, chaussures · noir et blanc'],
-    ['concept', 'Concept', 'Grand catalogue en rayons : accessoires, cadeaux, beauté']];
+    ['concept', 'Concept', 'Grand catalogue en rayons : accessoires, cadeaux, beauté'], ['rituel', 'Rituel', 'Salons : coiffure, barbier, ongles, spa · réservation']];
   // Style du modèle Concept : valeurs par défaut (coins arrondis, animations, pas de cœurs de saison).
   function conceptStyle(st) { st = st || {}; return { corners: st.corners === 'nets' ? 'nets' : 'doux', anim: st.anim !== false, season: st.season === true }; }
   function isPremiumTheme(t) { return t === 'atelier' || t === 'comptoir' || t === 'maison' || t === 'edition' || t === 'concept'; }
@@ -4092,6 +4370,7 @@
       else if (p[0] === 'vide-dressing' && !p[1]) view = viewVideDressing();
       else if (p[0] === 'vide-dressing' && p[1] === 'vendre') view = viewVdSell(r.q);
       else if (p[0] === 'boutique' && p[1] === 'reglages') view = viewShopSettings();
+      else if (p[0] === 'boutique' && p[1] === 'salon') view = viewSalonSettings();
       else if (p[0] === 'boutique' && p[1] === 'marketing') view = viewShopMarketing(r.q || {});
       else if (p[0] === 'boutique' && p[1] === 'vitrine') view = viewVitrineLook(r.q);
       else if (p[0] === 'boutique' && p[1] === 'domaine') view = viewShopDomain();
@@ -4108,6 +4387,7 @@
       else if (p[0] === 'commande' && p[1]) view = viewOrder(p[1], r.q);
       else if (p[0] === 'f' && p[1]) view = viewInvoice(p[1], r.q);
       else if (p[0] === 'b' && p[1]) view = viewVitrine(p[1].toLowerCase(), r.q);
+      else if (p[0] === 'rdv' && p[1]) view = viewBooking(p[1], r.q);
       else if (p[0] === 'confidentialite') view = viewPrivacy();
       else view = page(backBtn(), stateCard('?', 'Page introuvable', 'Ce lien n’est pas valide.'));
     } catch (e) {
@@ -6207,24 +6487,191 @@
       footer());
   }
 
+  /* ----- salon : agenda et réglages de réservation (31/10) */
+  var BK_ST = { pending: ['wait', 'Caution attendue'], confirmed: ['ok', 'Confirmé'], cancelled: ['off', 'Annulé'], expired: ['off', 'Caution non reçue'], done: ['ok', 'Venu(e)'], no_show: ['off', 'Absent(e)'] };
+  function bkChip(b) { var st = BK_ST[b.status] || ['wait', b.status]; return h('span', { class: 'chip ' + st[0] }, st[1]); }
+  function salonAgenda(r, q) {
+    var shop = r.shop;
+    var today = dkIso(dkAdd(0)), day = q.j && /^\d{4}-\d{2}-\d{2}$/.test(q.j) ? q.j : today;
+    var days = h('div', { class: 'sl-days', id: 'agenda-days', role: 'radiogroup', 'aria-label': 'Jour' });
+    var listBox = h('div', { class: 'stack', id: 'agenda' }, loading('Chargement des rendez-vous…'));
+    var banner = h('div', { id: 'agenda-banner' });
+    var items = [];
+    var share = iconBtn('button', { class: 'btn big full', type: 'button', id: 'agenda-share', onclick: function () {
+      sapi('fiila_shop_vitrine', { p: null }).then(function (v) {
+        if (!v.slug || !v.public) { go('#/boutique/vitrine'); return; }
+        var url = vitrineUrl(v.slug);
+        if (navigator.share) navigator.share({ title: shop.name, text: 'Réservez votre rendez-vous chez ' + shop.name + ' :', url: url }).catch(function () {});
+        else copy(url, 'Lien');
+      }, function (e) { toast(errText(e)); });
+    } }, 'share', 'Partager mon lien de réservation');
+    function drawDays() {
+      setKids(days, Array.apply(null, Array(14)).map(function (_, i) {
+        var d = dkAdd(i), iso = dkIso(d), on = iso === day;
+        var n = items.filter(function (b) { return b.start_at.slice(0, 10) === iso && (b.status === 'pending' || b.status === 'confirmed'); }).length;
+        return h('button', { type: 'button', class: 'sl-day' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-day': iso,
+          onclick: function () { day = iso; drawDays(); drawList(); } },
+          h('span', null, i === 0 ? 'Auj.' : i === 1 ? 'Dem.' : DAYS_FR[d.getUTCDay()].slice(0, 3) + '.'), h('b', null, String(d.getUTCDate())), h('span', null, n ? n + ' rdv' : '–'));
+      }));
+    }
+    function drawList() {
+      var l = items.filter(function (b) { return b.start_at.slice(0, 10) === day; });
+      setKids(listBox, l.length ? h('div', { class: 'list', id: 'agenda-list' }, l.map(function (b) {
+        return h('button', { class: 'item bk-row', type: 'button', 'data-bk': b.id, onclick: function () { bkSheet(b); } },
+          h('span', { class: 'bk-time' }, hm(new Date(b.start_at).getUTCHours() * 60 + new Date(b.start_at).getUTCMinutes())),
+          h('div', { style: 'flex:1;min-width:0;text-align:left' }, h('div', { class: 't' }, b.customer_name), h('div', { class: 'small muted' }, b.service + ' · ' + durText(b.duration))),
+          bkChip(b));
+      })) : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun rendez-vous ce jour-là.')));
+    }
+    function load() {
+      return sapi('fiila_bookings', { p_from: today, p_days: 14 }).then(function (res) {
+        items = res.items || [];
+        setKids(banner, res.waiting ? h('div', { class: 'card warn', id: 'agenda-waiting' }, h('p', null, h('b', null, res.waiting + (res.waiting > 1 ? ' cautions' : ' caution') + ' à vérifier.'),
+          ' Vérifiez la réception sur Wave ou Orange Money, puis touchez « Caution reçue ».')) : null);
+        drawDays(); drawList();
+      }, function (e) { errBox(listBox, e); });
+    }
+    function act(b, a, close) {
+      return sapi('fiila_booking_set', { p_id: b.id, p_action: a }).then(function () {
+        toast({ deposit: 'Caution reçue : rendez-vous confirmé.', confirm: 'Rendez-vous confirmé.', cancel: 'Rendez-vous annulé.', done: 'C’est noté.', no_show: 'Absence notée.' }[a]);
+        close(); load();
+      }, function (e) { toast(errText(e)); });
+    }
+    function bkSheet(b) {
+      var live = b.status === 'pending' || b.status === 'confirmed';
+      var acts = h('div', { class: 'stack' });
+      var back = h('div', { class: 'sheet-back', id: 'bk-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'bk-h', onclick: function (e) { if (e.target === back) close(); } },
+        h('div', { class: 'sheet' },
+          h('button', { class: 'iconbtn vsheet-close', type: 'button', 'aria-label': 'Fermer', onclick: function () { close(); } }, icon('close', 20)),
+          h('h2', { id: 'bk-h' }, b.customer_name), h('p', { class: 'small muted' }, b.ref + ' · ' + bookDateText(b.start_at)),
+          h('p', null, h('b', null, b.service), ' · ', durText(b.duration), ' · ', fcfa(b.price)),
+          b.deposit ? h('p', { class: 'small' }, 'Caution ' + fcfa(b.deposit) + ' par ' + (PAY_SHORT[b.pay_mode] || '—') + (b.deposit_paid ? ' · reçue' : ' · pas encore reçue')) : null,
+          bkChip(b), acts));
+      var close = openSheet(back);
+      setKids(acts,
+        b.status === 'pending' && b.deposit && !b.deposit_paid ? iconBtn('button', { class: 'btn big full', type: 'button', id: 'bk-deposit', onclick: function () { act(b, 'deposit', close); } }, 'check', 'Caution reçue') : null,
+        b.status === 'confirmed' ? iconBtn('button', { class: 'btn big full', type: 'button', id: 'bk-done', onclick: function () { act(b, 'done', close); } }, 'check', 'Client(e) venu(e)') : null,
+        iconBtn('a', { class: 'btn ghost full', href: waTo(b.customer_phone, 'Bonjour ' + b.customer_name.split(' ')[0] + ', c’est ' + shop.name + ' au sujet de votre rendez-vous du ' + bookDateText(b.start_at) + '.'), target: '_blank', rel: 'noopener noreferrer', id: 'bk-wa' }, 'whatsapp', 'Écrire sur WhatsApp'),
+        live && b.status === 'confirmed' ? h('button', { class: 'btn link', type: 'button', id: 'bk-noshow', onclick: function () { act(b, 'no_show', close); } }, 'Absent(e)') : null,
+        live ? h('button', { class: 'btn link danger', type: 'button', id: 'bk-cancel', onclick: function (e) {
+          var x = e.currentTarget; if (x.getAttribute('data-sure') !== '1') { x.setAttribute('data-sure', '1'); x.textContent = 'Confirmer l’annulation'; return; }
+          act(b, 'cancel', close); } }, 'Annuler le rendez-vous') : null);
+    }
+    load();
+    return shopTabs(page(backBtn(),
+      secHead('orders', 'cal', shop.name, { id: 'shop-title' }),
+      identitySlot(), partnerSlot(),
+      share, banner, days, listBox,
+      h('a', { class: 'btn link', href: '#/boutique/salon', id: 'agenda-settings' }, 'Horaires, adresse et réalisations'),
+      footer()), 'orders');
+  }
+
+  // Réglages de réservation : horaires par jour (interrupteur + heures), postes, intervalle, adresse Fii, réalisations.
+  function viewSalonSettings() {
+    return sapi('fiila_shop_salon', { p: null }).then(function (d) {
+      if (d.salon) { SHOP_SALON = true; LS.set('fiila.salon', true); }
+      var hours = {}; [0, 1, 2, 3, 4, 5, 6].forEach(function (k) { hours[k] = d.hours && d.hours[k] ? d.hours[k].slice() : null; });
+      var f = { seats: d.seats || 1, step: d.step || 30, place: d.place ? d.place.token : '' };
+      var err = h('div', { role: 'alert' }), hoursBox = h('div', { class: 'stack tight', id: 'salon-hours-edit' });
+      function drawHours() {
+        setKids(hoursBox, [1, 2, 3, 4, 5, 6, 0].map(function (k) {
+          var t = hours[k], name = DAYS_FR[k].replace(/^./, function (c) { return c.toUpperCase(); });
+          return h('div', { class: 'hr-row', 'data-d': String(k) },
+            h('button', { type: 'button', class: 'switch-row mini' + (t ? ' on' : ''), role: 'switch', 'aria-checked': t ? 'true' : 'false', 'aria-label': name + (t ? ' ouvert' : ' fermé'),
+              onclick: function () { hours[k] = t ? null : ['09:00', '19:00']; drawHours(); } }, h('span', { class: 'sw', 'aria-hidden': 'true' }, h('i'))),
+            h('span', { class: 'hr-day' }, name),
+            t ? h('span', { class: 'hr-t' },
+              h('input', { type: 'time', value: t[0], step: '900', 'aria-label': name + ' ouverture', oninput: function (e) { hours[k][0] = e.target.value; } }), '–',
+              h('input', { type: 'time', value: t[1], step: '900', 'aria-label': name + ' fermeture', oninput: function (e) { hours[k][1] = e.target.value; } }))
+              : h('span', { class: 'muted small' }, 'Fermé'));
+        }));
+      }
+      drawHours();
+      function pills(id, label, list, key) {
+        var box = h('div', { class: 'pills', role: 'radiogroup', 'aria-label': label, id: id });
+        function draw() { setKids(box, list.map(function (x) { var on = f[key] === x[0]; return h('button', { type: 'button', class: 'pill sm' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-v': String(x[0]), onclick: function () { f[key] = x[0]; draw(); } }, x[1]); })); }
+        draw();
+        return h('div', { class: 'field' }, h('span', { class: 'lbl' }, label), box);
+      }
+      var save = h('button', { class: 'btn big full', type: 'button', id: 'salon-save', onclick: function () {
+        setKids(err); save.disabled = true;
+        var hh = {}; Object.keys(hours).forEach(function (k) { if (hours[k]) hh[k] = hours[k]; });
+        sapi('fiila_shop_salon', { p: { hours: hh, seats: f.seats, step: String(f.step), place: f.place.trim() } }).then(function () {
+          save.disabled = false; toast('Réservations enregistrées.');
+        }, function (e) { save.disabled = false; errBox(err, e); });
+      } }, 'Enregistrer');
+      // Réalisations : photo (et vidéo MP4 courte, facultative) ; la vidéo est copiée dans le stockage en une minute environ.
+      var reels = d.reels || [], reelBox = h('div', { class: 'sl-reels mine', id: 'salon-reels-edit' });
+      function drawReels() {
+        setKids(reelBox, reels.map(function (r) {
+          return h('div', { class: 'sl-reel' }, h('img', { src: r.poster, alt: r.caption || '' }), r.video || r.video_pending ? h('span', { class: 'sl-play', 'aria-hidden': 'true' }, icon('play', 16)) : null,
+            h('button', { class: 'iconbtn reel-del', type: 'button', 'aria-label': 'Retirer cette réalisation', 'data-del': r.id, onclick: function () {
+              sapi('fiila_reel_delete', { p_id: r.id }).then(function (l) { reels = l; drawReels(); toast('Réalisation retirée.'); }, function (e) { toast(errText(e)); }); } }, icon('trash', 16)));
+        }), reels.length < 24 ? h('label', { class: 'sl-reel add', id: 'reel-add' }, icon('plus', 22), h('span', null, 'Photo ou vidéo'),
+          h('input', { type: 'file', accept: 'image/*,video/mp4', hidden: true, onchange: function (e) { var file = e.target.files && e.target.files[0]; e.target.value = ''; if (file) addReel(file); } })) : null);
+      }
+      function fileB64(file) { return new Promise(function (ok, ko) { var rd = new FileReader(); rd.onload = function () { ok(String(rd.result).replace(/^data:[^,]+,/, '')); }; rd.onerror = ko; rd.readAsDataURL(file); }); }
+      function posterOf(file) {
+        return new Promise(function (ok, ko) {
+          var v = document.createElement('video'); v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = URL.createObjectURL(file);
+          v.onloadeddata = function () { v.currentTime = Math.min(1, (v.duration || 2) / 2); };
+          v.onseeked = function () {
+            var c = document.createElement('canvas'), w = 540, hh = Math.round(w * (v.videoHeight / v.videoWidth || 16 / 9)); c.width = w; c.height = hh;
+            c.getContext('2d').drawImage(v, 0, 0, w, hh); URL.revokeObjectURL(v.src); ok(c.toDataURL('image/jpeg', 0.82).replace(/^data:[^,]+,/, ''));
+          };
+          v.onerror = function () { ko(new ApiError('invalid_video')); };
+        });
+      }
+      function addReel(file) {
+        var isVid = /^video\//.test(file.type);
+        if (isVid && file.type !== 'video/mp4') return toast(ERRORS.invalid_video);
+        if (isVid && file.size > 4200000) return toast(ERRORS.video_too_large);
+        toast(isVid ? 'Envoi de la vidéo…' : 'Envoi de la photo…');
+        (isVid ? Promise.all([posterOf(file), fileB64(file)]) : compressPhoto(file, 1080).then(function (u) { return [u.replace(/^data:[^,]+,/, ''), null]; })).then(function (x) {
+          return sapi('fiila_reel_add', { p: { poster: x[0], video: x[1] || undefined } });
+        }).then(function (l) { reels = l; drawReels(); toast('Réalisation ajoutée.'); }, function (e) { toast(errText(e)); });
+      }
+      drawReels();
+      return shopTabs(page(backBtn('Réglages', '#/boutique/reglages'),
+        secHead('settings', 'cal', 'Réservations'),
+        h('section', { class: 'card' }, h('h2', null, 'Horaires'), hoursBox),
+        h('section', { class: 'card' }, h('h2', null, 'Rendez-vous'),
+          pills('salon-seats', 'Rendez-vous en même temps', [[1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6']], 'seats'),
+          pills('salon-step', 'Créneaux toutes les', [[15, '15 min'], [30, '30 min'], [60, '1 h']], 'step'),
+          textField({ id: 'salon-place', label: 'Adresse du salon (lien de votre fiche Fii)', optional: true, value: f.place ? baseUrl() + '#/a/' + f.place : '',
+            hint: d.place ? d.place.label + (d.place.locality ? ', ' + d.place.locality : '') : 'Créez la fiche de votre salon (entrée, photo), puis collez son lien ici.', onInput: function (v) { f.place = v; } })),
+        err, save,
+        h('section', { class: 'card' }, h('h2', null, 'Réalisations'), h('p', { class: 'small muted' }, 'Vos plus beaux résultats, en photo ou en vidéo courte (MP4, 4 Mo).'), reelBox),
+        footer()), 'settings');
+    }, failPage('Impossible de charger les réservations', 'boutique'));
+  }
+
   /* ----- boutique */
   // Rôle dans la boutique ('owner', 'admin', 'editor') : l'interface masque ce que le serveur refuserait.
   var SHOP_ROLE = null;
+  // Salon (31/10) : l'onglet « Commandes » devient « Agenda » ; gardé sur le téléphone pour les écrans qui ne relisent pas la boutique.
+  var SHOP_SALON = LS.get('fiila.salon', false) === true;
+  function setSalon(shop) { SHOP_SALON = !!(shop && isSalon(shop.business_type)); LS.set('fiila.salon', SHOP_SALON); }
   function viewShop(q) {
     return sapi('fiila_shop_get', {}).then(function (r) {
-      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null; SHOP_ID_CUR = r.shop ? r.shop.id : SHOP_ID_CUR;
+      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null; SHOP_ID_CUR = r.shop ? r.shop.id : SHOP_ID_CUR; setSalon(r.shop);
+      if (r.shop && SHOP_SALON) return salonAgenda(r, q || {});
       return r.shop ? shopDashboard(r, q || {}) : onboardingOn() ? setupStepName() : shopForm(null);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
   // Types de commerce (19/10) : choisis à la création, ils serviront aux outils propres à chaque métier.
-  var BUSINESS_TYPES = [['mode', 'Vêtements, mode'], ['chaussures', 'Chaussures'], ['beaute', 'Beauté, cosmétiques'], ['coiffure', 'Salon de coiffure, barbier'],
-    ['esthetique', 'Institut, onglerie'], ['restauration', 'Restaurant, traiteur'], ['patisserie', 'Pâtisserie, boulangerie'], ['epicerie', 'Épicerie, alimentation'],
+  // « Beauté & bien-être » (31/10) regroupe coiffure, barbier, ongles, cils, spa, massage : réservation de créneaux.
+  // « Institut, onglerie » (esthetique) reste valable pour les boutiques existantes, sans être proposé.
+  var BUSINESS_TYPES = [['mode', 'Vêtements, mode'], ['chaussures', 'Chaussures'], ['coiffure', 'Beauté & bien-être : coiffure, barbier, ongles, spa'], ['beaute', 'Cosmétiques, parfums'],
+    ['restauration', 'Restaurant, traiteur'], ['patisserie', 'Pâtisserie, boulangerie'], ['epicerie', 'Épicerie, alimentation'],
     ['electronique', 'Téléphones, électronique'], ['maison', 'Maison, déco'], ['bijoux', 'Bijoux, accessoires'], ['enfants', 'Enfants, bébé'],
     ['fleurs', 'Fleurs, événements'], ['couture', 'Couture, retouches'], ['services', 'Services, réparations'], ['autre', 'Autre commerce']];
-  function typeLabel(k) { var t = BUSINESS_TYPES.filter(function (x) { return x[0] === k; })[0]; return t ? t[1] : ''; }
+  // Salons (31/10) : réservation, prestations à durée ; le reste des métiers garde les articles et les commandes.
+  function isSalon(k) { return k === 'coiffure' || k === 'esthetique'; }
+  function typeLabel(k) { if (isSalon(k)) return 'Beauté & bien-être'; var t = BUSINESS_TYPES.filter(function (x) { return x[0] === k; })[0]; return t ? t[1] : ''; }
   function viewShopSettings() {
     return sapi('fiila_shop_get', {}).then(function (r) {
-      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null; SHOP_ID_CUR = r.shop ? r.shop.id : SHOP_ID_CUR;
+      SHOP_ROLE = r.shop ? r.shop.role || 'owner' : null; SHOP_ID_CUR = r.shop ? r.shop.id : SHOP_ID_CUR; setSalon(r.shop);
       return r.shop && SHOP_ROLE === 'editor' ? memberSettings(r.shop) : shopForm(r.shop);
     }, failPage('Impossible de charger la boutique', 'boutique'));
   }
@@ -6325,6 +6772,7 @@
       setKids(tiles,
         tile('info', 'shop', 'Informations', shop.name + (typ ? ' · ' + typ[1] : ''), false, openInfo),
         tile('policies', 'cash', 'Livraison et paiement', !d.site ? '—' : policiesOk() ? [lbl(POLICY_DELIVERY, po.delivery), (po.pay || []).map(function (x) { return lbl(POLICY_PAY, x); }).join(', ')].join(' · ') : 'Non indiqués', d.site && !policiesOk(), openPolicies),
+        isSalon(shop.business_type) ? tile('salon', 'cal', 'Réservations', 'Horaires, adresse, réalisations', false, function () { go('#/boutique/salon'); }) : null,
         tile('team', 'users', 'Équipe', people == null ? (d.err ? '—' : '…') : people === 1 ? 'Vous seul(e)' : people + ' personnes' + (t.invites && t.invites.length ? ' · ' + t.invites.length + ' invitée(s)' : ''), false, openTeam),
         tile('courier', 'moto', 'Livreur attitré', shop.courier ? shop.courier.name + (shop.courier_confirmed ? '' : ' · à confirmer') : shop.courier_invite ? 'Invitation envoyée' : 'Aucun pour le moment',
           !!(shop.courier && !shop.courier_confirmed), openCourier),
@@ -7158,7 +7606,8 @@
     }
     pg.classList.add('has-tabs');
     pg.appendChild(h('div', { class: 'tabbar' }, h('nav', { 'aria-label': 'Boutique' },
-      tab('orders', '#/boutique', 'box', 'Commandes'), tab('products', '#/boutique/articles', 'tag', 'Articles'),
+      SHOP_SALON ? tab('orders', '#/boutique', 'cal', 'Agenda') : tab('orders', '#/boutique', 'box', 'Commandes'),
+      tab('products', '#/boutique/articles', 'tag', SHOP_SALON ? 'Prestations' : 'Articles'),
       tab('marketing', '#/boutique/marketing', 'megaphone', 'Marketing'),
       tab('customers', '#/clients', 'users', 'Clients'), tab('settings', '#/boutique/reglages', 'settings', 'Réglages'))));
     return pg;
@@ -7825,7 +8274,34 @@
       return base.concat(cur.filter(function (x) { return base.indexOf(x) < 0; }));
     }
     var extraSize = '', extraColor = '';
+    // Prestation d'un salon : rubrique, durée en pastilles, caution facultative (ni tailles, ni couleurs, ni stock).
+    function drawSalon() {
+      var DUR = [15, 20, 30, 45, 60, 90, 120, 180];
+      if (f.duration && DUR.indexOf(f.duration) < 0) DUR.push(f.duration);
+      setKids(box,
+        h('h2', { class: 'pf-h' }, 'Détails'),
+        h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-rubric-l' }, 'Rubrique', h('span', { class: 'opt' }, ' · facultatif')),
+          h('div', { class: 'pills', role: 'radiogroup', 'aria-labelledby': 'product-rubric-l', id: 'product-rubric' },
+            rubs.concat(f.rubric && rubs.indexOf(f.rubric) < 0 ? [f.rubric] : []).map(function (r) {
+              var on = f.rubric === r;
+              return h('button', { type: 'button', class: 'pill sm' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-v': r,
+                onclick: function () { f.rubric = on ? '' : r; drawSalon(); } }, r);
+            }),
+            h('span', { class: 'pill-add' }, h('input', { type: 'text', id: 'product-rubric-add', maxlength: 30, placeholder: rubs.length ? 'Nouvelle' : 'Ex. : Coupes', 'aria-label': 'Nouvelle rubrique', value: extraRub,
+              oninput: function (e) { extraRub = e.target.value; },
+              onkeydown: function (e) { if (e.key === 'Enter' && extraRub.trim()) { e.preventDefault(); f.rubric = extraRub.trim(); extraRub = ''; drawSalon(); } },
+              onblur: function () { if (extraRub.trim()) { f.rubric = extraRub.trim(); extraRub = ''; drawSalon(); } } })))),
+        h('div', { class: 'field' }, h('span', { class: 'lbl', id: 'product-duration-l' }, 'Durée'),
+          h('div', { class: 'pills', role: 'radiogroup', 'aria-labelledby': 'product-duration-l', id: 'product-duration' }, DUR.map(function (m) {
+            var on = f.duration === m;
+            return h('button', { type: 'button', class: 'pill sm' + (on ? ' on' : ''), role: 'radio', 'aria-checked': on ? 'true' : 'false', 'data-v': String(m),
+              onclick: function () { f.duration = m; drawSalon(); } }, durText(m));
+          }))),
+        textField({ id: 'product-deposit', label: 'Caution à la réservation', optional: true, inputmode: 'numeric', value: f.deposit, placeholder: 'Ex. : 2000',
+          hint: 'Payée par Wave ou Orange Money pour bloquer le créneau, déduite du prix. Vide = pas de caution.', onInput: function (v) { f.deposit = v; } }));
+    }
     function draw() {
+      if (f.salon) { drawSalon(); return; }
       var curS = tags(f.sizes), curC = tags(f.colors);
       var stockN = f.stock.trim() === '' ? null : parseInt(f.stock.replace(/\D/g, ''), 10);
       function setStock(n) { f.stock = n == null ? '' : String(Math.max(0, n)); draw(); }
@@ -8138,6 +8614,7 @@
     f.category = pr && pr.category || ''; f.rubric = pr && pr.rubric || ''; f.sizes = (pr && pr.sizes || []).join(', '); f.colors = (pr && pr.colors || []).join(', ');
     f.stock = pr && pr.stock != null ? String(pr.stock) : '';
     f.price_was = pr && pr.price_was ? String(pr.price_was) : ''; f.sizes_out = (pr && pr.sizes_out || []).slice();
+    f.salon = !!(shop && isSalon(shop.business_type)); f.duration = pr && pr.duration ? pr.duration : f.salon ? 30 : null; f.deposit = pr && pr.deposit ? String(pr.deposit) : '';
     // Nouvel article : brouillon (nom, prix, description) gardé sur le téléphone, par boutique et rôle, pour « Reprendre l'article ».
     var pd = pr ? null : draftOf(PRODUCT_DRAFT, shop);
     if (pd) { f.name = pd.name || ''; f.price = pd.price || ''; f.description = pd.description || ''; }
@@ -8183,6 +8660,11 @@
       if (was !== null && !(was > price)) { if (promo) promo.open = true; return errBox(err, new ApiError('invalid_price_was'), 'product-price-was'); }
       var p = { id: pr ? pr.id : undefined, name: f.name.trim(), price: price, description: f.description.trim() || null, active: f.active,
         category: f.category || null, rubric: f.rubric.trim(), sizes: splitTags(f.sizes), colors: splitTags(f.colors), stock: stock, price_was: was, sizes_out: f.sizes_out };
+      if (f.salon) {
+        var dep = String(f.deposit).trim() === '' ? 0 : parseInt(String(f.deposit).replace(/\D/g, ''), 10);
+        if (!(dep >= 0) || dep > price) return errBox(err, new ApiError('invalid_deposit'), 'product-deposit');
+        p.duration = f.duration || 30; p.deposit = dep; delete p.sizes; delete p.colors; delete p.sizes_out; p.stock = null;
+      }
       btn.disabled = true;
       return photos.payload().then(function (pp) {
         if (pp) { p.photo = pp.photo; p.photos = pp.photos; }

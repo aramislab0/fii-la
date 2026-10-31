@@ -97,6 +97,14 @@ Avant de livrer, vérifier :
 4. **Régler** : un paramètre qui peut changer (montant, seuil, interrupteur) est dans Réglages, avec des bornes ;
 5. **Tester** : un test SQL et un test navigateur couvrent la partie back-office ; ce document est à jour.
 
+## Réservations des salons (31/10)
+
+- **Voir** : fiche d'une boutique → carte « Réservations » (salons seulement) : horaires, rendez-vous simultanés et pas des créneaux, adresse liée, compteurs (à venir, cautions à vérifier, venus, absents, annulés), 60 derniers rendez-vous (sans le numéro de la cliente), réalisations (photo ou vidéo, copie en cours).
+- **Agir** : retirer une réalisation (confirmation en deux temps).
+- **Tracer** : `reel_delete` dans le journal (« a retiré une réalisation de »).
+- **Régler** : `salon_booking` (réservation en ligne des salons ouverte ou coupée), `book_hold` (délai de paiement de la caution, 15 à 240 min).
+- **Tester** : `tests/salon.sql.test.mjs` (back-office : équipe seulement, réglages, retrait).
+
 ## Vérification
 
 - Tests SQL : `tests/backoffice.sql.test.mjs` (12 tests) — droits par rôle, invitations, garde-fous d'équipe, suspension, fil, réglages, journal.

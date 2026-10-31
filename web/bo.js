@@ -562,6 +562,37 @@ window.FiiBO = function (F) {
     api('fiila_bo_shop_site', { p_shop: id }).then(draw, function (e) { setKids(box, h('h2', null, 'Site'), h('p', { class: 'small muted' }, errText(e))); });
     return box;
   }
+  // Réservations d'un salon (31/10) : horaires, postes, adresse, rendez-vous récents et à venir, réalisations (retrait journalisé).
+  function boShopBookings(id) {
+    var box = h('section', { class: 'card stack tight', id: 'bo-shop-bookings' }, h('h2', null, 'Réservations'), loading());
+    var DN = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+    var ST = { pending: ['warn', 'Caution attendue'], confirmed: ['ok', 'Confirmé'], cancelled: ['muted', 'Annulé'], expired: ['muted', 'Caution non reçue'], done: ['ok', 'Venu(e)'], no_show: ['danger', 'Absent(e)'] };
+    function row(label, value, idv) { return h('div', { class: 'bo-dl' }, h('span', { class: 'muted' }, label), h('span', { class: 'wrapword', id: idv || null }, value)); }
+    function draw(a) {
+      if (!a.salon) { box.remove(); return; }
+      var hrs = [1, 2, 3, 4, 5, 6, 0].filter(function (d) { return a.hours && a.hours[d]; }).map(function (d) { return DN[d] + ' ' + a.hours[d][0] + '–' + a.hours[d][1]; });
+      var c = a.counts || {};
+      setKids(box, h('h2', null, 'Réservations'),
+        row('Horaires', hrs.length ? hrs.join(' · ') : h('span', { class: 'bo-warn' }, 'Non renseignés : aucun créneau proposé'), 'bo-bk-hours'),
+        row('Rendez-vous en même temps', boNum(a.seats) + ' · créneaux toutes les ' + a.step + ' min'),
+        row('Adresse', a.place ? h('a', { href: '#/a/' + a.place.token, target: '_blank', rel: 'noopener' }, [a.place.label, a.place.locality].filter(Boolean).join(', ')) : 'Non liée'),
+        row('Rendez-vous', boNum(c.upcoming) + ' à venir · ' + boNum(c.waiting) + ' caution(s) à vérifier · ' + boNum(c.done) + ' venu(s) · ' + boNum(c.no_show) + ' absent(s) · ' + boNum(c.cancelled) + ' annulé(s)', 'bo-bk-counts'),
+        boTable([{ label: 'Réf.', get: function (b) { return b.ref; } }, { label: 'Prestation', get: function (b) { return b.service; } },
+          { label: 'Date', get: function (b) { return boDate(b.start_at, true); } }, { label: 'Caution', get: function (b) { return b.deposit ? fcfa(b.deposit) + (b.deposit_paid ? ' · reçue' : '') : '—'; } },
+          { label: 'Statut', get: function (b) { var st = ST[b.status] || ['muted', b.status]; return boBadge(st[0], st[1]); } }], a.items || [], { empty: 'Aucun rendez-vous.' }),
+        h('div', { class: 'stack tight', id: 'bo-bk-reels' }, h('h3', null, 'Réalisations (' + a.reels.length + ')'),
+          a.reels.length ? a.reels.map(function (r) {
+            return h('div', { class: 'row', style: 'justify-content:space-between;align-items:center' },
+              h('span', { class: 'small' }, (r.caption || 'Sans légende') + (r.video ? ' · vidéo' : ' · photo') + (r.synced ? '' : ' · copie en cours')),
+              boCan('shops_write') ? h('button', { class: 'btn ghost small', type: 'button', 'data-reel-del': r.id, onclick: function (e) {
+                var b = e.currentTarget; if (b.getAttribute('data-sure') !== '1') { b.setAttribute('data-sure', '1'); b.textContent = 'Confirmer le retrait'; return; }
+                api('fiila_bo_reel_delete', { p_id: r.id }).then(function (x) { toast('Réalisation retirée.'); draw(x); }, function (er) { toast(errText(er)); });
+              } }, 'Retirer') : null);
+          }) : h('p', { class: 'small muted' }, 'Aucune réalisation.')));
+    }
+    api('fiila_bo_bookings', { p_shop: id }).then(draw, function (e) { setKids(box, h('h2', null, 'Réservations'), h('p', { class: 'small muted' }, errText(e))); });
+    return box;
+  }
   // Fiche article du site (Fii Édition V1) : conditions choisies par la boutique, articles en promo, tailles épuisées.
   function boShopSheet(id) {
     var box = h('section', { class: 'card stack tight', id: 'bo-shop-sheet' }, h('h2', null, 'Fiche article'), loading());
@@ -841,6 +872,7 @@ window.FiiBO = function (F) {
         boCan('shops_write') && !s.platform ? boShopIdentity(id) : null,
         boShopAudience(id),
         boShopSite(id),
+        boShopBookings(id),
         boShopSheet(id),
         s.recent_orders ? h('section', { class: 'stack tight' }, h('h2', null, 'Dernières commandes'),
           boTable([{ label: 'N°', get: function (o) { return String(o.number).padStart(4, '0'); } }, { label: 'Total', get: function (o) { return fcfa(o.total); }, cls: 'num' },
@@ -1688,7 +1720,7 @@ window.FiiBO = function (F) {
   // ----- Journal
   var BO_ACTIONS = { partner_reply: 'a répondu à la marque', partner_invite: 'a invité la marque', partner_regenerate: 'a renouvelé le lien d’invitation de', partner_revoke: 'a retiré l’invitation de', partner_extend: 'a prolongé l’essai de',
     partner_suspend: 'a suspendu l’essai de', partner_resume: 'a repris l’essai de', pack_saved: 'a enregistré une version du pack', shop_suspend: 'a suspendu la boutique', shop_unsuspend: 'a réactivé la boutique', shop_feed_off: 'a retiré la boutique du fil',
-    shop_feed_on: 'a remis la boutique dans le fil', shop_free_place: 'a libéré la place du fil', shop_set_type: 'a changé le type de la boutique', shop_look: 'a changé le site (modèle, couleur ou style) de',
+    shop_feed_on: 'a remis la boutique dans le fil', shop_free_place: 'a libéré la place du fil', shop_set_type: 'a changé le type de la boutique', shop_look: 'a changé le site (modèle, couleur ou style) de', reel_delete: 'a retiré une réalisation de',
     team_invite: 'a invité', team_invite_revoke: 'a annulé l’invitation de', team_join: 'a rejoint l’équipe', team_role: 'a changé le rôle de',
     team_remove: 'a retiré de l’équipe', setting: 'a modifié le réglage', comment_delete: 'a supprimé un commentaire', comment_hide: 'a masqué un commentaire',
     comment_restore: 'a rétabli un commentaire', vd_approved: 'a publié un article de vide-dressing', vd_rejected: 'a refusé un article de vide-dressing',
@@ -1718,6 +1750,8 @@ window.FiiBO = function (F) {
     kyc_required: ['Pièce d’identité exigée après la première vente', '0 = non exigée, 1 = exigée (nouvelles commandes bloquées sans pièce)'],
     site_look: ['« Complétez le look » sur la fiche article', 'Nombre d’articles de la même boutique proposés (0 = masqué, 6 au plus)'],
     site_rail: ['Articles par rangée (modèle Concept)', 'Nombre d’articles montrés dans chaque rayon avant « Tout voir » (4 à 20)'],
+    salon_booking: ['Réservation en ligne des salons (beauté & bien-être)', '0 = coupée (les salons montrent leurs prestations sans réserver), 1 = ouverte'],
+    book_hold: ['Délai pour payer la caution d’un rendez-vous', 'minutes (15 à 240) ; passé ce délai, le créneau est libéré'],
     pay_before: ['Paiement avant la livraison (Wave, Orange Money)', '0 = coupé pour toutes les boutiques (seul le paiement à la livraison reste proposé), 1 = selon le choix de chaque boutique'],
     site_anim: ['Animations des sites (modèle Concept)', '0 = coupées pour toutes les boutiques, 1 = selon le choix de chaque boutique'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
