@@ -2343,56 +2343,77 @@
     var theme = ['galerie', 'catalogue', 'magazine', 'atelier', 'comptoir', 'maison', 'edition', 'concept', 'rituel'].indexOf(shop.theme) >= 0 ? shop.theme : 'galerie';
     var reels = (shop.reels || []).filter(function (r) { return r.poster; });
     var byId = {}; products.forEach(function (p) { byId[p.id] = p; });
-    var groups = {}, order = [];
-    products.slice().sort(function (a, b) { return (a.price || 0) - (b.price || 0); }).forEach(function (p) {
-      var k = p.rubric || 'Prestations'; if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(p);
+    // Ordre : rubriques dans l'ordre où le salon les a créées, puis le prix croissant (simple, prévisible).
+    var first = {};
+    products.forEach(function (p) { var k = p.rubric || ''; if (first[k] == null || (p.added || 0) < first[k]) first[k] = p.added || 0; });
+    var rubs = Object.keys(first).filter(Boolean).sort(function (a, b) { return first[a] - first[b]; });
+    var list = products.slice().sort(function (a, b) {
+      var ra = a.rubric ? rubs.indexOf(a.rubric) : 99, rb = b.rubric ? rubs.indexOf(b.rubric) : 99;
+      return ra - rb || (a.price || 0) - (b.price || 0);
     });
+    var tab = '';
     var st = openState(shop.hours);
     var cover = shop.has_cover ? h('div', { class: 'sl-cover loading-skel', id: 'vitrine-cover' }) : null;
     if (cover) lazyPhoto(cover, function () { return coverLoad(slug); }, '');
     else delete COVER_P[slug];
     var wa = shop.phone ? waTo(shop.phone, 'Bonjour ' + shop.name + ', ') : null;
     var ig = shop.socials && shop.socials.instagram ? socialUrl('instagram', shop.socials.instagram) : null;
-    var quick = h('div', { class: 'sl-quick' },
-      shop.place ? h('a', { class: 'sl-q', href: '#/a/' + shop.place.token, id: 'salon-route' }, icon('nav', 20), h('span', null, 'Itinéraire')) : null,
-      wa ? h('a', { class: 'sl-q', href: wa, target: '_blank', rel: 'noopener noreferrer', id: 'salon-wa' }, icon('whatsapp', 20), h('span', null, 'WhatsApp')) : null,
-      ig ? h('a', { class: 'sl-q', href: ig, target: '_blank', rel: 'noopener noreferrer', id: 'salon-ig' }, icon('instagram', 20), h('span', null, 'Instagram')) : null);
+    function round(attrs, ic, label) { return h('a', Object.assign({ class: 'sl-ib', 'aria-label': label }, attrs), icon(ic, 20)); }
+    // En-tête : nom, une ligne d'information (ouverture → horaires), petits ronds d'action.
     var head = h('header', { class: 'sl-head' },
       shop.logo ? h('img', { class: 'sl-logo', src: shop.logo, alt: '' }) : null,
       h('h1', { class: 'sl-name' }, shop.name),
-      shop.about ? h('p', { class: 'sl-about' }, shop.about) : null,
-      st ? h('p', { class: 'sl-open' + (st.open ? ' on' : ''), id: 'salon-open' }, h('i', { 'aria-hidden': 'true' }), st.text) : null,
-      quick.children.length ? quick : null);
-    var reelRow = reels.length ? h('section', { class: 'sl-sec', id: 'salon-reels' },
-      h('div', { class: 'sl-h' }, h('h2', null, 'Réalisations'), h('span', { class: 'small muted' }, reels.length + (reels.length > 1 ? ' looks' : ' look'))),
-      h('div', { class: 'sl-reels' }, reels.map(function (r, i) {
-        var im = h('img', { alt: r.caption || 'Réalisation', decoding: 'async' }); deferSrc(im, r.poster);
-        return h('button', { class: 'sl-reel', type: 'button', 'data-reel': i, onclick: function () { reelViewer(reels, i, function () { book(null); }); } },
-          im, r.video ? h('span', { class: 'sl-play', 'aria-hidden': 'true' }, icon('play', 16)) : null,
-          r.caption ? h('span', { class: 'sl-reel-cap' }, r.caption) : null);
-      }))) : null;
-    var menu = h('section', { class: 'sl-sec', id: 'salon-menu' },
-      h('div', { class: 'sl-h' }, h('h2', null, 'Prestations')),
-      order.map(function (k) {
-        return h('div', { class: 'sl-grp' }, order.length > 1 ? h('h3', null, k) : null,
-          groups[k].map(function (p) {
-            return h('button', { class: 'sl-svc', type: 'button', 'data-svc': p.id, onclick: function () { book(p); } },
-              h('span', { class: 'sl-svc-t' }, h('b', null, p.name), h('span', { class: 'small muted' }, [durText(p.duration), p.deposit ? 'caution ' + fcfa(p.deposit) : ''].filter(Boolean).join(' · '))),
-              h('span', { class: 'sl-svc-p' }, fcfa(p.price)), icon('chev', 16));
-          }));
+      st ? h('button', { class: 'sl-open' + (st.open ? ' on' : ''), type: 'button', id: 'salon-open', onclick: hoursSheet }, h('i', { 'aria-hidden': 'true' }), st.text, h('span', { class: 'sl-more' }, ' · Horaires')) : null,
+      h('div', { class: 'sl-ibs' },
+        shop.place ? round({ href: '#/a/' + shop.place.token, id: 'salon-route' }, 'nav', 'Itinéraire') : null,
+        wa ? round({ href: wa, target: '_blank', rel: 'noopener noreferrer', id: 'salon-wa' }, 'whatsapp', 'WhatsApp') : null,
+        ig ? round({ href: ig, target: '_blank', rel: 'noopener noreferrer', id: 'salon-ig' }, 'instagram', 'Instagram') : null));
+    // Réalisations : des bulles comme les « stories à la une » d'Instagram ; un toucher ouvre le lecteur.
+    var reelRow = reels.length ? h('div', { class: 'sl-bubbles', id: 'salon-reels', role: 'list', 'aria-label': 'Réalisations' }, reels.map(function (r, i) {
+      var im = h('img', { alt: '', decoding: 'async' }); deferSrc(im, r.poster);
+      return h('button', { class: 'sl-bub', type: 'button', role: 'listitem', 'data-reel': i, onclick: function () { reelViewer(reels, i, function () { book(null); }); } },
+        h('span', { class: 'sl-bub-img' }, im), h('span', { class: 'sl-bub-t' }, r.caption || 'Réalisation'));
+    })) : null;
+    var tabs = rubs.length > 1 ? h('div', { class: 'opt-row sl-tabs', id: 'salon-tabs', role: 'tablist' }) : null;
+    var grid = h('div', { class: 'sl-grid', id: 'salon-menu' });
+    function card(p) {
+      var img = h('div', { class: 'sl-cimg' + (p.has_photo ? ' loading-skel' : '') }, p.has_photo ? null : h('span', { class: 'sl-cph', 'aria-hidden': 'true' }, p.name.charAt(0)));
+      if (p.has_photo) cardPhoto(img, p.img, function () { return api('fiila_vitrine_photo', { p_slug: slug, p_id: p.id }).then(function (x) { return x.photo; }); }, p.name, true);
+      return h('article', { class: 'sl-card', 'data-svc': p.id },
+        img,
+        h('div', { class: 'sl-cbody' },
+          h('h3', null, p.name),
+          h('p', { class: 'sl-cmeta' }, h('b', null, fcfa(p.price)), p.duration ? h('span', null, ' · ' + durText(p.duration)) : null),
+          h('button', { class: 'btn sl-cbtn', type: 'button', 'data-book': p.id, onclick: function () { book(p); } }, 'Réserver')));
+    }
+    function draw() {
+      if (tabs) setKids(tabs, [['', 'Tout']].concat(rubs.map(function (r) { return [r, r]; })).map(function (t) {
+        var on = tab === t[0];
+        return h('button', { type: 'button', class: 'opt' + (on ? ' on' : ''), role: 'tab', 'aria-selected': on ? 'true' : 'false', 'data-tab': t[0], onclick: function () { tab = t[0]; draw(); } }, t[1]);
       }));
-    var hoursBox = shop.hours ? h('section', { class: 'sl-sec', id: 'salon-hours' }, h('div', { class: 'sl-h' }, h('h2', null, 'Horaires')),
-      h('div', { class: 'sl-hours' }, [1, 2, 3, 4, 5, 6, 0].map(function (d) {
-        var t = shop.hours[String(d)];
-        return h('div', { class: 'sl-hr' + (d === dkNow().getUTCDay() ? ' on' : '') }, h('span', null, DAYS_FR[d].replace(/^./, function (c) { return c.toUpperCase(); })), h('span', null, t ? t[0] + ' – ' + t[1] : 'Fermé'));
-      })),
-      shop.place ? iconBtn('a', { class: 'btn ghost full', href: '#/a/' + shop.place.token, id: 'salon-route-2' }, 'pin', [shop.place.label, shop.place.locality].filter(Boolean).join(', ')) : null) : null;
-    var bar = h('div', { class: 'cartbar sl-bar' }, iconBtn('button', { class: 'btn big', type: 'button', id: 'salon-book', onclick: function () { book(null); } }, 'cal', 'Réserver'));
-    var pg = page(h('div', { class: 'brand-bar nobrand' }), cover, head, reelRow, menu, hoursBox, h('div', { style: 'height:90px' }), isPremiumTheme(theme) && !SITE ? madeBy() : footer(true));
+      setKids(grid, list.filter(function (p) { return !tab || p.rubric === tab; }).map(card));
+    }
+    draw();
+    function hoursSheet() {
+      var back = h('div', { class: 'sheet-back', id: 'hours-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'hours-h', onclick: function (e) { if (e.target === back) close(); } },
+        h('div', { class: 'sheet sl-sheet' },
+          h('button', { class: 'iconbtn vsheet-close', type: 'button', 'aria-label': 'Fermer', onclick: function () { close(); } }, icon('close', 20)),
+          h('h2', { id: 'hours-h' }, 'Horaires'),
+          h('div', { class: 'sl-hours' }, [1, 2, 3, 4, 5, 6, 0].map(function (d) {
+            var t = shop.hours && shop.hours[String(d)];
+            return h('div', { class: 'sl-hr' + (d === dkNow().getUTCDay() ? ' on' : '') }, h('span', null, DAYS_FR[d].replace(/^./, function (c) { return c.toUpperCase(); })), h('span', null, t ? t[0] + ' – ' + t[1] : 'Fermé'));
+          })),
+          shop.place ? iconBtn('a', { class: 'btn ghost full', href: '#/a/' + shop.place.token }, 'nav', [shop.place.label, shop.place.locality].filter(Boolean).join(', ')) : null));
+      back.classList.add('vt', 'vt-' + theme, 'sl');
+      back.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.noir)[1]);
+      var close = openSheet(back);
+    }
+    var pg = page(h('div', { class: 'brand-bar nobrand' }), cover, head, reelRow,
+      h('section', { class: 'sl-sec' }, h('h2', { class: 'sl-title' }, 'Prestations'), tabs, grid),
+      h('div', { style: 'height:24px' }), isPremiumTheme(theme) && !SITE ? madeBy() : footer(true));
     pg.classList.add('vt', 'vt-' + theme, 'sl');
     if (isPremiumTheme(theme)) { pg.classList.add('vt-premium'); document.documentElement.setAttribute('data-vt', theme); }
     pg.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.noir)[1]);
-    pg.appendChild(bar);
     if (q && q.s && byId[q.s]) setTimeout(function () { if (pg.isConnected) book(byId[q.s]); }, 80);
 
     // Réservation en trois temps dans une feuille : prestation → jour et heure → coordonnées (et caution).
@@ -2411,8 +2432,8 @@
       function close() { window.removeEventListener('hashchange', close); if (back.isConnected) closeSheet(); }
       window.addEventListener('hashchange', close);
       function chosen() {
-        return h('button', { class: 'sl-chosen', type: 'button', id: 'book-change', onclick: function () { f.p = null; f.day = null; f.time = null; draw(); } },
-          h('span', null, h('b', null, f.p.name), h('span', { class: 'small muted' }, [durText(f.p.duration), fcfa(f.p.price)].filter(Boolean).join(' · '))), h('span', { class: 'small' }, 'Changer'));
+        return h('div', { class: 'sl-chosen' }, h('span', null, h('b', null, f.p.name), h('span', { class: 'small muted' }, [fcfa(f.p.price), durText(f.p.duration)].filter(Boolean).join(' · '))),
+          h('button', { class: 'btn link small', type: 'button', id: 'book-change', onclick: function () { f.p = null; f.day = null; f.time = null; draw(); } }, 'Changer'));
       }
       function draw() {
         setKids(err);

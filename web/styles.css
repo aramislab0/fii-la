@@ -2529,3 +2529,33 @@ html[data-vt="rituel"] body{background:#F4EFE8}
 .reel-del{position:absolute;bottom:8px;right:8px;z-index:2;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);color:#A93226;border:0;display:grid;place-items:center}
 .sl-sheet .vsheet-close,#bk-sheet .vsheet-close{align-self:flex-end;margin:0 0 -40px;top:0;background:var(--surface);border:1px solid var(--line)}
 #bk-sheet h2{margin:0 48px 0 0}
+/* Salons v2 (fondateur, 31/10 15:34 : « simple, intuitif et beau ») : cartes photo + prix + Réserver, bulles des réalisations. */
+.sl-head{gap:6px}
+.sl-open{border:0;background:none;padding:6px 10px;border-radius:999px;cursor:pointer;font-family:inherit}
+.sl-more{color:var(--sl-soft);font-weight:500;text-decoration:underline;text-underline-offset:3px}
+.sl-ibs{display:flex;gap:10px;justify-content:center;margin-top:4px}
+.sl-ib{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#fff;border:1px solid var(--sl-line);color:var(--sl-ink)}
+.vt-rituel .sl-ib{background:#FBF8F4}
+.sl-bubbles{display:flex;gap:14px;overflow-x:auto;margin:6px -16px 0;padding:4px 16px 2px;scrollbar-width:none}
+.sl-bubbles::-webkit-scrollbar{display:none}
+.sl-bub{flex:0 0 72px;display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:none;padding:0;cursor:pointer;color:var(--sl-ink)}
+.sl-bub-img{width:68px;height:68px;border-radius:50%;padding:2.5px;background:conic-gradient(from 210deg,#C9A86A,#111,#C9A86A)}
+.sl-bub-img img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:2.5px solid var(--bg,#F4EFE8);display:block;background:#ddd}
+.sl-bub-t{font-size:11px;line-height:1.2;text-align:center;max-width:72px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sl-title{margin:8px 0 0;font-family:"Jost",system-ui,sans-serif;font-size:13px;font-weight:600;letter-spacing:.18em;text-transform:uppercase}
+.vt-rituel .sl-title{font-family:"Instrument Serif",Georgia,serif;font-size:30px;font-weight:400;letter-spacing:0;text-transform:none}
+.sl-tabs{overflow-x:auto;flex-wrap:nowrap;margin:0 -16px;padding:0 16px 2px;scrollbar-width:none}
+.sl-tabs::-webkit-scrollbar{display:none}
+.sl-tabs .opt{flex:none}
+.sl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sl-card{display:flex;flex-direction:column;background:#fff;border-radius:18px;overflow:hidden;border:1px solid var(--sl-line);min-width:0}
+.vt-rituel .sl-card{background:#FBF8F4;border-color:rgba(17,17,17,.06)}
+.sl-cimg{aspect-ratio:4/5;background:#EDE7DF;overflow:hidden;display:grid;place-items:center}
+.sl-cimg img{width:100%;height:100%;object-fit:cover;display:block}
+.sl-cph{font-family:"Instrument Serif",Georgia,serif;font-size:56px;color:#B9AE9F}
+.sl-cbody{display:flex;flex-direction:column;gap:4px;padding:10px 12px 12px;flex:1}
+.sl-cbody h3{margin:0;font-size:15px;line-height:1.25;font-weight:700}
+.sl-cmeta{margin:0 0 6px;font-size:13px;color:var(--sl-soft)}
+.sl-cmeta b{color:var(--sl-ink)}
+.sl-cbtn{margin-top:auto;min-height:40px;padding:8px 12px;font-size:14px;border-radius:999px;width:100%}
+@media (min-width:640px){.sl-grid{grid-template-columns:repeat(3,1fr)}}

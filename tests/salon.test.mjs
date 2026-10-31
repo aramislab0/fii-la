@@ -55,15 +55,22 @@ const SITE = URL0 + '#/b/' + V.slug;
 
 const C = await newPhone();
 let RDV;
-await t('page du salon : nom, prestations par rubrique (durée, caution), réalisations, horaires, une seule action « Réserver »', async () => {
+await t('page du salon : cartes (photo, prix, durée, « Réserver »), une rangée de rubriques, réalisations en bulles, horaires dans une feuille', async () => {
   await C.goto(SITE);
-  await C.locator('#salon-book').waitFor();
+  await C.locator('#salon-menu .sl-card').first().waitFor();
   assert.equal(await C.locator('.sl-name').textContent(), 'Salon Démo (test)');
   assert.equal(await C.locator('.vt-rituel').count(), 1);
-  assert.deepEqual(await C.locator('.sl-grp h3').allTextContents(), ['Coupes', 'Beauté']);
-  assert.match(await C.locator(`[data-svc="${FADE.id}"]`).textContent(), /1 h.*caution 2 000 FCFA.*8 000 FCFA/);
-  assert.equal(await C.locator('.sl-reel').count(), 2);
-  assert.equal(await C.locator('.sl-hr').count(), 7);
+  const tabs = await C.locator('#salon-tabs .opt').allTextContents();
+  assert.equal(tabs[0], 'Tout'); assert.deepEqual(tabs.slice(1).sort(), ['Beauté', 'Coupes']);
+  assert.equal(await C.locator('.sl-card').count(), 3);
+  assert.match(await C.locator(`[data-svc="${FADE.id}"]`).textContent(), /8 000 FCFA · 1 h.*Réserver/);
+  await C.locator('#salon-tabs [data-tab="Beauté"]').click();
+  assert.equal(await C.locator('.sl-card').count(), 1);
+  await C.locator('#salon-tabs [data-tab=""]').click();
+  assert.equal(await C.locator('.sl-bub').count(), 2);
+  await C.click('#salon-open');
+  assert.equal(await C.locator('#hours-sheet .sl-hr').count(), 7);
+  await C.locator('#hours-sheet .vsheet-close').click();
   assert.equal(await C.locator('.brand-bar .logo').count(), 0, 'pas de logo Fii en tête (Premium)');
   assert.equal(await C.locator('.vrail, .vcard').count(), 0, 'pas de catalogue d’articles');
   await shot(C, '01-salon');
@@ -81,7 +88,7 @@ await t('réalisation : lecteur plein écran, « Réserver » ouvre la réservat
 });
 
 await t('réservation : prestation → jour et heure → coordonnées, caution Wave ; page du rendez-vous avec le numéro à payer', async () => {
-  await C.locator(`[data-svc="${FADE.id}"]`).click();
+  await C.locator(`[data-book="${FADE.id}"]`).click();
   await C.locator('#book-days').waitFor();
   await C.locator('[data-day]').nth(1).click();
   await C.locator('#book-slots .sl-slot').first().waitFor();
