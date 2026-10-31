@@ -3154,7 +3154,8 @@
     // Fii Édition (27/10) : un seul cœur « Favoris » (J'aime et Enregistrer réunis) ; « Suivre » la boutique.
     var st = { fav: !!(p.liked || p.saved), favs: Math.max(p.likes || 0, p.saves || 0), comments: p.comments || 0 };
     var acc = (VT_ACCENTS[p.shop.accent] || VT_ACCENTS.foret)[1];
-    var shopHref = '#/b/' + p.shop.slug, buyHref = shopHref + qs({ a: p.id });
+    // Salons (31/10) : la prestation se réserve (page du salon ouverte sur la réservation), elle ne se commande pas.
+    var salon = isSalon(p.shop.type), shopHref = '#/b/' + p.shop.slug, buyHref = shopHref + qs(salon ? { s: p.id } : { a: p.id });
     var img;
     if (p.photos > 1) img = photoCarousel(p.photos, function (k) { return !k && p.img ? Promise.resolve(p.img) : api('fiila_vitrine_photo', { p_slug: p.shop.slug, p_id: k ? p.id + ':' + k : p.id }).then(function (r) { return r.photo || null; }); }, p.name, 'post-img');
     else {
@@ -3208,7 +3209,7 @@
       h('div', { class: 'post-bar' }, likeBtn,
         h('button', { class: 'post-act', type: 'button', 'aria-label': 'Commenter', onclick: function () { openComments(p, st, draw); } }, icon('bubble', 25)),
         h('button', { class: 'post-act', type: 'button', 'aria-label': 'Partager', onclick: share }, icon('share', 26)),
-        h('span', { class: 'grow' }), h('a', { class: 'post-buy', href: buyHref, id: 'buy-' + p.id }, 'Commander')),
+        h('span', { class: 'grow' }), h('a', { class: 'post-buy', href: buyHref, id: 'buy-' + p.id }, salon ? 'Réserver' : 'Commander')),
       h('div', { class: 'post-body' }, likesLine,
         h('p', { class: 'post-cap' }, h('b', { class: 'wrapword' }, p.name), h('span', { class: 'post-price' }, fcfa(p.price))),
         badges.length ? h('p', { class: 'post-badges' }, badges) : null,

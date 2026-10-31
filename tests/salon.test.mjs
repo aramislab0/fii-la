@@ -80,6 +80,20 @@ await t('page du salon : cartes (photo, prix, durée, « Réserver »), une rang
   await shot(C, '01-salon');
 });
 
+await t('fil Fii : une prestation de salon se réserve (« Réserver » ouvre la réservation)', async () => {
+  await local.db.query(`update fiila.shops set featured_rank = 25, feed = true where id = $1`, [S.shop.id]);
+  await local.db.query(`update fiila.products set photo = decode($2, 'base64'), photo_type = 'image/png' where id = $1`, [FADE.id, png]);
+  const F = await newPhone();
+  await F.goto(URL0 + '#/boutiques');
+  const buy = F.locator(`#buy-${FADE.id}`);
+  await buy.waitFor();
+  assert.equal(await buy.textContent(), 'Réserver');
+  await buy.click();
+  await F.locator('#book-days').waitFor();
+  await local.db.query(`update fiila.shops set featured_rank = null where id = $1`, [S.shop.id]);
+  await local.db.query(`update fiila.products set photo = null where id = $1`, [FADE.id]);
+});
+
 await t('réalisation : lecteur plein écran, « Réserver » ouvre la réservation', async () => {
   await C.locator('[data-reel="1"]').click();
   await C.locator('#reel-viewer').waitFor();
