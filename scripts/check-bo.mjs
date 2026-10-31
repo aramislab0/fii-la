@@ -20,10 +20,11 @@ export function topDecls(text) {
   }
   return out;
 }
-export function checkBo(root = new URL('../web/', import.meta.url)) {
-  const app = readFileSync(new URL('app.js', root), 'utf8'), bo = readFileSync(new URL('bo.js', root), 'utf8');
+// Même contrôle pour salon.js (31/10) : checkBo(root, 'salon.js', 'salonShared').
+export function checkBo(root = new URL('../web/', import.meta.url), file = 'bo.js', fn = 'boShared') {
+  const app = readFileSync(new URL('app.js', root), 'utf8'), bo = readFileSync(new URL(file, root), 'utf8');
   const given = new Set((/^  var (.*) = F\.[^;]*;$/m.exec(bo) || [, ''])[1] ? [...bo.matchAll(/([A-Za-z_$][\w$]*) = F\.\1\b/g)].map((m) => m[1]) : []);
-  const shared = new Set([...(/function boShared\(\) \{\s*return \{([^}]*)\}/.exec(app) || [, ''])[1].matchAll(/([A-Za-z_$][\w$]*): \1\b/g)].map((m) => m[1]));
+  const shared = new Set([...(new RegExp('function ' + fn + '\\(\\) \\{\\s*return \\{([^}]*)\\}').exec(app) || [, ''])[1].matchAll(/([A-Za-z_$][\w$]*): \1\b/g)].map((m) => m[1]));
   const appD = topDecls(app), boD = topDecls(bo), used = refs(bo);
   const missing = [...appD].filter((n) => used.has(n) && !boD.has(n) && !given.has(n)).sort();
   const notShared = [...given].filter((n) => !shared.has(n)).sort();
@@ -31,6 +32,7 @@ export function checkBo(root = new URL('../web/', import.meta.url)) {
   return { missing, notShared, notDeclared, given: given.size };
 }
 if (process.argv[1] && process.argv[1].endsWith('check-bo.mjs')) {
-  const r = checkBo(); console.log(JSON.stringify(r));
-  process.exit(r.missing.length || r.notShared.length || r.notDeclared.length ? 1 : 0);
+  const rs = [checkBo(), checkBo(undefined, 'salon.js', 'salonShared')];
+  for (const r of rs) console.log(JSON.stringify(r));
+  process.exit(rs.some((r) => r.missing.length || r.notShared.length || r.notDeclared.length) ? 1 : 0);
 }

@@ -215,6 +215,7 @@ await t('Worker : remplacement de l’ancienne adresse et page de site pures (fo
   const s = siteIndex('<head><title>Fii</title></head>', { slug: 'a', name: 'A"B', host: 'a.sn' });
   const rich = siteIndex('<head><title>Fii</title><meta name="description" content="x"><meta property="og:description" content="x"></head>', { slug: 'le-labo', name: 'Le Labo', host: 'le-labo.getfii.app', about: 'Barbier & beauté', kind: 'salon', image: 'https://cdn.example.test/c.jpg' });
   assert.match(rich, /og:description" content="Barbier &amp; beauté · Réservez en ligne"/);
+  assert.match(rich, /<link rel="preload" as="script" href="salon.js">/, "code des salons demandé avec la page");
   assert.match(rich, /og:image" content="https:\/\/cdn\.example\.test\/c\.jpg"/);
   assert.match(rich, /twitter:card" content="summary_large_image"/);
   assert.match(s, /<title>A&quot;B<\/title>/); assert.match(s, /og:url" content="https:\/\/a.sn\/"/);

@@ -48,7 +48,9 @@ export function siteIndex(html, site) {
     .replace(/<meta name="twitter:card"[^>]*>\n?/, '')
     .replace(/<link rel="manifest"[^>]*>\n?/, '');
   const imgTags = img ? `<meta property="og:image" content="${img}">\n<meta name="twitter:card" content="summary_large_image">\n` : '';
-  out = out.replace('</head>', `<meta name="fii-site" content="${meta}">\n<meta property="og:url" content="https://${esc(site.host)}/">\n${imgTags}</head>`);
+  // Salons : le code de la page de réservation (salon.js, chargé à part) est demandé en même temps que la page.
+  const pre = site.kind === 'salon' ? '<link rel="preload" as="script" href="salon.js">\n' : '';
+  out = out.replace('</head>', `<meta name="fii-site" content="${meta}">\n<meta property="og:url" content="https://${esc(site.host)}/">\n${imgTags}${pre}</head>`);
   return out;
 }
 

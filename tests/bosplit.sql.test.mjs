@@ -19,6 +19,14 @@ t('bo.js reçoit tous les noms de app.js qu’il utilise, et seulement des noms 
   assert.ok(r.given > 30);
 });
 
+t('salon.js (31/10) reçoit tous les noms de app.js qu’il utilise ; app.js ne garde que le chargeur', () => {
+  const r = checkBo(undefined, 'salon.js', 'salonShared');
+  assert.deepEqual(r.missing, [], 'noms à ajouter à salonShared() et à « var … = F.… »');
+  assert.deepEqual(r.notShared, []); assert.deepEqual(r.notDeclared, []);
+  const app = readFileSync('web/app.js', 'utf8');
+  assert.ok(!/function openState\(|function salonAgenda\(r, q\)|function viewSalonSettings\(\) \{/.test(app), 'code des salons resté dans app.js');
+});
+
 t('le contrôle attrape un oubli (bo.js qui utiliserait « shopKey » sans le recevoir)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'bosplit-'));
   writeFileSync(join(dir, 'app.js'), readFileSync('web/app.js', 'utf8'));
