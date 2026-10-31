@@ -72,6 +72,7 @@ await t('page du salon : cartes (photo, prix, durée, « Réserver »), une rang
   assert.equal(await C.locator('#hours-sheet .sl-hr').count(), 7);
   await C.locator('#hours-sheet .vsheet-close').click();
   assert.equal(await C.locator('.brand-bar .logo').count(), 0, 'pas de logo Fii en tête (Premium)');
+  assert.equal(await C.locator('#made-by').count(), 1, '« Conçu par Fii Boutique » en pied de page (Premium)');
   assert.equal(await C.locator('.vrail, .vcard').count(), 0, 'pas de catalogue d’articles');
   await shot(C, '01-salon');
 });

@@ -3798,7 +3798,7 @@
     ['concept', 'Concept', 'Grand catalogue en rayons : accessoires, cadeaux, beauté'], ['rituel', 'Rituel', 'Salons : coiffure, barbier, ongles, spa · réservation']];
   // Style du modèle Concept : valeurs par défaut (coins arrondis, animations, pas de cœurs de saison).
   function conceptStyle(st) { st = st || {}; return { corners: st.corners === 'nets' ? 'nets' : 'doux', anim: st.anim !== false, season: st.season === true }; }
-  function isPremiumTheme(t) { return t === 'atelier' || t === 'comptoir' || t === 'maison' || t === 'edition' || t === 'concept'; }
+  function isPremiumTheme(t) { return t === 'atelier' || t === 'comptoir' || t === 'maison' || t === 'edition' || t === 'concept' || t === 'rituel'; }
   TRACKABLE.premium = [];
   VT_PREMIUM.forEach(function (t) { ['locked', 'preview', 'interest', 'applied'].forEach(function (a) { TRACKABLE.premium.push(t[0] + ':' + a); }); });
   function viewVitrineLook(q) {
