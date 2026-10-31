@@ -34,17 +34,21 @@ export function mainIndex(html, env) {
 // Page d'un site de boutique : nom de la boutique partout, aucune marque Fii (Site Pro), pas d'application installable.
 export function siteIndex(html, site) {
   const name = esc(site.name), meta = esc(JSON.stringify({ slug: site.slug, name: site.name, host: site.host }));
+  // Aperçu WhatsApp / Instagram (31/10) : la présentation de la boutique (« Réservez en ligne » pour un salon) et sa photo.
+  const desc = esc([site.about, site.kind === 'salon' ? 'Réservez en ligne' : ''].filter(Boolean).join(' · ') || site.name);
+  const img = site.image ? esc(site.image) : '';
   let out = html
     .replace(/<title>[^<]*<\/title>/, `<title>${name}</title>`)
     .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${name}">`)
     .replace(/<meta property="og:site_name" content="[^"]*">/, `<meta property="og:site_name" content="${name}">`)
     .replace(/<meta name="apple-mobile-web-app-title" content="[^"]*">/, `<meta name="apple-mobile-web-app-title" content="${name}">`)
-    .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${name}">`)
-    .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${name}">`)
+    .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${desc}">`)
+    .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${desc}">`)
     .replace(/<meta property="og:image[^>]*>\n?/g, '')
     .replace(/<meta name="twitter:card"[^>]*>\n?/, '')
     .replace(/<link rel="manifest"[^>]*>\n?/, '');
-  out = out.replace('</head>', `<meta name="fii-site" content="${meta}">\n<meta property="og:url" content="https://${esc(site.host)}/">\n</head>`);
+  const imgTags = img ? `<meta property="og:image" content="${img}">\n<meta name="twitter:card" content="summary_large_image">\n` : '';
+  out = out.replace('</head>', `<meta name="fii-site" content="${meta}">\n<meta property="og:url" content="https://${esc(site.host)}/">\n${imgTags}</head>`);
   return out;
 }
 
@@ -65,7 +69,16 @@ export async function resolveHost(host, env, deps) {
     const r = await deps.fetch(`${String(env.SUPABASE_URL).replace(/\/$/, '')}/rest/v1/rpc/fiila_domain_resolve`, { method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + env.SUPABASE_ANON_KEY },
       body: JSON.stringify({ p_host: host }) });
-    if (r.ok) { const b = await r.json(); if (b && b.state === 'ok' && b.slug && b.host === host) out = { state: 'ok', slug: b.slug, name: b.name, host }; }
+    if (r.ok) {
+      const b = await r.json();
+      if (b && b.state === 'ok' && b.slug && b.host === host) {
+        out = { state: 'ok', slug: b.slug, name: b.name, host };
+        // Aperçu de partage (31/10) : présentation et image publique de la boutique (adresse https du stockage seulement).
+        if (typeof b.about === 'string' && b.about) out.about = b.about.slice(0, 200);
+        if (typeof b.image === 'string' && /^https:\/\//.test(b.image)) out.image = b.image;
+        if (b.kind === 'salon') out.kind = 'salon';
+      }
+    }
     else return { state: 'error', why: 'http ' + r.status };   // base indisponible : on ne met rien en cache
   } catch (e) { return { state: 'error', why: String((e && e.message) || e).slice(0, 80) }; }
   if (cache) await cache.put(key, new Response(JSON.stringify(out), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=' + RESOLVE_TTL } }));

@@ -186,6 +186,17 @@ await t('back-office : rendez-vous et réalisations du salon (équipe seulement)
   assert.equal(after.reels.length, 0);
 });
 
+await t('lot 1 : prochain créneau de chaque prestation, règles et délai de caution sur le site, aperçu de partage', async () => {
+  await ok('fiila_shop_salon', { p_key: KEY, p: { hours: ALL, seats: 1, rules: 'Merci d’arriver 5 minutes avant. Retard de plus de 15 min : rendez-vous décalé.' } });
+  const nx = await ok('fiila_vitrine_next', { p_slug: SLUG });
+  assert.ok(nx[CUT.id] && /^\d{4}-\d{2}-\d{2}$/.test(nx[CUT.id].day) && /^\d{2}:\d{2}$/.test(nx[CUT.id].time));
+  const site = await ok('fiila_vitrine', { p_slug: SLUG });
+  assert.equal(site.shop.hold, 60); assert.match(site.shop.rules, /Retard/);
+  await db.query(`update fiila.shops set about = 'Coupes et soins', cover_path = 'c/x.jpg' where slug = $1`, [SLUG]);
+  const m = (await one(`select fiila.share_meta(id) m from fiila.shops where slug = $1`, [SLUG])).m;
+  assert.equal(m.about, 'Coupes et soins'); assert.equal(m.kind, 'salon'); assert.match(m.image, /c\/x\.jpg$/);
+});
+
 for (const r of results) console.log(r[0], r[1], r[2] ? '\n    ' + r[2] : '');
 console.log(`\n${passed}/${results.length} tests SQL salons réussis`);
 process.exit(passed === results.length ? 0 : 1);

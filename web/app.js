@@ -2363,8 +2363,8 @@
     var head = h('header', { class: 'sl-head' },
       shop.logo ? h('img', { class: 'sl-logo', src: shop.logo, alt: '' }) : null,
       h('h1', { class: 'sl-name' }, shop.name),
-      st ? h('button', { class: 'sl-open' + (st.open ? ' on' : ''), type: 'button', id: 'salon-open', onclick: hoursSheet }, h('i', { 'aria-hidden': 'true' }), st.text, h('span', { class: 'sl-more' }, ' · Horaires')) : null,
       h('div', { class: 'sl-ibs' },
+        st ? h('button', { class: 'sl-open' + (st.open ? ' on' : ''), type: 'button', id: 'salon-open', onclick: hoursSheet }, h('i', { 'aria-hidden': 'true' }), st.text) : null,
         shop.place ? round({ href: '#/a/' + shop.place.token, id: 'salon-route' }, 'nav', 'Itinéraire') : null,
         wa ? round({ href: wa, target: '_blank', rel: 'noopener noreferrer', id: 'salon-wa' }, 'whatsapp', 'WhatsApp') : null,
         ig ? round({ href: ig, target: '_blank', rel: 'noopener noreferrer', id: 'salon-ig' }, 'instagram', 'Instagram') : null));
@@ -2375,6 +2375,14 @@
         h('span', { class: 'sl-bub-img' }, im), h('span', { class: 'sl-bub-t' }, r.caption || 'Réalisation'));
     })) : null;
     var tabs = rubs.length > 1 ? h('div', { class: 'opt-row sl-tabs', id: 'salon-tabs', role: 'tablist' }) : null;
+    // Prochain créneau libre de chaque prestation (14 jours), affiché sur sa carte ; la réservation s'ouvre sur ce jour.
+    var NEXT = {};
+    api('fiila_vitrine_next', { p_slug: slug }).then(function (r) { NEXT = r || {}; if (grid.isConnected) draw(); }, function () {});
+    function nextText(n) {
+      if (!n) return '';
+      var i = Math.round((Date.parse(n.day + 'T12:00:00Z') - Date.parse(dkIso(dkAdd(0)) + 'T12:00:00Z')) / 864e5);
+      return (i === 0 ? 'Dispo à ' : i === 1 ? 'Demain ' : DAYS_FR[new Date(n.day + 'T12:00:00Z').getUTCDay()].slice(0, 3) + '. ' + Number(n.day.slice(8)) + ' à ') + n.time.replace(':', 'h');
+    }
     var grid = h('div', { class: 'sl-grid', id: 'salon-menu' });
     function card(p) {
       var img = h('div', { class: 'sl-cimg' + (p.has_photo ? ' loading-skel' : '') }, p.has_photo ? null : h('span', { class: 'sl-cph', 'aria-hidden': 'true' }, p.name.charAt(0)));
@@ -2384,6 +2392,7 @@
         h('div', { class: 'sl-cbody' },
           h('h3', null, p.name),
           h('p', { class: 'sl-cmeta' }, h('b', null, fcfa(p.price)), p.duration ? h('span', null, ' · ' + durText(p.duration)) : null),
+          NEXT[p.id] ? h('p', { class: 'sl-next', 'data-next': p.id }, h('i', { 'aria-hidden': 'true' }), nextText(NEXT[p.id])) : null,
           h('button', { class: 'btn sl-cbtn', type: 'button', 'data-book': p.id, onclick: function () { book(p); } }, 'Réserver')));
     }
     function draw() {
@@ -2409,7 +2418,7 @@
       var close = openSheet(back);
     }
     var pg = page(h('div', { class: 'brand-bar nobrand' }), cover, head, reelRow,
-      h('section', { class: 'sl-sec' }, h('h2', { class: 'sl-title' }, 'Prestations'), tabs, grid),
+      h('section', { class: 'sl-sec', 'aria-label': 'Prestations' }, tabs, grid),
       h('div', { style: 'height:24px' }), isPremiumTheme(theme) && !SITE ? madeBy() : footer(true));
     pg.classList.add('vt', 'vt-' + theme, 'sl');
     if (isPremiumTheme(theme)) { pg.classList.add('vt-premium'); document.documentElement.setAttribute('data-vt', theme); }
@@ -2454,8 +2463,8 @@
       }
       function drawWhen() {
         title.textContent = 'Jour et heure';
-        if (!f.day) f.day = dkIso(dkAdd(0));
-        var slotsBox = h('div', { class: 'sl-slots', id: 'book-slots' }, loading('Créneaux…'));
+        if (!f.day) f.day = NEXT[f.p.id] ? NEXT[f.p.id].day : dkIso(dkAdd(0));
+        var slotsBox = h('div', { class: 'sl-slotbox', id: 'book-slots' }, loading('Créneaux…'));
         var days = h('div', { class: 'sl-days', id: 'book-days', role: 'radiogroup', 'aria-label': 'Jour' });
         for (var i = 0; i < 21; i++) (function (i) {
           var d = dkAdd(i), iso = dkIso(d), open = shop.hours && shop.hours[String(d.getUTCDay())], on = f.day === iso;
@@ -2468,8 +2477,14 @@
         api('fiila_vitrine_slots', { p_slug: slug, p_product: f.p.id, p_day: f.day }).then(function (r) {
           if (!slotsBox.isConnected) return;
           if (r.closed || !r.slots.length) { setKids(slotsBox, h('p', { class: 'muted small', id: 'book-none' }, r.closed ? 'Le salon est fermé ce jour-là.' : 'Plus de créneau libre ce jour-là. Essayez un autre jour.')); return; }
-          setKids(slotsBox, r.slots.map(function (t) {
-            return h('button', { type: 'button', class: 'sl-slot', 'data-time': t, onclick: function () { f.time = t; draw(); } }, t);
+          // Créneaux groupés : Matin, Après-midi, Soir.
+          var parts = [['Matin', function (t) { return t < '12:00'; }], ['Après-midi', function (t) { return t >= '12:00' && t < '17:00'; }], ['Soir', function (t) { return t >= '17:00'; }]];
+          setKids(slotsBox, parts.map(function (pp) {
+            var l = r.slots.filter(pp[1]);
+            return l.length ? h('div', { class: 'sl-part' }, h('p', { class: 'sl-part-h' }, pp[0]),
+              h('div', { class: 'sl-slots-g' }, l.map(function (t) {
+                return h('button', { type: 'button', class: 'sl-slot', 'data-time': t, onclick: function () { f.time = t; draw(); } }, t);
+              }))) : null;
           }));
         }, function (e) { setKids(slotsBox); errBox(err, e); });
       }
@@ -2506,10 +2521,14 @@
             errBox(err, e);
           });
         } }, 'check', dep ? 'Réserver et payer la caution' : 'Confirmer le rendez-vous');
+        var rules = h('div', { class: 'sl-rules', id: 'book-rules' },
+          h('p', null, 'Annulation gratuite jusqu’à 2 h avant le rendez-vous.'),
+          dep ? h('p', null, 'La caution est déduite du prix. Sans elle, le créneau est libéré après ' + (shop.hold || 60) + ' min.') : null,
+          shop.rules ? h('p', null, shop.rules) : null);
         setKids(body, chosen(), when,
           textField({ id: 'book-name', label: 'Votre nom', value: f.name, autocomplete: 'name', onInput: function (v) { f.name = v; } }),
           textField({ id: 'book-phone', label: 'Votre numéro WhatsApp', type: 'tel', value: f.phone, autocomplete: 'tel', onInput: function (v) { f.phone = v; } }),
-          payBox, send);
+          payBox, rules, send);
       }
       draw();
     }
@@ -2543,7 +2562,11 @@
           h('p', null, h('b', null, b.service), ' · ', durText(b.duration), ' · ', fcfa(b.price))),
         payCard,
         s.place ? iconBtn('a', { class: 'btn ghost full', href: '#/a/' + s.place.token, id: 'rdv-route' }, 'nav', 'Itinéraire jusqu’au salon') : null,
-        s.phone ? iconBtn('a', { class: 'btn ghost full', href: waTo(s.phone, 'Bonjour, c’est au sujet de mon rendez-vous ' + b.ref + '.'), target: '_blank', rel: 'noopener noreferrer', id: 'rdv-wa' }, 'whatsapp', 'Écrire au salon') : null,
+        // Nouvelle réservation (recommandation A1) : la cliente prévient le salon sur WhatsApp, message prérempli.
+        s.phone && q && q.nouveau && (b.status === 'pending' || b.status === 'confirmed') ? iconBtn('a', { class: 'btn big full', id: 'rdv-notify', target: '_blank', rel: 'noopener noreferrer',
+          href: waTo(s.phone, 'Bonjour ' + s.name + ', je viens de réserver sur votre page Fii : ' + b.service + ', ' + bookDateText(b.start_at) + ' (' + b.ref + ').' + (b.pay_to ? ' J’envoie la caution de ' + fcfa(b.deposit) + ' par ' + PAY_SHORT[b.pay_mode] + '.' : '') + ' ' + baseUrl() + '#/rdv/' + token) },
+          'whatsapp', 'Prévenir le salon sur WhatsApp') : null,
+        s.phone && !(q && q.nouveau) ? iconBtn('a', { class: 'btn ghost full', href: waTo(s.phone, 'Bonjour, c’est au sujet de mon rendez-vous ' + b.ref + '.'), target: '_blank', rel: 'noopener noreferrer', id: 'rdv-wa' }, 'whatsapp', 'Écrire au salon') : null,
         s.slug ? h('a', { class: 'btn link', href: '#/b/' + s.slug }, 'Voir le salon') : null,
         cancel, err, footer(true));
       if (q && q.nouveau) setTimeout(function () { toast(b.status === 'pending' ? 'Créneau réservé. Payez la caution pour le confirmer.' : 'Rendez-vous confirmé.'); }, 200);
@@ -6539,18 +6562,22 @@
           h('span', null, i === 0 ? 'Auj.' : i === 1 ? 'Dem.' : DAYS_FR[d.getUTCDay()].slice(0, 3) + '.'), h('b', null, String(d.getUTCDate())), h('span', null, n ? n + ' rdv' : '–'));
       }));
     }
+    // Réservations arrivées depuis la dernière visite de l'agenda (recommandation A1) : marquées « Nouveau ».
+    var seen = LS.get(SEEN_KEY, 0);
+    function isNew(b) { return seen && Date.parse(b.created_at) > seen; }
     function drawList() {
       var l = items.filter(function (b) { return b.start_at.slice(0, 10) === day; });
       setKids(listBox, l.length ? h('div', { class: 'list', id: 'agenda-list' }, l.map(function (b) {
         return h('button', { class: 'item bk-row', type: 'button', 'data-bk': b.id, onclick: function () { bkSheet(b); } },
           h('span', { class: 'bk-time' }, hm(new Date(b.start_at).getUTCHours() * 60 + new Date(b.start_at).getUTCMinutes())),
-          h('div', { style: 'flex:1;min-width:0;text-align:left' }, h('div', { class: 't' }, b.customer_name), h('div', { class: 'small muted' }, b.service + ' · ' + durText(b.duration))),
+          h('div', { style: 'flex:1;min-width:0;text-align:left' }, h('div', { class: 't' }, b.customer_name, isNew(b) ? h('span', { class: 'bk-new' }, 'Nouveau') : null), h('div', { class: 'small muted' }, b.service + ' · ' + durText(b.duration))),
           bkChip(b));
       })) : h('div', { class: 'card' }, h('p', { class: 'muted' }, 'Aucun rendez-vous ce jour-là.')));
     }
     function load() {
       return sapi('fiila_bookings', { p_from: today, p_days: 14 }).then(function (res) {
         items = res.items || [];
+        LS.set(SEEN_KEY, Date.now()); setAgendaBadge(0);
         setKids(banner, res.waiting ? h('div', { class: 'card warn', id: 'agenda-waiting' }, h('p', null, h('b', null, res.waiting + (res.waiting > 1 ? ' cautions' : ' caution') + ' à vérifier.'),
           ' Vérifiez la réception sur Wave ou Orange Money, puis touchez « Caution reçue ».')) : null);
         drawDays(); drawList();
@@ -6576,6 +6603,9 @@
       setKids(acts,
         b.status === 'pending' && b.deposit && !b.deposit_paid ? iconBtn('button', { class: 'btn big full', type: 'button', id: 'bk-deposit', onclick: function () { act(b, 'deposit', close); } }, 'check', 'Caution reçue') : null,
         b.status === 'confirmed' ? iconBtn('button', { class: 'btn big full', type: 'button', id: 'bk-done', onclick: function () { act(b, 'done', close); } }, 'check', 'Client(e) venu(e)') : null,
+        // Rappel (recommandation A7) : message prêt à envoyer la veille ou le jour même.
+        live && Date.parse(b.start_at) > Date.now() ? iconBtn('a', { class: 'btn ghost full', target: '_blank', rel: 'noopener noreferrer', id: 'bk-remind',
+          href: waTo(b.customer_phone, 'Bonjour ' + b.customer_name.split(' ')[0] + ', petit rappel de ' + shop.name + ' : votre rendez-vous ' + b.service + ' est prévu ' + bookDateText(b.start_at) + '. À bientôt !') }, 'clock', 'Rappeler le rendez-vous') : null,
         iconBtn('a', { class: 'btn ghost full', href: waTo(b.customer_phone, 'Bonjour ' + b.customer_name.split(' ')[0] + ', c’est ' + shop.name + ' au sujet de votre rendez-vous du ' + bookDateText(b.start_at) + '.'), target: '_blank', rel: 'noopener noreferrer', id: 'bk-wa' }, 'whatsapp', 'Écrire sur WhatsApp'),
         live && b.status === 'confirmed' ? h('button', { class: 'btn link', type: 'button', id: 'bk-noshow', onclick: function () { act(b, 'no_show', close); } }, 'Absent(e)') : null,
         live ? h('button', { class: 'btn link danger', type: 'button', id: 'bk-cancel', onclick: function (e) {
@@ -6596,7 +6626,7 @@
     return sapi('fiila_shop_salon', { p: null }).then(function (d) {
       if (d.salon) { SHOP_SALON = true; LS.set('fiila.salon', true); }
       var hours = {}; [0, 1, 2, 3, 4, 5, 6].forEach(function (k) { hours[k] = d.hours && d.hours[k] ? d.hours[k].slice() : null; });
-      var f = { seats: d.seats || 1, step: d.step || 30, place: d.place ? d.place.token : '' };
+      var f = { seats: d.seats || 1, step: d.step || 30, place: d.place ? d.place.token : '', rules: d.rules || '' };
       var err = h('div', { role: 'alert' }), hoursBox = h('div', { class: 'stack tight', id: 'salon-hours-edit' });
       function drawHours() {
         setKids(hoursBox, [1, 2, 3, 4, 5, 6, 0].map(function (k) {
@@ -6621,7 +6651,7 @@
       var save = h('button', { class: 'btn big full', type: 'button', id: 'salon-save', onclick: function () {
         setKids(err); save.disabled = true;
         var hh = {}; Object.keys(hours).forEach(function (k) { if (hours[k]) hh[k] = hours[k]; });
-        sapi('fiila_shop_salon', { p: { hours: hh, seats: f.seats, step: String(f.step), place: f.place.trim() } }).then(function () {
+        sapi('fiila_shop_salon', { p: { hours: hh, seats: f.seats, step: String(f.step), place: f.place.trim(), rules: f.rules.trim() } }).then(function () {
           save.disabled = false; toast('Réservations enregistrées.');
         }, function (e) { save.disabled = false; errBox(err, e); });
       } }, 'Enregistrer');
@@ -6664,7 +6694,9 @@
           pills('salon-seats', 'Rendez-vous en même temps', [[1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6']], 'seats'),
           pills('salon-step', 'Créneaux toutes les', [[15, '15 min'], [30, '30 min'], [60, '1 h']], 'step'),
           textField({ id: 'salon-place', label: 'Adresse du salon (lien de votre fiche Fii)', optional: true, value: f.place ? baseUrl() + '#/a/' + f.place : '',
-            hint: d.place ? d.place.label + (d.place.locality ? ', ' + d.place.locality : '') : 'Créez la fiche de votre salon (entrée, photo), puis collez son lien ici.', onInput: function (v) { f.place = v; } })),
+            hint: d.place ? d.place.label + (d.place.locality ? ', ' + d.place.locality : '') : 'Créez la fiche de votre salon (entrée, photo), puis collez son lien ici.', onInput: function (v) { f.place = v; } }),
+          textField({ id: 'salon-rules', label: 'Vos règles (montrées avant de réserver)', optional: true, multiline: true, max: 200, value: f.rules,
+            placeholder: 'Ex. : merci d’arriver 5 minutes avant ; au-delà de 15 min de retard, le rendez-vous est décalé.', onInput: function (v) { f.rules = v; } })),
         err, save,
         h('section', { class: 'card' }, h('h2', null, 'Réalisations'), h('p', { class: 'small muted' }, 'Vos plus beaux résultats, en photo ou en vidéo courte (MP4, 4 Mo).'), reelBox),
         footer()), 'settings');
@@ -6676,6 +6708,27 @@
   var SHOP_ROLE = null;
   // Salon (31/10) : l'onglet « Commandes » devient « Agenda » ; gardé sur le téléphone pour les écrans qui ne relisent pas la boutique.
   var SHOP_SALON = LS.get('fiila.salon', false) === true;
+  // Pastille « nouvelles réservations » sur l'onglet Agenda (recommandation A1) : réservations créées depuis la dernière
+  // ouverture de l'agenda sur cet appareil. Une lecture au plus par minute.
+  var SEEN_KEY = 'fiila.agenda.seen', BADGE = { at: 0, n: 0 };
+  function setAgendaBadge(n) {
+    BADGE.n = n;
+    var t = document.getElementById('tab-orders'); if (!t) return;
+    var b = t.querySelector('.tab-new');
+    if (!n) { if (b) b.remove(); return; }
+    if (!b) { b = h('span', { class: 'tab-new', id: 'agenda-badge' }); t.querySelector('.p').appendChild(b); }
+    b.textContent = n > 9 ? '9+' : String(n);
+    t.setAttribute('aria-label', 'Agenda, ' + n + ' nouvelle' + (n > 1 ? 's' : '') + ' réservation' + (n > 1 ? 's' : ''));
+  }
+  function agendaBadgeLoad() {
+    var seen = LS.get(SEEN_KEY, 0);
+    if (!seen) return;
+    if (Date.now() - BADGE.at < 60000) { setAgendaBadge(BADGE.n); return; }
+    BADGE.at = Date.now();
+    sapi('fiila_bookings', { p_from: dkIso(dkAdd(0)), p_days: 14 }).then(function (res) {
+      setAgendaBadge((res.items || []).filter(function (b) { return Date.parse(b.created_at) > seen; }).length);
+    }, function () {});
+  }
   function setSalon(shop) { SHOP_SALON = !!(shop && isSalon(shop.business_type)); LS.set('fiila.salon', SHOP_SALON); }
   function viewShop(q) {
     return sapi('fiila_shop_get', {}).then(function (r) {
@@ -7630,6 +7683,7 @@
         h('span', { class: 'p', 'aria-hidden': 'true' }, icon(name, 22)), label);
     }
     pg.classList.add('has-tabs');
+    if (SHOP_SALON && active !== 'orders') setTimeout(agendaBadgeLoad, 0);
     pg.appendChild(h('div', { class: 'tabbar' }, h('nav', { 'aria-label': 'Boutique' },
       SHOP_SALON ? tab('orders', '#/boutique', 'cal', 'Agenda') : tab('orders', '#/boutique', 'box', 'Commandes'),
       tab('products', '#/boutique/articles', 'tag', SHOP_SALON ? 'Prestations' : 'Articles'),

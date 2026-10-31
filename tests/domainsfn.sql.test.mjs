@@ -213,6 +213,10 @@ await t('Worker : liens universels iPhone servis en JSON sur le domaine principa
 await t('Worker : remplacement de l’ancienne adresse et page de site pures (fonctions exportées)', async () => {
   assert.equal(mainIndex('<a href="https://aramislab0.github.io/fii-la/x">', WENV), '<a href="https://getfii.app/x">');
   const s = siteIndex('<head><title>Fii</title></head>', { slug: 'a', name: 'A"B', host: 'a.sn' });
+  const rich = siteIndex('<head><title>Fii</title><meta name="description" content="x"><meta property="og:description" content="x"></head>', { slug: 'le-labo', name: 'Le Labo', host: 'le-labo.getfii.app', about: 'Barbier & beauté', kind: 'salon', image: 'https://cdn.example.test/c.jpg' });
+  assert.match(rich, /og:description" content="Barbier &amp; beauté · Réservez en ligne"/);
+  assert.match(rich, /og:image" content="https:\/\/cdn\.example\.test\/c\.jpg"/);
+  assert.match(rich, /twitter:card" content="summary_large_image"/);
   assert.match(s, /<title>A&quot;B<\/title>/); assert.match(s, /og:url" content="https:\/\/a.sn\/"/);
 });
 

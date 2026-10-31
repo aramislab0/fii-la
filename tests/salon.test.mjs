@@ -45,7 +45,7 @@ await local.db.query(`update fiila.shops set plan = 'premium' where id = $1`, [S
 const V = await ok('fiila_shop_vitrine', { p_key: KEY, p: { public: true, theme: 'rituel', accent: 'noir', about: 'Coupes, barbe et soins.',
   policies: { pay: ['wave'], wave_to: '77 111 22 33' } } });
 const ALL = {}; for (let d = 0; d <= 6; d++) ALL[d] = ['08:00', '22:00'];
-await ok('fiila_shop_salon', { p_key: KEY, p: { hours: ALL, seats: 1, step: '30' } });
+await ok('fiila_shop_salon', { p_key: KEY, p: { hours: ALL, seats: 1, step: '30', rules: 'Merci d’arriver 5 minutes avant.' } });
 const CUT = await ok('fiila_product_save', { p_key: KEY, p: { name: 'Coupe homme (test)', price: 5000, duration: 30, rubric: 'Coupes' } });
 const FADE = await ok('fiila_product_save', { p_key: KEY, p: { name: 'Coupe + barbe (test)', price: 8000, duration: 60, deposit: 2000, rubric: 'Coupes' } });
 await ok('fiila_product_save', { p_key: KEY, p: { name: 'Manucure (test)', price: 6000, duration: 45, rubric: 'Beauté' } });
@@ -68,6 +68,9 @@ await t('page du salon : cartes (photo, prix, durée, « Réserver »), une rang
   assert.equal(await C.locator('.sl-card').count(), 1);
   await C.locator('#salon-tabs [data-tab=""]').click();
   assert.equal(await C.locator('.sl-bub').count(), 2);
+  await C.locator(`[data-next="${FADE.id}"]`).waitFor();
+  assert.match(await C.locator(`[data-next="${FADE.id}"]`).textContent(), /^(Dispo à|Demain) \d\dh\d\d$/, 'prochain créneau sur la carte');
+  assert.equal(await C.locator('.sl-ibs #salon-open').count(), 1, 'statut et icônes sur une ligne');
   await C.click('#salon-open');
   assert.equal(await C.locator('#hours-sheet .sl-hr').count(), 7);
   await C.locator('#hours-sheet .vsheet-close').click();
@@ -94,11 +97,14 @@ await t('réservation : prestation → jour et heure → coordonnées, caution W
   await C.locator('[data-day]').nth(1).click();
   await C.locator('#book-slots .sl-slot').first().waitFor();
   assert.equal(await C.locator('#book-slots .sl-slot').first().textContent(), '08:00');
+  assert.deepEqual(await C.locator('#book-slots .sl-part-h').allTextContents(), ['Matin', 'Après-midi', 'Soir'], 'créneaux groupés');
   await shot(C, '02-creneaux');
   await C.locator('#book-slots .sl-slot[data-time="10:00"]').click();
   await C.fill('#book-name', 'Awa Test');
   await C.fill('#book-phone', '77 000 00 01');
   assert.match(await C.locator('#book-pay').textContent(), /Caution de 2 000 FCFA.*Wave/);
+  const rules = await C.locator('#book-rules').textContent();
+  assert.match(rules, /Annulation gratuite jusqu’à 2 h avant/); assert.match(rules, /déduite du prix/); assert.match(rules, /arriver 5 minutes avant/);
   await shot(C, '03-coordonnees');
   await C.click('#book-send');
   await C.locator('#rdv-card').waitFor();
@@ -106,6 +112,9 @@ await t('réservation : prestation → jour et heure → coordonnées, caution W
   assert.match(await C.locator('#rdv-pay-to').textContent(), /77 111 22 33/);
   assert.match(await C.locator('#rdv-when').textContent(), /· 10:00$/);
   RDV = C.url().split('#/rdv/')[1].split('?')[0];
+  const wa = decodeURIComponent(await C.locator('#rdv-notify').getAttribute('href'));
+  assert.match(wa, /^https:\/\/wa\.me\/221770000009\?text=Bonjour Salon Démo \(test\), je viens de réserver.*Coupe \+ barbe \(test\).*J’envoie la caution de 2 000 FCFA par Wave/);
+  assert.equal(await C.locator('#rdv-wa').count(), 0, 'un seul bouton WhatsApp');
   await shot(C, '04-rendez-vous');
 });
 
@@ -131,9 +140,11 @@ await t('salon : agenda du jour, « Caution reçue » confirme le rendez-vous', 
   await B.locator('#agenda-waiting').waitFor();
   await B.locator('[data-day]').nth(1).click();
   await B.locator('.bk-row').first().waitFor();
+  assert.equal(await B.locator('.bk-new').count(), 0, 'première visite : rien de marqué');
   assert.match(await B.locator('.bk-row').first().textContent(), /10:00.*Awa Test.*Caution attendue/);
   await shot(B, '05-agenda');
   await B.locator('.bk-row').first().click();
+  assert.match(decodeURIComponent(await B.locator('#bk-remind').getAttribute('href')), /petit rappel de Salon Démo \(test\) : votre rendez-vous Coupe \+ barbe \(test\)/);
   await B.click('#bk-deposit');
   await B.getByText('Caution reçue : rendez-vous confirmé.').waitFor();
   await B.locator('.bk-row', { hasText: 'Confirmé' }).waitFor();
@@ -142,6 +153,22 @@ await t('salon : agenda du jour, « Caution reçue » confirme le rendez-vous', 
   await C2.locator('#rdv-card').waitFor();
   assert.equal(await C2.locator('#rdv-status').getAttribute('data-status'), 'confirmed');
   assert.equal(await C2.locator('#rdv-pay').count(), 0);
+});
+
+await t('nouvelle réservation : pastille sur l’onglet Agenda et « Nouveau » sur la ligne', async () => {
+  await B.evaluate(() => localStorage.setItem('fiila.agenda.seen', String(Date.now() - 1000)));
+  const d = new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10);
+  await ok('fiila_vitrine_book', { p_slug: V.slug, p: { product_id: CUT.id, day: d, time: '15:00', customer: { name: 'Binta Test', phone: '77 000 00 02' } } });
+  await B.goto(URL0 + '#/boutique/articles');
+  await B.locator('#agenda-badge').waitFor();
+  assert.equal(await B.locator('#agenda-badge').textContent(), '1');
+  await B.click('#tab-orders');
+  await B.locator('[data-day="' + d + '"]').click();
+  await B.locator('.bk-row .bk-new').waitFor();
+  assert.match(await B.locator('.bk-row', { hasText: 'Binta Test' }).textContent(), /Binta Test.*Nouveau/);
+  await B.goto(URL0 + '#/boutique/articles');
+  await B.locator('#tab-orders').waitFor(); await B.waitForTimeout(400);
+  assert.equal(await B.locator('#agenda-badge').count(), 0, 'vue : la pastille disparaît');
 });
 
 await t('réglages : horaires par jour (fermé le dimanche), postes ; enregistrés', async () => {
@@ -154,6 +181,7 @@ await t('réglages : horaires par jour (fermé le dimanche), postes ; enregistr�
   await B.getByText('Réservations enregistrées.').waitFor();
   const row = (await local.db.query(`select hours, seats from fiila.shops where id = $1`, [S.shop.id])).rows[0];
   assert.equal(row.hours['0'], undefined); assert.equal(row.seats, 2);
+  assert.equal(await B.locator('#salon-rules').inputValue(), 'Merci d’arriver 5 minutes avant.');
   assert.equal(await B.locator('#salon-reels-edit .sl-reel:not(.add)').count(), 2);
   await shot(B, '06-reglages', true);
 });

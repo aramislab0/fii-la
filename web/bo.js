@@ -575,6 +575,7 @@ window.FiiBO = function (F) {
       setKids(box, h('h2', null, 'Réservations'),
         row('Horaires', hrs.length ? hrs.join(' · ') : h('span', { class: 'bo-warn' }, 'Non renseignés : aucun créneau proposé'), 'bo-bk-hours'),
         row('Rendez-vous en même temps', boNum(a.seats) + ' · créneaux toutes les ' + a.step + ' min'),
+        row('Règles', a.rules || 'Aucune (seules les règles Fii s’affichent)', 'bo-bk-rules'),
         row('Adresse', a.place ? h('a', { href: '#/a/' + a.place.token, target: '_blank', rel: 'noopener' }, [a.place.label, a.place.locality].filter(Boolean).join(', ')) : 'Non liée'),
         row('Rendez-vous', boNum(c.upcoming) + ' à venir · ' + boNum(c.waiting) + ' caution(s) à vérifier · ' + boNum(c.done) + ' venu(s) · ' + boNum(c.no_show) + ' absent(s) · ' + boNum(c.cancelled) + ' annulé(s)', 'bo-bk-counts'),
         boTable([{ label: 'Réf.', get: function (b) { return b.ref; } }, { label: 'Prestation', get: function (b) { return b.service; } },

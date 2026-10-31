@@ -42,7 +42,7 @@ const EXPECTED_FUNCTIONS = [
   // mesures du Studio (20261028800000) : décors affichés, rejets, partages (boutiques sans compte comprises)
   'fiila_studio_seen', 'fiila_studio_reject', 'fiila_studio_shared',
   // salons : prestations, créneaux, rendez-vous, réalisations (20261031100000)
-  'fiila_vitrine_slots', 'fiila_vitrine_book', 'fiila_booking_public', 'fiila_booking_cancel', 'fiila_bookings', 'fiila_booking_set',
+  'fiila_vitrine_slots', 'fiila_vitrine_next', 'fiila_vitrine_book', 'fiila_booking_public', 'fiila_booking_cancel', 'fiila_bookings', 'fiila_booking_set',
   'fiila_shop_salon', 'fiila_reel_add', 'fiila_reel_delete',
 // Audit du 27/10 (20261028300000) : le back-office est fermé à anon, sauf l'ouverture d'une invitation et le portail.
 ].filter((f) => !/^fiila_(bo|admin)_/.test(f) || f === 'fiila_bo_invite_get' || f === 'fiila_bo_me').sort();
