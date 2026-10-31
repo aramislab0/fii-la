@@ -297,6 +297,7 @@
       if (opts.onClose) opts.onClose();
     }
     document.addEventListener('keydown', key, true);
+    fxGrab(back, close);
     document.body.append(back);
     // Fond figé et inerte pendant la feuille (audit du 27/10 : la page défilait derrière, VoiceOver pouvait en sortir).
     document.documentElement.classList.add('sheet-open'); app.inert = true;
@@ -2277,7 +2278,7 @@
   function markSalon() { SHOP_SALON = true; LS.set('fiila.salon', true); }
   // Outils de app.js utilisés par salon.js (contrôlé par scripts/check-bo.mjs).
   function salonShared() {
-    return { api: api, ApiError: ApiError, backBtn: backBtn, baseUrl: baseUrl, brandBar: brandBar, cardPhoto: cardPhoto, compressPhoto: compressPhoto, copy: copy, COVER_P: COVER_P, coverLoad: coverLoad, deferSrc: deferSrc, dkAdd: dkAdd, dkIso: dkIso, dkNow: dkNow, durText: durText, errBox: errBox, ERRORS: ERRORS, errText: errText, failPage: failPage, fcfa: fcfa, fill: fill, footer: footer, go: go, h: h, hm: hm, icon: icon, iconBtn: iconBtn, identitySlot: identitySlot, isPremiumTheme: isPremiumTheme, lazyPhoto: lazyPhoto, loading: loading, LS: LS, madeBy: madeBy, markSalon: markSalon, openSheet: openSheet, page: page, partnerSlot: partnerSlot, PAY_SHORT: PAY_SHORT, render: render, retryBtn: retryBtn, sapi: sapi, secHead: secHead, SEEN_KEY: SEEN_KEY, setAgendaBadge: setAgendaBadge, setKids: setKids, shopTabs: shopTabs, SITE: SITE, socialUrl: socialUrl, stateCard: stateCard, statePill: statePill, textField: textField, toast: toast, vitrineUrl: vitrineUrl, VT_ACCENTS: VT_ACCENTS, waTo: waTo };
+    return { api: api, ApiError: ApiError, backBtn: backBtn, baseUrl: baseUrl, brandBar: brandBar, cardPhoto: cardPhoto, compressPhoto: compressPhoto, copy: copy, COVER_P: COVER_P, coverLoad: coverLoad, deferSrc: deferSrc, dkAdd: dkAdd, dkIso: dkIso, dkNow: dkNow, durText: durText, errBox: errBox, ERRORS: ERRORS, errText: errText, failPage: failPage, fcfa: fcfa, fill: fill, footer: footer, go: go, h: h, hm: hm, icon: icon, iconBtn: iconBtn, identitySlot: identitySlot, isPremiumTheme: isPremiumTheme, lazyPhoto: lazyPhoto, loading: loading, LS: LS, madeBy: madeBy, markSalon: markSalon, openSheet: openSheet, page: page, partnerSlot: partnerSlot, PAY_SHORT: PAY_SHORT, render: render, retryBtn: retryBtn, sapi: sapi, secHead: secHead, SEEN_KEY: SEEN_KEY, setAgendaBadge: setAgendaBadge, setKids: setKids, shopTabs: shopTabs, SITE: SITE, socialUrl: socialUrl, stateCard: stateCard, statePill: statePill, textField: textField, toast: toast, vitrineUrl: vitrineUrl, VT_ACCENTS: VT_ACCENTS, waTo: waTo, REDUCED: REDUCED, buzz: buzz, fxOnce: fxOnce, fxShop: fxShop, fxTicket: fxTicket };
   }
   var salonPromise = null;
   function loadSalon() {
@@ -2825,7 +2826,7 @@
       h('span', null, 'Aperçu du modèle Premium « ' + VT_PREMIUM.filter(function (t) { return t[0] === preview; })[0][1] + ' ». Vos clientes voient votre modèle actuel.')), pg.firstChild.nextSibling);
     pg.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.foret)[1]);
     pg.appendChild(bar);
-    return pg;
+    return fxShop(pg);
   }
   // Photo chargée quand la carte arrive à l'écran (page légère sur réseau lent).
 
@@ -8528,6 +8529,14 @@
         var at = afterTask('order', { icon: 'shop', title: 'Vous vendez aussi ?', cta: 'Ouvrir ma boutique gratuite', href: '#/boutique' });
         if (at) act.push(h('div', { class: 'no-print' }, at));
       }
+      // Carte de félicitations (31/10) : une fois, juste après la commande ; l'action suivante en un seul bouton.
+      if (q && q.nouvelle === '1' && fxOnce('fiila.yay.' + token)) setTimeout(function () {
+        if (!document.getElementById('order-sent')) return;
+        var go2 = o.address_state === 'pending' && o.request_token ? iconBtn('a', { class: 'btn big full', id: 'fx-yay-go', href: '#/d/' + o.request_token + qs({ f: token }) }, 'pin', 'Donner mon adresse de livraison')
+          : s.phone ? iconBtn('a', { class: 'btn big full fx-wa', id: 'fx-yay-go', href: waTo(s.phone, 'Bonjour, je viens de commander (N° ' + o.ref + ') : ' + invoiceUrl(token)), target: '_blank', rel: 'noopener noreferrer' }, 'whatsapp', 'Prévenir la boutique sur WhatsApp') : null;
+        fxTicket({ title: 'Commande envoyée !', sub: s.name + ' a bien reçu votre commande.' + (o.address_state === 'pending' ? ' Dernière étape : votre adresse.' : ''),
+          rows: [['Commande', 'N° ' + o.ref], ['Total', fcfa(o.total)], ['Paiement', PAY_SHORT[o.pay_mode] || ''], ['Boutique', s.name]], cta: go2, more: 'Voir ma commande' });
+      }, 250);
       // Paiement avant la livraison (30/10) : montant, mode et numéro de la boutique, tant que ce n'est pas réglé.
       if ((o.pay_mode === 'wave' || o.pay_mode === 'om') && o.pay_state !== 'paid' && !delivered && o.pay_to) {
         act.push(h('section', { class: 'card highlight no-print', id: 'pay-before' },
@@ -8829,12 +8838,12 @@
     if (!REDUCED) setTimeout(function () { fg.setAttribute('stroke-dashoffset', c * (1 - k)); }, 120);
     return svg;
   }
-  function confetti(canvas) {
+  function confetti(canvas, palette) {
     if (REDUCED || !canvas.getContext) return;
     var ctx = canvas.getContext('2d'), W, H, dpr = Math.min(2, window.devicePixelRatio || 1), t0 = null;
     function size() { W = canvas.clientWidth; H = canvas.clientHeight; canvas.width = W * dpr; canvas.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
     size();
-    var colors = ['#CFE7A6', '#7ECC9A', '#F6F4EE', '#E8B95E', '#2E7D55', '#F1C5C0'];
+    var colors = palette || ['#CFE7A6', '#7ECC9A', '#F6F4EE', '#E8B95E', '#2E7D55', '#F1C5C0'];
     var ps = [];
     for (var i = 0; i < 150; i++) {
       var left = i % 2 === 0;
@@ -8855,6 +8864,98 @@
       if (el < 3600) requestAnimationFrame(f); else ctx.clearRect(0, 0, W, H);
     });
   }
+  /* ================================================================ ANIMATIONS DES PAGES BOUTIQUE (fondateur, 31/10 19:36 : « je valide »)
+     Minimum pour toutes les pages boutique (articles et salons, tous modèles et formules) : entrée orchestrée, cartes qui
+     montent au défilement et répondent au doigt, rubriques qui glissent, feuilles à ressort fermées en glissant, carte de
+     félicitations après une commande ou une réservation. Position et opacité seulement ; rien si « réduire les animations ». */
+  function buzz(ms) { try { if (!REDUCED && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* rien */ } }
+  function fxShop(pg) {
+    if (REDUCED) return pg;
+    pg.classList.add('fx', 'fx-play');
+    var fine = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    var io = window.IntersectionObserver ? new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.remove('fx-pre'); io.unobserve(e.target); } });
+    }, { rootMargin: '0px 0px -6% 0px' }) : null;
+    var ready = false, queued = false, tabs = {};
+    function tilt(c) {
+      c.addEventListener('pointermove', function (e) {
+        var r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        c.style.setProperty('--fx-rx', ((0.5 - y) * 6).toFixed(2) + 'deg'); c.style.setProperty('--fx-ry', ((x - 0.5) * 6).toFixed(2) + 'deg'); c.classList.add('fx-tilt');
+      });
+      c.addEventListener('pointerleave', function () { c.classList.remove('fx-tilt'); });
+    }
+    // Rubriques : une pastille glisse de l'ancienne rubrique à la nouvelle (la rangée est redessinée à chaque choix).
+    function slide(row) {
+      var on = row.querySelector('.opt.on'); if (!on || row.__fxOn === on) return;
+      row.__fxOn = on;
+      var key = row.id || 'tabs', now = { x: on.offsetLeft, y: on.offsetTop, w: on.offsetWidth, h: on.offsetHeight }, was = tabs[key];
+      tabs[key] = now;
+      if (!was || (was.x === now.x && was.w === now.w)) return;
+      var ghost = h('span', { class: 'fx-pill', 'aria-hidden': 'true',
+        style: 'background:' + getComputedStyle(on).backgroundColor + ';left:' + was.x + 'px;top:' + was.y + 'px;width:' + was.w + 'px;height:' + was.h + 'px' });
+      row.appendChild(ghost); on.classList.add('fx-tab-in'); buzz(6);
+      requestAnimationFrame(function () { requestAnimationFrame(function () { ghost.style.left = now.x + 'px'; ghost.style.top = now.y + 'px'; ghost.style.width = now.w + 'px'; }); });
+      setTimeout(function () { ghost.remove(); on.classList.remove('fx-tab-in'); }, 380);
+    }
+    function scan() {
+      queued = false;
+      var n = 0;
+      Array.prototype.forEach.call(pg.querySelectorAll('.vcard, .sl-card'), function (c) {
+        if (c.__fx) return; c.__fx = true;
+        if (ready) { c.classList.add('fx-new'); c.style.setProperty('--fx-i', Math.min(n++, 8)); }
+        else if (io && c.getBoundingClientRect().top > window.innerHeight) { c.classList.add('fx-pre'); io.observe(c); }
+        if (fine) tilt(c);
+      });
+      Array.prototype.forEach.call(pg.querySelectorAll('.vtabs, .sl-tabs'), slide);
+      ready = true;
+    }
+    if (window.MutationObserver) new MutationObserver(function () { if (!queued && pg.isConnected) { queued = true; requestAnimationFrame(scan); } }).observe(pg, { childList: true, subtree: true });
+    setTimeout(scan, 0);
+    return pg;
+  }
+  // Feuilles : poignée en haut, on les ferme en les glissant vers le bas.
+  function fxGrab(back, close) {
+    var sh = back.querySelector('.sheet'); if (!sh || sh.querySelector('.fx-grab')) return;
+    var g = h('div', { class: 'fx-grab', 'aria-hidden': 'true' }), y0 = null;
+    sh.insertBefore(g, sh.firstChild);
+    g.addEventListener('pointerdown', function (e) { y0 = e.clientY; sh.style.transition = 'none'; try { g.setPointerCapture(e.pointerId); } catch (x) { /* rien */ } });
+    g.addEventListener('pointermove', function (e) { if (y0 !== null) sh.style.transform = 'translateY(' + Math.max(0, e.clientY - y0) + 'px)'; });
+    function up(e) {
+      if (y0 === null) return;
+      var d = e.clientY - y0; y0 = null; sh.style.transition = 'transform .3s cubic-bezier(.16,1,.3,1)';
+      if (d > 80) { sh.style.transform = 'translateY(105%)'; setTimeout(close, 220); } else sh.style.transform = '';
+    }
+    g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+  }
+  // Carte de félicitations des pages boutique (commande envoyée, rendez-vous réservé) : coche, confettis, ticket, une action.
+  // o : {title, sub, rows: [[libellé, valeur]], cta: élément, more: texte du lien de fermeture, accent}
+  function fxTicket(o) {
+    var prev = document.getElementById('fx-yay'); if (prev) prev.remove();
+    var canvas = h('canvas', { class: 'cel-fx', 'aria-hidden': 'true' });
+    var check = h('div', { class: 'fx-check', 'aria-hidden': 'true' });
+    check.innerHTML = '<svg width="34" height="34" viewBox="0 0 34 34"><path d="M8 17.5l6 6 12-13"/></svg>';
+    function close() {
+      if (!ov.isConnected) return;
+      window.removeEventListener('hashchange', close); document.removeEventListener('keydown', key);
+      ov.classList.add('out'); setTimeout(function () { ov.remove(); }, REDUCED ? 0 : 220);
+    }
+    function key(e) { if (e.key === 'Escape') close(); }
+    var more = h('button', { class: 'fx-more', type: 'button', id: 'fx-yay-close', onclick: close }, o.more || 'Continuer');
+    var ov = h('div', { class: 'fx-yay', id: 'fx-yay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'fx-yay-t', onclick: function (e) { if (e.target === ov) close(); } }, canvas,
+      h('div', { class: 'fx-ticket' }, check,
+        h('h2', { id: 'fx-yay-t' }, o.title), o.sub ? h('p', { class: 'fx-sub' }, o.sub) : null,
+        h('div', { class: 'fx-stub' }, o.rows.filter(function (r) { return r && r[1]; }).map(function (r) { return h('div', null, h('small', null, r[0]), h('b', null, r[1])); })),
+        o.cta || null, more));
+    if (o.cta) o.cta.addEventListener('click', function () { setTimeout(close, 60); });
+    document.body.appendChild(ov);
+    window.addEventListener('hashchange', close); document.addEventListener('keydown', key);
+    try { (o.cta || more).focus({ preventScroll: true }); } catch (e) { /* rien */ }
+    buzz([12, 60, 18]);
+    confetti(canvas, ['#C9A86A', '#111111', '#E8D9B8', '#FFFFFF', o.accent || '#1F8F4E']);
+    return close;
+  }
+  // Une seule fois par commande ou rendez-vous (pas à chaque réouverture du lien).
+  function fxOnce(key) { try { if (sessionStorage.getItem(key)) return false; sessionStorage.setItem(key, '1'); } catch (e) { /* rien */ } return true; }
   // Félicitations : carte en plein écran, confettis, une seule action. o : {icon, kicker, title, sub, gain, card, cta, onClose}
   function celebrate(o) {
     var prev = document.getElementById('cel'); if (prev) prev.remove();

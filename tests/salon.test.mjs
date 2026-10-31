@@ -78,6 +78,12 @@ await t('page du salon : cartes (photo, prix, durée, « Réserver »), une rang
   assert.equal(await C.locator('#made-by').count(), 1, '« Conçu par Fii Boutique » en pied de page (Premium)');
   assert.equal(await C.locator('.vrail, .vcard').count(), 0, 'pas de catalogue d’articles');
   await shot(C, '01-salon');
+  await C.locator('#salon-menu').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await C.locator('#salon-dock:not([hidden])').waitFor();
+  assert.match(await C.locator('#salon-dock').textContent(), /Dès 5 000 FCFA.*Réserver/, 'barre Réserver collante');
+  await C.waitForTimeout(600);
+  await shot(C, '01b-barre');
+  await C.evaluate(() => window.scrollTo(0, 0));
 });
 
 await t('fil Fii : une prestation de salon se réserve (« Réserver » ouvre la réservation)', async () => {
@@ -108,6 +114,8 @@ await t('réalisation : lecteur plein écran, « Réserver » ouvre la réservat
 await t('réservation : prestation → jour et heure → coordonnées, caution Wave ; page du rendez-vous avec le numéro à payer', async () => {
   await C.locator(`[data-book="${FADE.id}"]`).click();
   await C.locator('#book-days').waitFor();
+  assert.equal(await C.locator('#book-steps i.on').count(), 1, 'étapes de la réservation');
+  assert.equal(await C.locator('#book-sheet .fx-grab').count(), 1, 'poignée pour fermer en glissant');
   await C.locator('[data-day]').nth(1).click();
   await C.locator('#book-slots .sl-slot').first().waitFor();
   assert.equal(await C.locator('#book-slots .sl-slot').first().textContent(), '08:00');
@@ -126,6 +134,14 @@ await t('réservation : prestation → jour et heure → coordonnées, caution W
   assert.match(await C.locator('#rdv-pay-to').textContent(), /77 111 22 33/);
   assert.match(await C.locator('#rdv-when').textContent(), /· 10:00$/);
   RDV = C.url().split('#/rdv/')[1].split('?')[0];
+  // Carte de félicitations (animations, 31/10) : ticket et un seul bouton, prévenir le salon.
+  await C.locator('#fx-yay .fx-ticket').waitFor();
+  assert.match(await C.locator('.fx-stub').textContent(), /Coupe \+ barbe \(test\).*10:00.*Caution Wave.*2 000 FCFA.*R\d{4}/);
+  assert.match(await C.locator('#fx-yay-go').getAttribute('href'), /^https:\/\/wa\.me\/221770000009/);
+  await C.waitForTimeout(1200);
+  await shot(C, '04b-felicitations');
+  await C.click('#fx-yay-close');
+  await C.locator('#fx-yay').waitFor({ state: 'detached' });
   const wa = decodeURIComponent(await C.locator('#rdv-notify').getAttribute('href'));
   assert.match(wa, /^https:\/\/wa\.me\/221770000009\?text=Bonjour Salon Démo \(test\), je viens de réserver.*Coupe \+ barbe \(test\).*J’envoie la caution de 2 000 FCFA par Wave/);
   assert.equal(await C.locator('#rdv-wa').count(), 0, 'un seul bouton WhatsApp');

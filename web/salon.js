@@ -3,7 +3,7 @@
 // Ce fichier ne voit pas la closure de app.js : chaque outil utilisé lui est passé (salonShared dans app.js, contrôlé
 // par scripts/check-bo.mjs).
 window.FiiSalon = function (F) {
-  var api = F.api, ApiError = F.ApiError, backBtn = F.backBtn, baseUrl = F.baseUrl, brandBar = F.brandBar, cardPhoto = F.cardPhoto, compressPhoto = F.compressPhoto, copy = F.copy, COVER_P = F.COVER_P, coverLoad = F.coverLoad, deferSrc = F.deferSrc, dkAdd = F.dkAdd, dkIso = F.dkIso, dkNow = F.dkNow, durText = F.durText, errBox = F.errBox, ERRORS = F.ERRORS, errText = F.errText, failPage = F.failPage, fcfa = F.fcfa, fill = F.fill, footer = F.footer, go = F.go, h = F.h, hm = F.hm, icon = F.icon, iconBtn = F.iconBtn, identitySlot = F.identitySlot, isPremiumTheme = F.isPremiumTheme, lazyPhoto = F.lazyPhoto, loading = F.loading, LS = F.LS, madeBy = F.madeBy, markSalon = F.markSalon, openSheet = F.openSheet, page = F.page, partnerSlot = F.partnerSlot, PAY_SHORT = F.PAY_SHORT, render = F.render, retryBtn = F.retryBtn, sapi = F.sapi, secHead = F.secHead, SEEN_KEY = F.SEEN_KEY, setAgendaBadge = F.setAgendaBadge, setKids = F.setKids, shopTabs = F.shopTabs, SITE = F.SITE, socialUrl = F.socialUrl, stateCard = F.stateCard, statePill = F.statePill, textField = F.textField, toast = F.toast, vitrineUrl = F.vitrineUrl, VT_ACCENTS = F.VT_ACCENTS, waTo = F.waTo;
+  var api = F.api, ApiError = F.ApiError, backBtn = F.backBtn, baseUrl = F.baseUrl, brandBar = F.brandBar, cardPhoto = F.cardPhoto, compressPhoto = F.compressPhoto, copy = F.copy, COVER_P = F.COVER_P, coverLoad = F.coverLoad, deferSrc = F.deferSrc, dkAdd = F.dkAdd, dkIso = F.dkIso, dkNow = F.dkNow, durText = F.durText, errBox = F.errBox, ERRORS = F.ERRORS, errText = F.errText, failPage = F.failPage, fcfa = F.fcfa, fill = F.fill, footer = F.footer, go = F.go, h = F.h, hm = F.hm, icon = F.icon, iconBtn = F.iconBtn, identitySlot = F.identitySlot, isPremiumTheme = F.isPremiumTheme, lazyPhoto = F.lazyPhoto, loading = F.loading, LS = F.LS, madeBy = F.madeBy, markSalon = F.markSalon, openSheet = F.openSheet, page = F.page, partnerSlot = F.partnerSlot, PAY_SHORT = F.PAY_SHORT, render = F.render, retryBtn = F.retryBtn, sapi = F.sapi, secHead = F.secHead, SEEN_KEY = F.SEEN_KEY, setAgendaBadge = F.setAgendaBadge, setKids = F.setKids, shopTabs = F.shopTabs, SITE = F.SITE, socialUrl = F.socialUrl, stateCard = F.stateCard, statePill = F.statePill, textField = F.textField, toast = F.toast, vitrineUrl = F.vitrineUrl, VT_ACCENTS = F.VT_ACCENTS, waTo = F.waTo, REDUCED = F.REDUCED, buzz = F.buzz, fxOnce = F.fxOnce, fxShop = F.fxShop, fxTicket = F.fxTicket;
   var DAYS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   var MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
   function openState(hours) {
@@ -99,9 +99,13 @@ window.FiiSalon = function (F) {
         wa ? round({ href: wa, target: '_blank', rel: 'noopener noreferrer', id: 'salon-wa' }, 'whatsapp', 'WhatsApp') : null,
         ig ? round({ href: ig, target: '_blank', rel: 'noopener noreferrer', id: 'salon-ig' }, 'instagram', 'Instagram') : null));
     // Réalisations : des bulles comme les « stories à la une » d'Instagram ; un toucher ouvre le lecteur.
+    // Anneau or qui tourne tant que la réalisation n'a pas été vue sur ce téléphone (animations, 31/10).
+    var SEEN = LS.get('fiila.reels.seen', []); if (!Array.isArray(SEEN)) SEEN = [];
     var reelRow = reels.length ? h('div', { class: 'sl-bubbles', id: 'salon-reels', role: 'list', 'aria-label': 'Réalisations' }, reels.map(function (r, i) {
       var im = h('img', { alt: '', decoding: 'async' }); deferSrc(im, r.poster);
-      return h('button', { class: 'sl-bub', type: 'button', role: 'listitem', 'data-reel': i, onclick: function () { reelViewer(reels, i, function () { book(null); }); } },
+      return h('button', { class: 'sl-bub' + (SEEN.indexOf(r.id) >= 0 ? ' seen' : ''), type: 'button', role: 'listitem', 'data-reel': i, style: '--fx-i:' + i, onclick: function (e) {
+        e.currentTarget.classList.add('seen'); if (r.id && SEEN.indexOf(r.id) < 0) { SEEN = SEEN.concat(r.id).slice(-60); LS.set('fiila.reels.seen', SEEN); }
+        reelViewer(reels, i, function () { book(null); }); } },
         h('span', { class: 'sl-bub-img' }, im), h('span', { class: 'sl-bub-t' }, r.caption || 'Réalisation'));
     })) : null;
     var tabs = rubs.length > 1 ? h('div', { class: 'opt-row sl-tabs', id: 'salon-tabs', role: 'tablist' }) : null;
@@ -147,13 +151,26 @@ window.FiiSalon = function (F) {
       back.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.noir)[1]);
       var close = openSheet(back);
     }
-    var pg = page(h('div', { class: 'brand-bar nobrand' }), cover, head, reelRow,
-      h('section', { class: 'sl-sec', 'aria-label': 'Prestations' }, tabs, grid),
-      h('div', { style: 'height:24px' }), isPremiumTheme(theme) && !SITE ? madeBy() : footer(true));
+    // Barre « Réserver » collante (animations, 31/10) : visible une fois l'en-tête dépassé, cachée en bas de page.
+    var prices = products.map(function (p) { return p.price || 0; }).filter(Boolean);
+    var dock = h('div', { class: 'fx-dock', id: 'salon-dock', hidden: true }, h('div', { class: 'fx-dock-in' },
+      h('div', { class: 'fx-dock-t' }, h('small', null, shop.name), h('b', null, prices.length ? 'Dès ' + fcfa(Math.min.apply(null, prices)) : 'Réservation en ligne')),
+      h('button', { class: 'btn', type: 'button', id: 'dock-book', onclick: function () { book(null); } }, 'Réserver')));
+    var sec = h('section', { class: 'sl-sec', 'aria-label': 'Prestations' }, tabs, grid);
+    var foot = isPremiumTheme(theme) && !SITE ? madeBy() : footer(true);
+    function dockState() {
+      if (!dock.isConnected) { window.removeEventListener('scroll', dockState); return; }
+      var show = sec.getBoundingClientRect().top < 80 && foot.getBoundingClientRect().top > window.innerHeight - 40;
+      if (show === dock.hidden) dock.hidden = !show;
+    }
+    window.addEventListener('scroll', dockState, { passive: true });
+    var pg = page(h('div', { class: 'brand-bar nobrand' }), cover, head, reelRow, sec,
+      h('div', { style: 'height:24px' }), foot, dock);
     pg.classList.add('vt', 'vt-' + theme, 'sl');
     if (isPremiumTheme(theme)) { pg.classList.add('vt-premium'); document.documentElement.setAttribute('data-vt', theme); }
     pg.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.noir)[1]);
     if (q && q.s && byId[q.s]) setTimeout(function () { if (pg.isConnected) book(byId[q.s]); }, 80);
+    fxShop(pg);
 
     // Réservation en trois temps dans une feuille : prestation → jour et heure → coordonnées (et caution).
     function book(pre) {
@@ -161,10 +178,13 @@ window.FiiSalon = function (F) {
       var payModes = shop.pay_before_off ? [] : ((shop.policies && shop.policies.pay) || []).filter(function (k) { return k === 'wave' || k === 'om'; });
       var body = h('div', { class: 'stack' }), err = h('div', { role: 'alert' });
       var title = h('h2', { id: 'book-h' });
+      // Trois étapes visibles en haut de la feuille : prestation, jour et heure, coordonnées.
+      var steps = h('div', { class: 'fx-steps', id: 'book-steps', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'));
+      function step(n) { Array.prototype.forEach.call(steps.children, function (x, k) { x.className = k === n ? 'on' : k < n ? 'done' : ''; }); body.classList.remove('fx-view'); void body.offsetWidth; body.classList.add('fx-view'); }
       var back = h('div', { class: 'sheet-back vt-sheet', id: 'book-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'book-h', onclick: function (e) { if (e.target === back) close(); } },
         h('div', { class: 'sheet vsheet sl-sheet' },
           h('button', { class: 'iconbtn vsheet-close', type: 'button', 'aria-label': 'Fermer', id: 'book-close', onclick: function () { close(); } }, icon('close', 20)),
-          title, body, err));
+          steps, title, body, err));
       back.classList.add('vt', 'vt-' + theme, 'sl'); if (isPremiumTheme(theme)) back.classList.add('vt-premium');
       back.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.noir)[1]);
       var closeSheet = openSheet(back);
@@ -180,7 +200,7 @@ window.FiiSalon = function (F) {
       function draw() {
         setKids(err);
         if (!f.p) {
-          title.textContent = 'Choisir une prestation';
+          title.textContent = 'Choisir une prestation'; step(0);
           setKids(body, products.slice().sort(function (a, b) { return (a.price || 0) - (b.price || 0); }).map(function (p) {
             return h('button', { class: 'sl-svc', type: 'button', 'data-pick': p.id, onclick: function () { f.p = p; draw(); } },
               p.img ? h('img', { class: 'sl-svc-im', src: p.img, alt: '', loading: 'lazy', decoding: 'async' }) : h('span', { class: 'sl-svc-im sl-cph', 'aria-hidden': 'true' }, p.name.charAt(0)),
@@ -192,7 +212,7 @@ window.FiiSalon = function (F) {
         drawWho();
       }
       function drawWhen() {
-        title.textContent = 'Jour et heure';
+        title.textContent = 'Jour et heure'; step(1);
         if (!f.day) f.day = NEXT[f.p.id] ? NEXT[f.p.id].day : dkIso(dkAdd(0));
         var slotsBox = h('div', { class: 'sl-slotbox', id: 'book-slots' }, loading('Créneaux…'));
         var days = h('div', { class: 'sl-days', id: 'book-days', role: 'radiogroup', 'aria-label': 'Jour' });
@@ -209,17 +229,18 @@ window.FiiSalon = function (F) {
           if (r.closed || !r.slots.length) { setKids(slotsBox, h('p', { class: 'muted small', id: 'book-none' }, r.closed ? 'Le salon est fermé ce jour-là.' : 'Plus de créneau libre ce jour-là. Essayez un autre jour.')); return; }
           // Créneaux groupés : Matin, Après-midi, Soir.
           var parts = [['Matin', function (t) { return t < '12:00'; }], ['Après-midi', function (t) { return t >= '12:00' && t < '17:00'; }], ['Soir', function (t) { return t >= '17:00'; }]];
+          var ci = 0;
           setKids(slotsBox, parts.map(function (pp) {
             var l = r.slots.filter(pp[1]);
             return l.length ? h('div', { class: 'sl-part' }, h('p', { class: 'sl-part-h' }, pp[0]),
               h('div', { class: 'sl-slots-g' }, l.map(function (t) {
-                return h('button', { type: 'button', class: 'sl-slot', 'data-time': t, onclick: function () { f.time = t; draw(); } }, t);
+                return h('button', { type: 'button', class: 'sl-slot fx-casc', style: '--fx-i:' + Math.min(ci++, 16), 'data-time': t, onclick: function (e) { e.currentTarget.classList.add('on'); buzz(8); f.time = t; setTimeout(draw, REDUCED ? 0 : 140); } }, t);
               }))) : null;
           }));
         }, function (e) { setKids(slotsBox); errBox(err, e); });
       }
       function drawWho() {
-        title.textContent = 'Vos coordonnées';
+        title.textContent = 'Vos coordonnées'; step(2);
         if (f.p.deposit && payModes.length === 1) f.pay = payModes[0];
         var dep = f.p.deposit && payModes.length;
         var when = h('div', { class: 'sl-when' }, icon('cal', 18), h('span', null, bookDateText(f.day + 'T' + f.time + ':00Z')),
@@ -299,7 +320,16 @@ window.FiiSalon = function (F) {
         s.phone && !(q && q.nouveau) ? iconBtn('a', { class: 'btn ghost full', href: waTo(s.phone, 'Bonjour, c’est au sujet de mon rendez-vous ' + b.ref + '.'), target: '_blank', rel: 'noopener noreferrer', id: 'rdv-wa' }, 'whatsapp', 'Écrire au salon') : null,
         s.slug ? h('a', { class: 'btn link', href: '#/b/' + s.slug }, 'Voir le salon') : null,
         cancel, err, footer(true));
-      if (q && q.nouveau) setTimeout(function () { toast(b.status === 'pending' ? 'Créneau réservé. Payez la caution pour le confirmer.' : 'Rendez-vous confirmé.'); }, 200);
+      // Carte de félicitations (animations, 31/10) : une fois, juste après la réservation ; un seul bouton, prévenir le salon.
+      if (q && q.nouveau && fxOnce('fiila.yay.' + token)) setTimeout(function () {
+        if (!pg.isConnected) return;
+        var n = document.getElementById('rdv-notify');
+        fxTicket({ title: 'C’est réservé !', sub: b.status === 'pending' && b.pay_to ? s.name + ' vous attend. Envoyez la caution pour confirmer.' : s.name + ' vous attend.',
+          rows: [['Prestation', b.service], ['Quand', bookDateText(b.start_at)], [b.pay_to ? 'Caution ' + PAY_SHORT[b.pay_mode] : 'Prix', fcfa(b.pay_to ? b.deposit : b.price)], ['Référence', b.ref]],
+          cta: n ? iconBtn('a', { class: 'btn big full fx-wa', id: 'fx-yay-go', href: n.getAttribute('href'), target: '_blank', rel: 'noopener noreferrer' }, 'whatsapp', 'Prévenir le salon sur WhatsApp') : null,
+          more: 'Voir mon rendez-vous', accent: '#1F8F4E' });
+      }, 250);
+      else if (q && q.nouveau) setTimeout(function () { toast(b.status === 'pending' ? 'Créneau réservé. Payez la caution pour le confirmer.' : 'Rendez-vous confirmé.'); }, 200);
       return pg;
     }, function (e) { return page(brandBar('Rendez-vous'), stateCard('!', 'Impossible d’afficher le rendez-vous', errText(e), retryBtn()), footer(true)); });
   }
