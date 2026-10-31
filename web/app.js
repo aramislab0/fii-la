@@ -4929,7 +4929,7 @@
         var nameFont = '400 84px ' + SERIF; g.font = nameFont;
         var size = 84; while (size > 52 && g.measureText(sh.name).width > 960) { size -= 4; g.font = '400 ' + size + 'px ' + SERIF; }
         g.fillText(fit(sh.name, g.font, 960), W / 2, 812);
-        if (sh.about) { g.fillStyle = '#6B645C'; g.fillText(fit(sh.about.replace(/\s+/g, ' '), '600 30px ' + SANS, 920), W / 2, 866); }
+        if (sh.about) { g.fillStyle = '#6B645C'; g.fillText(fit(sh.about.replace(/\s+/g, ' ').split(/(?<=[.!?])\s/)[0].replace(/\.$/, ''), '600 30px ' + SANS, 920), W / 2, 866); }
         var y = 898;
         if (thumbs.length) {
           var gap = 20, tw = (W - 120 - gap * (thumbs.length - 1)) / thumbs.length;
