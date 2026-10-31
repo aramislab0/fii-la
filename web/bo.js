@@ -1754,7 +1754,7 @@ window.FiiBO = function (F) {
     salon_booking: ['Réservation en ligne des salons (beauté & bien-être)', '0 = coupée (les salons montrent leurs prestations sans réserver), 1 = ouverte'],
     book_hold: ['Délai pour payer la caution d’un rendez-vous', 'minutes (15 à 240) ; passé ce délai, le créneau est libéré'],
     pay_before: ['Paiement avant la livraison (Wave, Orange Money)', '0 = coupé pour toutes les boutiques (seul le paiement à la livraison reste proposé), 1 = selon le choix de chaque boutique'],
-    site_anim: ['Animations des sites (modèle Concept)', '0 = coupées pour toutes les boutiques, 1 = selon le choix de chaque boutique'] };
+    site_anim: ['Animations des sites', '0 = coupées sur tous les sites (entrée, cartes, barre Réserver, félicitations, effets du modèle Concept), 1 = actives'] };
   // « Prénom · rôle » tel que gardé au journal, avec le rôle en clair.
   function boActor(a) { return String(a || '—').replace(/ · ([a-z_]+)$/, function (m, r) { return ' · ' + (BO_ROLES[r] || r); }); }
   function boActionLabel(a, d) {

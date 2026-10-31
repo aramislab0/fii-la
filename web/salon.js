@@ -170,7 +170,7 @@ window.FiiSalon = function (F) {
     if (isPremiumTheme(theme)) { pg.classList.add('vt-premium'); document.documentElement.setAttribute('data-vt', theme); }
     pg.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.noir)[1]);
     if (q && q.s && byId[q.s]) setTimeout(function () { if (pg.isConnected) book(byId[q.s]); }, 80);
-    fxShop(pg);
+    fxShop(pg, shop);
 
     // Réservation en trois temps dans une feuille : prestation → jour et heure → coordonnées (et caution).
     function book(pre) {

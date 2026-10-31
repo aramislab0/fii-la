@@ -95,6 +95,14 @@ await t('cliente : vitrine sans compte, photos chargées à l’affichage, panie
   assert.match(await C.locator('#notify-shop').getAttribute('href'), /^https:\/\/wa\.me\/221771000001\?text=/);
   await C.locator('#give-address-btn').waitFor();
   assert.equal(await C.evaluate(() => localStorage.length), 0, 'rien écrit sur le téléphone de la cliente');
+  // Carte de félicitations (animations, 31/10) : ticket, l'étape suivante (adresse) en un bouton.
+  await C.locator('#fx-yay .fx-ticket').waitFor();
+  assert.match(await C.locator('.fx-stub').textContent(), /Commande.*N°.*Total.*33 000 FCFA/);
+  assert.match(await C.locator('#fx-yay-go').getAttribute('href'), /^#\/d\//);
+  await C.waitForTimeout(1200);
+  await shot(C, '04b-felicitations');
+  await C.click('#fx-yay-close');
+  await C.locator('#fx-yay').waitFor({ state: 'detached' });
   await shot(C, '04-facture');
 });
 

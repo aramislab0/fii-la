@@ -2826,7 +2826,7 @@
       h('span', null, 'Aperçu du modèle Premium « ' + VT_PREMIUM.filter(function (t) { return t[0] === preview; })[0][1] + ' ». Vos clientes voient votre modèle actuel.')), pg.firstChild.nextSibling);
     pg.style.setProperty('--accent', (VT_ACCENTS[shop.accent] || VT_ACCENTS.foret)[1]);
     pg.appendChild(bar);
-    return fxShop(pg);
+    return fxShop(pg, shop);
   }
   // Photo chargée quand la carte arrive à l'écran (page légère sur réseau lent).
 
@@ -8869,8 +8869,9 @@
      montent au défilement et répondent au doigt, rubriques qui glissent, feuilles à ressort fermées en glissant, carte de
      félicitations après une commande ou une réservation. Position et opacité seulement ; rien si « réduire les animations ». */
   function buzz(ms) { try { if (!REDUCED && navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* rien */ } }
-  function fxShop(pg) {
-    if (REDUCED) return pg;
+  // Réglage du back-office site_anim = 0 (shop.anim_off) : coupées sur tous les sites.
+  function fxShop(pg, shop) {
+    if (REDUCED || (shop && shop.anim_off)) return pg;
     pg.classList.add('fx', 'fx-play');
     var fine = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     var io = window.IntersectionObserver ? new IntersectionObserver(function (es) {
