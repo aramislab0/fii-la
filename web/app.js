@@ -2431,9 +2431,12 @@
       var closeSheet = openSheet(back);
       function close() { window.removeEventListener('hashchange', close); if (back.isConnected) closeSheet(); }
       window.addEventListener('hashchange', close);
+      // En-tête de la réservation : la photo de la prestation, son nom, son prix, « Changer ».
       function chosen() {
-        return h('div', { class: 'sl-chosen' }, h('span', null, h('b', null, f.p.name), h('span', { class: 'small muted' }, [fcfa(f.p.price), durText(f.p.duration)].filter(Boolean).join(' · '))),
-          h('button', { class: 'btn link small', type: 'button', id: 'book-change', onclick: function () { f.p = null; f.day = null; f.time = null; draw(); } }, 'Changer'));
+        var ph = f.p.img ? h('img', { src: f.p.img, alt: '', decoding: 'async' }) : h('span', { class: 'sl-cph', 'aria-hidden': 'true' }, f.p.name.charAt(0));
+        return h('div', { class: 'sl-hero', id: 'book-hero' }, ph,
+          h('div', { class: 'sl-hero-t' }, h('b', null, f.p.name), h('span', null, [fcfa(f.p.price), durText(f.p.duration)].filter(Boolean).join(' · '))),
+          h('button', { class: 'sl-hero-chg', type: 'button', id: 'book-change', onclick: function () { f.p = null; f.day = null; f.time = null; draw(); } }, 'Changer'));
       }
       function draw() {
         setKids(err);
@@ -2441,6 +2444,7 @@
           title.textContent = 'Choisir une prestation';
           setKids(body, products.slice().sort(function (a, b) { return (a.price || 0) - (b.price || 0); }).map(function (p) {
             return h('button', { class: 'sl-svc', type: 'button', 'data-pick': p.id, onclick: function () { f.p = p; draw(); } },
+              p.img ? h('img', { class: 'sl-svc-im', src: p.img, alt: '', loading: 'lazy', decoding: 'async' }) : h('span', { class: 'sl-svc-im sl-cph', 'aria-hidden': 'true' }, p.name.charAt(0)),
               h('span', { class: 'sl-svc-t' }, h('b', null, p.name), h('span', { class: 'small muted' }, durText(p.duration))), h('span', { class: 'sl-svc-p' }, fcfa(p.price)));
           }));
           return;

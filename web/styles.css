@@ -2559,3 +2559,24 @@ html[data-vt="rituel"] body{background:#F4EFE8}
 .sl-cmeta b{color:var(--sl-ink)}
 .sl-cbtn{margin-top:auto;min-height:40px;padding:8px 12px;font-size:14px;border-radius:999px;width:100%}
 @media (min-width:640px){.sl-grid{grid-template-columns:repeat(3,1fr)}}
+/* Salons : toujours en clair, même si le téléphone est en mode sombre (page et feuilles de réservation). */
+.sl{--bg:#F4EFE8;--surface:#FFFFFF;--surface-2:#F3F0E8;--surface-3:#E8E4D8;--ink:#111111;--muted:#6B645C;--line:rgba(17,17,17,.12);--line-strong:#7F857E;
+  --link:#111111;--focus:#111111;--ok:#1E6B43;--warn:#7A4F00;--danger:#A3302A;--soft:#EDE7DF;color-scheme:light;color:var(--ink)}
+.sl.sheet-back .sheet,.sl .sheet{background:#F4EFE8;color:#111}
+.sl input,.sl textarea{background:#fff;color:#111;border-color:rgba(17,17,17,.18)}
+.sl label,.sl .lbl{color:#111}
+/* En-tête photo de la réservation */
+.sl-hero{position:relative;border-radius:20px;overflow:hidden;aspect-ratio:16/10;background:#EDE7DF;display:grid;place-items:center;flex:none}
+.sl-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.sl-hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(0,0,0,.72))}
+.sl-hero-t{position:absolute;left:16px;right:16px;bottom:14px;z-index:1;display:flex;flex-direction:column;gap:2px;color:#fff}
+.sl-hero-t b{font-size:22px;line-height:1.15}
+.sl-hero-t span{font-size:14px;opacity:.92}
+.sl-hero-chg{position:absolute;top:12px;left:12px;z-index:1;border:0;border-radius:999px;padding:7px 14px;background:rgba(255,255,255,.92);color:#111;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.sl-hero .sl-cph{font-size:72px}
+.sl-sheet{gap:14px}
+.sl-sheet h2{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-size:30px;line-height:1.1}
+.sl-svc-im{width:56px;height:56px;border-radius:14px;object-fit:cover;flex:none;display:grid;place-items:center;font-size:24px;background:#EDE7DF}
+.sl-day{background:#fff;color:#111;border-color:rgba(17,17,17,.12)}
+.sl-day:disabled{background:transparent}
+.sl-slot{background:#fff;color:#111;border-color:rgba(17,17,17,.12)}
