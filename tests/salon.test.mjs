@@ -216,6 +216,15 @@ await t('réglages : horaires par jour (fermé le dimanche), postes ; enregistr�
   await shot(B, '06-reglages', true);
 });
 
+await t('carte d’invitation WhatsApp du salon (photos, logo, nom, lien) dans Marketing', async () => {
+  await B.goto(URL0 + '#/boutique/marketing');
+  await B.locator('#mk-card:not([hidden])').waitFor();
+  const w = await B.locator('#mk-card').evaluate((im) => im.complete ? im.naturalWidth + 'x' + im.naturalHeight : '');
+  assert.equal(w, '1080x1350');
+  await B.locator('#mk-card').scrollIntoViewIfNeeded();
+  await shot(B, '07-carte-invitation');
+});
+
 await t('prestation : durée en pastilles et caution, ni tailles ni stock', async () => {
   await B.goto(URL0 + '#/boutique/article/' + CUT.id);
   await B.locator('#product-duration').waitFor();

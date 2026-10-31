@@ -2691,3 +2691,5 @@ html.sheet-open .fx-dock{display:none}
 /* 8. retours immédiats : les bulles d'information glissent */
 .toast>div{animation:fx-up .4s var(--fx-spring) both}
 @media (prefers-reduced-motion: reduce){.fx-yay,.fx-yay *,.fx-dock,.sheet,.toast>div,.fx-casc,.fx-view>*,.cartbar,.cartbar .btn,.rv-back,.rv-stage .rv-media{animation:none!important;transition:none!important}}
+/* Carte d'invitation WhatsApp de la boutique (31/10) : aperçu dans Marketing → Mon site. */
+.mk-card{display:block;width:100%;max-width:260px;margin:4px auto 0;border-radius:16px;box-shadow:var(--shadow-card);aspect-ratio:4/5;object-fit:cover}

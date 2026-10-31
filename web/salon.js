@@ -3,7 +3,7 @@
 // Ce fichier ne voit pas la closure de app.js : chaque outil utilisé lui est passé (salonShared dans app.js, contrôlé
 // par scripts/check-bo.mjs).
 window.FiiSalon = function (F) {
-  var api = F.api, ApiError = F.ApiError, backBtn = F.backBtn, baseUrl = F.baseUrl, brandBar = F.brandBar, cardPhoto = F.cardPhoto, compressPhoto = F.compressPhoto, copy = F.copy, COVER_P = F.COVER_P, coverLoad = F.coverLoad, deferSrc = F.deferSrc, dkAdd = F.dkAdd, dkIso = F.dkIso, dkNow = F.dkNow, durText = F.durText, errBox = F.errBox, ERRORS = F.ERRORS, errText = F.errText, failPage = F.failPage, fcfa = F.fcfa, fill = F.fill, footer = F.footer, go = F.go, h = F.h, hm = F.hm, icon = F.icon, iconBtn = F.iconBtn, identitySlot = F.identitySlot, isPremiumTheme = F.isPremiumTheme, lazyPhoto = F.lazyPhoto, loading = F.loading, LS = F.LS, madeBy = F.madeBy, markSalon = F.markSalon, openSheet = F.openSheet, page = F.page, partnerSlot = F.partnerSlot, PAY_SHORT = F.PAY_SHORT, render = F.render, retryBtn = F.retryBtn, sapi = F.sapi, secHead = F.secHead, SEEN_KEY = F.SEEN_KEY, setAgendaBadge = F.setAgendaBadge, setKids = F.setKids, shopTabs = F.shopTabs, SITE = F.SITE, socialUrl = F.socialUrl, stateCard = F.stateCard, statePill = F.statePill, textField = F.textField, toast = F.toast, vitrineUrl = F.vitrineUrl, VT_ACCENTS = F.VT_ACCENTS, waTo = F.waTo, REDUCED = F.REDUCED, buzz = F.buzz, fxOnce = F.fxOnce, fxShop = F.fxShop, fxTicket = F.fxTicket;
+  var api = F.api, ApiError = F.ApiError, backBtn = F.backBtn, baseUrl = F.baseUrl, brandBar = F.brandBar, cardPhoto = F.cardPhoto, compressPhoto = F.compressPhoto, copy = F.copy, COVER_P = F.COVER_P, coverLoad = F.coverLoad, deferSrc = F.deferSrc, dkAdd = F.dkAdd, dkIso = F.dkIso, dkNow = F.dkNow, durText = F.durText, errBox = F.errBox, ERRORS = F.ERRORS, errText = F.errText, failPage = F.failPage, fcfa = F.fcfa, fill = F.fill, footer = F.footer, go = F.go, h = F.h, hm = F.hm, icon = F.icon, iconBtn = F.iconBtn, identitySlot = F.identitySlot, isPremiumTheme = F.isPremiumTheme, lazyPhoto = F.lazyPhoto, loading = F.loading, LS = F.LS, madeBy = F.madeBy, markSalon = F.markSalon, openSheet = F.openSheet, page = F.page, partnerSlot = F.partnerSlot, PAY_SHORT = F.PAY_SHORT, render = F.render, retryBtn = F.retryBtn, sapi = F.sapi, secHead = F.secHead, SEEN_KEY = F.SEEN_KEY, setAgendaBadge = F.setAgendaBadge, setKids = F.setKids, shopTabs = F.shopTabs, SITE = F.SITE, socialUrl = F.socialUrl, stateCard = F.stateCard, statePill = F.statePill, textField = F.textField, toast = F.toast, vitrineUrl = F.vitrineUrl, VT_ACCENTS = F.VT_ACCENTS, waTo = F.waTo, REDUCED = F.REDUCED, buzz = F.buzz, fxOnce = F.fxOnce, fxShop = F.fxShop, fxTicket = F.fxTicket, shopCardFile = F.shopCardFile, shopShareMsg = F.shopShareMsg, canShareFile = F.canShareFile;
   var DAYS_FR = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
   var MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
   function openState(hours) {
@@ -345,13 +345,20 @@ window.FiiSalon = function (F) {
     var listBox = h('div', { class: 'stack', id: 'agenda' }, loading('Chargement des rendez-vous…'));
     var banner = h('div', { id: 'agenda-banner' });
     var items = [];
+    // Partage du lien de réservation avec la carte d'invitation du salon (photos, logo, nom), préparée dès l'affichage :
+    // le partage doit partir du toucher lui-même.
+    var site = null, card = null;
+    sapi('fiila_shop_vitrine', { p: null }).then(function (v) {
+      if (!v.slug || !v.public) return;
+      site = { slug: v.slug, url: vitrineUrl(v.slug) };
+      shopCardFile(v.slug).then(function (f) { card = f; });
+    }, function () {});
     var share = iconBtn('button', { class: 'btn big full', type: 'button', id: 'agenda-share', onclick: function () {
-      sapi('fiila_shop_vitrine', { p: null }).then(function (v) {
-        if (!v.slug || !v.public) { go('#/boutique/vitrine'); return; }
-        var url = vitrineUrl(v.slug);
-        if (navigator.share) navigator.share({ title: shop.name, text: 'Réservez votre rendez-vous chez ' + shop.name + ' :', url: url }).catch(function () {});
-        else copy(url, 'Lien');
-      }, function (e) { toast(errText(e)); });
+      if (!site) { go('#/boutique/vitrine'); return; }
+      var msg = shopShareMsg(shop.name, site.url);
+      if (canShareFile(card)) { navigator.share({ files: [card], text: msg }).catch(function () {}); return; }
+      if (navigator.share) navigator.share({ title: shop.name, text: msg.replace(site.url, '').replace(/\s*:\s*$/, ''), url: site.url }).catch(function () {});
+      else copy(site.url, 'Lien');
     } }, 'share', 'Partager mon lien de réservation');
     function drawDays() {
       setKids(days, Array.apply(null, Array(14)).map(function (_, i) {

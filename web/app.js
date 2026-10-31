@@ -2278,7 +2278,7 @@
   function markSalon() { SHOP_SALON = true; LS.set('fiila.salon', true); }
   // Outils de app.js utilisés par salon.js (contrôlé par scripts/check-bo.mjs).
   function salonShared() {
-    return { api: api, ApiError: ApiError, backBtn: backBtn, baseUrl: baseUrl, brandBar: brandBar, cardPhoto: cardPhoto, compressPhoto: compressPhoto, copy: copy, COVER_P: COVER_P, coverLoad: coverLoad, deferSrc: deferSrc, dkAdd: dkAdd, dkIso: dkIso, dkNow: dkNow, durText: durText, errBox: errBox, ERRORS: ERRORS, errText: errText, failPage: failPage, fcfa: fcfa, fill: fill, footer: footer, go: go, h: h, hm: hm, icon: icon, iconBtn: iconBtn, identitySlot: identitySlot, isPremiumTheme: isPremiumTheme, lazyPhoto: lazyPhoto, loading: loading, LS: LS, madeBy: madeBy, markSalon: markSalon, openSheet: openSheet, page: page, partnerSlot: partnerSlot, PAY_SHORT: PAY_SHORT, render: render, retryBtn: retryBtn, sapi: sapi, secHead: secHead, SEEN_KEY: SEEN_KEY, setAgendaBadge: setAgendaBadge, setKids: setKids, shopTabs: shopTabs, SITE: SITE, socialUrl: socialUrl, stateCard: stateCard, statePill: statePill, textField: textField, toast: toast, vitrineUrl: vitrineUrl, VT_ACCENTS: VT_ACCENTS, waTo: waTo, REDUCED: REDUCED, buzz: buzz, fxOnce: fxOnce, fxShop: fxShop, fxTicket: fxTicket };
+    return { api: api, ApiError: ApiError, backBtn: backBtn, baseUrl: baseUrl, brandBar: brandBar, cardPhoto: cardPhoto, compressPhoto: compressPhoto, copy: copy, COVER_P: COVER_P, coverLoad: coverLoad, deferSrc: deferSrc, dkAdd: dkAdd, dkIso: dkIso, dkNow: dkNow, durText: durText, errBox: errBox, ERRORS: ERRORS, errText: errText, failPage: failPage, fcfa: fcfa, fill: fill, footer: footer, go: go, h: h, hm: hm, icon: icon, iconBtn: iconBtn, identitySlot: identitySlot, isPremiumTheme: isPremiumTheme, lazyPhoto: lazyPhoto, loading: loading, LS: LS, madeBy: madeBy, markSalon: markSalon, openSheet: openSheet, page: page, partnerSlot: partnerSlot, PAY_SHORT: PAY_SHORT, render: render, retryBtn: retryBtn, sapi: sapi, secHead: secHead, SEEN_KEY: SEEN_KEY, setAgendaBadge: setAgendaBadge, setKids: setKids, shopTabs: shopTabs, SITE: SITE, socialUrl: socialUrl, stateCard: stateCard, statePill: statePill, textField: textField, toast: toast, vitrineUrl: vitrineUrl, VT_ACCENTS: VT_ACCENTS, waTo: waTo, REDUCED: REDUCED, buzz: buzz, fxOnce: fxOnce, fxShop: fxShop, fxTicket: fxTicket, shopCardFile: shopCardFile, shopShareMsg: shopShareMsg, canShareFile: canShareFile };
   }
   var salonPromise = null;
   function loadSalon() {
@@ -3192,7 +3192,8 @@
       else lastTap = now;
     });
     function share() {
-      var url = baseUrl() + buyHref;
+      // Lien du site de la boutique (<boutique>.getfii.app) : l'aperçu WhatsApp montre la boutique, pas Fii.
+      var url = salon ? vitrineUrl(p.shop.slug) + qs({ s: p.id }) : vitrineUrl(p.shop.slug, p.id);
       if (navigator.share) navigator.share({ title: p.name, text: p.name + ' · ' + fcfa(p.price) + ' chez ' + p.shop.name, url: url }).catch(function () {});
       else copy(url, 'Lien');
     }
@@ -3423,8 +3424,8 @@
             'aria-label': 'Site en ligne', onclick: toggle }, h('i', { 'aria-hidden': 'true' }))),
         h('p', { class: 'st-state' + (state.public ? ' on' : ''), id: 'vitrine-state' }, state.public ? 'En ligne : vos clientes peuvent commander.' : 'Hors ligne : personne ne voit le site.'),
         state.public && url ? h('div', { class: 'duo' },
-            iconBtn('a', { class: 'btn ghost mid', id: 'vitrine-wa', href: waLink('Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url), target: '_blank', rel: 'noopener noreferrer',
-              onclick: waCardClick('vitrine', 'Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url) }, 'chat', 'Partager'),
+            iconBtn('a', { class: 'btn ghost mid', id: 'vitrine-wa', href: waLink(shopShareMsg(shop.name || '', url)), target: '_blank', rel: 'noopener noreferrer',
+              onclick: shopShareClick(state.slug, shopShareMsg(shop.name || '', url)) }, 'chat', 'Partager'),
             iconBtn('a', { class: 'btn ghost mid', id: 'vitrine-view', href: '#/b/' + state.slug }, 'eye', 'Voir')) : null,
         h('a', { class: 'st-row', id: 'vitrine-customize', href: '#/boutique/vitrine' },
           h('span', { class: 'st-row-ic', 'aria-hidden': 'true' }, icon('spark', 20)),
@@ -4880,6 +4881,97 @@
         location.href = waLink(msg);
       });
     };
+  }
+  /* Carte d'invitation WhatsApp propre à chaque boutique (fondateur, 31/10 20:53 : « ce sont les visuels de Fii qui
+     s'affichent alors que ça doit être personnalisé pour chaque boutique avec ses images et signatures »). Dessinée sur le
+     téléphone : couverture, trois de ses photos (réalisations d'abord pour un salon), logo, nom, présentation, bouton
+     « Réserver / Commander en ligne », adresse courte du site ; « Conçu par Fii » en petit. JPEG 1080 × 1350. */
+  var SHOP_CARDS = {};
+  function cardImg(src) {
+    if (!src) return Promise.resolve(null);
+    var u = /^(data|blob):/.test(src) ? Promise.resolve(src) : fetch(src).then(function (r) { return r.ok ? r.blob() : null; }).then(function (b) { return b ? URL.createObjectURL(b) : null; });
+    return u.then(function (x) {
+      return x ? new Promise(function (res) { var im = new Image(); im.onload = function () { res(im); }; im.onerror = function () { res(null); }; im.src = x; }) : null;
+    }, function () { return null; });
+  }
+  function shopCardFile(slug) {
+    if (SHOP_CARDS[slug]) return SHOP_CARDS[slug];
+    SHOP_CARDS[slug] = api('fiila_vitrine', { p_slug: slug }).then(function (r) {
+      if (r.state !== 'ok' || typeof document.createElement('canvas').toBlob !== 'function') return null;
+      var sh = r.shop, salon = !!sh.salon;
+      var pics = (r.products || []).map(function (p) { return p.img; }).filter(Boolean);
+      if (salon) pics = (sh.reels || []).map(function (x) { return x.poster; }).filter(Boolean).concat(pics);
+      var fonts = document.fonts && document.fonts.load ? Promise.all(['400 84px "Instrument Serif"', '600 30px Montserrat', '700 36px Montserrat'].map(function (f) { return document.fonts.load(f); })).catch(function () {}) : null;
+      return Promise.all([api('fiila_vitrine_photo', { p_slug: slug, p_id: 'cover' }).then(function (x) { return cardImg(x.photo); }, function () { return null; }), cardImg(sh.logo)]
+        .concat(pics.slice(0, 4).map(cardImg)).concat([fonts])).then(function (im) {
+        var cover = im[0], logo = im[1], thumbs = im.slice(2, im.length - 1).filter(function (x) { return x instanceof Image; });
+        if (!cover && thumbs.length) cover = thumbs.shift();
+        thumbs = thumbs.slice(0, 3);
+        var W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+        var g = c.getContext('2d'), acc = (VT_ACCENTS[sh.accent] || VT_ACCENTS[salon ? 'noir' : 'foret'])[1];
+        var SERIF = '"Instrument Serif", "Cormorant Garamond", Georgia, serif', SANS = 'Montserrat, system-ui, sans-serif';
+        function rr(x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+        function fill(img, x, y, w, h, r) {
+          g.save(); rr(x, y, w, h, r); g.clip();
+          var k = Math.max(w / img.width, h / img.height), iw = img.width * k, ih = img.height * k;
+          g.drawImage(img, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih); g.restore();
+        }
+        function fit(text, font, max) { g.font = font; if (g.measureText(text).width <= max) return text; while (text.length > 1 && g.measureText(text + '…').width > max) text = text.slice(0, -1); return text.trim() + '…'; }
+        g.fillStyle = '#F4EFE8'; g.fillRect(0, 0, W, H);
+        var top = 640;
+        if (cover) fill(cover, 0, 0, W, top, 0); else { g.fillStyle = acc; g.fillRect(0, 0, W, top); }
+        // logo en rond, posé à cheval sur la photo
+        g.save(); g.shadowColor = 'rgba(0,0,0,.22)'; g.shadowBlur = 30; g.shadowOffsetY = 8;
+        g.beginPath(); g.arc(W / 2, top, 92, 0, Math.PI * 2); g.fillStyle = '#F4EFE8'; g.fill(); g.restore();
+        if (logo) { g.save(); g.beginPath(); g.arc(W / 2, top, 82, 0, Math.PI * 2); g.clip(); var k = Math.max(164 / logo.width, 164 / logo.height); g.drawImage(logo, W / 2 - logo.width * k / 2, top - logo.height * k / 2, logo.width * k, logo.height * k); g.restore(); }
+        else { g.beginPath(); g.arc(W / 2, top, 82, 0, Math.PI * 2); g.fillStyle = acc; g.fill(); g.fillStyle = '#fff'; g.font = '400 92px ' + SERIF; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText((sh.name || '?').trim().charAt(0).toUpperCase(), W / 2, top + 4); }
+        g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillStyle = '#111';
+        var nameFont = '400 84px ' + SERIF; g.font = nameFont;
+        var size = 84; while (size > 52 && g.measureText(sh.name).width > 960) { size -= 4; g.font = '400 ' + size + 'px ' + SERIF; }
+        g.fillText(fit(sh.name, g.font, 960), W / 2, 812);
+        if (sh.about) { g.fillStyle = '#6B645C'; g.fillText(fit(sh.about.replace(/\s+/g, ' '), '600 30px ' + SANS, 920), W / 2, 866); }
+        var y = 898;
+        if (thumbs.length) {
+          var gap = 20, tw = (W - 120 - gap * (thumbs.length - 1)) / thumbs.length;
+          thumbs.forEach(function (t, i) { fill(t, 60 + i * (tw + gap), y, tw, 230, 26); });
+          y += 256;
+        } else y += 40;
+        // bouton
+        var label = salon ? 'Réserver en ligne' : 'Commander en ligne';
+        g.font = '700 36px ' + SANS; var bw = Math.max(560, g.measureText(label).width + 140);
+        rr((W - bw) / 2, y, bw, 96, 48); g.fillStyle = acc; g.fill();
+        g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(label, W / 2, y + 50);
+        g.textBaseline = 'alphabetic';
+        var host = vitrineUrl(slug).replace(/^https?:\/\//, '').replace(/\/?#.*$/, '');
+        g.fillStyle = '#111'; g.font = '600 30px ' + SANS; g.fillText(fit(host, g.font, 960), W / 2, y + 140);
+        g.fillStyle = '#9A928A'; g.font = '600 22px ' + SANS; g.fillText('Conçu par Fii', W / 2, H - 22);
+        return new Promise(function (res) {
+          c.toBlob(function (b) { res(b ? new File([b], 'invitation-' + slug + '.jpg', { type: 'image/jpeg' }) : null); }, 'image/jpeg', 0.88);
+        });
+      });
+    }).catch(function () { return null; });
+    return SHOP_CARDS[slug];
+  }
+  // Partage WhatsApp d'une boutique : sa carte d'invitation + le texte et le lien quand le téléphone sait joindre une image ;
+  // sinon le texte seul (le lien <boutique>.getfii.app affiche lui aussi l'aperçu de la boutique).
+  function shopShareClick(slug, msg) {
+    var file = null, on = nudgeFlags().wa_card !== false;
+    if (on && slug) shopCardFile(slug).then(function (f) { file = f; });
+    return function (e) {
+      track('share_initiated', 'whatsapp_vitrine');
+      if (!on || !canShareFile(file)) { track('wa_card', 'vitrine:text'); return; }
+      e.preventDefault();
+      track('wa_card', 'vitrine:file');
+      navigator.share({ files: [file], text: msg }).catch(function (err) {
+        if (err && err.name === 'AbortError') return;
+        track('wa_card', 'vitrine:failed');
+        location.href = waLink(msg);
+      });
+    };
+  }
+  function shopShareMsg(name, url) {
+    return SHOP_SALON ? 'Réservez votre rendez-vous chez ' + name + ', en ligne et sans compte : ' + url
+      : 'Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url;
   }
   function canShareFile(f) { try { return !!(f && navigator.share && navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) { return false; } }
   function waCardBlock(o) {
@@ -7782,13 +7874,17 @@
       // 2. Mon site : le lien et quatre gestes, sans grand bouton (l'action principale est au-dessus).
       var url = r.vitrine && r.vitrine.public && r.vitrine.slug ? vitrineUrl(r.vitrine.slug) : null;
       var qrBox = h('div', { class: 'stack tight', id: 'mk-qr', hidden: true });
-      var waMsg = 'Ma boutique en ligne : choisissez vos articles et commandez ici, sans compte : ' + url;
+      var waMsg = shopShareMsg(shop.name || '', url);
+      // Aperçu de la carte d'invitation de la boutique (envoyée avec le lien sur WhatsApp).
+      var cardPrev = url ? h('img', { class: 'mk-card', id: 'mk-card', alt: 'Carte d’invitation de la boutique', hidden: true }) : null;
+      if (cardPrev) shopCardFile(r.vitrine.slug).then(function (f) { if (f) { cardPrev.src = URL.createObjectURL(f); cardPrev.hidden = false; } });
       var share = url ? h('section', { class: 'stack tight', id: 'mk-share' },
         h('h2', null, 'Mon site'),
         h('p', { class: 'sharelink', id: 'mk-url' }, url),
+        cardPrev,
         h('div', { class: 'rnd-row mk-site-row' },
           roundBtn('a', { id: 'mk-share-wa', class: 'net-wa', href: waLink(waMsg), target: '_blank', rel: 'noopener noreferrer',
-            onclick: (function (go) { return function (e) { track('marketing', 'share:wa'); go(e); }; })(waCardClick('vitrine', waMsg)) }, 'whatsapp', 'WhatsApp'),
+            onclick: (function (go) { return function (e) { track('marketing', 'share:wa'); go(e); }; })(shopShareClick(r.vitrine.slug, waMsg)) }, 'whatsapp', 'WhatsApp'),
           roundBtn('button', { type: 'button', id: 'mk-copy', onclick: function () { copy(url, 'Lien', function () { track('marketing', 'share:copy'); }); } }, 'link', 'Copier'),
           roundBtn('button', { type: 'button', id: 'mk-qr-btn', 'aria-expanded': 'false', 'aria-controls': 'mk-qr', onclick: function (e) {
             var btn = e.currentTarget, open = qrBox.hidden; qrBox.hidden = !open; btn.setAttribute('aria-expanded', open ? 'true' : 'false');
