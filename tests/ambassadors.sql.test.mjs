@@ -179,7 +179,9 @@ await t('niveau 3 : 60 jours après, au moins 4 semaines actives sur 8 ; délais
 
 await t('plafond mensuel ; classement : prénom et zone seulement ; exclusion : gains non versés annulés', async () => {
   await db.query(`update fiila.settings set value = '1' where key = 'amb_monthly_cap'`);
-  const k = (await ok('fiila_shop_save', { p_key: null, p: { name: 'En trop [TEST]', business_type: 'mode' } })).key;
+  // Une boutique reliée ce mois-ci, quel que soit le jour du mois (le recul de 8 jours plus haut tombe le mois d'avant du 1er au 8).
+  await db.query(`update fiila.ambassador_shops set linked_at = now() where shop_id = (select id from fiila.shops where name = 'Lente [TEST]')`);
+  const k =(await ok('fiila_shop_save', { p_key: null, p: { name: 'En trop [TEST]', business_type: 'mode' } })).key;
   await ko('fiila_ambassador_link', { p_key: k, p_code: CODE }, 'ambassador_cap');
   const board = await ok('fiila_ambassador_board', {});
   assert.equal(board.length, 0, 'le gain de niveau 2 a été annulé : pas classé');
