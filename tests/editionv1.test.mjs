@@ -173,6 +173,25 @@ await t('boutique : prix barré et tailles épuisées sur l’article ; livraiso
   assert.deepEqual(po, { delivery: '48h', pay: ['livraison', 'wave', 'om'], exchange: '3j' });
 });
 
+await t('Édition tablette et ordinateur : largeur utile, trois colonnes, aucun débordement', async () => {
+  for (const width of [768, 1280]) {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: 'block' });
+    const p = await ctx.newPage();
+    await p.goto(SITE);
+    await p.locator('.vt-edition .vcard').first().waitFor();
+    const layout = await p.evaluate(() => ({
+      width: document.querySelector('.wrap.vt-edition').getBoundingClientRect().width,
+      columns: getComputedStyle(document.querySelector('.vgrid')).gridTemplateColumns.split(' ').length,
+      overflow: document.documentElement.scrollWidth > innerWidth
+    }));
+    assert.ok(layout.width > 560);
+    assert.equal(layout.columns, 3);
+    assert.equal(layout.overflow, false);
+    await shot(p, 'responsive-' + width);
+    await ctx.close();
+  }
+});
+
 await t('aucune erreur JavaScript', async () => {
   const errs = pages.flatMap((p) => p.__errors);
   assert.deepEqual(errs, []);

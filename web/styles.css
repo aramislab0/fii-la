@@ -2140,6 +2140,8 @@ html.kbd .tabbar{display:none}
 .vt-edition .vhead,.vt-edition .vprof{text-align:center;align-items:center;justify-content:center}
 .vt-edition .vhead h1{font-family:"Jost","Futura","Avenir Next",sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.3em;font-size:24px;line-height:1.15}
 .vt-edition .vavatar{border-radius:50%;background:#0E0E0E}
+.vt-edition .vavatar.has-logo{width:112px;height:64px;border-radius:0;box-shadow:none;background:transparent}
+.vt-edition .vavatar.has-logo img{object-fit:contain}
 .vt-edition .vcover{border-radius:0;height:auto;aspect-ratio:4/5;max-height:72vh;margin:0 -16px}
 .vt-edition .vgrid{gap:18px 2px;margin:0 -16px}
 .vt-edition .vcard{border-radius:0;box-shadow:none;background:transparent;padding:0}
@@ -2154,6 +2156,20 @@ html.kbd .tabbar{display:none}
 .vt-edition .vheart.on{color:#0E0E0E}
 .vt-edition .safe-line{border-radius:0;background:var(--surface-2)}
 .vt-edition .vfollow{justify-content:center}
+/* Édition: use tablet/desktop space without changing the mobile storefront or management screens. */
+@media (min-width:768px){
+  .wrap.vt-edition{max-width:1200px;padding-inline:32px;gap:24px}
+  .wrap.vt-edition .vcover{margin:0;aspect-ratio:3/1;max-height:360px}
+  .vt-edition .vgrid{margin:0;gap:28px 20px;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .vt-edition .vbody{padding:12px 0 4px;gap:6px}
+  .vt-edition .vbody h3{font-size:14px}
+  .vt-edition .vprice{font-size:15px}
+  .vt-edition .vhead.vprof{flex-direction:row;text-align:left;justify-content:space-between;gap:24px;margin-block:24px}
+  .vt-edition .vhead.vprof .vprof-txt{align-items:flex-start;text-align:left;flex:1}
+  .vt-edition .vhead.vprof .vprof-top{flex-direction:row;flex-shrink:0}
+  .vt-edition .vhead h1{font-size:28px;letter-spacing:.16em}
+  .vt-edition .vfollow{flex-shrink:0}
+}
 .vt-mini-edition{grid-template-columns:1fr 1fr;grid-template-rows:1.4fr 1fr;background:#FFFFFF;border-radius:2px;gap:2px}
 .vt-mini-edition i{border-radius:0;background:#0E0E0E;opacity:.85}.vt-mini-edition i:first-child{grid-column:1/-1;opacity:1}
 .vtp-edition .lp-name{font-family:"Jost",sans-serif;font-weight:600;letter-spacing:.3em;text-transform:uppercase;font-size:18px}

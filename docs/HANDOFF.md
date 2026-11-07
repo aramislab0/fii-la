@@ -25,6 +25,8 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 
 ## 2. État actuel (28/10/2026)
 
+**Préparation du 07/11 (non publiée)** : branche `codex/edition-launch-review-001`, Édition élargie sur tablette/ordinateur, logos complets, artefacts Pages nommés par run/attempt. Production inchangée. Recette ciblée : 19 contrôles SQL, 9 navigateur Chrome ; Safari et nouvelle CI non exécutés. Données boutique privées dans XEL.
+
 **Vue d'ensemble (28/10, après l'audit #78)** : application en production sur **https://getfii.app** (servie par le Worker Cloudflare `fii` ; l'ancienne adresse GitHub Pages reste en service et renvoie vers getfii.app) ; base Supabase `lkvulwocirttozfnyxck` (Paris), **78 migrations**, ≈ 240 fonctions publiques, RLS sur toutes les tables, back-office fermé aux visiteurs anonymes (sauf portail et invitation) ; **9 fonctions Edge** (`fiila-resolve-maps`, `fiila-send-sms`, `fiila-manager`, `fiila-whatsapp`, `fiila-media-sync`, `fiila-studio`, `fiila-studio-export`, `fiila-domains`, `fiila-studio-bench` neutralisée) ; back-office chargé à part (`web/bo.js`) ; page reçue 230 Ko ; 3 boutiques réelles (Maison OUMY, Key's, Douds shop bloquée faute de pièce), 1 de recette (Testo), 15 de démonstration. Ouverture au public : voir #78 (CDP différée par le fondateur, recette sur téléphones, SMS Africa's Talking).
 
 
@@ -98,6 +100,8 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | Interface | **Design system v1.1 appliqué** (Light + Dark, sélecteur de thème, 6 cartes, contrastes AA). Aucune coordonnée affichée. Audit UI/UX fait et corrigé le 17/10 | `docs/design-system/README.md`, `web/styles.css` |
 
 ## 3. Décisions en vigueur
+
+**07/11 :** préparation autonome autorisée, publication uniquement après validation du fondateur. Conserver le catalogue existant ; aucun stock, numéro de paiement ou condition commerciale inventé. Ne pas confondre sélection Wave/OM et encaissement automatique.
 
 | Date | Décision | Par |
 |---|---|---|
@@ -216,6 +220,8 @@ Fii La permet d'expliquer **une seule fois** comment arriver à une entrée : po
 | 22/10 01:35 | **Accueil du commerçant et Marketing** (demande du fondateur : « Ma boutique » sur l'accueil, à côté « Mes commandes », « Marketing » avec statistiques et pages réseaux) : « Ma boutique » devient l'action principale de l'accueil dès qu'une boutique existe ; Marketing = 5ᵉ onglet de la boutique. Découpage : lot 1 (statistiques, partage, réseaux) livré ; lot 2 promotions (prix barré daté) et campagnes WhatsApp vers les clients + horaires et zones de livraison ; lot 3 créations Fii Studio et connexion des pages Meta. Mot retenu : « Ma boutique » (plus court que « Ma boutique en ligne », la vitrine en ligne est dedans) | Fondateur (demande) ; Builder (découpage, à valider) |
 
 ## 4. En attente / prochaines actions
+
+**07/11 / Édition launch review :** Jëf doit confirmer données commerciales, droits effectifs du compte et photos, inspecter cette branche, compléter Safari et recette réelle. Dernier run 41871382701 : Worker et base réussis, Pages échoué sur deux artefacts `github-pages`, vérification production sautée. Aucun feu vert de lancement.
 
 | # | Action | Qui | Bloquant pour |
 |---|---|---|---|
@@ -342,6 +348,8 @@ Les tests créent puis suppriment des données synthétiques. Ne jamais lancer l
 - **Fonctions réservées à la clé de service** : sur Supabase, une nouvelle fonction du schéma public est exécutable par anon et authenticated par défaut. Toujours révoquer explicitement `from public, anon, authenticated` (incident du 22/10, corrigé en ~15 min, `20261022210000_fiila_media_grants`). Le contrôle `verify-db` en CI l'attrape.
 
 ## 7. Journal (le plus récent en haut)
+
+**07/11 / Codex :** aperçu local avec les cinq photos approuvées, tests SQL Édition 8/8, Premium 4/4, vitrine 7/7, navigateur Édition 9/9 ; correction responsive et nommage CI proposés. Pas de modification de production. Coordination XEL #160, demande 6704392364.
 
 | Date (Dakar) | Action | Commit / preuve |
 |---|---|---|
